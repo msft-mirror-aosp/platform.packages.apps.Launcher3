@@ -21,10 +21,10 @@ import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.ShapeDrawable
+import com.android.app.animation.Interpolators
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.Utilities.mapToRange
-import com.android.launcher3.anim.Interpolators
 import com.android.launcher3.icons.GraphicsUtils.setColorAlphaBound
 import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.wm.shell.common.TriangleShape
@@ -48,6 +48,24 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
     private var showingArrow: Boolean = false
     private var arrowDrawable: ShapeDrawable
 
+    var width: Float = 0f
+
+    /**
+     * Set whether the drawable is anchored to the left or right edge of the container.
+     *
+     * When `anchorLeft` is set to `true`, drawable left edge aligns up with the container left
+     * edge. Drawable can be drawn outside container bounds on the right edge. When it is set to
+     * `false` (the default), drawable right edge aligns up with the container right edge. Drawable
+     * can be drawn outside container bounds on the left edge.
+     */
+    var anchorLeft: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidateSelf()
+            }
+        }
+
     init {
         paint.color = context.getColor(R.color.taskbar_background)
         paint.flags = Paint.ANTI_ALIAS_FLAG
@@ -59,8 +77,11 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
         pointerSize = res.getDimension(R.dimen.bubblebar_pointer_size)
 
         shadowAlpha =
-            if (Utilities.isDarkTheme(context)) DARK_THEME_SHADOW_ALPHA
-            else LIGHT_THEME_SHADOW_ALPHA
+            if (Utilities.isDarkTheme(context)) {
+                DARK_THEME_SHADOW_ALPHA
+            } else {
+                LIGHT_THEME_SHADOW_ALPHA
+            }
 
         arrowDrawable =
             ShapeDrawable(TriangleShape.create(pointerSize, pointerSize, /* pointUp= */ true))
@@ -101,15 +122,9 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
 
         // Draw background.
         val radius = backgroundHeight / 2f
-        canvas.drawRoundRect(
-            0f,
-            0f,
-            canvas.width.toFloat(),
-            canvas.height.toFloat(),
-            radius,
-            radius,
-            paint
-        )
+        val left = if (anchorLeft) 0f else canvas.width.toFloat() - width
+        val right = if (anchorLeft) width else canvas.width.toFloat()
+        canvas.drawRoundRect(left, 0f, right, canvas.height.toFloat(), radius, radius, paint)
 
         if (showingArrow) {
             // Draw arrow.
@@ -131,5 +146,9 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
 
     override fun setColorFilter(colorFilter: ColorFilter?) {
         paint.colorFilter = colorFilter
+    }
+
+    fun setArrowAlpha(alpha: Int) {
+        arrowDrawable.paint.alpha = alpha
     }
 }

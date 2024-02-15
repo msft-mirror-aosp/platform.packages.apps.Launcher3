@@ -18,15 +18,17 @@ package com.android.launcher3.model.data;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Process;
 
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.Utilities;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.BitmapInfo.DrawableCreationFlags;
 import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.pm.PackageInstallInfo;
-import com.android.launcher3.util.PackageManagerHelper;
+import com.android.launcher3.uioverrides.ApiWrapper;
 
 /**
  * Represents an ItemInfo which also holds an icon.
@@ -83,17 +85,6 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
     public static final int FLAG_SYSTEM_MASK = FLAG_SYSTEM_YES | FLAG_SYSTEM_NO;
 
     /**
-     * Flag indicating that the icon is an {@link android.graphics.drawable.AdaptiveIconDrawable}
-     * that can be optimized in various way.
-     */
-    public static final int FLAG_ADAPTIVE_ICON = 1 << 8;
-
-    /**
-     * Flag indicating that the icon is badged.
-     */
-    public static final int FLAG_ICON_BADGED = 1 << 9;
-
-    /**
      * The icon is being installed. If {@link WorkspaceItemInfo#FLAG_RESTORED_ICON} or
      * {@link WorkspaceItemInfo#FLAG_AUTOINSTALL_ICON} is set, then the icon is either being
      * installed or is in a broken state.
@@ -117,6 +108,22 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
             | FLAG_DISABLED_NOT_AVAILABLE | FLAG_DISABLED_SUSPENDED
             | FLAG_DISABLED_QUIET_USER | FLAG_DISABLED_BY_PUBLISHER | FLAG_DISABLED_LOCKED_USER
             | FLAG_DISABLED_VERSION_LOWER;
+
+    /**
+     * Flag indicating this item can't be pinned to home screen.
+     */
+    public static final int FLAG_NOT_PINNABLE = 1 << 13;
+
+    /**
+     * Flag indicating whether the package related to the item & user corresponds to that of
+     * archived app.
+     */
+    public static final int FLAG_ARCHIVED = 1 << 14;
+
+    /**
+     * Flag indicating it's the Private Space Install App icon.
+     */
+    public static final int FLAG_PRIVATE_SPACE_INSTALL_APP = 1 << 15;
 
     /**
      * Status associated with the system state of the underlying item. This is calculated every
@@ -148,6 +155,15 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
     }
 
     /**
+     * Returns true if the app corresponding to the item is archived. */
+    public boolean isArchived() {
+        if (!Utilities.enableSupportForArchiving()) {
+            return false;
+        }
+        return (runtimeStatusFlags & FLAG_ARCHIVED) != 0;
+    }
+
+    /**
      * Indicates whether we're using a low res icon
      */
     public boolean usingLowResIcon() {
@@ -163,7 +179,7 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
     public boolean isAppStartable() {
         return ((runtimeStatusFlags & FLAG_INSTALL_SESSION_ACTIVE) == 0)
                 && (((runtimeStatusFlags & FLAG_INCREMENTAL_DOWNLOAD_ACTIVE) != 0)
-                    || mProgressLevel == 100);
+                    || mProgressLevel == 100 || isArchived());
     }
 
     /**
@@ -172,7 +188,10 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
      * progress.
      */
     public int getProgressLevel() {
-        if ((runtimeStatusFlags & FLAG_SHOW_DOWNLOAD_PROGRESS_MASK) != 0) {
+        if (((runtimeStatusFlags & FLAG_SHOW_DOWNLOAD_PROGRESS_MASK) != 0)
+                // This condition for archived apps is so that in case unarchival/update of
+                // archived app is cancelled, the state transitions back to 0% installed state.
+                || isArchived()) {
             return mProgressLevel;
         }
         return 100;
@@ -222,7 +241,8 @@ public abstract class ItemInfoWithIcon extends ItemInfo {
         String targetPackage = getTargetPackage();
 
         return targetPackage != null
-                ? new PackageManagerHelper(context).getMarketIntent(targetPackage)
+                ? ApiWrapper.getAppMarketActivityIntent(
+                        context, targetPackage, Process.myUserHandle())
                 : null;
     }
 

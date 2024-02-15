@@ -21,17 +21,18 @@ import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITION
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.FINISH_RECENTS_ANIMATION;
 
 import android.content.Context;
+import android.os.Bundle;
 import android.os.RemoteException;
 import android.util.Log;
 import android.view.IRecentsAnimationController;
-import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.view.WindowManagerGlobal;
 import android.window.PictureInPictureSurfaceTransaction;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.UiThread;
 
+import com.android.internal.jank.Cuj;
+import com.android.internal.os.IResultReceiver;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.RunnableList;
 import com.android.quickstep.util.ActiveGestureErrorDetector;
@@ -115,8 +116,8 @@ public class RecentsAnimationController {
      * {@link RecentsAnimationCallbacks#onTasksAppeared}}.
      */
     @UiThread
-    public void removeTaskTarget(@NonNull RemoteAnimationTarget target) {
-        UI_HELPER_EXECUTOR.execute(() -> mController.removeTask(target.taskId));
+    public void removeTaskTarget(int targetTaskId) {
+        UI_HELPER_EXECUTOR.execute(() -> mController.removeTask(targetTaskId));
     }
 
     @UiThread
@@ -167,18 +168,23 @@ public class RecentsAnimationController {
                 /* event= */ "finishRecentsAnimation",
                 /* extras= */ toRecents,
                 /* gestureEvent= */ FINISH_RECENTS_ANIMATION);
-
         // Finish not yet requested
         mFinishRequested = true;
         mFinishTargetIsLauncher = toRecents;
         mOnFinishedListener.accept(this);
         Runnable finishCb = () -> {
-            mController.finish(toRecents, sendUserLeaveHint);
-            InteractionJankMonitorWrapper.end(InteractionJankMonitorWrapper.CUJ_QUICK_SWITCH);
-            InteractionJankMonitorWrapper.end(InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_HOME);
-            InteractionJankMonitorWrapper.end(
-                    InteractionJankMonitorWrapper.CUJ_APP_SWIPE_TO_RECENTS);
-            MAIN_EXECUTOR.execute(mPendingFinishCallbacks::executeAllAndDestroy);
+            mController.finish(toRecents, sendUserLeaveHint, new IResultReceiver.Stub() {
+                @Override
+                public void send(int i, Bundle bundle) throws RemoteException {
+                    ActiveGestureLog.INSTANCE.addLog("finishRecentsAnimation-callback");
+                    MAIN_EXECUTOR.execute(() -> {
+                        mPendingFinishCallbacks.executeAllAndDestroy();
+                    });
+                }
+            });
+            InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_QUICK_SWITCH);
+            InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_HOME);
+            InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_APP_SWIPE_TO_RECENTS);
         };
         if (forceFinish) {
             finishCb.run();

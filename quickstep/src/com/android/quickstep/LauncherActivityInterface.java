@@ -15,12 +15,12 @@
  */
 package com.android.quickstep;
 
+import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.LauncherState.ALL_APPS;
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
+import static com.android.launcher3.LauncherState.FLOATING_SEARCH_BAR;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.LauncherState.OVERVIEW;
-import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
-import static com.android.launcher3.anim.Interpolators.LINEAR;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
 
@@ -45,11 +45,11 @@ import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.taskbar.LauncherTaskbarUIController;
-import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.quickstep.GestureState.GestureEndTarget;
+import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.LayoutUtils;
@@ -73,7 +73,7 @@ public final class LauncherActivityInterface extends
 
     @Override
     public int getSwipeUpDestinationAndLength(DeviceProfile dp, Context context, Rect outRect,
-            PagedOrientationHandler orientationHandler) {
+            RecentsPagedOrientationHandler orientationHandler) {
         calculateTaskSize(context, dp, outRect, orientationHandler);
         if (dp.isVerticalBarLayout()
                 && DisplayController.getNavigationMode(context) != NavigationMode.NO_BUTTON) {
@@ -211,7 +211,7 @@ public final class LauncherActivityInterface extends
     }
 
     @Override
-    public boolean switchToRecentsIfVisible(Runnable onCompleteCallback) {
+    public boolean switchToRecentsIfVisible(Animator.AnimatorListener animatorListener) {
         Launcher launcher = getVisibleLauncher();
         if (launcher == null) {
             return false;
@@ -226,7 +226,7 @@ public final class LauncherActivityInterface extends
         closeOverlay();
         launcher.getStateManager().goToState(OVERVIEW,
                 launcher.getStateManager().shouldAnimateStateChange(),
-                onCompleteCallback == null ? null : forEndCallback(onCompleteCallback));
+                animatorListener);
         return true;
     }
 
@@ -267,14 +267,19 @@ public final class LauncherActivityInterface extends
 
     @Override
     public boolean allowAllAppsFromOverview() {
-        return FeatureFlags.ENABLE_ALL_APPS_FROM_OVERVIEW.get();
+        return FeatureFlags.ENABLE_ALL_APPS_FROM_OVERVIEW.get()
+                // If floating search bar would not show in overview, don't allow all apps gesture.
+                && OVERVIEW.areElementsVisible(getCreatedActivity(), FLOATING_SEARCH_BAR);
     }
 
     @Override
     public boolean isInLiveTileMode() {
         Launcher launcher = getCreatedActivity();
-        return launcher != null && launcher.getStateManager().getState() == OVERVIEW &&
-                launcher.isStarted();
+
+        return launcher != null
+                && launcher.getStateManager().getState() == OVERVIEW
+                && launcher.isStarted()
+                && TopTaskTracker.INSTANCE.get(launcher).getCachedTopTask(false).isHomeTask();
     }
 
     @Override

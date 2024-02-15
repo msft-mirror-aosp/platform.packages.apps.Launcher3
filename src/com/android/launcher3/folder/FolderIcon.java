@@ -16,6 +16,7 @@
 
 package com.android.launcher3.folder;
 
+import static com.android.launcher3.Flags.enableCursorHoverStates;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.MAX_NUM_ITEMS_IN_PREVIEW;
 import static com.android.launcher3.folder.PreviewItemManager.INITIAL_ITEM_ANIMATION_DURATION;
@@ -28,6 +29,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
@@ -42,6 +44,7 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.app.animation.Interpolators;
 import com.android.launcher3.Alarm;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.CellLayout;
@@ -56,7 +59,6 @@ import com.android.launcher3.Reorderable;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
-import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.dot.FolderDotInfo;
 import com.android.launcher3.dragndrop.BaseItemDragListener;
@@ -84,7 +86,6 @@ import com.android.launcher3.widget.PendingAddShortcutInfo;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
-
 
 /**
  * An icon that can appear on in the workspace representing an {@link Folder}.
@@ -220,7 +221,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
         icon.setAccessibilityDelegate(activity.getAccessibilityDelegate());
 
-        icon.mPreviewVerifier = new FolderGridOrganizer(activity.getDeviceProfile().inv);
+        icon.mPreviewVerifier = new FolderGridOrganizer(activity.getDeviceProfile());
         icon.mPreviewVerifier.setFolderInfo(folderInfo);
         icon.updatePreviewItems(false);
 
@@ -260,7 +261,6 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
     private boolean willAcceptItem(ItemInfo item) {
         final int itemType = item.itemType;
         return ((itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION ||
-                itemType == LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT ||
                 itemType == LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT) &&
                 item != mInfo && !mFolder.isOpen());
     }
@@ -407,7 +407,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
             final int finalIndex = index;
             dragLayer.animateView(animateView, to, finalAlpha,
                     finalScale, finalScale, DROP_IN_ANIMATION_DURATION,
-                    Interpolators.DEACCEL_2,
+                    Interpolators.DECELERATE_2,
                     () -> {
                         mPreviewItemManager.hidePreviewItem(finalIndex, false);
                         mFolder.showItem(item);
@@ -628,12 +628,27 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
             Utilities.scaleRectAboutCenter(iconBounds, iconScale);
 
             // If we are animating to the accepting state, animate the dot out.
-            mDotParams.scale = Math.max(0, mDotScale - mBackground.getScaleProgress());
+            mDotParams.scale = Math.max(0, mDotScale - mBackground.getAcceptScaleProgress());
             mDotParams.dotColor = mBackground.getDotColor();
             mDotRenderer.draw(canvas, mDotParams);
         }
     }
 
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        boolean shouldCenterIcon = mActivity.getDeviceProfile().iconCenterVertically;
+        if (shouldCenterIcon) {
+            int iconSize = mActivity.getDeviceProfile().iconSizePx;
+            Paint.FontMetrics fm = mFolderName.getPaint().getFontMetrics();
+            int cellHeightPx = iconSize + mFolderName.getCompoundDrawablePadding()
+                    + (int) Math.ceil(fm.bottom - fm.top);
+            setPadding(getPaddingLeft(), (MeasureSpec.getSize(heightMeasureSpec)
+                    - cellHeightPx) / 2, getPaddingRight(), getPaddingBottom());
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    /** Sets the visibility of the icon's title text */
     public void setTextVisible(boolean visible) {
         if (visible) {
             mFolderName.setVisibility(VISIBLE);
@@ -799,6 +814,14 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
         } else {
             return getContext().getString(R.string.folder_name_format_overflow, title,
                     MAX_NUM_ITEMS_IN_PREVIEW);
+        }
+    }
+
+    @Override
+    public void onHoverChanged(boolean hovered) {
+        super.onHoverChanged(hovered);
+        if (enableCursorHoverStates()) {
+            mBackground.setHovered(hovered);
         }
     }
 

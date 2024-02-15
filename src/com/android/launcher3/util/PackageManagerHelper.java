@@ -16,6 +16,8 @@
 
 package com.android.launcher3.util;
 
+import static com.android.launcher3.Flags.enableSupportForArchiving;
+
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
@@ -28,8 +30,8 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
 import android.graphics.Rect;
-import android.net.Uri;
 import android.os.Bundle;
+import android.os.Process;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -46,6 +48,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.uioverrides.ApiWrapper;
 
 import java.net.URISyntaxException;
 import java.util.List;
@@ -104,6 +107,23 @@ public class PackageManagerHelper {
     }
 
     /**
+     * Returns whether the target app is in archived state
+     */
+    @SuppressWarnings("NewApi")
+    public boolean isAppArchived(@NonNull final String packageName) {
+        final ApplicationInfo info;
+        try {
+            info = mPm.getPackageInfo(packageName,
+                    PackageManager.PackageInfoFlags.of(
+                            PackageManager.MATCH_ARCHIVED_PACKAGES)).applicationInfo;
+            return info.isArchived;
+        } catch (NameNotFoundException e) {
+            Log.e(TAG, "Failed to get applicationInfo for package: " + packageName, e);
+            return false;
+        }
+    }
+
+    /**
      * Returns the application info for the provided package or null
      */
     @Nullable
@@ -111,15 +131,10 @@ public class PackageManagerHelper {
             @NonNull final UserHandle user, final int flags) {
         try {
             ApplicationInfo info = mLauncherApps.getApplicationInfo(packageName, flags, user);
-            return (info.flags & ApplicationInfo.FLAG_INSTALLED) == 0 || !info.enabled
-                    ? null : info;
+            return !isPackageInstalledOrArchived(info) || !info.enabled ? null : info;
         } catch (PackageManager.NameNotFoundException e) {
             return null;
         }
-    }
-
-    public boolean isSafeMode() {
-        return mPm.isSafeMode();
     }
 
     @Nullable
@@ -135,17 +150,6 @@ public class PackageManagerHelper {
      */
     public static boolean isAppSuspended(ApplicationInfo info) {
         return (info.flags & ApplicationInfo.FLAG_SUSPENDED) != 0;
-    }
-
-    public Intent getMarketIntent(String packageName) {
-        return new Intent(Intent.ACTION_VIEW)
-                .setData(new Uri.Builder()
-                        .scheme("market")
-                        .authority("details")
-                        .appendQueryParameter("id", packageName)
-                        .build())
-                .putExtra(Intent.EXTRA_REFERRER, new Uri.Builder().scheme("android-app")
-                        .authority(mContext.getPackageName()).build());
     }
 
     /**
@@ -164,13 +168,6 @@ public class PackageManagerHelper {
         }
     }
 
-    public static Intent getStyleWallpapersIntent(Context context) {
-        return new Intent(Intent.ACTION_SET_WALLPAPER).setComponent(
-                new ComponentName(context.getString(R.string.wallpaper_picker_package),
-                    context.getString(R.string.custom_activity_picker)
-                ));
-    }
-
     /**
      * Starts the details activity for {@code info}
      */
@@ -179,8 +176,8 @@ public class PackageManagerHelper {
                 && (((ItemInfoWithIcon) info).runtimeStatusFlags
                     & ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE) != 0) {
             ItemInfoWithIcon appInfo = (ItemInfoWithIcon) info;
-            mContext.startActivity(new PackageManagerHelper(mContext)
-                    .getMarketIntent(appInfo.getTargetComponent().getPackageName()));
+            mContext.startActivity(ApiWrapper.getAppMarketActivityIntent(mContext,
+                    appInfo.getTargetComponent().getPackageName(), Process.myUserHandle()));
             return;
         }
         ComponentName componentName = null;
@@ -273,5 +270,12 @@ public class PackageManagerHelper {
             return (int) (100 * info.getLoadingProgress());
         }
         return 100;
+    }
+
+    /** Returns true in case app is installed on the device or in archived state. */
+    @SuppressWarnings("NewApi")
+    private boolean isPackageInstalledOrArchived(ApplicationInfo info) {
+        return (info.flags & ApplicationInfo.FLAG_INSTALLED) != 0 || (
+                enableSupportForArchiving() && info.isArchived);
     }
 }

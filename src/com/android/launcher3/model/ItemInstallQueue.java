@@ -18,10 +18,12 @@ package com.android.launcher3.model;
 
 import static android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID;
 
+import static com.android.launcher3.Flags.enableSupportForArchiving;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.model.data.AppInfo.makeLaunchIntent;
+import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ARCHIVED;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
 import android.appwidget.AppWidgetManager;
@@ -276,6 +278,7 @@ public class ItemInstallQueue {
             return intent;
         }
 
+        @SuppressWarnings("NewApi")
         public Pair<ItemInfo, Object> getItemInfo(Context context) {
             switch (itemType) {
                 case ITEM_TYPE_APPLICATION: {
@@ -286,7 +289,6 @@ public class ItemInstallQueue {
 
                     final WorkspaceItemInfo si = new WorkspaceItemInfo();
                     si.user = user;
-                    si.itemType = ITEM_TYPE_APPLICATION;
 
                     LauncherActivityInfo lai;
                     boolean usePackageIcon = laiList.isEmpty();
@@ -298,6 +300,9 @@ public class ItemInstallQueue {
                     } else {
                         lai = laiList.get(0);
                         si.intent = makeLaunchIntent(lai);
+                        if (enableSupportForArchiving() && lai.getActivityInfo().isArchived) {
+                            si.runtimeStatusFlags |= FLAG_ARCHIVED;
+                        }
                     }
                     LauncherAppState.getInstance(context).getIconCache()
                             .getTitleAndIcon(si, () -> lai, usePackageIcon, false);

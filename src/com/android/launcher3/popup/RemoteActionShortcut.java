@@ -16,15 +16,15 @@
 
 package com.android.launcher3.popup;
 
+import static com.android.launcher3.Utilities.allowBGLaunch;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_PAUSE_TAP;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
-import android.annotation.TargetApi;
+import android.app.ActivityOptions;
 import android.app.PendingIntent;
 import android.app.RemoteAction;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import android.util.Log;
 import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -40,7 +40,6 @@ import com.android.launcher3.model.data.ItemInfo;
 
 import java.lang.ref.WeakReference;
 
-@TargetApi(Build.VERSION_CODES.Q)
 public class RemoteActionShortcut extends SystemShortcut<BaseDraggingActivity> {
     private static final String TAG = "RemoteActionShortcut";
     private static final boolean DEBUG = Utilities.IS_DEBUG_DEVICE;
@@ -84,6 +83,8 @@ public class RemoteActionShortcut extends SystemShortcut<BaseDraggingActivity> {
         final WeakReference<BaseDraggingActivity> weakTarget = new WeakReference<>(mTarget);
         final String actionIdentity = mAction.getTitle() + ", "
                 + mItemInfo.getTargetComponent().getPackageName();
+
+        ActivityOptions options = allowBGLaunch(ActivityOptions.makeBasic());
         try {
             if (DEBUG) Log.d(TAG, "Sending action: " + actionIdentity);
             mAction.getActionIntent().send(
@@ -103,7 +104,9 @@ public class RemoteActionShortcut extends SystemShortcut<BaseDraggingActivity> {
                             }
                         }
                     },
-                    MAIN_EXECUTOR.getHandler());
+                    MAIN_EXECUTOR.getHandler(),
+                    null,
+                    options.toBundle());
         } catch (PendingIntent.CanceledException e) {
             Log.e(TAG, "Remote action canceled: " + actionIdentity, e);
             Toast.makeText(mTarget, mTarget.getString(
@@ -112,10 +115,5 @@ public class RemoteActionShortcut extends SystemShortcut<BaseDraggingActivity> {
                     Toast.LENGTH_SHORT)
                     .show();
         }
-    }
-
-    @Override
-    public boolean isLeftGroup() {
-        return true;
     }
 }

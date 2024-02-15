@@ -25,15 +25,15 @@ import android.content.Context;
 import android.os.Binder;
 import android.os.Bundle;
 import android.system.Os;
-import android.util.Log;
 
 import androidx.annotation.Keep;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.LauncherAppState;
-import com.android.launcher3.LauncherSettings;
+import com.android.launcher3.LauncherModel;
 import com.android.launcher3.ShortcutAndWidgetContainer;
+import com.android.launcher3.icons.ClockDrawableWrapper;
 import com.android.launcher3.testing.shared.TestProtocol;
 
 import java.util.ArrayList;
@@ -62,7 +62,6 @@ public class DebugTestInformationHandler extends TestInformationHandler {
                 public void onActivityCreated(Activity activity, Bundle bundle) {
                     sActivities.put(activity, true);
                     ++sActivitiesCreatedCount;
-                    Log.d(TestProtocol.FLAKY_ACTIVITY_COUNT, "onActivityCreated", new Exception());
                 }
 
                 @Override
@@ -138,10 +137,12 @@ public class DebugTestInformationHandler extends TestInformationHandler {
 
             case TestProtocol.REQUEST_ENABLE_DEBUG_TRACING:
                 TestProtocol.sDebugTracing = true;
+                ClockDrawableWrapper.sRunningInTest = true;
                 return response;
 
             case TestProtocol.REQUEST_DISABLE_DEBUG_TRACING:
                 TestProtocol.sDebugTracing = false;
+                ClockDrawableWrapper.sRunningInTest = false;
                 return response;
 
             case TestProtocol.REQUEST_PID: {
@@ -188,13 +189,29 @@ public class DebugTestInformationHandler extends TestInformationHandler {
                 return response;
             }
 
+            case TestProtocol.REQUEST_REINITIALIZE_DATA: {
+                final long identity = Binder.clearCallingIdentity();
+                try {
+                    MODEL_EXECUTOR.execute(() -> {
+                        LauncherModel model = LauncherAppState.getInstance(mContext).getModel();
+                        model.getModelDbController().createEmptyDB();
+                        MAIN_EXECUTOR.execute(model::forceReload);
+                    });
+                    return response;
+                } finally {
+                    Binder.restoreCallingIdentity(identity);
+                }
+            }
+
             case TestProtocol.REQUEST_CLEAR_DATA: {
                 final long identity = Binder.clearCallingIdentity();
                 try {
-                    LauncherSettings.Settings.call(mContext.getContentResolver(),
-                            LauncherSettings.Settings.METHOD_CREATE_EMPTY_DB);
-                    MAIN_EXECUTOR.submit(() ->
-                            LauncherAppState.getInstance(mContext).getModel().forceReload());
+                    MODEL_EXECUTOR.execute(() -> {
+                        LauncherModel model = LauncherAppState.getInstance(mContext).getModel();
+                        model.getModelDbController().createEmptyDB();
+                        model.getModelDbController().clearEmptyDbFlag();
+                        MAIN_EXECUTOR.execute(model::forceReload);
+                    });
                     return response;
                 } finally {
                     Binder.restoreCallingIdentity(identity);

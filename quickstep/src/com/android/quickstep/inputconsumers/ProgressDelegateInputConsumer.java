@@ -15,7 +15,7 @@
  */
 package com.android.quickstep.inputconsumers;
 
-import static com.android.launcher3.anim.Interpolators.scrollInterpolatorForVelocity;
+import static com.android.app.animation.Interpolators.scrollInterpolatorForVelocity;
 import static com.android.launcher3.touch.BaseSwipeDetector.calculateDuration;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.DIRECTION_POSITIVE;
 import static com.android.launcher3.touch.SingleAxisSwipeDetector.VERTICAL;
@@ -53,6 +53,7 @@ import java.util.HashMap;
 public class ProgressDelegateInputConsumer implements InputConsumer,
         RecentsAnimationCallbacks.RecentsAnimationListener,
         SingleAxisSwipeDetector.Listener {
+    private static final String TAG = "ProgressDelegateInputConsumer";
 
     private static final float SWIPE_DISTANCE_THRESHOLD = 0.2f;
 
@@ -103,7 +104,8 @@ public class ProgressDelegateInputConsumer implements InputConsumer,
         mStateCallback = new MultiStateCallback(STATE_NAMES);
         mStateCallback.runOnceAtState(STATE_TARGET_RECEIVED | STATE_HANDLER_INVALIDATED,
                 this::endRemoteAnimation);
-        mStateCallback.runOnceAtState(STATE_FLING_FINISHED, this::onFlingFinished);
+        mStateCallback.runOnceAtState(STATE_TARGET_RECEIVED | STATE_FLING_FINISHED,
+                this::onFlingFinished);
 
         mSwipeDetector = new SingleAxisSwipeDetector(mContext, this, VERTICAL);
         mSwipeDetector.setDetectableScrollConditions(DIRECTION_POSITIVE, false);
@@ -164,7 +166,7 @@ public class ProgressDelegateInputConsumer implements InputConsumer,
             mRecentsAnimationController.finishController(endToRecents /* toRecents */,
                     null /* callback */, false /* sendUserLeaveHint */);
         } else if (endToRecents) {
-            startHomeIntentSafely(mContext, null);
+            startHomeIntentSafely(mContext, null, TAG);
         }
     }
 

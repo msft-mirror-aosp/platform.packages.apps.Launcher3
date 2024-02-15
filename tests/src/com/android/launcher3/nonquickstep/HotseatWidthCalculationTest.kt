@@ -47,7 +47,7 @@ class HotseatWidthCalculationTest : FakeInvariantDeviceProfileTest() {
         assertThat(dp.getHotseatLayoutPadding(context).right).isEqualTo(177)
 
         assertThat(dp.isQsbInline).isFalse()
-        assertThat(dp.hotseatQsbWidth).isEqualTo(1445)
+        assertThat(dp.hotseatQsbWidth).isEqualTo(1435)
     }
 
     /**
@@ -69,7 +69,7 @@ class HotseatWidthCalculationTest : FakeInvariantDeviceProfileTest() {
         assertThat(dp.getHotseatLayoutPadding(context).right).isEqualTo(110)
 
         assertThat(dp.isQsbInline).isFalse()
-        assertThat(dp.hotseatQsbWidth).isEqualTo(1080)
+        assertThat(dp.hotseatQsbWidth).isEqualTo(1070)
     }
 
     /**
@@ -90,7 +90,7 @@ class HotseatWidthCalculationTest : FakeInvariantDeviceProfileTest() {
         assertThat(dp.getHotseatLayoutPadding(context).right).isEqualTo(370)
 
         assertThat(dp.isQsbInline).isFalse()
-        assertThat(dp.hotseatQsbWidth).isEqualTo(1468)
+        assertThat(dp.hotseatQsbWidth).isEqualTo(1455)
     }
 
     /**
@@ -115,7 +115,7 @@ class HotseatWidthCalculationTest : FakeInvariantDeviceProfileTest() {
         assertThat(dp.getHotseatLayoutPadding(context).right).isEqualTo(668)
 
         assertThat(dp.isQsbInline).isFalse()
-        assertThat(dp.hotseatQsbWidth).isEqualTo(1224)
+        assertThat(dp.hotseatQsbWidth).isEqualTo(1214)
     }
 
     /** This is a case when after setting the hotseat, the QSB width needs to be changed to fit */
@@ -134,7 +134,7 @@ class HotseatWidthCalculationTest : FakeInvariantDeviceProfileTest() {
         assertThat(dp.getHotseatLayoutPadding(context).right).isEqualTo(640)
 
         assertThat(dp.isQsbInline).isFalse()
-        assertThat(dp.hotseatQsbWidth).isEqualTo(1179)
+        assertThat(dp.hotseatQsbWidth).isEqualTo(1169)
     }
 
     /**
@@ -156,6 +156,27 @@ class HotseatWidthCalculationTest : FakeInvariantDeviceProfileTest() {
         assertThat(dp.getHotseatLayoutPadding(context).right).isEqualTo(582)
 
         assertThat(dp.isQsbInline).isFalse()
-        assertThat(dp.hotseatQsbWidth).isEqualTo(1095)
+        assertThat(dp.hotseatQsbWidth).isEqualTo(1085)
+    }
+
+    @Test
+    fun border_space_should_be_zero_when_numHotseatIcons_is_smallerOrEqual_1() {
+        initializeVarsForTablet(isGestureMode = false)
+        windowBounds = WindowBounds(Rect(0, 0, 1800, 2560), Rect(0, 104, 0, 0))
+
+        val numShownHotseatIcons = listOf(-1, 0, 1)
+        for (numHotseatIcons in numShownHotseatIcons) {
+            inv?.numShownHotseatIcons = numHotseatIcons
+
+            val dp = newDP()
+            dp.isTaskbarPresentInApps = true
+
+            assertThat(dp.numShownHotseatIcons).isEqualTo(numHotseatIcons)
+            assertThat(dp.hotseatBorderSpace).isEqualTo(0)
+
+            assertThat(dp.getHotseatLayoutPadding(context).left).isEqualTo(177)
+            assertThat(dp.getHotseatLayoutPadding(context).right).isEqualTo(177)
+            assertThat(dp.hotseatQsbWidth).isEqualTo(1435)
+        }
     }
 }

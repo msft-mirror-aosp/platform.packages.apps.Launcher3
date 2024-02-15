@@ -19,8 +19,10 @@ import android.view.View;
 
 import com.android.launcher3.CellLayout;
 import com.android.launcher3.MultipageCellLayout;
+import com.android.launcher3.ShortcutAndWidgetContainer;
 import com.android.launcher3.util.GridOccupancy;
 
+import java.util.Arrays;
 import java.util.function.Supplier;
 
 /**
@@ -36,8 +38,8 @@ public class MulticellReorderAlgorithm extends ReorderAlgorithm {
         mSeam = new View(cellLayout.getContext());
     }
 
-    private CellLayout.ItemConfiguration removeSeamFromSolution(
-            CellLayout.ItemConfiguration solution) {
+    public ItemConfiguration removeSeamFromSolution(ItemConfiguration solution) {
+        solution.map.remove(mSeam);
         solution.map.forEach((view, cell) -> cell.cellX =
                 cell.cellX > mCellLayout.getCountX() / 2 ? cell.cellX - 1 : cell.cellX);
         solution.cellX =
@@ -46,29 +48,24 @@ public class MulticellReorderAlgorithm extends ReorderAlgorithm {
     }
 
     @Override
-    public CellLayout.ItemConfiguration closestEmptySpaceReorder(int pixelX, int pixelY,
-            int minSpanX, int minSpanY,
-            int spanX, int spanY) {
+    public ItemConfiguration closestEmptySpaceReorder(ReorderParameters reorderParameters) {
         return removeSeamFromSolution(simulateSeam(
-                () -> super.closestEmptySpaceReorder(pixelX, pixelY, minSpanX, minSpanY, spanX,
-                        spanY)));
+                () -> super.closestEmptySpaceReorder(reorderParameters))
+        );
     }
 
     @Override
-    public CellLayout.ItemConfiguration findReorderSolution(int pixelX, int pixelY, int minSpanX,
-            int minSpanY, int spanX, int spanY, int[] direction, View dragView, boolean decX,
-            CellLayout.ItemConfiguration solution) {
+    public ItemConfiguration findReorderSolution(ReorderParameters reorderParameters,
+            boolean decX) {
         return removeSeamFromSolution(simulateSeam(
-                () -> super.findReorderSolution(pixelX, pixelY, minSpanX, minSpanY, spanX, spanY,
-                        direction, dragView, decX, solution)));
+                () -> super.findReorderSolution(reorderParameters, decX)));
     }
 
     @Override
-    public CellLayout.ItemConfiguration dropInPlaceSolution(int pixelX, int pixelY, int spanX,
-            int spanY,
-            View dragView) {
-        return removeSeamFromSolution(simulateSeam(
-                () -> super.dropInPlaceSolution(pixelX, pixelY, spanX, spanY, dragView)));
+    public ItemConfiguration dropInPlaceSolution(ReorderParameters reorderParameters) {
+        return removeSeamFromSolution(
+                simulateSeam(() -> super.dropInPlaceSolution(reorderParameters))
+        );
     }
 
     void addSeam() {
@@ -79,7 +76,7 @@ public class MulticellReorderAlgorithm extends ReorderAlgorithm {
         lp.canReorder = false;
         mcl.setCountX(mcl.getCountX() + 1);
         mcl.getShortcutsAndWidgets().addViewInLayout(mSeam, lp);
-        mcl.setOccupied(createGridOccupancyWithSeam(mcl.getOccupied()));
+        mcl.setOccupied(createGridOccupancyWithSeam());
         mcl.mTmpOccupied = new GridOccupancy(mcl.getCountX(), mcl.getCountY());
     }
 
@@ -93,7 +90,8 @@ public class MulticellReorderAlgorithm extends ReorderAlgorithm {
 
     /**
      * The function supplied here will execute while the CellLayout has a simulated seam added.
-     * @param f function to run under simulation
+     *
+     * @param f   function to run under simulation
      * @param <T> return value of the supplied function
      * @return Value of supplied function
      */
@@ -110,18 +108,17 @@ public class MulticellReorderAlgorithm extends ReorderAlgorithm {
         return res;
     }
 
-    GridOccupancy createGridOccupancyWithSeam(GridOccupancy gridOccupancy) {
+    GridOccupancy createGridOccupancyWithSeam() {
+        ShortcutAndWidgetContainer shortcutAndWidgets = mCellLayout.getShortcutsAndWidgets();
         GridOccupancy grid = new GridOccupancy(mCellLayout.getCountX(), mCellLayout.getCountY());
-        for (int x = 0; x < mCellLayout.getCountX(); x++) {
-            for (int y = 0; y < mCellLayout.getCountY(); y++) {
-                int offset = x >= mCellLayout.getCountX() / 2 ? 1 : 0;
-                if (x == mCellLayout.getCountX() / 2) {
-                    grid.cells[x][y] = true;
-                } else {
-                    grid.cells[x][y] = gridOccupancy.cells[x - offset][y];
-                }
-            }
+        for (int i = 0; i < shortcutAndWidgets.getChildCount(); i++) {
+            View view = shortcutAndWidgets.getChildAt(i);
+            CellLayoutLayoutParams lp = (CellLayoutLayoutParams) view.getLayoutParams();
+            int seamOffset = lp.getCellX() >= mCellLayout.getCountX() / 2 && lp.canReorder ? 1 : 0;
+            grid.markCells(lp.getCellX() + seamOffset, lp.getCellY(), lp.cellHSpan, lp.cellVSpan,
+                    true);
         }
+        Arrays.fill(grid.cells[mCellLayout.getCountX() / 2], true);
         return grid;
     }
 }

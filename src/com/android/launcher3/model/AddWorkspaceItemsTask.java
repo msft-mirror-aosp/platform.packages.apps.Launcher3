@@ -33,6 +33,7 @@ import com.android.launcher3.model.BgDataModel.Callbacks;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.WorkspaceItemFactory;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
@@ -91,8 +92,7 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
             List<ItemInfo> filteredItems = new ArrayList<>();
             for (Pair<ItemInfo, Object> entry : mItemList) {
                 ItemInfo item = entry.first;
-                if (item.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION ||
-                        item.itemType == LauncherSettings.Favorites.ITEM_TYPE_SHORTCUT) {
+                if (item.itemType == LauncherSettings.Favorites.ITEM_TYPE_APPLICATION) {
                     // Short-circuit this logic if the icon exists somewhere on the workspace
                     if (shortcutExists(dataModel, item.getIntent(), item.user)) {
                         continue;
@@ -101,6 +101,11 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
                     // b/139663018 Short-circuit this logic if the icon is a system app
                     if (PackageManagerHelper.isSystemApp(app.getContext(),
                             Objects.requireNonNull(item.getIntent()))) {
+                        continue;
+                    }
+
+                    if (item instanceof ItemInfoWithIcon
+                            && ((ItemInfoWithIcon) item).isArchived()) {
                         continue;
                     }
                 }

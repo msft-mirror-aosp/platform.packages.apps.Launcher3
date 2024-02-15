@@ -1,8 +1,23 @@
+/*
+ * Copyright (C) 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.android.quickstep.views;
 
+import static com.android.app.animation.Interpolators.LINEAR;
+import static com.android.app.animation.Interpolators.clampToProgress;
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASK_MENU;
-import static com.android.launcher3.anim.Interpolators.LINEAR;
-import static com.android.launcher3.anim.Interpolators.clampToProgress;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
@@ -11,7 +26,6 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
@@ -29,9 +43,9 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
-import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 import com.android.quickstep.util.AnimUtils;
 import com.android.quickstep.util.MultiValueUpdateListener;
 import com.android.quickstep.util.SplitAnimationTimings;
@@ -48,8 +62,6 @@ import com.android.systemui.shared.system.QuickStepContract;
  * {@link #addConfirmAnimation(PendingAnimation, RectF, Rect, boolean, boolean)}
  * giving a starting and ending bounds. Currently this is set to use the split placeholder view,
  * but it could be generified.
- *
- * TODO: Figure out how to copy thumbnail data from existing TaskView to this view.
  */
 public class FloatingTaskView extends FrameLayout {
 
@@ -83,7 +95,7 @@ public class FloatingTaskView extends FrameLayout {
     private final StatefulActivity mActivity;
     private final boolean mIsRtl;
     private final FullscreenDrawParams mFullscreenParams;
-    private PagedOrientationHandler mOrientationHandler;
+    private RecentsPagedOrientationHandler mOrientationHandler;
     @SplitConfigurationOptions.StagePosition
     private int mStagePosition;
     private final Rect mTmpRect = new Rect();
@@ -208,13 +220,13 @@ public class FloatingTaskView extends FrameLayout {
         mOrientationHandler.setSecondaryScale(mSplitPlaceholderView.getIconView(), childScaleY);
     }
 
-    public void updateOrientationHandler(PagedOrientationHandler orientationHandler) {
+    public void updateOrientationHandler(RecentsPagedOrientationHandler orientationHandler) {
         mOrientationHandler = orientationHandler;
         mSplitPlaceholderView.getIconView().setRotation(mOrientationHandler.getDegreesRotated());
     }
 
-    public void setIcon(Bitmap icon) {
-        mSplitPlaceholderView.setIcon(new BitmapDrawable(icon), mSplitHolderSize);
+    public void setIcon(Drawable drawable) {
+        mSplitPlaceholderView.setIcon(drawable, mSplitHolderSize);
     }
 
     protected void initPosition(RectF pos, InsettableFrameLayout.LayoutParams lp) {
@@ -307,7 +319,7 @@ public class FloatingTaskView extends FrameLayout {
 
             // Fade in the placeholder view during Normal > OverviewSplitSelect
             if (mSplitPlaceholderView.getAlpha() == 0) {
-                mSplitPlaceholderView.getIconView().setAlpha(0);
+                mSplitPlaceholderView.getIconView().setContentAlpha(0);
                 fadeInSplitPlaceholder(animation, timings);
             }
 

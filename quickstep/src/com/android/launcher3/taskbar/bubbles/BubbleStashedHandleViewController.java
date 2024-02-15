@@ -16,6 +16,7 @@
 package com.android.launcher3.taskbar.bubbles;
 
 import static android.view.View.INVISIBLE;
+import static android.view.View.LAYOUT_DIRECTION_RTL;
 import static android.view.View.VISIBLE;
 
 import android.animation.Animator;
@@ -24,6 +25,7 @@ import android.animation.ValueAnimator;
 import android.content.res.Resources;
 import android.graphics.Outline;
 import android.graphics.Rect;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewOutlineProvider;
 
@@ -52,6 +54,7 @@ public class BubbleStashedHandleViewController {
     private BubbleStashController mBubbleStashController;
     private RegionSamplingHelper mRegionSamplingHelper;
     private int mBarSize;
+    private int mStashedTaskbarHeight;
     private int mStashedHandleWidth;
     private int mStashedHandleHeight;
 
@@ -92,7 +95,7 @@ public class BubbleStashedHandleViewController {
 
         mTaskbarStashedHandleAlpha.get(0).setValue(0);
 
-        final int stashedTaskbarHeight = resources.getDimensionPixelSize(
+        mStashedTaskbarHeight = resources.getDimensionPixelSize(
                 R.dimen.bubblebar_stashed_size);
         mStashedHandleView.setOutlineProvider(new ViewOutlineProvider() {
             @Override
@@ -115,22 +118,40 @@ public class BubbleStashedHandleViewController {
                     }
                 }, Executors.UI_HELPER_EXECUTOR);
 
-        mStashedHandleView.addOnLayoutChangeListener((view, i, i1, i2, i3, i4, i5, i6, i7) -> {
-            // As more bubbles get added, the icon bounds become larger. To ensure a consistent
-            // handle bar position, we pin it to the edge of the screen.
-            Rect bubblebarRect = mBarViewController.getBubbleBarBounds();
-            final int stashedCenterY = view.getHeight() - stashedTaskbarHeight / 2;
+        mStashedHandleView.addOnLayoutChangeListener((view, i, i1, i2, i3, i4, i5, i6, i7) ->
+                updateBounds());
+    }
 
+    private void updateBounds() {
+        // As more bubbles get added, the icon bounds become larger. To ensure a consistent
+        // handle bar position, we pin it to the edge of the screen.
+        final int stashedCenterY = mStashedHandleView.getHeight() - mStashedTaskbarHeight / 2;
+        if (isOnLeft()) {
+            final int left = mBarViewController.getHorizontalMargin();
             mStashedHandleBounds.set(
-                    bubblebarRect.right - mStashedHandleWidth,
+                    left,
                     stashedCenterY - mStashedHandleHeight / 2,
-                    bubblebarRect.right,
+                    left + mStashedHandleWidth,
                     stashedCenterY + mStashedHandleHeight / 2);
-            mStashedHandleView.updateSampledRegion(mStashedHandleBounds);
+            mStashedHandleView.setPivotX(0);
+        } else {
+            final int right =
+                    mActivity.getDeviceProfile().widthPx - mBarViewController.getHorizontalMargin();
+            mStashedHandleBounds.set(
+                    right - mStashedHandleWidth,
+                    stashedCenterY - mStashedHandleHeight / 2,
+                    right,
+                    stashedCenterY + mStashedHandleHeight / 2);
+            mStashedHandleView.setPivotX(mStashedHandleView.getWidth());
+        }
 
-            view.setPivotX(view.getWidth());
-            view.setPivotY(view.getHeight() - stashedTaskbarHeight / 2f);
-        });
+        mStashedHandleView.updateSampledRegion(mStashedHandleBounds);
+        mStashedHandleView.setPivotY(mStashedHandleView.getHeight() - mStashedTaskbarHeight / 2f);
+    }
+
+    private boolean isOnLeft() {
+        // TODO(b/313661121): set this based on bubble bar position and not LTR or RTL
+        return mStashedHandleView.getLayoutDirection() == LAYOUT_DIRECTION_RTL;
     }
 
     public void onDestroy() {
@@ -188,6 +209,7 @@ public class BubbleStashedHandleViewController {
             mStashedHandleView.setVisibility(VISIBLE);
         } else {
             mStashedHandleView.setVisibility(INVISIBLE);
+            mStashedHandleView.setAlpha(0);
         }
         updateRegionSampling();
     }
@@ -203,12 +225,14 @@ public class BubbleStashedHandleViewController {
     private void updateRegionSampling() {
         boolean handleVisible = mStashedHandleView.getVisibility() == VISIBLE
                 && mBubbleStashController.isStashed();
-        mRegionSamplingHelper.setWindowVisible(handleVisible);
-        if (handleVisible) {
-            mStashedHandleView.updateSampledRegion(mStashedHandleBounds);
-            mRegionSamplingHelper.start(mStashedHandleView.getSampledRegion());
-        } else {
-            mRegionSamplingHelper.stop();
+        if (mRegionSamplingHelper != null) {
+            mRegionSamplingHelper.setWindowVisible(handleVisible);
+            if (handleVisible) {
+                mStashedHandleView.updateSampledRegion(mStashedHandleBounds);
+                mRegionSamplingHelper.start(mStashedHandleView.getSampledRegion());
+            } else {
+                mRegionSamplingHelper.stop();
+            }
         }
     }
 
@@ -258,5 +282,23 @@ public class BubbleStashedHandleViewController {
             }
         });
         return revealAnim;
+    }
+
+    /** Checks that the stash handle is visible and that the motion event is within bounds. */
+    public boolean isEventOverHandle(MotionEvent ev) {
+        if (mStashedHandleView.getVisibility() != VISIBLE) {
+            return false;
+        }
+
+        // the bounds of the handle only include the visible part, so we check that the Y coordinate
+        // is anywhere within the stashed taskbar height.
+        int top = mActivity.getDeviceProfile().heightPx - mStashedTaskbarHeight;
+
+        return (int) ev.getRawY() >= top && containsX((int) ev.getRawX());
+    }
+
+    /** Checks if the given x coordinate is within the stashed handle bounds. */
+    public boolean containsX(int x) {
+        return x >= mStashedHandleBounds.left && x <= mStashedHandleBounds.right;
     }
 }

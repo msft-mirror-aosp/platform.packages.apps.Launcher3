@@ -1,40 +1,55 @@
 package com.android.launcher3.model;
 
+import static android.os.Process.myUserHandle;
+
+import static androidx.test.InstrumentationRegistry.getInstrumentation;
+
+import static com.android.launcher3.Flags.FLAG_ENABLE_SUPPORT_FOR_ARCHIVING;
+import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ARCHIVED;
+import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
+import static com.android.launcher3.util.LauncherModelHelper.TEST_ACTIVITY;
+import static com.android.launcher3.util.LauncherModelHelper.TEST_ACTIVITY2;
+import static com.android.launcher3.util.LauncherModelHelper.TEST_ACTIVITY3;
+import static com.android.launcher3.util.LauncherModelHelper.TEST_PACKAGE;
+import static com.android.launcher3.util.TestUtil.DUMMY_CLASS_NAME;
+import static com.android.launcher3.util.TestUtil.DUMMY_PACKAGE;
+import static com.android.launcher3.util.TestUtil.runOnExecutorSync;
+
+import static com.google.common.truth.Truth.assertThat;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 
-import android.content.ComponentName;
 import android.content.Context;
-import android.content.pm.PackageInfo;
-import android.graphics.Bitmap;
-import android.graphics.Bitmap.Config;
-import android.graphics.Color;
-import android.os.Process;
-import android.os.UserHandle;
-import android.os.UserManager;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 
-import androidx.annotation.NonNull;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
+import androidx.test.uiautomator.UiDevice;
 
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.icons.BitmapInfo;
-import com.android.launcher3.icons.IconCache;
-import com.android.launcher3.icons.cache.CachingLogic;
-import com.android.launcher3.model.data.AppInfo;
-import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.util.IntSet;
+import com.android.launcher3.util.LauncherLayoutBuilder;
 import com.android.launcher3.util.LauncherModelHelper;
+import com.android.launcher3.util.PackageUserKey;
+import com.android.launcher3.util.TestUtil;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 
 /**
  * Tests for {@link CacheDataUpdatedTask}
@@ -43,78 +58,164 @@ import java.util.HashSet;
 @RunWith(AndroidJUnit4.class)
 public class CacheDataUpdatedTaskTest {
 
-    private static final String NEW_LABEL_PREFIX = "new-label-";
+    @Rule
+    public final CheckFlagsRule mCheckFlagsRule =
+            DeviceFlagsValueProvider.createCheckFlagsRule();
+
+    private static final String PENDING_APP_1 = TEST_PACKAGE + ".pending1";
+    private static final String PENDING_APP_2 = TEST_PACKAGE + ".pending2";
+
+    private static final String ARCHIVED_PACKAGE = DUMMY_PACKAGE;
+    private static final String ARCHIVED_CLASS_NAME = DUMMY_CLASS_NAME;
+    private static final String ARCHIVED_TITLE = "Aardwolf";
+
 
     private LauncherModelHelper mModelHelper;
+    private Context mContext;
+
+    private int mSession1;
 
     @Before
     public void setup() throws Exception {
         mModelHelper = new LauncherModelHelper();
-        mModelHelper.initializeData("cache_data_updated_task_data");
+        mContext = mModelHelper.sandboxContext;
+        mSession1 = mModelHelper.createInstallerSession(PENDING_APP_1);
+        mModelHelper.createInstallerSession(PENDING_APP_2);
+        TestUtil.installDummyApp();
 
-        // Add placeholder entries in the cache to simulate update
-        Context context = mModelHelper.sandboxContext;
-        IconCache iconCache = LauncherAppState.getInstance(context).getIconCache();
-        CachingLogic<ItemInfo> placeholderLogic = new CachingLogic<ItemInfo>() {
-            @Override
-            @NonNull
-            public ComponentName getComponent(@NonNull ItemInfo info) {
-                return info.getTargetComponent();
-            }
+        LauncherLayoutBuilder builder = new LauncherLayoutBuilder()
+                .atHotseat(1).putFolder("MyFolder")
+                .addApp(TEST_PACKAGE, TEST_ACTIVITY)    // 2
+                .addApp(TEST_PACKAGE, TEST_ACTIVITY2)   // 3
+                .addApp(TEST_PACKAGE, TEST_ACTIVITY3)   // 4
 
-            @NonNull
-            @Override
-            public UserHandle getUser(@NonNull ItemInfo info) {
-                return info.user;
-            }
+                // Pending App 1
+                .addApp(PENDING_APP_1, TEST_ACTIVITY)   // 5
+                .addApp(PENDING_APP_1, TEST_ACTIVITY2)  // 6
+                .addApp(PENDING_APP_1, TEST_ACTIVITY3)  // 7
 
-            @NonNull
-            @Override
-            public CharSequence getLabel(@NonNull ItemInfo info) {
-                return NEW_LABEL_PREFIX + info.id;
-            }
+                // Pending App 2
+                .addApp(PENDING_APP_2, TEST_ACTIVITY)   // 8
+                .addApp(PENDING_APP_2, TEST_ACTIVITY2)  // 9
+                .addApp(PENDING_APP_2, TEST_ACTIVITY3)  // 10
 
-            @NonNull
-            @Override
-            public BitmapInfo loadIcon(@NonNull Context context, @NonNull ItemInfo info) {
-                return BitmapInfo.of(Bitmap.createBitmap(1, 1, Config.ARGB_8888), Color.RED);
-            }
-        };
+                // Dummy Test Package
+                .addApp(ARCHIVED_PACKAGE, ARCHIVED_CLASS_NAME) // 11
+                .build();
+        mModelHelper.setupDefaultLayoutProvider(builder);
+        mModelHelper.loadModelSync();
+        assertEquals(11, mModelHelper.getBgDataModel().itemsIdMap.size());
 
-        UserManager um = context.getSystemService(UserManager.class);
-        for (ItemInfo info : mModelHelper.getBgDataModel().itemsIdMap) {
-            iconCache.addIconToDBAndMemCache(info, placeholderLogic, new PackageInfo(),
-                    um.getSerialNumberForUser(info.user), true);
-        }
+        UiDevice device = UiDevice.getInstance(getInstrumentation());
+        assertThat(device.executeShellCommand(String.format("pm archive %s", ARCHIVED_PACKAGE)))
+                .isEqualTo("Success\n");
     }
 
     @After
-    public void tearDown() {
+    public void tearDown() throws IOException {
+        TestUtil.uninstallDummyApp();
         mModelHelper.destroy();
     }
 
     private CacheDataUpdatedTask newTask(int op, String... pkg) {
-        return new CacheDataUpdatedTask(op, Process.myUserHandle(),
+        return new CacheDataUpdatedTask(op, myUserHandle(),
                 new HashSet<>(Arrays.asList(pkg)));
     }
 
     @Test
-    public void testCacheUpdate_update_apps() throws Exception {
-        // Clear all icons from apps list so that its easy to check what was updated
-        for (AppInfo info : mModelHelper.getAllAppsList().data) {
-            info.bitmap = BitmapInfo.LOW_RES_INFO;
-        }
+    public void testCacheUpdate_update_apps() {
+        // Run on model executor so that no other task runs in the middle.
+        runOnExecutorSync(MODEL_EXECUTOR, () -> {
+            // Clear all icons from apps list so that its easy to check what was updated
+            allItems().forEach(wi -> wi.bitmap = BitmapInfo.LOW_RES_INFO);
 
-        mModelHelper.executeTaskForTest(newTask(CacheDataUpdatedTask.OP_CACHE_UPDATE, "app1"));
+            mModelHelper.getModel().enqueueModelUpdateTask(
+                    newTask(CacheDataUpdatedTask.OP_CACHE_UPDATE, TEST_PACKAGE));
 
-        // Verify that only the app icons of app1 (id 1 & 2) are updated. Custom shortcut (id 7)
-        // is not updated
-        verifyUpdate(1, 2);
+            // Verify that only the app icons of TEST_PACKAGE (id 2, 3, 4) are updated.
+            verifyUpdate(2, 3, 4);
+        });
+    }
 
-        // Verify that only app1 var updated in allAppsList
-        assertFalse(mModelHelper.getAllAppsList().data.isEmpty());
-        for (AppInfo info : mModelHelper.getAllAppsList().data) {
-            if (info.componentName.getPackageName().equals("app1")) {
+    @Test
+    public void testSessionUpdate_ignores_normal_apps() {
+        // Run on model executor so that no other task runs in the middle.
+        runOnExecutorSync(MODEL_EXECUTOR, () -> {
+            // Clear all icons from apps list so that its easy to check what was updated
+            allItems().forEach(wi -> wi.bitmap = BitmapInfo.LOW_RES_INFO);
+
+            mModelHelper.getModel().enqueueModelUpdateTask(
+                    newTask(CacheDataUpdatedTask.OP_SESSION_UPDATE, TEST_PACKAGE));
+
+            // TEST_PACKAGE has no restored shortcuts. Verify that nothing was updated.
+            verifyUpdate();
+        });
+    }
+
+    @Test
+    public void testSessionUpdate_updates_pending_apps() {
+        // Run on model executor so that no other task runs in the middle.
+        runOnExecutorSync(MODEL_EXECUTOR, () -> {
+            LauncherAppState.getInstance(mContext).getIconCache().updateSessionCache(
+                    new PackageUserKey(PENDING_APP_1, myUserHandle()),
+                    mContext.getPackageManager().getPackageInstaller().getSessionInfo(mSession1));
+
+            // Clear all icons from apps list so that its easy to check what was updated
+            allItems().forEach(wi -> wi.bitmap = BitmapInfo.LOW_RES_INFO);
+
+            mModelHelper.getModel().enqueueModelUpdateTask(
+                    newTask(CacheDataUpdatedTask.OP_SESSION_UPDATE, PENDING_APP_1));
+
+            // Only restored apps from PENDING_APP_1 (id 5, 6, 7) are updated
+            verifyUpdate(5, 6, 7);
+        });
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ENABLE_SUPPORT_FOR_ARCHIVING)
+    public void testSessionUpdate_archivedApps_sessionInfoPrioritized() {
+        // Run on model executor so that no other task runs in the middle.
+        runOnExecutorSync(MODEL_EXECUTOR, () -> {
+            // Clear all icons from apps list so that its easy to check what was updated
+            allItems().forEach(wi -> wi.bitmap = BitmapInfo.LOW_RES_INFO);
+            int mSession2 = mModelHelper.createInstallerSession(ARCHIVED_PACKAGE);
+            mModelHelper.getModel().enqueueModelUpdateTask(
+                    newTask(CacheDataUpdatedTask.OP_CACHE_UPDATE, ARCHIVED_PACKAGE));
+            List<Integer> pendingArchivedAppIds = List.of(11);
+            // Mark the app items as archived.
+            allItems().forEach(wi -> {
+                if (pendingArchivedAppIds.contains(wi.id)) {
+                    wi.runtimeStatusFlags |= FLAG_ARCHIVED;
+                }
+            });
+            // Before cache is updated with sessionInfo, confirm the title.
+            for (WorkspaceItemInfo info : allItems()) {
+                if (pendingArchivedAppIds.contains(info.id)) {
+                    assertEquals(info.title, ARCHIVED_TITLE);
+                }
+            }
+
+            // Update the cache with session details.
+            LauncherAppState.getInstance(mContext).getIconCache().updateSessionCache(
+                    new PackageUserKey(ARCHIVED_PACKAGE, myUserHandle()),
+                    mContext.getPackageManager().getPackageInstaller().getSessionInfo(mSession2));
+
+            // Trigger a refresh for workspace itemInfo objects.
+            mModelHelper.getModel().enqueueModelUpdateTask(
+                    newTask(CacheDataUpdatedTask.OP_SESSION_UPDATE, ARCHIVED_PACKAGE));
+            // Verify the new title from session is applied to the iconInfo.
+            for (WorkspaceItemInfo info : allItems()) {
+                if (pendingArchivedAppIds.contains(info.id)) {
+                    assertEquals(info.title, ARCHIVED_PACKAGE);
+                }
+            }
+        });
+    }
+
+    private void verifyUpdate(int... idsUpdated) {
+        IntSet updates = IntSet.wrap(idsUpdated);
+        for (WorkspaceItemInfo info : allItems()) {
+            if (updates.contains(info.id)) {
                 assertFalse(info.bitmap.isNullOrLowRes());
             } else {
                 assertTrue(info.bitmap.isNullOrLowRes());
@@ -122,33 +223,7 @@ public class CacheDataUpdatedTaskTest {
         }
     }
 
-    @Test
-    public void testSessionUpdate_ignores_normal_apps() throws Exception {
-        mModelHelper.executeTaskForTest(newTask(CacheDataUpdatedTask.OP_SESSION_UPDATE, "app1"));
-
-        // app1 has no restored shortcuts. Verify that nothing was updated.
-        verifyUpdate();
-    }
-
-    @Test
-    public void testSessionUpdate_updates_pending_apps() throws Exception {
-        mModelHelper.executeTaskForTest(newTask(CacheDataUpdatedTask.OP_SESSION_UPDATE, "app3"));
-
-        // app3 has only restored apps (id 5, 6) and shortcuts (id 9). Verify that only apps were
-        // were updated
-        verifyUpdate(5, 6);
-    }
-
-    private void verifyUpdate(Integer... idsUpdated) {
-        HashSet<Integer> updates = new HashSet<>(Arrays.asList(idsUpdated));
-        for (ItemInfo info : mModelHelper.getBgDataModel().itemsIdMap) {
-            if (updates.contains(info.id)) {
-                assertEquals(NEW_LABEL_PREFIX + info.id, info.title);
-                assertFalse(((WorkspaceItemInfo) info).bitmap.isNullOrLowRes());
-            } else {
-                assertNotSame(NEW_LABEL_PREFIX + info.id, info.title);
-                assertTrue(((WorkspaceItemInfo) info).bitmap.isNullOrLowRes());
-            }
-        }
+    private List<WorkspaceItemInfo> allItems() {
+        return ((FolderInfo) mModelHelper.getBgDataModel().itemsIdMap.get(1)).contents;
     }
 }

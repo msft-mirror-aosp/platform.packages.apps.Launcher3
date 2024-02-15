@@ -15,8 +15,8 @@
  */
 package com.android.quickstep;
 
-import static com.android.launcher3.anim.Interpolators.ACCEL_1_5;
-import static com.android.launcher3.anim.Interpolators.LINEAR;
+import static com.android.app.animation.Interpolators.ACCELERATE_1_5;
+import static com.android.app.animation.Interpolators.LINEAR;
 
 import android.animation.Animator;
 import android.content.Context;
@@ -37,6 +37,7 @@ import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.touch.PagedOrientationHandler;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
+import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.RectFSpringAnim;
 import com.android.quickstep.util.RectFSpringAnim.DefaultSpringConfig;
@@ -151,7 +152,7 @@ public abstract class SwipeUpAnimationLogic implements
     @UiThread
     public abstract void onCurrentShiftUpdated();
 
-    protected PagedOrientationHandler getOrientationHandler() {
+    protected RecentsPagedOrientationHandler getOrientationHandler() {
         // OrientationHandler should be independent of remote target, can directly take one
         return mRemoteTargetHandles[0].getTaskViewSimulator()
                 .getOrientationState().getOrientationHandler();
@@ -218,7 +219,7 @@ public abstract class SwipeUpAnimationLogic implements
             if (progress >= end) {
                 return 0f;
             }
-            return Utilities.mapToRange(progress, start, end, 1, 0, ACCEL_1_5);
+            return Utilities.mapToRange(progress, start, end, 1, 0, ACCELERATE_1_5);
         }
     }
 
