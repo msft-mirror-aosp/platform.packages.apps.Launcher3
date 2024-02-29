@@ -48,6 +48,7 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutRequest;
+import com.android.launcher3.uioverrides.ApiWrapper;
 import com.android.launcher3.util.FlagOp;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInfoMatcher;
@@ -240,8 +241,9 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                                 isTargetValid = context.getSystemService(LauncherApps.class)
                                         .isActivityEnabled(cn, mUser);
                             }
-                            if (!isTargetValid && si.hasStatusFlag(
-                                    FLAG_RESTORED_ICON | FLAG_AUTOINSTALL_ICON)) {
+                            if (!isTargetValid && (si.hasStatusFlag(
+                                    FLAG_RESTORED_ICON | FLAG_AUTOINSTALL_ICON)
+                                    || si.isArchived())) {
                                 if (updateWorkspaceItemIntent(context, si, packageName)) {
                                     infoUpdated = true;
                                 } else if (si.hasPromiseIconUi()) {
@@ -283,6 +285,12 @@ public class PackageUpdatedTask extends BaseModelUpdateTask {
                                 }
                             }
                             if (si.itemType == Favorites.ITEM_TYPE_APPLICATION) {
+                                if (activities != null && !activities.isEmpty()) {
+                                    si.status = ApiWrapper
+                                            .isNonResizeableActivity(activities.get(0))
+                                            ? si.status | WorkspaceItemInfo.FLAG_NON_RESIZEABLE
+                                            : si.status & ~WorkspaceItemInfo.FLAG_NON_RESIZEABLE;
+                                }
                                 iconCache.getTitleAndIcon(si, si.usingLowResIcon());
                                 infoUpdated = true;
                             }

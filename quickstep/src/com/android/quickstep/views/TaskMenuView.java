@@ -18,6 +18,8 @@ package com.android.quickstep.views;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.launcher3.Flags.enableOverviewIconMenu;
+import static com.android.launcher3.testing.shared.TestProtocol.TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE;
+import static com.android.launcher3.testing.shared.TestProtocol.testLogD;
 import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.quickstep.views.TaskThumbnailView.DIM_ALPHA;
@@ -134,6 +136,17 @@ public class TaskMenuView extends AbstractFloatingView {
                         TaskCornerRadius.get(view.getContext()));
             }
         };
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        if (!enableOverviewIconMenu()) {
+            int maxMenuHeight = calculateMaxHeight();
+            if (MeasureSpec.getSize(heightMeasureSpec) > maxMenuHeight) {
+                heightMeasureSpec = MeasureSpec.makeMeasureSpec(maxMenuHeight, MeasureSpec.AT_MOST);
+            }
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 
     public void onRotationChanged() {
@@ -359,6 +372,8 @@ public class TaskMenuView extends AbstractFloatingView {
         mOpenCloseAnimator.addListener(new AnimationSuccessListener() {
             @Override
             public void onAnimationStart(Animator animation) {
+                testLogD(TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE,
+                        "TaskMenuView.java.animateOpenOrClosed: onAnimationStart");
                 setVisibility(VISIBLE);
                 if (closing && mOnClosingStartCallback != null) {
                     mOnClosingStartCallback.run();
@@ -367,6 +382,8 @@ public class TaskMenuView extends AbstractFloatingView {
 
             @Override
             public void onAnimationSuccess(Animator animator) {
+                testLogD(TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE,
+                        "TaskMenuView.java.animateOpenOrClosed: onAnimationSuccess");
                 if (closing) {
                     closeComplete();
                 }
@@ -391,6 +408,18 @@ public class TaskMenuView extends AbstractFloatingView {
                 0);
         Rect toRect = new Rect(0, 0, getWidth(), getHeight());
         return new RoundedRectRevealOutlineProvider(radius, radius, fromRect, toRect);
+    }
+
+    /**
+     * Calculates max height based on how much space we have available.
+     * If not enough space then the view will scroll. The maximum menu size will sit inside the task
+     * with a margin on the top and bottom.
+     */
+    private int calculateMaxHeight() {
+        float taskBottom = mTaskView.getHeight() + mTaskView.getPersistentTranslationY();
+        float taskInsetMargin = getResources().getDimension(R.dimen.task_card_margin);
+
+        return (int) (taskBottom - taskInsetMargin - getTranslationY());
     }
 
     private void setOnClosingStartCallback(Runnable onClosingStartCallback) {

@@ -37,6 +37,7 @@ import android.content.pm.ShortcutInfo;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
 import android.graphics.drawable.Drawable;
+import android.os.Looper;
 import android.os.Process;
 import android.os.Trace;
 import android.os.UserHandle;
@@ -44,6 +45,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseArray;
 
+import androidx.annotation.AnyThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -54,7 +56,6 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.icons.ComponentWithLabel.ComponentCachingLogic;
 import com.android.launcher3.icons.cache.BaseIconCache;
 import com.android.launcher3.icons.cache.CachingLogic;
-import com.android.launcher3.icons.cache.HandlerRunnable;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.IconRequestInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
@@ -63,9 +64,9 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutKey;
+import com.android.launcher3.util.CancellableTask;
 import com.android.launcher3.util.InstantAppResolver;
 import com.android.launcher3.util.PackageUserKey;
-import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.widget.WidgetSections;
 import com.android.launcher3.widget.WidgetSections.WidgetSection;
 
@@ -100,7 +101,7 @@ public class IconCache extends BaseIconCache {
     private final UserCache mUserManager;
     private final InstantAppResolver mInstantAppResolver;
     private final IconProvider mIconProvider;
-    private final HandlerRunnable mCancelledRunnable;
+    private final CancellableTask mCancelledTask;
 
     private final SparseArray<BitmapInfo> mWidgetCategoryBitmapInfos;
 
@@ -119,9 +120,8 @@ public class IconCache extends BaseIconCache {
         mIconProvider = iconProvider;
         mWidgetCategoryBitmapInfos = new SparseArray<>();
 
-        mCancelledRunnable = new HandlerRunnable(
-                mWorkerHandler, () -> null, MAIN_EXECUTOR, c -> { });
-        mCancelledRunnable.cancel();
+        mCancelledTask = new CancellableTask(() -> null, MAIN_EXECUTOR, c -> { });
+        mCancelledTask.cancel();
     }
 
     @Override
@@ -174,9 +174,9 @@ public class IconCache extends BaseIconCache {
      *
      * @return a request ID that can be used to cancel the request.
      */
-    public HandlerRunnable updateIconInBackground(final ItemInfoUpdateReceiver caller,
+    @AnyThread
+    public CancellableTask updateIconInBackground(final ItemInfoUpdateReceiver caller,
             final ItemInfoWithIcon info) {
-        Preconditions.assertUIThread();
         Supplier<ItemInfoWithIcon> task;
         if (info instanceof AppInfo || info instanceof WorkspaceItemInfo) {
             task = () -> {
@@ -191,16 +191,22 @@ public class IconCache extends BaseIconCache {
         } else {
             Log.i(TAG, "Icon update not supported for "
                     + info == null ? "null" : info.getClass().getName());
-            return mCancelledRunnable;
+            return mCancelledTask;
         }
 
-        if (mPendingIconRequestCount <= 0) {
-            MODEL_EXECUTOR.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
+        Runnable endRunnable;
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            if (mPendingIconRequestCount <= 0) {
+                MODEL_EXECUTOR.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
+            }
+            mPendingIconRequestCount++;
+            endRunnable = this::onIconRequestEnd;
+        } else {
+            endRunnable = () -> { };
         }
-        mPendingIconRequestCount++;
 
-        HandlerRunnable<ItemInfoWithIcon> request = new HandlerRunnable<>(mWorkerHandler,
-                task, MAIN_EXECUTOR, caller::reapplyItemInfo, this::onIconRequestEnd);
+        CancellableTask<ItemInfoWithIcon> request = new CancellableTask<>(
+                task, MAIN_EXECUTOR, caller::reapplyItemInfo, endRunnable);
         Utilities.postAsyncCallback(mWorkerHandler, request);
         return request;
     }

@@ -20,6 +20,7 @@ import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
 import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IN_APP;
+import static com.android.quickstep.OverviewCommandHelper.TYPE_HIDE;
 
 import android.content.Intent;
 import android.graphics.drawable.BitmapDrawable;
@@ -38,7 +39,9 @@ import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SplitConfigurationOptions;
+import com.android.quickstep.OverviewCommandHelper;
 import com.android.quickstep.util.GroupTask;
+import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskView;
 import com.android.quickstep.views.TaskView.TaskIdAttributeContainer;
@@ -260,7 +263,8 @@ public class TaskbarUIController {
                                     taskAttributes.getThumbnailView(),
                                     taskAttributes.getThumbnailView().getThumbnail(),
                                     null /* intent */,
-                                    null /* user */);
+                                    null /* user */,
+                                    info);
                             return;
                         }
                     }
@@ -273,7 +277,8 @@ public class TaskbarUIController {
                             startingView,
                             null /* thumbnail */,
                             intent,
-                            info.user);
+                            info.user,
+                            info);
                 }
         );
     }
@@ -358,6 +363,28 @@ public class TaskbarUIController {
 
     /** Adjusts the hotseat for the bubble bar. */
     public void adjustHotseatForBubbleBar(boolean isBubbleBarVisible) {}
+
+    @Nullable
+    protected TISBindHelper getTISBindHelper() {
+        return null;
+    }
+
+    /**
+     * Launches the focused task in the Keyboard Quick Switch view through the OverviewCommandHelper
+     * <p>
+     * Use this helper method when the focused task may be the overview task.
+     */
+    public void launchKeyboardFocusedTask() {
+        TISBindHelper tisBindHelper = getTISBindHelper();
+        if (tisBindHelper == null) {
+            return;
+        }
+        OverviewCommandHelper overviewCommandHelper = tisBindHelper.getOverviewCommandHelper();
+        if (overviewCommandHelper == null) {
+            return;
+        }
+        overviewCommandHelper.addCommand(TYPE_HIDE);
+    }
 
     /**
      * Adjusts the taskbar based on the visibility of the launcher.

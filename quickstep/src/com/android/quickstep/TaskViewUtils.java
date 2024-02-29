@@ -82,9 +82,9 @@ import com.android.quickstep.views.GroupedTaskView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskThumbnailView;
 import com.android.quickstep.views.TaskView;
+import com.android.systemui.animation.RemoteAnimationTargetCompat;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
-import com.android.systemui.shared.system.RemoteAnimationTargetCompat;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -208,7 +208,8 @@ public final class TaskViewUtils {
         BaseActivity baseActivity = BaseActivity.fromContext(context);
         DeviceProfile dp = baseActivity.getDeviceProfile();
         boolean showAsGrid = dp.isTablet;
-        boolean parallaxCenterAndAdjacentTask = taskIndex != recentsView.getCurrentPage();
+        boolean parallaxCenterAndAdjacentTask =
+                !showAsGrid && taskIndex != recentsView.getCurrentPage();
         int taskRectTranslationPrimary = recentsView.getScrollOffset(taskIndex);
         int taskRectTranslationSecondary = showAsGrid ? (int) v.getGridTranslationY() : 0;
 

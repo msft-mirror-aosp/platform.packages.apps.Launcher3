@@ -101,6 +101,7 @@ public final class TestProtocol {
     public static final String REQUEST_TASKBAR_FROM_NAV_THRESHOLD = "taskbar-from-nav-threshold";
     public static final String REQUEST_STASHED_TASKBAR_SCALE = "taskbar-stash-handle-scale";
     public static final String REQUEST_RECREATE_TASKBAR = "recreate-taskbar";
+    public static final String REQUEST_TASKBAR_IME_DOCKED = "taskbar-ime-docked";
     public static final String REQUEST_APP_LIST_FREEZE_FLAGS = "app-list-freeze-flags";
     public static final String REQUEST_APPS_LIST_SCROLL_Y = "apps-list-scroll-y";
     public static final String REQUEST_TASKBAR_APPS_LIST_SCROLL_Y = "taskbar-apps-list-scroll-y";
@@ -172,6 +173,9 @@ public final class TestProtocol {
     public static final String OVERVIEW_OVER_HOME = "b/279059025";
     public static final String UIOBJECT_STALE_ELEMENT = "b/319501259";
     public static final String ACTIVITY_NOT_RESUMED_AFTER_BACK = "b/322823209";
+    public static final String GET_FROM_RECENTS_FAILURE = "b/321775748";
+    public static final String SUCCESSFUL_GESTURE_MISMATCH_EVENTS = "b/324940434";
+    public static final String TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE = "b/326073471";
 
     public static final String REQUEST_EMULATE_DISPLAY = "emulate-display";
     public static final String REQUEST_STOP_EMULATE_DISPLAY = "stop-emulate-display";

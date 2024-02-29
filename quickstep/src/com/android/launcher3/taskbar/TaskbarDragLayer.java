@@ -30,9 +30,12 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewTreeObserver;
+import android.view.WindowInsets;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.Insets;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.android.app.viewcapture.SettingsAwareViewCapture;
 import com.android.launcher3.AbstractFloatingView;
@@ -111,6 +114,18 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
     }
 
     @Override
+    public WindowInsets onApplyWindowInsets(WindowInsets insets) {
+        if (insets != null) {
+            WindowInsetsCompat insetsCompat = WindowInsetsCompat.toWindowInsetsCompat(insets, this);
+            Insets imeInsets = insetsCompat.getInsets(WindowInsetsCompat.Type.ime());
+            if (imeInsets != null) {
+                mControllerCallbacks.onImeInsetChanged();
+            }
+        }
+        return insets;
+    }
+
+    @Override
     public void recreateControllers() {
         mControllers = mControllerCallbacks.getTouchControllers();
     }
@@ -144,6 +159,15 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
         super.onDetachedFromWindow();
         mViewCaptureCloseable.close();
         onDestroy(true);
+    }
+
+    @Override
+    protected boolean isEventWithinSystemGestureRegion(MotionEvent ev) {
+        final float x = ev.getX();
+        final float y = ev.getY();
+
+        return x >= mSystemGestureRegion.left && x < getWidth() - mSystemGestureRegion.right
+                && y >= mSystemGestureRegion.top;
     }
 
     @Override

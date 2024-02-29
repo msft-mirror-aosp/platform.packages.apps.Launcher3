@@ -147,14 +147,15 @@ import com.android.launcher3.anim.SpringProperty;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.desktop.DesktopRecentsTransitionController;
-import com.android.launcher3.icons.cache.HandlerRunnable;
 import com.android.launcher3.logging.StatsLogManager;
+import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.OverScroll;
+import com.android.launcher3.util.CancellableTask;
 import com.android.launcher3.util.DynamicResource;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
@@ -589,8 +590,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                 return;
             }
             Task.TaskKey taskKey = taskView.getTask().key;
-            UI_HELPER_EXECUTOR.execute(new HandlerRunnable<>(
-                    UI_HELPER_EXECUTOR.getHandler(),
+            UI_HELPER_EXECUTOR.execute(new CancellableTask<>(
                     () -> PackageManagerWrapper.getInstance()
                             .getActivityInfo(taskKey.getComponent(), taskKey.userId) == null,
                     MAIN_EXECUTOR,
@@ -2093,22 +2093,20 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     // Update task size and padding that are dependent on DeviceProfile and insets.
     private void updateSizeAndPadding() {
         DeviceProfile dp = mActivity.getDeviceProfile();
-        getTaskSize(mTempRect);
-        mTaskWidth = mTempRect.width();
-        mTaskHeight = mTempRect.height();
+        getTaskSize(mLastComputedTaskSize);
+        mTaskWidth = mLastComputedTaskSize.width();
+        mTaskHeight = mLastComputedTaskSize.height();
 
-        mTempRect.top -= dp.overviewTaskThumbnailTopMarginPx;
-        setPadding(mTempRect.left - mInsets.left, mTempRect.top - mInsets.top,
-                dp.widthPx - mInsets.right - mTempRect.right,
-                dp.heightPx - mInsets.bottom - mTempRect.bottom);
+        setPadding(mLastComputedTaskSize.left - mInsets.left,
+                mLastComputedTaskSize.top - dp.overviewTaskThumbnailTopMarginPx - mInsets.top,
+                dp.widthPx - mInsets.right - mLastComputedTaskSize.right,
+                dp.heightPx - mInsets.bottom - mLastComputedTaskSize.bottom);
 
-        mSizeStrategy.calculateGridSize(mActivity.getDeviceProfile(), mActivity,
-                mLastComputedGridSize);
-        mSizeStrategy.calculateGridTaskSize(mActivity, mActivity.getDeviceProfile(),
-                mLastComputedGridTaskSize, getPagedOrientationHandler());
+        mSizeStrategy.calculateGridSize(dp, mActivity, mLastComputedGridSize);
+        mSizeStrategy.calculateGridTaskSize(mActivity, dp, mLastComputedGridTaskSize,
+                getPagedOrientationHandler());
         if (isDesktopModeSupported()) {
-            mSizeStrategy.calculateDesktopTaskSize(mActivity, mActivity.getDeviceProfile(),
-                    mLastComputedDesktopTaskSize);
+            mSizeStrategy.calculateDesktopTaskSize(mActivity, dp, mLastComputedDesktopTaskSize);
         }
         if (enableGridOnlyOverview()) {
             mSizeStrategy.calculateCarouselTaskSize(mActivity, dp, mLastComputedCarouselTaskSize,
@@ -2122,6 +2120,7 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
 
         // Force TaskView to update size from thumbnail
         updateTaskSize();
+        updatePivots();
     }
 
     /**
@@ -2168,7 +2167,6 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
     public void getTaskSize(Rect outRect) {
         mSizeStrategy.calculateTaskSize(mActivity, mActivity.getDeviceProfile(), outRect,
                 getPagedOrientationHandler());
-        mLastComputedTaskSize.set(outRect);
     }
 
     /**
@@ -4263,10 +4261,12 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
         for (int i = getTaskViewCount() - 1; i >= 0; i--) {
             TaskView child = requireTaskViewAt(i);
             int[] childTaskIds = child.getTaskIds();
-            if (!mRunningTaskTileHidden ||
-                    (childTaskIds[0] != runningTaskId && childTaskIds[1] != runningTaskId)) {
-                child.setStableAlpha(alpha);
+            if (runningTaskId != INVALID_TASK_ID
+                    && mRunningTaskTileHidden
+                    && (childTaskIds[0] == runningTaskId || childTaskIds[1] == runningTaskId)) {
+                continue;
             }
+            child.setStableAlpha(alpha);
         }
         mClearAllButton.setContentAlpha(mContentAlpha);
         int alphaInt = Math.round(alpha * 255);
@@ -4406,9 +4406,6 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
 
         updateEmptyStateUi(changed);
 
-        // Update the pivots such that when the task is scaled, it fills the full page
-        getTaskSize(mTempRect);
-        updatePivots();
         setTaskModalness(mTaskModalness);
         mLastComputedTaskStartPushOutDistance = null;
         mLastComputedTaskEndPushOutDistance = null;
@@ -4814,7 +4811,8 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
      *          false otherwise
      */
     public boolean confirmSplitSelect(TaskView containerTaskView, Task task, Drawable drawable,
-            View secondView, @Nullable Bitmap thumbnail, Intent intent, UserHandle user) {
+            View secondView, @Nullable Bitmap thumbnail, Intent intent, UserHandle user,
+            ItemInfo itemInfo) {
         if (canLaunchFullscreenTask()) {
             return false;
         }
@@ -4833,9 +4831,9 @@ public abstract class RecentsView<ACTIVITY_TYPE extends StatefulActivity<STATE_T
                                 + ") is not dockable / does not support splitscreen"));
                 return true;
             }
-            mSplitSelectStateController.setSecondTask(task);
+            mSplitSelectStateController.setSecondTask(task, itemInfo);
         } else {
-            mSplitSelectStateController.setSecondTask(intent, user);
+            mSplitSelectStateController.setSecondTask(intent, user, itemInfo);
         }
 
         RectF secondTaskStartingBounds = new RectF();

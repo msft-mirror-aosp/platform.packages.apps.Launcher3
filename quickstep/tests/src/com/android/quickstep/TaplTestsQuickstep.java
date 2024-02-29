@@ -44,7 +44,7 @@ import com.android.launcher3.tapl.Overview;
 import com.android.launcher3.tapl.OverviewActions;
 import com.android.launcher3.tapl.OverviewTask;
 import com.android.launcher3.tapl.SelectModeButtons;
-import com.android.launcher3.ui.AbstractLauncherUiTest;
+import com.android.launcher3.tapl.Workspace;
 import com.android.launcher3.ui.PortraitLandscapeRunner.PortraitLandscape;
 import com.android.launcher3.util.Wait;
 import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
@@ -70,7 +70,6 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @Before
     public void setUp() throws Exception {
         super.setUp();
-        AbstractLauncherUiTest.initialize(this);
         executeOnLauncher(launcher -> {
             RecentsView recentsView = launcher.getOverviewPanel();
             recentsView.getPagedViewOrientedState().forceAllowRotationForTesting(true);
@@ -229,6 +228,32 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
                 isInState(() -> LauncherState.NORMAL));
     }
 
+    @Test
+    public void testOpenOverviewWithActionPlusTabKeys() throws Exception {
+        startTestAppsWithCheck();
+        startAppFast(CALCULATOR_APP_PACKAGE); // Ensure Calculator is last opened app.
+        Workspace home = mLauncher.goHome();
+        assertTrue("Launcher state is not Home", isInState(() -> LauncherState.NORMAL));
+
+        Overview overview = home.openOverviewFromActionPlusTabKeyboardShortcut();
+
+        assertTrue("Launcher state is not Overview", isInState(() -> LauncherState.OVERVIEW));
+        overview.launchFocusedTaskByEnterKey(CALCULATOR_APP_PACKAGE); // Assert app is focused.
+    }
+
+    @Test
+    public void testOpenOverviewWithRecentsKey() throws Exception {
+        startTestAppsWithCheck();
+        startAppFast(CALCULATOR_APP_PACKAGE); // Ensure Calculator is last opened app.
+        Workspace home = mLauncher.goHome();
+        assertTrue("Launcher state is not Home", isInState(() -> LauncherState.NORMAL));
+
+        Overview overview = home.openOverviewFromRecentsKeyboardShortcut();
+
+        assertTrue("Launcher state is not Overview", isInState(() -> LauncherState.OVERVIEW));
+        overview.launchFocusedTaskByEnterKey(CALCULATOR_APP_PACKAGE); // Assert app is focused.
+    }
+
     private int getCurrentOverviewPage(Launcher launcher) {
         return launcher.<RecentsView>getOverviewPanel().getCurrentPage();
     }
@@ -305,6 +330,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @NavigationModeSwitch
     @PortraitLandscape
     @ScreenRecord // b/313464374
+    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/325659406
     public void testQuickSwitchFromApp() throws Exception {
         startTestActivity(2);
         startTestActivity(3);
@@ -347,7 +373,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
             boolean isTransientTaskbar = mLauncher.isTransientTaskbar();
             // Expect task bar invisible when the launched app was the IME activity.
             LaunchedAppState launchedAppState = getAndAssertLaunchedApp();
-            if (!isTransientTaskbar && isHardwareKeyboard()) {
+            if (!isTransientTaskbar && isHardwareKeyboard() && !mLauncher.isImeDocked()) {
                 launchedAppState.assertTaskbarVisible();
             } else {
                 launchedAppState.assertTaskbarHidden();
@@ -477,6 +503,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
 
     @Test
     @PortraitLandscape
+    @ScreenRecord // b/326839375
     public void testOverviewDeadzones() throws Exception {
         startTestAppsWithCheck();
 
