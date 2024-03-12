@@ -1483,11 +1483,10 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (showPendingWidget) {
             launcherInfo.restoreStatus = LauncherAppWidgetInfo.FLAG_UI_NOT_READY;
             PendingAppWidgetHostView pendingAppWidgetHostView = new PendingAppWidgetHostView(
-                    this, mAppWidgetHolder, launcherInfo, appWidgetInfo);
-            pendingAppWidgetHostView.setPreviewBitmap(widgetPreviewBitmap);
+                    this, mAppWidgetHolder, launcherInfo, appWidgetInfo, widgetPreviewBitmap);
             hostView = pendingAppWidgetHostView;
         } else if (hostView instanceof PendingAppWidgetHostView) {
-            ((PendingAppWidgetHostView) hostView).setPreviewBitmap(null);
+            ((PendingAppWidgetHostView) hostView).setPreviewBitmapAndUpdateBackground(null);
             // User has selected a widget config and exited the config activity, we can trigger
             // re-inflation of PendingAppWidgetHostView to replace it with
             // LauncherAppWidgetHostView in workspace.
@@ -1629,7 +1628,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         } else if (INTENT_ACTION_ALL_APPS_TOGGLE.equals(intent.getAction())) {
             toggleAllAppsFromIntent(alreadyOnHome);
         } else if (Intent.ACTION_SHOW_WORK_APPS.equals(intent.getAction())) {
-            showAllAppsWorkTabFromIntent(alreadyOnHome);
+            showAllAppsWithSelectedTabFromIntent(alreadyOnHome,
+                    ActivityAllAppsContainerView.AdapterHolder.WORK);
         }
 
         TraceHelper.INSTANCE.endSection();
@@ -1661,13 +1661,19 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     protected void showAllAppsFromIntent(boolean alreadyOnHome) {
-        AbstractFloatingView.closeAllOpenViews(this);
-        getStateManager().goToState(ALL_APPS, alreadyOnHome);
+        showAllAppsWithSelectedTabFromIntent(alreadyOnHome,
+                ActivityAllAppsContainerView.AdapterHolder.MAIN);
     }
 
-    private void showAllAppsWorkTabFromIntent(boolean alreadyOnHome) {
-        showAllAppsFromIntent(alreadyOnHome);
-        mAppsView.switchToTab(ActivityAllAppsContainerView.AdapterHolder.WORK);
+    private void showAllAppsWithSelectedTabFromIntent(boolean alreadyOnHome, int tab) {
+        AbstractFloatingView.closeAllOpenViews(this);
+        getStateManager().goToState(ALL_APPS, alreadyOnHome);
+        if (mAppsView.isSearching()) {
+            mAppsView.reset(alreadyOnHome);
+        }
+        if (mAppsView.getCurrentPage() != tab) {
+            mAppsView.switchToTab(tab);
+        }
     }
 
     /**
@@ -1822,7 +1828,9 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (isActivityStarted) {
             DragView dropView = getDragLayer().clearAnimatedView();
             if (dropView != null && dropView.containsAppWidgetHostView()) {
-                widgetPreviewBitmap = getBitmapFromView(dropView.getContentView());
+                // Extracting Bitmap from dropView instead of its content view produces the correct
+                // bitmap.
+                widgetPreviewBitmap = getBitmapFromView(dropView);
             }
         }
 

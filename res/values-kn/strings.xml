@@ -31,6 +31,8 @@
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"%1$s ಗಾಗಿ ಆ್ಯಪ್ ಮಾಹಿತಿ"</string>
     <string name="save_app_pair" msgid="5647523853662686243">"ಆ್ಯಪ್ ಜೋಡಿ ಉಳಿಸಿ"</string>
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
+    <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"ಈ ಆ್ಯಪ್ ಜೋಡಿಯು ಈ ಸಾಧನದಲ್ಲಿ ಬೆಂಬಲಿತವಾಗಿಲ್ಲ"</string>
+    <string name="app_pair_needs_unfold" msgid="4588897528143807002">"ಈ ಆ್ಯಪ್ ಜೋಡಿಯನ್ನು ಬಳಸಲು ಸಾಧನವನ್ನು ಅನ್‌ಫೋಲ್ಡ್ ಮಾಡಿ"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"ವಿಜೆಟ್ ಸರಿಸಲು ಸ್ಪರ್ಶಿಸಿ ಮತ್ತು ಹಿಡಿದುಕೊಳ್ಳಿ."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"ವಿಜೆಟ್ ಸರಿಸಲು ಅಥವಾ ಕಸ್ಟಮ್ ಕ್ರಿಯೆಗಳನ್ನು ಬಳಸಲು ಡಬಲ್-ಟ್ಯಾಪ್ ಮಾಡಿ ಮತ್ತು ಹಿಡಿದುಕೊಳ್ಳಿ."</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
@@ -40,8 +42,7 @@
     <string name="add_to_home_screen" msgid="9168649446635919791">"ಹೋಮ್ ಸ್ಕ್ರೀನ್‌ಗೆ ಸೇರಿಸಿ"</string>
     <string name="added_to_home_screen_accessibility_text" msgid="4451545765448884415">"ಹೋಮ್‌ಸ್ಕ್ರೀನ್‌ಗೆ <xliff:g id="WIDGET_NAME">%1$s</xliff:g> ವಿಜೆಟ್ ಅನ್ನು ಸೇರಿಸಲಾಗಿದೆ"</string>
     <string name="suggested_widgets_header_title" msgid="1844314680798145222">"ಸಲಹೆಗಳು"</string>
-    <!-- no translation found for productivity_widget_recommendation_category_label (1722113555721820766) -->
-    <skip />
+    <string name="productivity_widget_recommendation_category_label" msgid="1722113555721820766">"ನಿಮ್ಮ ದೈನಂದಿನ ಎಸೆನ್ಶಿಯಲ್‌ಗಳು"</string>
     <string name="news_widget_recommendation_category_label" msgid="3908242346768119070">"ನಿಮಗಾಗಿ ಸುದ್ದಿ"</string>
     <string name="social_and_entertainment_widget_recommendation_category_label" msgid="2923840997302308191">"ನೀವು ವಿಶ್ರಾಂತಿ ಪಡೆಯುವ ಸ್ಥಳ"</string>
     <string name="fitness_widget_recommendation_category_label" msgid="2657652999128882431">"ನಿಮ್ಮ ಫಿಟ್‌ನೆಸ್ ಗುರಿಗಳನ್ನು ಸಾಧಿಸಿ"</string>
@@ -134,6 +135,7 @@
     <string name="app_installing_title" msgid="5864044122733792085">"<xliff:g id="NAME">%1$s</xliff:g> ಇನ್‌ಸ್ಟಾಲ್ ಮಾಡಲಾಗುತ್ತಿದೆ, <xliff:g id="PROGRESS">%2$s</xliff:g> ಪೂರ್ಣಗೊಂಡಿದೆ"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g> ಡೌನ್‌ಲೋಡ್‌ ಮಾಡಲಾಗುತ್ತಿದೆ, <xliff:g id="PROGRESS">%2$s</xliff:g> ಪೂರ್ಣಗೊಂಡಿದೆ"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g> ಸ್ಥಾಪಿಸಲು ಕಾಯಲಾಗುತ್ತಿದೆ"</string>
+    <string name="app_archived_title" msgid="9124290918876665128">"<xliff:g id="NAME">%1$s</xliff:g> ಅನ್ನು ಆರ್ಕೈವ್ ಮಾಡಲಾಗಿದೆ. ಡೌನ್‌ಲೋಡ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ."</string>
     <string name="dialog_update_title" msgid="114234265740994042">"ಆ್ಯಪ್ ಅಪ್‌ಡೇಟ್ ಅಗತ್ಯವಿದೆ"</string>
     <string name="dialog_update_message" msgid="4176784553982226114">"ಈ ಐಕಾನ್‌ಗಾಗಿ ಆ್ಯಪ್ ಅನ್ನು ಅಪ್‌ಡೇಟ್ ಮಾಡಲಾಗಿಲ್ಲ. ಈ ಶಾರ್ಟ್‌ಕಟ್ ಅನ್ನು ಮರು-ಸಕ್ರಿಯಗೊಳಿಸಲು ನೀವು ಹಸ್ತಚಾಲಿತವಾಗಿ ಅಪ್‌ಡೇಟ್ ಮಾಡಬಹುದು ಅಥವಾ ಐಕಾನ್ ಅನ್ನು ತೆಗೆದುಹಾಕಬಹುದು."</string>
     <string name="dialog_update" msgid="2178028071796141234">"ಅಪ್‌ಡೇಟ್ ಮಾಡಿ"</string>
@@ -185,8 +187,7 @@
     <string name="ps_container_title" msgid="4391796149519594205">"ಖಾಸಗಿ"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"ಖಾಸಗಿ ಸ್ಪೇಸ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳು"</string>
     <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"ಖಾಸಗಿ ಸ್ಪೇಸ್ ಅನ್ನು ಲಾಕ್/ಅನ್‌ಲಾಕ್ ಮಾಡಿ"</string>
-    <!-- no translation found for ps_container_lock_title (2640257399982364682) -->
-    <skip />
+    <string name="ps_container_lock_title" msgid="2640257399982364682">"ಲಾಕ್ ಮಾಡಿ"</string>
     <string name="ps_container_transition" msgid="8667331812048014412">"ಖಾಸಗಿ ಸ್ಪೇಸ್ ಪರಿವರ್ತನೆಯಾಗುತ್ತಿದೆ"</string>
     <string name="ps_add_button_label" msgid="8611055839242385935">"ಆ್ಯಪ್‌ಗಳನ್ನು ಇನ್‌ಸ್ಟಾಲ್ ಮಾಡಿ"</string>
     <string name="ps_add_button_content_description" msgid="3254274107740952556">"ಆ್ಯಪ್‌ಗಳನ್ನು ಪ್ರೈವೇಟ್ ಸ್ಪೇಸ್‌ನಲ್ಲಿ ಇನ್‌ಸ್ಟಾಲ್ ಮಾಡಿ"</string>

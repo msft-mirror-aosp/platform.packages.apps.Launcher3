@@ -31,6 +31,8 @@
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"Maelezo ya programu ya %1$s"</string>
     <string name="save_app_pair" msgid="5647523853662686243">"Hifadhi jozi ya programu"</string>
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
+    <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"Jozi hii ya programu haitumiki kwenye kifaa hiki"</string>
+    <string name="app_pair_needs_unfold" msgid="4588897528143807002">"Fungua kifaa ili utumie jozi hii ya programu"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Gusa na ushikilie ili usogeze wijeti."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Gusa mara mbili na ushikilie ili usogeze wijeti au utumie vitendo maalum."</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
@@ -40,8 +42,7 @@
     <string name="add_to_home_screen" msgid="9168649446635919791">"Weka kwenye skrini ya kwanza"</string>
     <string name="added_to_home_screen_accessibility_text" msgid="4451545765448884415">"Umeongeza wijeti ya <xliff:g id="WIDGET_NAME">%1$s</xliff:g> kwenye skrini ya kwanza"</string>
     <string name="suggested_widgets_header_title" msgid="1844314680798145222">"Mapendekezo"</string>
-    <!-- no translation found for productivity_widget_recommendation_category_label (1722113555721820766) -->
-    <skip />
+    <string name="productivity_widget_recommendation_category_label" msgid="1722113555721820766">"Hati Zako Muhimu za Kila Siku"</string>
     <string name="news_widget_recommendation_category_label" msgid="3908242346768119070">"Habari Kwa Ajili Yako"</string>
     <string name="social_and_entertainment_widget_recommendation_category_label" msgid="2923840997302308191">"Mahali Pako pa Kupumzika"</string>
     <string name="fitness_widget_recommendation_category_label" msgid="2657652999128882431">"Fikia Malengo Yako ya Siha"</string>
@@ -134,6 +135,7 @@
     <string name="app_installing_title" msgid="5864044122733792085">"Inasakinisha <xliff:g id="NAME">%1$s</xliff:g>, imekamilika <xliff:g id="PROGRESS">%2$s</xliff:g>"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g> inapakuliwa, <xliff:g id="PROGRESS">%2$s</xliff:g> imekamilika"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g> inasubiri kusakinisha"</string>
+    <string name="app_archived_title" msgid="9124290918876665128">"<xliff:g id="NAME">%1$s</xliff:g> imewekwa kwenye kumbukumbu. Gusa ili uipakue."</string>
     <string name="dialog_update_title" msgid="114234265740994042">"Unahitaji kusasisha programu"</string>
     <string name="dialog_update_message" msgid="4176784553982226114">"Programu ya aikoni hii haijasasishwa. Unaweza kusasisha mwenyewe ili uruhusu upya njia hii ya mkato au uondoe aikoni."</string>
     <string name="dialog_update" msgid="2178028071796141234">"Sasisha"</string>
@@ -182,11 +184,10 @@
     <string name="remote_action_failed" msgid="1383965239183576790">"Hitilafu: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"Nafasi ya faragha"</string>
     <string name="private_space_secondary_label" msgid="611902414159280263">"Funga na ufiche programu za faragha"</string>
-    <string name="ps_container_title" msgid="4391796149519594205">"Ya Faragha"</string>
+    <string name="ps_container_title" msgid="4391796149519594205">"Faragha"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"Mipangilio ya Nafasi ya Faragha"</string>
     <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"Funga/Fungua Nafasi ya Faragha"</string>
-    <!-- no translation found for ps_container_lock_title (2640257399982364682) -->
-    <skip />
+    <string name="ps_container_lock_title" msgid="2640257399982364682">"Funga"</string>
     <string name="ps_container_transition" msgid="8667331812048014412">"Mabadiliko ya Nafasi ya Faragha"</string>
     <string name="ps_add_button_label" msgid="8611055839242385935">"Sakinisha programu"</string>
     <string name="ps_add_button_content_description" msgid="3254274107740952556">"Sakinisha programu kwenye Sehemu ya Faragha"</string>

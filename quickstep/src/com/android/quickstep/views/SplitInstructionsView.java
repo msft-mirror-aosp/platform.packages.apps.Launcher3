@@ -21,11 +21,9 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.content.Context;
-import android.os.Bundle;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.view.ViewGroup;
-import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -130,6 +128,9 @@ public class SplitInstructionsView extends LinearLayout {
             cancelTextView.setOnClickListener((v) -> exitSplitSelection());
             instructionTextView.setText(R.string.toast_contextual_split_select_app);
         }
+
+        // Set accessibility title, will be announced by a11y tools.
+        instructionTextView.setAccessibilityPaneTitle(instructionTextView.getText());
     }
 
     private void exitSplitSelection() {
@@ -139,32 +140,6 @@ public class SplitInstructionsView extends LinearLayout {
         splitSelectController.getSplitAnimationController().playPlaceholderDismissAnim(mLauncher,
                 LAUNCHER_SPLIT_SELECTION_EXIT_CANCEL_BUTTON);
         mLauncher.getStateManager().goToState(LauncherState.NORMAL);
-    }
-
-    @Override
-    public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
-        super.onInitializeAccessibilityNodeInfo(info);
-        if (!FeatureFlags.enableSplitContextually()) {
-            return;
-        }
-
-        info.addAction(new AccessibilityNodeInfo.AccessibilityAction(
-                R.string.toast_split_select_cont_desc,
-                getResources().getString(R.string.toast_split_select_cont_desc)
-        ));
-    }
-
-    @Override
-    public boolean performAccessibilityAction(int action, Bundle arguments) {
-        if (!FeatureFlags.enableSplitContextually()) {
-            return super.performAccessibilityAction(action, arguments);
-        }
-
-        if (action == R.string.toast_split_select_cont_desc) {
-            exitSplitSelection();
-            return true;
-        }
-        return super.performAccessibilityAction(action, arguments);
     }
 
     void ensureProperRotation() {

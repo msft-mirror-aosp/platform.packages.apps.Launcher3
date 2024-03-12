@@ -31,6 +31,8 @@
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"%1$s အတွက် အက်ပ်အချက်အလက်"</string>
     <string name="save_app_pair" msgid="5647523853662686243">"အက်ပ်တွဲချိတ်ခြင်း သိမ်းရန်"</string>
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
+    <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"ဤအက်ပ်တွဲချိတ်ခြင်းကို ဤစက်တွင် ပံ့ပိုးမထားပါ"</string>
+    <string name="app_pair_needs_unfold" msgid="4588897528143807002">"ဤအက်ပ်တွဲချိတ်ခြင်းကို သုံးရန် စက်ကိုဖြန့်ပါ"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"ဝိဂျက်ကို ရွှေ့ရန် တို့ပြီး ဖိထားပါ။"</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"ဝိဂျက်ကို ရွှေ့ရန် (သို့) စိတ်ကြိုက်လုပ်ဆောင်ချက်များကို သုံးရန် နှစ်ချက်တို့ပြီး ဖိထားပါ။"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
@@ -40,8 +42,7 @@
     <string name="add_to_home_screen" msgid="9168649446635919791">"ပင်မစာမျက်နှာတွင် ထည့်ရန်"</string>
     <string name="added_to_home_screen_accessibility_text" msgid="4451545765448884415">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> ဝိဂျက်ကို ပင်မစာမျက်နှာတွင် ထည့်လိုက်ပြီ"</string>
     <string name="suggested_widgets_header_title" msgid="1844314680798145222">"အကြံပြုချက်"</string>
-    <!-- no translation found for productivity_widget_recommendation_category_label (1722113555721820766) -->
-    <skip />
+    <string name="productivity_widget_recommendation_category_label" msgid="1722113555721820766">"သင်၏ နေ့စဉ်မရှိမဖြစ်များ"</string>
     <string name="news_widget_recommendation_category_label" msgid="3908242346768119070">"သင့်အတွက် သတင်းများ"</string>
     <string name="social_and_entertainment_widget_recommendation_category_label" msgid="2923840997302308191">"သင်အနားယူသောနေရာ"</string>
     <string name="fitness_widget_recommendation_category_label" msgid="2657652999128882431">"သင့်ကြံ့ခိုင်ရေးပန်းတိုင်ဆီ သွားရန်"</string>
@@ -134,6 +135,7 @@
     <string name="app_installing_title" msgid="5864044122733792085">"<xliff:g id="NAME">%1$s</xliff:g> ကို ထည့်သွင်းနေသည်၊ <xliff:g id="PROGRESS">%2$s</xliff:g> ပြီးပါပြီ"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g> ဒေါင်းလုဒ်လုပ်နေသည်၊ <xliff:g id="PROGRESS">%2$s</xliff:g> ပြီးပါပြီ"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g> ကိုထည့်သွင်းရန်စောင့်နေသည်"</string>
+    <string name="app_archived_title" msgid="9124290918876665128">"<xliff:g id="NAME">%1$s</xliff:g> ကို သိမ်းထားသည်။ ဒေါင်းလုဒ်လုပ်ရန် တို့ပါ။"</string>
     <string name="dialog_update_title" msgid="114234265740994042">"အက်ပ်ကို အပ်ဒိတ်လုပ်ရန် လိုအပ်သည်"</string>
     <string name="dialog_update_message" msgid="4176784553982226114">"ဤသင်္ကေတအတွက် အက်ပ်ကို အပ်ဒိတ်လုပ်မထားပါ။ ဤဖြတ်လမ်းလင့်ခ်ကို ပြန်ဖွင့်ရန် ကိုယ်တိုင်အပ်ဒိတ်လုပ်နိုင်သည် (သို့) သင်္ကေတကို ဖယ်ရှားနိုင်သည်။"</string>
     <string name="dialog_update" msgid="2178028071796141234">"အပ်ဒိတ်လုပ်ရန်"</string>
@@ -185,8 +187,7 @@
     <string name="ps_container_title" msgid="4391796149519594205">"သီးသန့်"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"သီးသန့်ချတ်ခန်း ဆက်တင်များ"</string>
     <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"သီးသန့်ချတ်ခန်း လော့ခ်ချ/ဖွင့်ရန်"</string>
-    <!-- no translation found for ps_container_lock_title (2640257399982364682) -->
-    <skip />
+    <string name="ps_container_lock_title" msgid="2640257399982364682">"လော့ခ်ချခြင်း"</string>
     <string name="ps_container_transition" msgid="8667331812048014412">"သီးသန့်ချတ်ခန်း အပြောင်းအလဲ"</string>
     <string name="ps_add_button_label" msgid="8611055839242385935">"အက်ပ်များ ထည့်သွင်းခြင်း"</string>
     <string name="ps_add_button_content_description" msgid="3254274107740952556">"‘သီးသန့်နေရာ’ တွင် အက်ပ်များ ထည့်သွင်းနိုင်သည်"</string>
