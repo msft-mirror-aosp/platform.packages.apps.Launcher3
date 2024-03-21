@@ -44,7 +44,7 @@
     <attr name="notificationDotColor" format="color" />
     <attr name="focusOutlineColor" format="color" />
 
-    <attr name="folderPaginationColor" format="color" />
+    <attr name="pageIndicatorDotColor" format="color" />
     <attr name="folderPreviewColor" format="color" />
     <attr name="folderBackgroundColor" format="color" />
     <attr name="folderIconRadius" format="float" />
@@ -72,6 +72,8 @@
     <attr name="widgetPickerSelectedTabTextColor" format="color"/>
     <attr name="widgetPickerUnselectedTabTextColor" format="color"/>
     <attr name="widgetPickerCollapseHandleColor" format="color"/>
+    <attr name="widgetPickerAddButtonBackgroundColor" format="color"/>
+    <attr name="widgetPickerAddButtonTextColor" format="color"/>
 
     <!-- BubbleTextView specific attributes. -->
     <declare-styleable name="BubbleTextView">

@@ -118,6 +118,9 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
         mContent = findViewById(R.id.widgets_bottom_sheet);
         setContentBackgroundWithParent(
                 getContext().getDrawable(R.drawable.bg_rounded_corner_bottom_sheet), mContent);
+        View scrollView = findViewById(R.id.widgets_table_scroll_view);
+        scrollView.setOutlineProvider(mViewOutlineProvider);
+        scrollView.setClipToOutline(true);
     }
 
     @Override
@@ -187,9 +190,7 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
                 mWidgetCellHorizontalPadding)
                 .forEach(row -> {
                     TableRow tableRow = new TableRow(getContext());
-                    // Vertically center align items, so that even if they don't fill bounds,
-                    // they can look organized when placed together in a row.
-                    tableRow.setGravity(Gravity.CENTER_VERTICAL);
+                    tableRow.setGravity(Gravity.TOP);
                     row.forEach(widgetItem -> {
                         WidgetCell widget = addItemCell(tableRow);
                         widget.applyFromCellItem(widgetItem);
