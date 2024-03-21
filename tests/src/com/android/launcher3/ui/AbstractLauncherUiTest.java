@@ -56,6 +56,7 @@ import androidx.test.uiautomator.Until;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.celllayout.FavoriteItemsTransaction;
 import com.android.launcher3.tapl.HomeAllApps;
 import com.android.launcher3.tapl.HomeAppIcon;
 import com.android.launcher3.tapl.LauncherInstrumentation;
@@ -589,6 +590,17 @@ public abstract class AbstractLauncherUiTest {
                 false /* newTask */);
     }
 
+    /** Starts ExcludeFromRecentsTestActivity, which has excludeFromRecents="true". */
+    public static void startExcludeFromRecentsTestActivity() {
+        final String packageName = getAppPackageName();
+        final Intent intent = getInstrumentation().getContext().getPackageManager()
+                .getLaunchIntentForPackage(packageName);
+        intent.setComponent(new ComponentName(packageName,
+                "com.android.launcher3.testcomponent.ExcludeFromRecentsTestActivity"));
+        startIntent(intent, By.pkg(packageName).text("ExcludeFromRecentsTestActivity"),
+                false /* newTask */);
+    }
+
     private static void startIntent(Intent intent, BySelector selector, boolean newTask) {
         intent.addCategory(Intent.CATEGORY_LAUNCHER);
         if (newTask) {
@@ -673,5 +685,13 @@ public abstract class AbstractLauncherUiTest {
             homeAppIcon = mLauncher.getWorkspace().getWorkspaceAppIcon(name);
         }
         return homeAppIcon;
+    }
+
+    protected void commitTransactionAndLoadHome(FavoriteItemsTransaction transaction) {
+        transaction.commit();
+
+        // Launch the home activity
+        UiDevice.getInstance(getInstrumentation()).pressHome();
+        mLauncher.waitForLauncherInitialized();
     }
 }
