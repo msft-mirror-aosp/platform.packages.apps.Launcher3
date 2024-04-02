@@ -58,7 +58,6 @@ import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.accessibility.BaseAccessibilityDelegate;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.dragndrop.DragOptions.PreDragCondition;
 import com.android.launcher3.dragndrop.DraggableView;
@@ -96,10 +95,10 @@ import java.util.Locale;
 public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         IconLabelDotView, DraggableView, Reorderable {
 
-    private static final int DISPLAY_WORKSPACE = 0;
+    public static final int DISPLAY_WORKSPACE = 0;
     public static final int DISPLAY_ALL_APPS = 1;
-    private static final int DISPLAY_FOLDER = 2;
-    protected static final int DISPLAY_TASKBAR = 5;
+    public static final int DISPLAY_FOLDER = 2;
+    public static final int DISPLAY_TASKBAR = 5;
     public static final int DISPLAY_SEARCH_RESULT = 6;
     public static final int DISPLAY_SEARCH_RESULT_SMALL = 7;
     public static final int DISPLAY_PREDICTION_ROW = 8;
@@ -238,7 +237,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             defaultIconSize = getResources().getDimensionPixelSize(
                     R.dimen.search_row_small_icon_size);
         } else if (mDisplay == DISPLAY_TASKBAR) {
-            defaultIconSize = mDeviceProfile.iconSizePx;
+            defaultIconSize = mDeviceProfile.taskbarIconSize;
         } else {
             // widget_selection or shortcut_popup
             defaultIconSize = mDeviceProfile.iconSizePx;
@@ -436,8 +435,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     @UiThread
-    @VisibleForTesting
-    public void applyLabel(ItemInfoWithIcon info) {
+    public void applyLabel(ItemInfo info) {
         CharSequence label = info.title;
         if (label != null) {
             mLastOriginalText = label;

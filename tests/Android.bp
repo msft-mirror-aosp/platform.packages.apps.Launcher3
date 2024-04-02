@@ -86,6 +86,7 @@ android_library {
         "mockito-target-extended-minus-junit4",
         "launcher_log_protos_lite",
         "truth",
+        "kotlinx_coroutines_test",
         "platform-test-rules",
         "testables",
         "com_android_launcher3_flags_lib",
@@ -166,20 +167,6 @@ filegroup {
         "multivalentTests/src/**/*Test.java",
         "multivalentTests/src/**/*Test.kt",
     ],
-}
-
-android_library {
-    name: "Launcher3Lib",
-    srcs: [
-        ":launcher-src",
-        ":launcher-src_shortcuts_overrides",
-        ":launcher-src_ui_overrides",
-    ],
-    static_libs: [
-        "Launcher3CommonDepsLib",
-    ],
-    // TODO(b/319712088): re-enable use_resource_processor
-    use_resource_processor: false,
 }
 
 android_robolectric_test {
