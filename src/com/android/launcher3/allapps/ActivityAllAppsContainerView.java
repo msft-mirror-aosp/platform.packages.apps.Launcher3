@@ -18,6 +18,7 @@ package com.android.launcher3.allapps;
 import static com.android.launcher3.Flags.enableExpandingPauseWorkButton;
 import static com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder.MAIN;
 import static com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder.SEARCH;
+import static com.android.launcher3.allapps.BaseAllAppsAdapter.VIEW_TYPE_PRIVATE_SPACE_HEADER;
 import static com.android.launcher3.allapps.BaseAllAppsAdapter.VIEW_TYPE_WORK_DISABLED_CARD;
 import static com.android.launcher3.allapps.BaseAllAppsAdapter.VIEW_TYPE_WORK_EDU_CARD;
 import static com.android.launcher3.config.FeatureFlags.ALL_APPS_GONE_VISIBILITY;
@@ -85,6 +86,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.recyclerview.AllAppsRecyclerViewPool;
 import com.android.launcher3.util.ItemInfoMatcher;
+import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.BaseDragLayer;
@@ -96,6 +98,7 @@ import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -156,6 +159,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             };
     private final Paint mNavBarScrimPaint;
     private final int mHeaderProtectionColor;
+    private final int mPrivateSpaceBottomExtraSpace;
     private final Path mTmpPath = new Path();
     private final RectF mTmpRectF = new RectF();
     protected AllAppsPagedView mViewPager;
@@ -187,7 +191,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private float mBottomSheetAlpha = 1f;
     private boolean mForceBottomSheetVisible;
     private int mTabsProtectionAlpha;
-    private float mTotalHeaderProtectionHeight;
     @Nullable private AllAppsTransitionController mAllAppsTransitionController;
 
     public ActivityAllAppsContainerView(Context context) {
@@ -218,6 +221,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 this,
                 mActivityContext.getStatsLogManager(),
                 UserCache.INSTANCE.get(mActivityContext));
+        mPrivateSpaceBottomExtraSpace = context.getResources().getDimensionPixelSize(
+                R.dimen.ps_extra_bottom_padding);
         mAH = Arrays.asList(null, null, null);
         mNavBarScrimPaint = new Paint();
         mNavBarScrimPaint.setColor(Themes.getNavBarScrimColor(mActivityContext));
@@ -511,7 +516,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             switchToTab(ActivityAllAppsContainerView.AdapterHolder.MAIN);
             // Scroll to bottom
             if (mPrivateProfileManager != null) {
-                mPrivateProfileManager.scrollForViewToBeVisibleInContainer(
+                mPrivateProfileManager.scrollForHeaderToBeVisibleInContainer(
                         getActiveAppsRecyclerView(),
                         getPersonalAppList().getAdapterItems(),
                         mPrivateProfileManager.getPsHeaderHeight(),
@@ -772,7 +777,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     protected void updateHeaderScroll(int scrolledOffset) {
         float prog1 = Utilities.boundToRange((float) scrolledOffset / mHeaderThreshold, 0f, 1f);
         int headerColor = getHeaderColor(prog1);
-        int tabsAlpha = mHeader.getPeripheralProtectionHeight() == 0 ? 0
+        int tabsAlpha = mHeader.getPeripheralProtectionHeight(/* expectedHeight */ false) == 0 ? 0
                 : (int) (Utilities.boundToRange(
                         (scrolledOffset + mHeader.mSnappedScrolledY) / mHeaderThreshold, 0f, 1f)
                         * 255);
@@ -1366,6 +1371,18 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         invalidateHeader();
     }
 
+    /**
+     * Set {@link Animator.AnimatorListener} on {@link mAllAppsTransitionController} to observe
+     * animation of backing out of all apps search view to all apps view.
+     */
+    public void setAllAppsSearchBackAnimatorListener(Animator.AnimatorListener listener) {
+        Preconditions.assertNotNull(mAllAppsTransitionController);
+        if (mAllAppsTransitionController == null) {
+            return;
+        }
+        mAllAppsTransitionController.setAllAppsSearchBackAnimationListener(listener);
+    }
+
     public void setScrimView(ScrimView scrimView) {
         mScrimView = scrimView;
     }
@@ -1430,15 +1447,13 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 mTmpPath.reset();
                 mTmpPath.addRoundRect(mTmpRectF, mBottomSheetCornerRadii, Direction.CW);
                 canvas.drawPath(mTmpPath, mHeaderPaint);
-                mTotalHeaderProtectionHeight = headerBottomWithScaleOnTablet;
             }
         } else {
             canvas.drawRect(0, 0, canvas.getWidth(), headerBottomWithScaleOnPhone, mHeaderPaint);
-            mTotalHeaderProtectionHeight = headerBottomWithScaleOnPhone;
         }
 
         // If tab exist (such as work profile), extend header with tab height
-        final int tabsHeight = headerView.getPeripheralProtectionHeight();
+        final int tabsHeight = headerView.getPeripheralProtectionHeight(/* expectedHeight */ false);
         if (mTabsProtectionAlpha > 0 && tabsHeight != 0) {
             if (DEBUG_HEADER_PROTECTION) {
                 mHeaderPaint.setColor(Color.BLUE);
@@ -1464,16 +1479,19 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                     right,
                     tabBottomWithScale,
                     mHeaderPaint);
-            mTotalHeaderProtectionHeight = tabBottomWithScale;
         }
     }
 
     /**
-     * The height of the header protection is dynamically calculated during the time of drawing the
-     * header.
+     * The height of the header protection as if the user scrolled down the app list.
      */
     float getHeaderProtectionHeight() {
-        return mTotalHeaderProtectionHeight;
+        float headerBottom = getHeaderBottom() - getTranslationY();
+        if (mUsingTabs) {
+            return headerBottom + mHeader.getPeripheralProtectionHeight(/* expectedHeight */ true);
+        } else {
+            return headerBottom;
+        }
     }
 
     /**
@@ -1495,6 +1513,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             return bottom;
         }
         return bottom + mHeader.getTop();
+    }
+
+    boolean isUsingTabs() {
+        return mUsingTabs;
     }
 
     /**
@@ -1564,6 +1586,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 int bottomOffset = 0;
                 if (isWork() && mWorkManager.getWorkModeSwitch() != null) {
                     bottomOffset = mInsets.bottom + mWorkManager.getWorkModeSwitch().getHeight();
+                } else if (isMain() && mPrivateProfileManager != null) {
+                    Optional<AdapterItem> privateSpaceHeaderItem = mAppsList.getAdapterItems()
+                            .stream()
+                            .filter(item -> item.viewType == VIEW_TYPE_PRIVATE_SPACE_HEADER)
+                            .findFirst();
+                    if (privateSpaceHeaderItem.isPresent()) {
+                        bottomOffset = mPrivateSpaceBottomExtraSpace;
+                    }
                 }
                 if (isSearchBarFloating()) {
                     bottomOffset += mSearchContainer.getHeight();
@@ -1579,6 +1609,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
         private boolean isSearch() {
             return mType == SEARCH;
+        }
+
+        private boolean isMain() {
+            return mType == MAIN;
         }
     }
 }

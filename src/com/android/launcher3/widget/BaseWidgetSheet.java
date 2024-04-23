@@ -16,22 +16,23 @@
 package com.android.launcher3.widget;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
-import static com.android.launcher3.Flags.enableCategorizedWidgetSuggestions;
-import static com.android.launcher3.Flags.enableUnfoldedTwoPanePicker;
 import static com.android.launcher3.Flags.enableWidgetTapToAdd;
 import static com.android.launcher3.LauncherPrefs.WIDGETS_EDUCATION_TIP_SEEN;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WIDGET_ADD_BUTTON_TAP;
 
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
 import android.view.WindowInsets;
 import android.view.animation.Interpolator;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.Px;
 import androidx.core.view.ViewCompat;
@@ -45,7 +46,6 @@ import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.PendingAddItemInfo;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
@@ -54,6 +54,8 @@ import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.views.AbstractSlideInView;
 import com.android.launcher3.views.ArrowTipView;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Base class for various widgets popup
@@ -138,6 +140,7 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<BaseActivity>
         }
 
         if (enableWidgetTapToAdd()) {
+            scrollToWidgetCell(wc);
             if (mWidgetCellWithAddButton != null) {
                 // If there is a add button currently showing, hide it.
                 mWidgetCellWithAddButton.hideAddButton(/* animate= */ true);
@@ -163,12 +166,71 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<BaseActivity>
     /**
      * Click handler for tap to add button.
      */
-    public void addWidget(PendingAddItemInfo info) {
+    private void addWidget(@NonNull PendingAddItemInfo info) {
+        // Using a boolean flag here to make sure the callback is only run once. This should never
+        // happen because we close the sheet and it will be reconstructed the next time it is
+        // needed.
+        final AtomicBoolean hasRun = new AtomicBoolean(false);
+        addOnCloseListener(() -> {
+            if (!hasRun.get()) {
+                Launcher.getLauncher(mActivityContext).getAccessibilityDelegate().addToWorkspace(
+                        info, /*accessibility=*/ false,
+                        /*finishCallback=*/ (success) -> {
+                            mActivityContext.getStatsLogManager()
+                                    .logger()
+                                    .withItemInfo(info)
+                                    .log(LAUNCHER_WIDGET_ADD_BUTTON_TAP);
+                        });
+                hasRun.set(true);
+            }
+        });
         handleClose(true);
-        Launcher.getLauncher(mActivityContext).getAccessibilityDelegate()
-                .addToWorkspace(info, /*accessibility=*/ false, /*finishCallback=*/ null);
-        mActivityContext.getStatsLogManager().logger().withItemInfo(info).log(
-                StatsLogManager.LauncherEvent.LAUNCHER_WIDGET_ADD_BUTTON_TAP);
+    }
+
+    /**
+     * Scroll to show the widget cell. If both the bottom and top of the cell are clipped, this will
+     * prioritize showing the bottom of the cell (where the add button is).
+     */
+    private void scrollToWidgetCell(@NonNull WidgetCell wc) {
+        final int headerTopClip = getHeaderTopClip(wc);
+        final Rect visibleRect = new Rect();
+        final boolean isPartiallyVisible = wc.getLocalVisibleRect(visibleRect);
+        int scrollByY = 0;
+        if (isPartiallyVisible) {
+            final int scrollPadding = getResources()
+                    .getDimensionPixelSize(R.dimen.widget_cell_add_button_scroll_padding);
+            final int topClip = visibleRect.top + headerTopClip;
+            final int bottomClip = wc.getHeight() - visibleRect.bottom;
+            if (bottomClip != 0) {
+                scrollByY = bottomClip + scrollPadding;
+            } else if (topClip != 0) {
+                scrollByY = -topClip - scrollPadding;
+            }
+        }
+
+        if (isPartiallyVisible && scrollByY == 0) {
+            // Widget is fully visible.
+            return;
+        } else if (!isPartiallyVisible) {
+            Log.e("BaseWidgetSheet", "click on invisible WidgetCell should not be possible");
+            return;
+        }
+
+        scrollCellContainerByY(wc, scrollByY);
+    }
+
+    /**
+     * Find the nearest scrollable container of the given WidgetCell, and scroll by the given
+     * amount.
+     */
+    protected abstract void scrollCellContainerByY(WidgetCell wc, int scrollByY);
+
+
+    /**
+     * Return the top clip of any sticky headers over the given cell.
+     */
+    protected int getHeaderTopClip(@NonNull WidgetCell cell) {
+        return 0;
     }
 
     @Override
@@ -256,19 +318,8 @@ public abstract class BaseWidgetSheet extends AbstractSlideInView<BaseActivity>
                 MeasureSpec.getSize(heightMeasureSpec));
     }
 
-    private int getTabletHorizontalMargin(DeviceProfile deviceProfile) {
-        // All bottom-sheets showing widgets will be full-width across all devices.
-        if (enableCategorizedWidgetSuggestions()) {
-            return 0;
-        }
-        if (deviceProfile.isLandscape && !deviceProfile.isTwoPanels) {
-            return getResources().getDimensionPixelSize(
-                    R.dimen.widget_picker_landscape_tablet_left_right_margin);
-        }
-        if (deviceProfile.isTwoPanels && enableUnfoldedTwoPanePicker()) {
-            return getResources().getDimensionPixelSize(
-                    R.dimen.widget_picker_two_panels_left_right_margin);
-        }
+    /** Returns the horizontal margins to be applied to the widget sheet. **/
+    protected int getTabletHorizontalMargin(DeviceProfile deviceProfile) {
         return deviceProfile.allAppsLeftRightMargin;
     }
 

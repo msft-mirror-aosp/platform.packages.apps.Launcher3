@@ -18,15 +18,19 @@ package com.android.launcher3.taskbar.bubbles;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
+import android.content.res.Resources;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatedFloat;
@@ -51,12 +55,13 @@ import java.util.function.Consumer;
 public class BubbleBarViewController {
 
     private static final String TAG = BubbleBarViewController.class.getSimpleName();
-
+    private static final float APP_ICON_SMALL_DP = 44f;
+    private static final float APP_ICON_MEDIUM_DP = 48f;
+    private static final float APP_ICON_LARGE_DP = 52f;
     private final SystemUiProxy mSystemUiProxy;
     private final TaskbarActivityContext mActivity;
     private final BubbleBarView mBarView;
-    private final int mIconSize;
-    private final int mPointerSize;
+    private int mIconSize;
 
     // Initialized in init.
     private BubbleStashController mBubbleStashController;
@@ -84,15 +89,19 @@ public class BubbleBarViewController {
 
     private BubbleBarViewAnimator mBubbleBarViewAnimator;
 
+    @Nullable
+    private BubbleBarBoundsChangeListener mBoundsChangeListener;
+
+    private final Rect mPreviousBubbleBarBounds = new Rect();
+
     public BubbleBarViewController(TaskbarActivityContext activity, BubbleBarView barView) {
         mActivity = activity;
         mBarView = barView;
         mSystemUiProxy = SystemUiProxy.INSTANCE.get(mActivity);
         mBubbleBarAlpha = new MultiValueAlpha(mBarView, 1 /* num alpha channels */);
         mBubbleBarAlpha.setUpdateVisibility(true);
-        mIconSize = activity.getResources().getDimensionPixelSize(R.dimen.bubblebar_icon_size);
-        mPointerSize = activity.getResources().getDimensionPixelSize(
-                R.dimen.bubblebar_pointer_size);
+        mIconSize = activity.getResources().getDimensionPixelSize(
+                R.dimen.bubblebar_icon_size);
     }
 
     public void init(TaskbarControllers controllers, BubbleControllers bubbleControllers) {
@@ -102,20 +111,24 @@ public class BubbleBarViewController {
         mTaskbarStashController = controllers.taskbarStashController;
         mTaskbarInsetsController = controllers.taskbarInsetsController;
 
-        mActivity.addOnDeviceProfileChangeListener(dp ->
-                mBarView.getLayoutParams().height =
-                        mActivity.getDeviceProfile().taskbarHeight + mPointerSize
-        );
-        mBarView.getLayoutParams().height =
-                mActivity.getDeviceProfile().taskbarHeight + mPointerSize;
+        mActivity.addOnDeviceProfileChangeListener(dp -> setBubbleBarIconSize(dp.taskbarIconSize));
+        setBubbleBarIconSize(mActivity.getDeviceProfile().taskbarIconSize);
         mBubbleBarScale.updateValue(1f);
         mBubbleClickListener = v -> onBubbleClicked(v);
         mBubbleBarClickListener = v -> onBubbleBarClicked();
         mBubbleDragController.setupBubbleBarView(mBarView);
         mBarView.setOnClickListener(mBubbleBarClickListener);
-        mBarView.addOnLayoutChangeListener((view, i, i1, i2, i3, i4, i5, i6, i7) ->
-                mTaskbarInsetsController.onTaskbarOrBubblebarWindowHeightOrInsetsChanged()
-        );
+        mBarView.addOnLayoutChangeListener(
+                (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+                    mTaskbarInsetsController.onTaskbarOrBubblebarWindowHeightOrInsetsChanged();
+                    Rect bubbleBarBounds = mBarView.getBubbleBarBounds();
+                    if (!bubbleBarBounds.equals(mPreviousBubbleBarBounds)) {
+                        mPreviousBubbleBarBounds.set(bubbleBarBounds);
+                        if (mBoundsChangeListener != null) {
+                            mBoundsChangeListener.onBoundsChanged(bubbleBarBounds);
+                        }
+                    }
+                });
 
         mBubbleBarViewAnimator = new BubbleBarViewAnimator(mBarView, mBubbleStashController);
     }
@@ -246,10 +259,42 @@ public class BubbleBarViewController {
         }
     }
 
+    private void setBubbleBarIconSize(int newIconSize) {
+        if (newIconSize == mIconSize) {
+            return;
+        }
+        Resources res = mActivity.getResources();
+        DisplayMetrics dm = res.getDisplayMetrics();
+        float smallIconSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+                APP_ICON_SMALL_DP, dm);
+        float mediumIconSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+                APP_ICON_MEDIUM_DP, dm);
+        float largeIconSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+                APP_ICON_LARGE_DP, dm);
+        float smallMediumThreshold = (smallIconSize + mediumIconSize) / 2f;
+        float mediumLargeThreshold = (mediumIconSize + largeIconSize) / 2f;
+        mIconSize = newIconSize <= smallMediumThreshold
+                ? res.getDimensionPixelSize(R.dimen.bubblebar_icon_size_small) :
+                res.getDimensionPixelSize(R.dimen.bubblebar_icon_size);
+        float bubbleBarPadding = newIconSize >= mediumLargeThreshold
+                ? res.getDimensionPixelSize(R.dimen.bubblebar_icon_spacing_large) :
+                res.getDimensionPixelSize(R.dimen.bubblebar_icon_spacing);
+
+        mBarView.setIconSizeAndPadding(mIconSize, bubbleBarPadding);
+        mBarView.setPadding((int) bubbleBarPadding, mBarView.getPaddingTop(),
+                (int) bubbleBarPadding,
+                mBarView.getPaddingBottom());
+    }
+
     /** Sets a callback that updates the selected bubble after the bubble bar collapses. */
     public void setUpdateSelectedBubbleAfterCollapse(
             Consumer<String> updateSelectedBubbleAfterCollapse) {
         mBarView.setUpdateSelectedBubbleAfterCollapse(updateSelectedBubbleAfterCollapse);
+    }
+
+    /** Returns whether the bubble bar should be hidden because of the current sysui state. */
+    boolean isHiddenForSysui() {
+        return mHiddenForSysui;
     }
 
     /**
@@ -315,16 +360,21 @@ public class BubbleBarViewController {
     /**
      * Adds the provided bubble to the bubble bar.
      */
-    public void addBubble(BubbleBarItem b) {
+    public void addBubble(BubbleBarItem b, boolean isExpanding, boolean suppressAnimation) {
         if (b != null) {
             mBarView.addView(b.getView(), 0,
                     new FrameLayout.LayoutParams(mIconSize, mIconSize, Gravity.LEFT));
             b.getView().setOnClickListener(mBubbleClickListener);
             mBubbleDragController.setupBubbleView(b.getView());
 
+            if (suppressAnimation) {
+                return;
+            }
+
             boolean isStashedOrGone =
                     mBubbleStashController.isStashed() || mBarView.getVisibility() != VISIBLE;
-            if (b instanceof BubbleBarBubble && isStashedOrGone) {
+            // don't animate the new bubble if we're auto expanding from stashed
+            if (b instanceof BubbleBarBubble && isStashedOrGone && !isExpanding) {
                 mBubbleBarViewAnimator.animateBubbleInForStashed((BubbleBarBubble) b);
             }
         } else {
@@ -425,5 +475,20 @@ public class BubbleBarViewController {
      */
     public void onDismissAllBubblesWhileDragging() {
         mSystemUiProxy.removeAllBubbles();
+    }
+
+    /**
+     * Set listener to be notified when bubble bar bounds have changed
+     */
+    public void setBoundsChangeListener(@Nullable BubbleBarBoundsChangeListener listener) {
+        mBoundsChangeListener = listener;
+    }
+
+    /**
+     * Listener to receive updates about bubble bar bounds changing
+     */
+    public interface BubbleBarBoundsChangeListener {
+        /** Called when bounds have changed */
+        void onBoundsChanged(Rect newBounds);
     }
 }

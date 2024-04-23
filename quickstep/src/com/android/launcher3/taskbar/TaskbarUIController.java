@@ -193,7 +193,7 @@ public class TaskbarUIController {
     }
 
     /** Returns {@code true} if Taskbar is currently within overview. */
-    protected boolean isInOverview() {
+    protected boolean isInOverviewUi() {
         return false;
     }
 
@@ -398,5 +398,13 @@ public class TaskbarUIController {
     public void onLauncherVisibilityChanged(boolean isVisible) {
         mControllers.taskbarStashController.updateStateForFlag(FLAG_IN_APP, !isVisible);
         mControllers.taskbarStashController.applyState();
+    }
+
+    /**
+     * Request for UI controller to ignore animations for the next callback for the end of recents
+     * animation
+     */
+    public void setSkipNextRecentsAnimEnd() {
+        // Overridden
     }
 }

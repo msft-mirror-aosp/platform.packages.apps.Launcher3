@@ -163,7 +163,6 @@ public class InvariantDeviceProfile {
      */
     public int numDatabaseHotseatIcons;
 
-    public int[] hotseatColumnSpan;
     public float[] hotseatBarBottomSpace;
     public float[] hotseatQsbSpace;
 
@@ -263,7 +262,7 @@ public class InvariantDeviceProfile {
 
         // Get the display info based on default display and interpolate it to existing display
         Info defaultInfo = DisplayController.INSTANCE.get(context).getInfo();
-        @DeviceType int defaultDeviceType = getDeviceType(defaultInfo);
+        @DeviceType int defaultDeviceType = defaultInfo.getDeviceType();
         DisplayOption defaultDisplayOption = invDistWeightedInterpolate(
                 defaultInfo,
                 getPredefinedDeviceProfiles(context, gridName, defaultDeviceType,
@@ -272,7 +271,7 @@ public class InvariantDeviceProfile {
 
         Context displayContext = context.createDisplayContext(display);
         Info myInfo = new Info(displayContext);
-        @DeviceType int deviceType = getDeviceType(myInfo);
+        @DeviceType int deviceType = myInfo.getDeviceType();
         DisplayOption myDisplayOption = invDistWeightedInterpolate(
                 myInfo,
                 getPredefinedDeviceProfiles(context, gridName, deviceType,
@@ -325,30 +324,13 @@ public class InvariantDeviceProfile {
         }
     }
 
-    private static @DeviceType int getDeviceType(Info displayInfo) {
-        int flagPhone = 1 << 0;
-        int flagTablet = 1 << 1;
-
-        int type = displayInfo.supportedBounds.stream()
-                .mapToInt(bounds -> displayInfo.isTablet(bounds) ? flagTablet : flagPhone)
-                .reduce(0, (a, b) -> a | b);
-        if (type == (flagPhone | flagTablet)) {
-            // device has profiles supporting both phone and table modes
-            return TYPE_MULTI_DISPLAY;
-        } else if (type == flagTablet) {
-            return TYPE_TABLET;
-        } else {
-            return TYPE_PHONE;
-        }
-    }
-
     public static String getCurrentGridName(Context context) {
         return LauncherPrefs.get(context).get(GRID_NAME);
     }
 
     private String initGrid(Context context, String gridName) {
         Info displayInfo = DisplayController.INSTANCE.get(context).getInfo();
-        @DeviceType int deviceType = getDeviceType(displayInfo);
+        @DeviceType int deviceType = displayInfo.getDeviceType();
 
         ArrayList<DisplayOption> allOptions =
                 getPredefinedDeviceProfiles(context, gridName, deviceType,
@@ -357,6 +339,15 @@ public class InvariantDeviceProfile {
                 invDistWeightedInterpolate(displayInfo, allOptions, deviceType);
         initGrid(context, displayInfo, displayOption, deviceType);
         return displayOption.grid.name;
+    }
+
+    /**
+     * @deprecated This is a temporary solution because on the backup and restore case we modify the
+     * IDP, this resets it. b/332974074
+     */
+    @Deprecated
+    public void reset(Context context) {
+        initGrid(context, getCurrentGridName(context));
     }
 
     @VisibleForTesting
@@ -420,7 +411,6 @@ public class InvariantDeviceProfile {
         numShownHotseatIcons = closestProfile.numHotseatIcons;
         numDatabaseHotseatIcons = deviceType == TYPE_MULTI_DISPLAY
                 ? closestProfile.numDatabaseHotseatIcons : closestProfile.numHotseatIcons;
-        hotseatColumnSpan = closestProfile.hotseatColumnSpan;
         hotseatBarBottomSpace = displayOption.hotseatBarBottomSpace;
         hotseatQsbSpace = displayOption.hotseatQsbSpace;
 
@@ -870,8 +860,6 @@ public class InvariantDeviceProfile {
         private final int numHotseatIcons;
         private final int numDatabaseHotseatIcons;
 
-        private final int[] hotseatColumnSpan = new int[COUNT_SIZES];
-
         private final boolean[] inlineQsb = new boolean[COUNT_SIZES];
 
         private @DimenRes int inlineNavButtonsEndSpacing;
@@ -921,17 +909,6 @@ public class InvariantDeviceProfile {
                     R.styleable.GridDisplayOption_numHotseatIcons, numColumns);
             numDatabaseHotseatIcons = a.getInt(
                     R.styleable.GridDisplayOption_numExtendedHotseatIcons, 2 * numHotseatIcons);
-
-            hotseatColumnSpan[INDEX_DEFAULT] = a.getInt(
-                    R.styleable.GridDisplayOption_hotseatColumnSpan, numColumns);
-            hotseatColumnSpan[INDEX_LANDSCAPE] = a.getInt(
-                    R.styleable.GridDisplayOption_hotseatColumnSpanLandscape, numColumns);
-            hotseatColumnSpan[INDEX_TWO_PANEL_LANDSCAPE] = a.getInt(
-                    R.styleable.GridDisplayOption_hotseatColumnSpanTwoPanelLandscape,
-                    numColumns);
-            hotseatColumnSpan[INDEX_TWO_PANEL_PORTRAIT] = a.getInt(
-                    R.styleable.GridDisplayOption_hotseatColumnSpanTwoPanelPortrait,
-                    numColumns);
 
             inlineNavButtonsEndSpacing =
                     a.getResourceId(R.styleable.GridDisplayOption_inlineNavButtonsEndSpacing,

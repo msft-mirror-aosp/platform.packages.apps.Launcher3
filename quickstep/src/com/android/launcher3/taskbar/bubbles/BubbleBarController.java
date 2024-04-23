@@ -151,6 +151,9 @@ public class BubbleBarController extends IBubblesListener.Stub {
     private BubbleStashController mBubbleStashController;
     private BubbleStashedHandleViewController mBubbleStashedHandleViewController;
 
+    // Keep track of bubble bar bounds sent to shell to avoid sending duplicate updates
+    private final Rect mLastSentBubbleBarBounds = new Rect();
+
     /**
      * Similar to {@link BubbleBarUpdate} but rather than {@link BubbleInfo}s it uses
      * {@link BubbleBarBubble}s so that it can be used to update the views.
@@ -220,7 +223,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
             mBubbleStashedHandleViewController.setHiddenForBubbles(
                     !sBubbleBarEnabled || mBubbles.isEmpty());
             mBubbleBarViewController.setUpdateSelectedBubbleAfterCollapse(
-                    key -> setSelectedBubble(mBubbles.get(key)));
+                    key -> setSelectedBubbleInternal(mBubbles.get(key)));
+            mBubbleBarViewController.setBoundsChangeListener(this::onBubbleBarBoundsChanged);
         });
     }
 
@@ -237,7 +241,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
                 // we're on the main executor now, so check that the overflow hasn't been created
                 // again to avoid races.
                 if (mOverflowBubble == null) {
-                    mBubbleBarViewController.addBubble(overflow);
+                    mBubbleBarViewController.addBubble(
+                            overflow, /* isExpanding= */ false, /* suppressAnimation= */ true);
                     mOverflowBubble = overflow;
                 }
             });
@@ -306,6 +311,13 @@ public class BubbleBarController extends IBubblesListener.Stub {
     private void applyViewChanges(BubbleBarViewUpdate update) {
         final boolean isCollapsed = (update.expandedChanged && !update.expanded)
                 || (!update.expandedChanged && !mBubbleBarViewController.isExpanded());
+        final boolean isExpanding = update.expandedChanged && update.expanded;
+        // don't animate bubbles if this is the initial state because we may be unfolding or
+        // enabling gesture nav. also suppress animation if the bubble bar is hidden for sysui e.g.
+        // the shade is open, or we're locked.
+        final boolean suppressAnimation =
+                update.initialState || mBubbleBarViewController.isHiddenForSysui();
+
         BubbleBarItem previouslySelectedBubble = mSelectedBubble;
         BubbleBarBubble bubbleToSelect = null;
         if (!update.removedBubbles.isEmpty()) {
@@ -322,7 +334,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
         }
         if (update.addedBubble != null) {
             mBubbles.put(update.addedBubble.getKey(), update.addedBubble);
-            mBubbleBarViewController.addBubble(update.addedBubble);
+            mBubbleBarViewController.addBubble(update.addedBubble, isExpanding, suppressAnimation);
             if (isCollapsed) {
                 // If we're collapsed, the most recently added bubble will be selected.
                 bubbleToSelect = update.addedBubble;
@@ -335,7 +347,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
                 BubbleBarBubble bubble = update.currentBubbles.get(i);
                 if (bubble != null) {
                     mBubbles.put(bubble.getKey(), bubble);
-                    mBubbleBarViewController.addBubble(bubble);
+                    mBubbleBarViewController.addBubble(bubble, isExpanding, suppressAnimation);
                     if (isCollapsed) {
                         // If we're collapsed, the most recently added bubble will be selected.
                         bubbleToSelect = bubble;
@@ -390,7 +402,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
             }
         }
         if (bubbleToSelect != null) {
-            setSelectedBubble(bubbleToSelect);
+            setSelectedBubbleInternal(bubbleToSelect);
             if (previouslySelectedBubble == null) {
                 mBubbleStashController.animateToInitialState(update.expanded);
             }
@@ -409,8 +421,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
             if (update.bubbleBarLocation != mBubbleBarViewController.getBubbleBarLocation()) {
                 // Animate when receiving updates. Skip it if we received the initial state.
                 boolean animate = !update.initialState;
-                mBubbleBarViewController.setBubbleBarLocation(update.bubbleBarLocation, animate);
-                mBubbleStashController.setBubbleBarLocation(update.bubbleBarLocation);
+                updateBubbleBarLocationInternal(update.bubbleBarLocation, animate);
             }
         }
     }
@@ -427,7 +438,9 @@ public class BubbleBarController extends IBubblesListener.Stub {
                         info.getFlags() | Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION);
                 mSelectedBubble.getView().updateDotVisibility(true /* animate */);
             }
-            mSystemUiProxy.showBubble(getSelectedBubbleKey(), getExpandedBubbleBarDisplayBounds());
+            Rect bounds = getExpandedBubbleBarDisplayBounds();
+            mLastSentBubbleBarBounds.set(bounds);
+            mSystemUiProxy.showBubble(getSelectedBubbleKey(), bounds);
         } else {
             Log.w(TAG, "Trying to show the selected bubble but it's null");
         }
@@ -436,7 +449,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
     /** Updates the currently selected bubble for launcher views and tells WMShell to show it. */
     public void showAndSelectBubble(BubbleBarItem b) {
         if (DEBUG) Log.w(TAG, "showingSelectedBubble: " + b.getKey());
-        setSelectedBubble(b);
+        setSelectedBubbleInternal(b);
         showSelectedBubble();
     }
 
@@ -445,7 +458,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
      * WMShell that the selection has changed, that should go through either
      * {@link #showSelectedBubble()} or {@link #showAndSelectBubble(BubbleBarItem)}.
      */
-    private void setSelectedBubble(BubbleBarItem b) {
+    private void setSelectedBubbleInternal(BubbleBarItem b) {
         if (!Objects.equals(b, mSelectedBubble)) {
             if (DEBUG) Log.w(TAG, "selectingBubble: " + b.getKey());
             mSelectedBubble = b;
@@ -462,6 +475,21 @@ public class BubbleBarController extends IBubblesListener.Stub {
             return mSelectedBubble.getKey();
         }
         return null;
+    }
+
+    /**
+     * Set a new bubble bar location.
+     * <p>
+     * Updates the value locally in Launcher and in WMShell.
+     */
+    public void updateBubbleBarLocation(BubbleBarLocation location) {
+        updateBubbleBarLocationInternal(location, false /* animate */);
+        mSystemUiProxy.setBubbleBarLocation(location);
+    }
+
+    private void updateBubbleBarLocationInternal(BubbleBarLocation location, boolean animate) {
+        mBubbleBarViewController.setBubbleBarLocation(location, animate);
+        mBubbleStashController.setBubbleBarLocation(location);
     }
 
     //
@@ -595,27 +623,39 @@ public class BubbleBarController extends IBubblesListener.Stub {
         return mIconFactory.createBadgedIconBitmap(drawable).icon;
     }
 
+    private void onBubbleBarBoundsChanged(Rect newBounds) {
+        Rect displayBounds = convertToDisplayBounds(newBounds);
+        // Only send bounds over if they changed
+        if (!displayBounds.equals(mLastSentBubbleBarBounds)) {
+            mLastSentBubbleBarBounds.set(displayBounds);
+            mSystemUiProxy.setBubbleBarBounds(displayBounds);
+        }
+    }
+
     /**
      * Get bounds of the bubble bar as if it would be expanded.
      * Calculates the bounds instead of retrieving current view location as the view may be
      * animating.
      */
     private Rect getExpandedBubbleBarDisplayBounds() {
+        return convertToDisplayBounds(mBarView.getBubbleBarBounds());
+    }
+
+    private Rect convertToDisplayBounds(Rect currentBarBounds) {
         Point displaySize = DisplayController.INSTANCE.get(mContext).getInfo().currentSize;
-        Rect currentBarBounds = mBarView.getBubbleBarBounds();
-        Rect location = new Rect();
+        Rect displayBounds = new Rect();
         // currentBarBounds is only useful for distance from left or right edge.
         // It contains the current bounds, calculate the expanded bounds.
         if (mBarView.getBubbleBarLocation().isOnLeft(mBarView.isLayoutRtl())) {
-            location.left = currentBarBounds.left;
-            location.right = (int) (currentBarBounds.left + mBarView.expandedWidth());
+            displayBounds.left = currentBarBounds.left;
+            displayBounds.right = (int) (currentBarBounds.left + mBarView.expandedWidth());
         } else {
-            location.left = (int) (currentBarBounds.right - mBarView.expandedWidth());
-            location.right = currentBarBounds.right;
+            displayBounds.left = (int) (currentBarBounds.right - mBarView.expandedWidth());
+            displayBounds.right = currentBarBounds.right;
         }
         final int translation = (int) abs(mBubbleStashController.getBubbleBarTranslationY());
-        location.top = displaySize.y - currentBarBounds.height() - translation;
-        location.bottom = displaySize.y - translation;
-        return location;
+        displayBounds.top = displaySize.y - currentBarBounds.height() - translation;
+        displayBounds.bottom = displaySize.y - translation;
+        return displayBounds;
     }
 }

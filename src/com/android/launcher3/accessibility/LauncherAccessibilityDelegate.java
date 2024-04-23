@@ -414,7 +414,7 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
                         LauncherSettings.Favorites.CONTAINER_DESKTOP,
                         screenId, coordinates[0], coordinates[1]);
 
-                bindItem(item, accessibility, finishCallback);
+                bindItem(info, accessibility, finishCallback);
                 announceConfirmation(R.string.item_added_to_workspace);
             } else if (item instanceof PendingAddItemInfo) {
                 PendingAddItemInfo info = (PendingAddItemInfo) item;
@@ -423,11 +423,16 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
                     widgetInfo.bindOptions = widgetInfo.getDefaultSizeOptions(mContext);
                 }
                 Workspace<?> workspace = mContext.getWorkspace();
-                workspace.post(
-                        () -> workspace.snapToPage(workspace.getPageIndexForScreenId(screenId))
-                );
-                mContext.addPendingItem(info, LauncherSettings.Favorites.CONTAINER_DESKTOP,
-                        screenId, coordinates, info.spanX, info.spanY);
+                workspace.post(() -> {
+                    workspace.snapToPage(workspace.getPageIndexForScreenId(screenId));
+                    workspace.setOnPageTransitionEndCallback(() -> {
+                        mContext.addPendingItem(info, LauncherSettings.Favorites.CONTAINER_DESKTOP,
+                                screenId, coordinates, info.spanX, info.spanY);
+                        if (finishCallback != null) {
+                            finishCallback.accept(/* success= */ true);
+                        }
+                    });
+                });
             } else if (item instanceof WorkspaceItemInfo) {
                 WorkspaceItemInfo info = ((WorkspaceItemInfo) item).clone();
                 mContext.getModelWriter().addItemToDatabase(info,

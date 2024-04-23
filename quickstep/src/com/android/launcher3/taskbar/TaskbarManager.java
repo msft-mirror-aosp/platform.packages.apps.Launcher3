@@ -58,6 +58,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.statemanager.StatefulActivity;
@@ -339,12 +340,12 @@ public class TaskbarManager {
 
     /**
      * Toggles All Apps for Taskbar or Launcher depending on the current state.
-     *
-     * @param homeAllAppsIntent Intent used if Taskbar is not enabled or Launcher is resumed.
      */
-    public void toggleAllApps(Intent homeAllAppsIntent) {
+    public void toggleAllApps() {
         if (mTaskbarActivityContext == null || mTaskbarActivityContext.canToggleHomeAllApps()) {
-            mContext.startActivity(homeAllAppsIntent);
+            // Home All Apps should be toggled from this class, because the controllers are not
+            // initialized when Taskbar is disabled (i.e. TaskbarActivityContext is null).
+            if (mActivity instanceof Launcher l) l.toggleAllAppsSearch();
         } else {
             mTaskbarActivityContext.toggleAllAppsSearch();
         }
@@ -443,7 +444,8 @@ public class TaskbarManager {
                 LauncherAppState.getIDP(mContext).getDeviceProfile(mContext) : null;
 
             // All Apps action is unrelated to navbar unification, so we only need to check DP.
-            mAllAppsActionManager.setTaskbarPresent(dp != null && dp.isTaskbarPresent);
+            final boolean isLargeScreenTaskbar = dp != null && dp.isTaskbarPresent;
+            mAllAppsActionManager.setTaskbarPresent(isLargeScreenTaskbar);
 
             destroyExistingTaskbar();
 
@@ -467,6 +469,7 @@ public class TaskbarManager {
             }
             mSharedState.startTaskbarVariantIsTransient =
                     DisplayController.isTransientTaskbar(mTaskbarActivityContext);
+            mSharedState.allAppsVisible = mSharedState.allAppsVisible && isLargeScreenTaskbar;
             mTaskbarActivityContext.init(mSharedState);
 
             if (mActivity != null) {

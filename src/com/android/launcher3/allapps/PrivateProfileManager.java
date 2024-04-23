@@ -21,6 +21,7 @@ import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
 import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_PRIVATESPACE;
 import static com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder.MAIN;
 import static com.android.launcher3.allapps.BaseAllAppsAdapter.VIEW_TYPE_ICON;
 import static com.android.launcher3.allapps.BaseAllAppsAdapter.VIEW_TYPE_PRIVATE_SPACE_HEADER;
@@ -40,6 +41,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.LayoutTransition;
+import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.Intent;
@@ -52,6 +54,7 @@ import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.recyclerview.widget.LinearSmoothScroller;
@@ -70,7 +73,7 @@ import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.PrivateSpaceInstallAppButtonInfo;
 import com.android.launcher3.pm.UserCache;
-import com.android.launcher3.uioverrides.ApiWrapper;
+import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.views.ActivityContext;
@@ -91,13 +94,27 @@ public class PrivateProfileManager extends UserProfileManager {
     private static final int SETTINGS_OPACITY_DURATION = 160;
     private final ActivityAllAppsContainerView<?> mAllApps;
     private final Predicate<UserHandle> mPrivateProfileMatcher;
+    private final int mPsHeaderHeight;
+    private final RecyclerView.OnScrollListener mOnIdleScrollListener =
+            new RecyclerView.OnScrollListener() {
+        @Override
+        public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+            super.onScrollStateChanged(recyclerView, newState);
+            if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                mAnimationScrolling = false;
+            }
+        }
+    };
     private Set<String> mPreInstalledSystemPackages = new HashSet<>();
     private Intent mAppInstallerIntent = new Intent();
     private PrivateAppsSectionDecorator mPrivateAppsSectionDecorator;
     private boolean mPrivateSpaceSettingsAvailable;
     private boolean mIsAnimationRunning;
-    private int mHeaderHeight;
     private boolean mAnimate;
+    private boolean mAnimationScrolling;
+    private Runnable mOnPSHeaderAdded;
+    @Nullable
+    private RelativeLayout mPSHeader;
 
     public PrivateProfileManager(UserManager userManager,
             ActivityAllAppsContainerView<?> allApps,
@@ -106,7 +123,11 @@ public class PrivateProfileManager extends UserProfileManager {
         super(userManager, statsLogManager, userCache);
         mAllApps = allApps;
         mPrivateProfileMatcher = (user) -> userCache.getUserInfo(user).isPrivate();
-        UI_HELPER_EXECUTOR.post(this::initializeInBackgroundThread);
+
+        Context appContext = allApps.getContext().getApplicationContext();
+        UI_HELPER_EXECUTOR.post(() -> initializeInBackgroundThread(appContext));
+        mPsHeaderHeight = mAllApps.getContext().getResources().getDimensionPixelSize(
+                R.dimen.ps_header_height);
     }
 
     /** Adds Private Space Header to the layout. */
@@ -169,29 +190,53 @@ public class PrivateProfileManager extends UserProfileManager {
     /** Whether private profile should be hidden on Launcher. */
     public boolean isPrivateSpaceHidden() {
         return getCurrentState() == STATE_DISABLED && SettingsCache.INSTANCE
-                    .get(mAllApps.mActivityContext).getValue(PRIVATE_SPACE_HIDE_WHEN_LOCKED_URI, 0);
+                    .get(mAllApps.getContext()).getValue(PRIVATE_SPACE_HIDE_WHEN_LOCKED_URI, 0);
     }
 
-    /** Resets the current state of Private Profile, w.r.t. to Launcher. */
+    /**
+     * Resets the current state of Private Profile, w.r.t. to Launcher. The decorator should only
+     * be applied upon expand before animating. When collapsing, reset() will remove the decorator
+     * when animation is not running.
+     */
     public void reset() {
+        getMainRecyclerView().setChildAttachedConsumer(null);
         int previousState = getCurrentState();
         boolean isEnabled = !mAllApps.getAppsStore()
                 .hasModelFlag(FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED);
         int updatedState = isEnabled ? STATE_ENABLED : STATE_DISABLED;
         setCurrentState(updatedState);
-        resetPrivateSpaceDecorator(updatedState);
+        if (mPSHeader != null) {
+            mPSHeader.setAlpha(1);
+        }
         if (transitioningFromLockedToUnlocked(previousState, updatedState)) {
             postUnlock();
         } else if (transitioningFromUnlockedToLocked(previousState, updatedState)){
             executeLock();
         }
+        resetPrivateSpaceDecorator(updatedState);
     }
 
-    /** Opens the Private Space Settings Page. */
-    public void openPrivateSpaceSettings() {
+    /**
+     * Opens the Private Space Settings Page.
+     *
+     * @param view the view that was clicked to open the settings page and which will be the same
+     *             view to animate back. Otherwise if there is no view, simply start the activity.
+     */
+    public void openPrivateSpaceSettings(View view) {
         if (mPrivateSpaceSettingsAvailable) {
-            mAllApps.getContext()
-                    .startActivity(ApiWrapper.getPrivateSpaceSettingsIntent(mAllApps.getContext()));
+            Context context = mAllApps.getContext();
+            Intent intent = ApiWrapper.INSTANCE.get(context).getPrivateSpaceSettingsIntent();
+            if (view == null) {
+                context.startActivity(intent);
+                return;
+            }
+            ActivityContext activityContext = ActivityContext.lookupContext(context);
+            AppInfo itemInfo = new AppInfo();
+            itemInfo.id = CONTAINER_PRIVATESPACE;
+            itemInfo.componentName = intent.getComponent();
+            itemInfo.container = CONTAINER_PRIVATESPACE;
+            view.setTag(itemInfo);
+            activityContext.startActivitySafely(view, intent, itemInfo);
         }
     }
 
@@ -214,33 +259,17 @@ public class PrivateProfileManager extends UserProfileManager {
      * This case should still be ok, as locking the Private Space container and unlocking it,
      * reloads the values, fixing the incorrect UI.
      */
-    private void initializeInBackgroundThread() {
+    private void initializeInBackgroundThread(Context appContext) {
         Preconditions.assertNonUiThread();
-        setPreInstalledSystemPackages();
-        setAppInstallerIntent();
-        initializePrivateSpaceSettingsState();
-    }
-
-    private void initializePrivateSpaceSettingsState() {
-        Preconditions.assertNonUiThread();
-        Intent psSettingsIntent = ApiWrapper.getPrivateSpaceSettingsIntent(mAllApps.getContext());
-        setPrivateSpaceSettingsAvailable(psSettingsIntent != null);
-    }
-
-    private void setPreInstalledSystemPackages() {
-        Preconditions.assertNonUiThread();
-        if (getProfileUser() != null) {
-            mPreInstalledSystemPackages = new HashSet<>(ApiWrapper
-                    .getPreInstalledSystemPackages(mAllApps.getContext(), getProfileUser()));
+        ApiWrapper apiWrapper = ApiWrapper.INSTANCE.get(appContext);
+        UserHandle profileUser = getProfileUser();
+        if (profileUser != null) {
+            mPreInstalledSystemPackages = new HashSet<>(
+                    apiWrapper.getPreInstalledSystemPackages(profileUser));
+            mAppInstallerIntent = apiWrapper
+                    .getAppMarketActivityIntent(BuildConfig.APPLICATION_ID, profileUser);
         }
-    }
-
-    private void setAppInstallerIntent() {
-        Preconditions.assertNonUiThread();
-        if (getProfileUser() != null) {
-            mAppInstallerIntent = ApiWrapper.getAppMarketActivityIntent(mAllApps.getContext(),
-                    BuildConfig.APPLICATION_ID, getProfileUser());
-        }
+        setPrivateSpaceSettingsAvailable(apiWrapper.getPrivateSpaceSettingsIntent() != null);
     }
 
     @VisibleForTesting
@@ -263,7 +292,7 @@ public class PrivateProfileManager extends UserProfileManager {
             mainAdapterHolder.mRecyclerView.addItemDecoration(mPrivateAppsSectionDecorator);
         } else {
             // Remove Private Space Decorator from the Recycler view.
-            if (mPrivateAppsSectionDecorator != null) {
+            if (mPrivateAppsSectionDecorator != null && !mIsAnimationRunning) {
                 mainAdapterHolder.mRecyclerView.removeItemDecoration(mPrivateAppsSectionDecorator);
             }
         }
@@ -289,10 +318,13 @@ public class PrivateProfileManager extends UserProfileManager {
 
     /** Collapses the private space before the app list has been updated. */
     void executeLock() {
-        MAIN_EXECUTOR.execute(this::collapsePrivateSpace);
+        MAIN_EXECUTOR.execute(() -> updatePrivateStateAnimator(false));
     }
 
     void setAnimationRunning(boolean isAnimationRunning) {
+        if (!isAnimationRunning) {
+            mAnimate = false;
+        }
         mIsAnimationRunning = isAnimationRunning;
     }
 
@@ -325,8 +357,13 @@ public class PrivateProfileManager extends UserProfileManager {
 
     /** Add Private Space Header view elements based upon {@link UserProfileState} */
     public void addPrivateSpaceHeaderViewElements(RelativeLayout parent) {
+        mPSHeader = parent;
+        if (mOnPSHeaderAdded != null) {
+            MAIN_EXECUTOR.execute(mOnPSHeaderAdded);
+            mOnPSHeaderAdded = null;
+        }
         // Set the transition duration for the settings and lock button to animate.
-        ViewGroup settingAndLockGroup = parent.findViewById(R.id.settingsAndLockGroup);
+        ViewGroup settingAndLockGroup = mPSHeader.findViewById(R.id.settingsAndLockGroup);
         if (mAnimate) {
             enableLayoutTransition(settingAndLockGroup);
         } else {
@@ -335,16 +372,15 @@ public class PrivateProfileManager extends UserProfileManager {
         }
 
         //Add quietMode image and action for lock/unlock button
-        ViewGroup lockButton =
-                parent.findViewById(R.id.ps_lock_unlock_button);
+        ViewGroup lockButton = mPSHeader.findViewById(R.id.ps_lock_unlock_button);
         assert lockButton != null;
         addLockButton(lockButton);
 
         //Trigger lock/unlock action from header.
-        addHeaderOnClickListener(parent);
+        addHeaderOnClickListener(mPSHeader);
 
         //Add image and action for private space settings button
-        ImageButton settingsButton = parent.findViewById(R.id.ps_settings_button);
+        ImageButton settingsButton = mPSHeader.findViewById(R.id.ps_settings_button);
         assert settingsButton != null;
         addPrivateSpaceSettingsButton(settingsButton);
 
@@ -352,7 +388,6 @@ public class PrivateProfileManager extends UserProfileManager {
         ImageView transitionView = parent.findViewById(R.id.ps_transition_image);
         assert transitionView != null;
         addTransitionImage(transitionView);
-        mHeaderHeight = parent.getHeight();
     }
 
     /**
@@ -379,8 +414,10 @@ public class PrivateProfileManager extends UserProfileManager {
     private void addHeaderOnClickListener(RelativeLayout header) {
         if (getCurrentState() == STATE_DISABLED) {
             header.setOnClickListener(view -> lockingAction(/* lock */ false));
+            header.setClickable(true);
         } else {
             header.setOnClickListener(null);
+            header.setClickable(false);
         }
     }
 
@@ -402,7 +439,7 @@ public class PrivateProfileManager extends UserProfileManager {
             settingsButton.setOnClickListener(
                     view -> {
                         logEvents(LAUNCHER_PRIVATE_SPACE_SETTINGS_TAP);
-                        openPrivateSpaceSettings();
+                        openPrivateSpaceSettings(view);
                     });
         } else {
             settingsButton.setVisibility(GONE);
@@ -436,16 +473,18 @@ public class PrivateProfileManager extends UserProfileManager {
                 smoothScroller.setTargetPosition(i);
                 RecyclerView.LayoutManager layoutManager = allAppsRecyclerView.getLayoutManager();
                 if (layoutManager != null) {
-                    layoutManager.startSmoothScroll(smoothScroller);
+                    startAnimationScroll(allAppsRecyclerView, layoutManager, smoothScroller);
+                    currentItem.decorationInfo = null;
                 }
                 break;
             }
             // Make the private space apps gone to "collapse".
-            if (currentItem.decorationInfo != null) {
+            if (isPrivateSpaceItem(currentItem)) {
                 RecyclerView.ViewHolder viewHolder =
                         allAppsRecyclerView.findViewHolderForAdapterPosition(i);
                 if (viewHolder != null) {
                     viewHolder.itemView.setVisibility(GONE);
+                    currentItem.decorationInfo = null;
                 }
             }
         }
@@ -455,7 +494,7 @@ public class PrivateProfileManager extends UserProfileManager {
      * Upon expanding, only scroll to the item position in the adapter that allows the header to be
      * visible.
      */
-    public int scrollForViewToBeVisibleInContainer(
+    public int scrollForHeaderToBeVisibleInContainer(
             AllAppsRecyclerView allAppsRecyclerView,
             List<BaseAllAppsAdapter.AdapterItem> appListAdapterItems,
             int psHeaderHeight,
@@ -474,9 +513,12 @@ public class PrivateProfileManager extends UserProfileManager {
                 if (rowToExpandToWithRespectToHeader == -1) {
                     rowToExpandToWithRespectToHeader = currentItem.rowIndex;
                 }
+                // If there are no tabs, decrease the row to scroll to by 1 since the header
+                // may be cut off slightly.
                 int rowToScrollTo =
                         (int) Math.floor((double) (mAllApps.getHeight() - psHeaderHeight
-                                - mAllApps.getHeaderProtectionHeight()) / allAppsCellHeight);
+                                - mAllApps.getHeaderProtectionHeight()) / allAppsCellHeight)
+                                - (mAllApps.isUsingTabs() ? 0 : 1);
                 int currentRowDistance = currentItem.rowIndex - rowToExpandToWithRespectToHeader;
                 // rowToScrollTo - 1 since the item to scroll to is 0 indexed.
                 if (currentRowDistance == rowToScrollTo - 1) {
@@ -495,7 +537,7 @@ public class PrivateProfileManager extends UserProfileManager {
             smoothScroller.setTargetPosition(itemToScrollTo);
             RecyclerView.LayoutManager layoutManager = allAppsRecyclerView.getLayoutManager();
             if (layoutManager != null) {
-                layoutManager.startSmoothScroll(smoothScroller);
+                startAnimationScroll(allAppsRecyclerView, layoutManager, smoothScroller);
             }
         }
         return itemToScrollTo;
@@ -531,27 +573,59 @@ public class PrivateProfileManager extends UserProfileManager {
         return collapseAnim;
     }
 
+    private ValueAnimator animateAlphaOfIcons(boolean isExpanding) {
+        float from = isExpanding ? 0 : 1;
+        float to = isExpanding ? 1 : 0;
+        AllAppsRecyclerView allAppsRecyclerView = mAllApps.getActiveRecyclerView();
+        List<BaseAllAppsAdapter.AdapterItem> allAppsAdapterItems =
+                mAllApps.getActiveRecyclerView().getApps().getAdapterItems();
+        ValueAnimator alphaAnim = ObjectAnimator.ofFloat(from, to);
+        alphaAnim.setDuration(EXPAND_COLLAPSE_DURATION);
+        alphaAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator valueAnimator) {
+                float newAlpha = (float) valueAnimator.getAnimatedValue();
+                for (int i = 0; i < allAppsAdapterItems.size(); i++) {
+                    BaseAllAppsAdapter.AdapterItem currentItem = allAppsAdapterItems.get(i);
+                    if (isPrivateSpaceItem(currentItem) &&
+                            currentItem.viewType != VIEW_TYPE_PRIVATE_SPACE_HEADER) {
+                        RecyclerView.ViewHolder viewHolder =
+                                allAppsRecyclerView.findViewHolderForAdapterPosition(i);
+                        if (viewHolder != null) {
+                            viewHolder.itemView.setAlpha(newAlpha);
+                        }
+                    }
+                }
+            }
+        });
+        return alphaAnim;
+    }
+
     /**
      * Using PropertySetter{@link PropertySetter}, we can update the view's attributes within an
      * animation. At the moment, collapsing, setting alpha changes, and animating the text is done
      * here.
      */
-    private void updatePrivateStateAnimator(boolean expand, @Nullable ViewGroup psHeader) {
-        if (psHeader == null) {
+    private void updatePrivateStateAnimator(boolean expand) {
+        if (!Flags.enablePrivateSpace() || !Flags.privateSpaceAnimation()) {
             return;
         }
-        ViewGroup settingsAndLockGroup = psHeader.findViewById(R.id.settingsAndLockGroup);
-        ViewGroup lockButton = psHeader.findViewById(R.id.ps_lock_unlock_button);
+        if (mPSHeader == null) {
+            mOnPSHeaderAdded = () -> updatePrivateStateAnimator(expand);
+            setAnimationRunning(false);
+            return;
+        }
+        ViewGroup settingsAndLockGroup = mPSHeader.findViewById(R.id.settingsAndLockGroup);
+        ViewGroup lockButton = mPSHeader.findViewById(R.id.ps_lock_unlock_button);
         if (settingsAndLockGroup.getLayoutTransition() == null) {
             // Set a new transition if the current ViewGroup does not already contain one as each
             // transition should only happen once when applied.
             enableLayoutTransition(settingsAndLockGroup);
         }
-
-        PropertySetter setter = new AnimatedPropertySetter();
-        ImageButton settingsButton = psHeader.findViewById(R.id.ps_settings_button);
-        updateSettingsGearAlpha(settingsButton, expand, setter);
-        AnimatorSet animatorSet = setter.buildAnim();
+        PropertySetter headerSetter = new AnimatedPropertySetter();
+        ImageButton settingsButton = mPSHeader.findViewById(R.id.ps_settings_button);
+        updateSettingsGearAlpha(settingsButton, expand, headerSetter);
+        AnimatorSet animatorSet = headerSetter.buildAnim();
         animatorSet.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationStart(Animator animation) {
@@ -562,20 +636,49 @@ public class PrivateProfileManager extends UserProfileManager {
         });
         animatorSet.addListener(forEndCallback(() -> {
             setAnimationRunning(false);
-            mAnimate = false;
+            getMainRecyclerView().setChildAttachedConsumer(child -> child.setAlpha(1));
             if (!expand) {
                 // Call onAppsUpdated() because it may be canceled when this animation occurs.
                 mAllApps.getPersonalAppList().onAppsUpdated();
+                if (isPrivateSpaceHidden()) {
+                    // TODO (b/325455879): Figure out if we can avoid this.
+                    getMainRecyclerView().getAdapter().notifyDataSetChanged();
+                }
             }
         }));
-        // Play the collapsing together of the stateAnimator to avoid being unable to scroll to the
-        // header. Otherwise the smooth scrolling will scroll higher when played with the state
-        // animator.
-        if (!expand) {
-            animatorSet.playTogether(animateCollapseAnimation());
+        if (expand) {
+            animatorSet.playTogether(animateAlphaOfIcons(true));
+        } else {
+            if (isPrivateSpaceHidden()) {
+                animatorSet.playSequentially(animateAlphaOfIcons(false),
+                        animateCollapseAnimation(), fadeOutHeaderAlpha());
+            } else {
+                animatorSet.playSequentially(animateAlphaOfIcons(false),
+                        animateCollapseAnimation());
+            }
         }
         animatorSet.setDuration(EXPAND_COLLAPSE_DURATION);
         animatorSet.start();
+    }
+
+    /** Fades out the private space container. */
+    private ValueAnimator fadeOutHeaderAlpha() {
+        if (mPSHeader == null) {
+            return new ValueAnimator();
+        }
+        float from = 1;
+        float to = 0;
+        ValueAnimator alphaAnim = ObjectAnimator.ofFloat(from, to);
+        alphaAnim.setDuration(EXPAND_COLLAPSE_DURATION);
+        alphaAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator valueAnimator) {
+                if (mPSHeader != null) {
+                    mPSHeader.setAlpha((float) valueAnimator.getAnimatedValue());
+                }
+            }
+        });
+        return alphaAnim;
     }
 
     /** Animates the layout changes when the text of the button becomes visible/gone. */
@@ -617,10 +720,9 @@ public class PrivateProfileManager extends UserProfileManager {
             // Animate the text and settings icon.
             DeviceProfile deviceProfile =
                     ActivityContext.lookupContext(mAllApps.getContext()).getDeviceProfile();
-            scrollForViewToBeVisibleInContainer(mainAdapterHolder.mRecyclerView, adapterItems,
+            scrollForHeaderToBeVisibleInContainer(mainAdapterHolder.mRecyclerView, adapterItems,
                     getPsHeaderHeight(), deviceProfile.allAppsCellHeightPx);
-            ViewGroup psHeader = getPsHeader(mainAdapterHolder.mRecyclerView, adapterItems);
-            updatePrivateStateAnimator(true, psHeader);
+            updatePrivateStateAnimator(true);
         }
     }
 
@@ -635,36 +737,33 @@ public class PrivateProfileManager extends UserProfileManager {
         });
     }
 
-    private void collapsePrivateSpace() {
-        AllAppsRecyclerView allAppsRecyclerView = mAllApps.getActiveRecyclerView();
-        AlphabeticalAppsList<?> appList = allAppsRecyclerView.getApps();
-        if (appList == null) {
-            return;
-        }
-        ViewGroup psHeader = getPsHeader(allAppsRecyclerView, appList.getAdapterItems());
-        assert psHeader != null;
-        updatePrivateStateAnimator(false, psHeader);
+    /** Starts the smooth scroll with the provided smoothScroller and add idle listener. */
+    private void startAnimationScroll(AllAppsRecyclerView allAppsRecyclerView,
+            RecyclerView.LayoutManager layoutManager, RecyclerView.SmoothScroller smoothScroller) {
+        mAnimationScrolling = true;
+        layoutManager.startSmoothScroll(smoothScroller);
+        allAppsRecyclerView.removeOnScrollListener(mOnIdleScrollListener);
+        allAppsRecyclerView.addOnScrollListener(mOnIdleScrollListener);
+    }
+
+    AllAppsRecyclerView getMainRecyclerView() {
+        return mAllApps.mAH.get(ActivityAllAppsContainerView.AdapterHolder.MAIN).mRecyclerView;
+    }
+
+    boolean getAnimate() {
+        return mAnimate;
+    }
+
+    boolean getAnimationScrolling() {
+        return mAnimationScrolling;
     }
 
     int getPsHeaderHeight() {
-        return mHeaderHeight;
+        return mPsHeaderHeight;
     }
 
-    /** Get the private space header from the adapter items. */
-    @Nullable
-    private ViewGroup getPsHeader(AllAppsRecyclerView allAppsRecyclerView,
-            List<BaseAllAppsAdapter.AdapterItem> adapterItems){
-        ViewGroup psHeader = null;
-        for (int i = 0; i < adapterItems.size(); i++) {
-            BaseAllAppsAdapter.AdapterItem currentItem = adapterItems.get(i);
-            if (currentItem.viewType == VIEW_TYPE_PRIVATE_SPACE_HEADER) {
-                RecyclerView.ViewHolder viewHolder =
-                        allAppsRecyclerView.findViewHolderForAdapterPosition(i);
-                if (viewHolder != null) {
-                    psHeader = (ViewGroup) viewHolder.itemView;
-                }
-            }
-        }
-        return psHeader;
+    boolean isPrivateSpaceItem(BaseAllAppsAdapter.AdapterItem item) {
+        return getItemInfoMatcher().test(item.itemInfo) || item.decorationInfo != null
+                || (item.itemInfo instanceof PrivateSpaceInstallAppButtonInfo);
     }
 }

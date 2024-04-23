@@ -23,14 +23,12 @@ import static com.android.launcher3.UtilitiesKt.modifyAttributesOnViewTree;
 import static com.android.launcher3.UtilitiesKt.restoreAttributesOnViewTree;
 
 import android.content.Context;
-import android.graphics.Outline;
 import android.graphics.Rect;
 import android.os.Process;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewOutlineProvider;
 import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -39,11 +37,13 @@ import android.widget.ScrollView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Px;
 
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.recyclerview.ViewHolderBinder;
 import com.android.launcher3.util.PackageUserKey;
+import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
@@ -74,24 +74,9 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     private ScrollView mRightPaneScrollView;
     private WidgetsListTableViewHolderBinder mWidgetsListTableViewHolderBinder;
 
-    private boolean mOldIsBackSwipeProgressing;
+    private boolean mOldIsSwipeToDismissInProgress;
     private int mActivePage = -1;
     private PackageUserKey mSelectedHeader;
-
-    private final ViewOutlineProvider mViewOutlineProviderRightPane = new ViewOutlineProvider() {
-        @Override
-        public void getOutline(View view, Outline outline) {
-            outline.setRoundRect(
-                    0,
-                    0,
-                    view.getMeasuredWidth(),
-                    view.getMeasuredHeight() - getResources().getDimensionPixelSize(
-                            R.dimen.widget_list_horizontal_margin_two_pane),
-                    view.getResources().getDimensionPixelSize(
-                            R.dimen.widget_list_top_bottom_corner_radius)
-            );
-        }
-    };
 
     public WidgetsTwoPaneSheet(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
@@ -136,11 +121,8 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
 
         mHeaderTitle = mContent.findViewById(R.id.title);
         mRightPane = mContent.findViewById(R.id.right_pane);
-        mRightPane.setOutlineProvider(mViewOutlineProviderRightPane);
         mRightPaneScrollView = mContent.findViewById(R.id.right_pane_scroll_view);
         mRightPaneScrollView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        mRightPaneScrollView.setOutlineProvider(mViewOutlineProvider);
-        mRightPaneScrollView.setClipToOutline(true);
 
         mPrimaryWidgetListView = findViewById(R.id.primary_widgets_list_view);
         mPrimaryWidgetListView.setOutlineProvider(mViewOutlineProvider);
@@ -154,14 +136,34 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     }
 
     @Override
-    protected void onScaleProgressChanged() {
-        super.onScaleProgressChanged();
-        boolean isBackSwipeProgressing = mSlideInViewScale.value > 0;
-        if (isBackSwipeProgressing == mOldIsBackSwipeProgressing) {
+    protected int getTabletHorizontalMargin(DeviceProfile deviceProfile) {
+        if (enableCategorizedWidgetSuggestions()) {
+            // two pane picker is full width for fold as well as tablet.
+            return getResources().getDimensionPixelSize(
+                    R.dimen.widget_picker_two_panels_left_right_margin);
+        }
+        if (deviceProfile.isTwoPanels && enableUnfoldedTwoPanePicker()) {
+            // enableUnfoldedTwoPanePicker made two pane picker full-width for fold only.
+            return getResources().getDimensionPixelSize(
+                    R.dimen.widget_picker_two_panels_left_right_margin);
+        }
+        if (deviceProfile.isLandscape && !deviceProfile.isTwoPanels) {
+            // non-fold tablet landscape margins (ag/22163531)
+            return getResources().getDimensionPixelSize(
+                    R.dimen.widget_picker_landscape_tablet_left_right_margin);
+        }
+        return deviceProfile.allAppsLeftRightMargin;
+    }
+
+    @Override
+    protected void onUserSwipeToDismissProgressChanged() {
+        super.onUserSwipeToDismissProgressChanged();
+        boolean isSwipeToDismissInProgress = mSwipeToDismissProgress.value > 0;
+        if (isSwipeToDismissInProgress == mOldIsSwipeToDismissInProgress) {
             return;
         }
-        mOldIsBackSwipeProgressing = isBackSwipeProgressing;
-        if (isBackSwipeProgressing) {
+        mOldIsSwipeToDismissInProgress = isSwipeToDismissInProgress;
+        if (isSwipeToDismissInProgress) {
             modifyAttributesOnViewTree(mPrimaryWidgetListView, (ViewParent) mContent,
                     CLIP_CHILDREN_FALSE_MODIFIER);
             modifyAttributesOnViewTree(mRightPaneScrollView,  (ViewParent) mContent,
@@ -276,8 +278,15 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
 
     @Override
     @Px
-    protected float getRecommendationSectionHeightRatio() {
-        return RECOMMENDATION_SECTION_HEIGHT_RATIO_TWO_PANE;
+    protected float getMaxAvailableHeightForRecommendations() {
+        if (mRecommendedWidgetsCount > 0) {
+            // If widgets were already selected for display, we show them all on orientation change
+            // in a two pane picker
+            return Float.MAX_VALUE;
+        }
+
+        return (mDeviceProfile.heightPx - mDeviceProfile.bottomSheetTopPadding)
+                * RECOMMENDATION_SECTION_HEIGHT_RATIO_TWO_PANE;
     }
 
     @Override
@@ -414,6 +423,23 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     @Override
     protected boolean isTwoPane() {
         return true;
+    }
+
+    @Override
+    protected int getHeaderTopClip(@NonNull WidgetCell cell) {
+        return 0;
+    }
+
+    @Override
+    protected void scrollCellContainerByY(WidgetCell wc, int scrollByY) {
+        for (ViewParent parent = wc.getParent(); parent != null; parent = parent.getParent()) {
+            if (parent instanceof ScrollView scrollView) {
+                scrollView.smoothScrollBy(0, scrollByY);
+                return;
+            } else if (parent == this) {
+                return;
+            }
+        }
     }
 
     /**

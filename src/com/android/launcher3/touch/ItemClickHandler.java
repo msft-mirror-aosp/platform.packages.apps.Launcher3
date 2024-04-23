@@ -41,6 +41,7 @@ import android.widget.Toast;
 
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.BuildConfig;
+import com.android.launcher3.Flags;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings;
@@ -63,7 +64,7 @@ import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
-import com.android.launcher3.uioverrides.ApiWrapper;
+import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.views.FloatingIconView;
 import com.android.launcher3.views.Snackbar;
@@ -148,29 +149,40 @@ public class ItemClickHandler {
      */
     private static void onClickAppPairIcon(View v) {
         Launcher launcher = Launcher.getLauncher(v.getContext());
-        AppPairIcon appPairIcon = (AppPairIcon) v;
-        if (!appPairIcon.getInfo().isLaunchable(launcher)) {
-            // Display a message for app pairs that are disabled due to screen size
+        AppPairIcon icon = (AppPairIcon) v;
+        AppPairInfo info = icon.getInfo();
+        boolean isApp1Launchable = info.isLaunchable(launcher).getFirst(),
+                isApp2Launchable = info.isLaunchable(launcher).getSecond();
+        if (!isApp1Launchable || !isApp2Launchable) {
+            // App pair is unlaunchable due to screen size.
             boolean isFoldable = InvariantDeviceProfile.INSTANCE.get(launcher)
                     .supportedProfiles.stream().anyMatch(dp -> dp.isTwoPanels);
             Toast.makeText(launcher, isFoldable
                             ? R.string.app_pair_needs_unfold
                             : R.string.app_pair_unlaunchable_at_screen_size,
                     Toast.LENGTH_SHORT).show();
-        } else if (appPairIcon.getInfo().isDisabled()) {
-            WorkspaceItemInfo app1 = appPairIcon.getInfo().getFirstApp();
-            WorkspaceItemInfo app2 = appPairIcon.getInfo().getSecondApp();
+            return;
+        } else if (info.isDisabled()) {
+            // App pair is disabled for another reason.
+            WorkspaceItemInfo app1 = info.getFirstApp();
+            WorkspaceItemInfo app2 = info.getSecondApp();
             // Show the user why the app pair is disabled.
-            if (app1.isDisabled() && !handleDisabledItemClicked(app1, launcher)) {
-                // If handleDisabledItemClicked() did not handle the error message, we initiate an
-                // app launch so Framework can tell the user why the app is suspended.
-                onClickAppShortcut(v, app1, launcher);
-            } else if (app2.isDisabled() && !handleDisabledItemClicked(app2, launcher)) {
-                onClickAppShortcut(v, app2, launcher);
+            if (app1.isDisabled() && app2.isDisabled()) {
+                // Both apps are disabled, show generic "app pair is not available" toast.
+                Toast.makeText(launcher, R.string.app_pair_not_available, Toast.LENGTH_SHORT)
+                        .show();
+                return;
+            } else if ((app1.isDisabled() && handleDisabledItemClicked(app1, launcher))
+                    || (app2.isDisabled() && handleDisabledItemClicked(app2, launcher))) {
+                // Only one is disabled, and handleDisabledItemClicked() showed a specific toast
+                // explaining why, so we are done.
+                return;
             }
-        } else {
-            launcher.launchAppPair(appPairIcon);
         }
+
+        // Either the app pair is not disabled, or it is a disabled state that can be handled by
+        // framework directly (e.g. one app is paused), so go ahead and launch.
+        launcher.launchAppPair(icon);
     }
 
     /**
@@ -227,7 +239,7 @@ public class ItemClickHandler {
                 }
             }
             // Fallback to using custom market intent.
-            Intent intent = ApiWrapper.getAppMarketActivityIntent(launcher,
+            Intent intent = ApiWrapper.INSTANCE.get(launcher).getAppMarketActivityIntent(
                     packageName, Process.myUserHandle());
             launcher.startActivitySafely(v, intent, item);
         };
@@ -339,7 +351,7 @@ public class ItemClickHandler {
 
         // Check for abandoned promise
         if ((v instanceof BubbleTextView) && shortcut.hasPromiseIconUi()
-                && (!Utilities.enableSupportForArchiving() || !shortcut.isArchived())) {
+                && (!Flags.enableSupportForArchiving() || !shortcut.isArchived())) {
             String packageName = shortcut.getIntent().getComponent() != null
                     ? shortcut.getIntent().getComponent().getPackageName()
                     : shortcut.getIntent().getPackage();
@@ -365,12 +377,12 @@ public class ItemClickHandler {
         if (item instanceof ItemInfoWithIcon itemInfoWithIcon) {
             if ((itemInfoWithIcon.runtimeStatusFlags
                     & ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE) != 0) {
-                intent = ApiWrapper.getAppMarketActivityIntent(launcher,
+                intent = ApiWrapper.INSTANCE.get(launcher).getAppMarketActivityIntent(
                         itemInfoWithIcon.getTargetComponent().getPackageName(),
                         Process.myUserHandle());
             } else if (itemInfoWithIcon.itemType
                     == LauncherSettings.Favorites.ITEM_TYPE_PRIVATE_SPACE_INSTALL_APP_BUTTON) {
-                intent = ApiWrapper.getAppMarketActivityIntent(launcher,
+                intent = ApiWrapper.INSTANCE.get(launcher).getAppMarketActivityIntent(
                         BuildConfig.APPLICATION_ID,
                         launcher.getAppsView().getPrivateProfileManager().getProfileUser());
                 launcher.getStatsLogManager().logger().log(

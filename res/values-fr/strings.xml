@@ -33,6 +33,7 @@
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"Cette paire d\'applications n\'est pas prise en charge sur cet appareil"</string>
     <string name="app_pair_needs_unfold" msgid="4588897528143807002">"Dépliez l\'appareil pour utiliser cette paire d\'applications"</string>
+    <string name="app_pair_not_available" msgid="3556767440808032031">"La paire d\'applications n\'est pas disponible"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Appuyez de manière prolongée sur un widget pour le déplacer."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Appuyez deux fois et maintenez la pression pour déplacer widget ou utiliser actions personnalisées."</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d x %2$d"</string>
@@ -123,8 +124,8 @@
     <string name="allow_rotation_title" msgid="7222049633713050106">"Autoriser la rotation de l\'écran d\'accueil"</string>
     <string name="allow_rotation_desc" msgid="8662546029078692509">"Lorsque vous faites pivoter le téléphone"</string>
     <string name="notification_dots_title" msgid="9062440428204120317">"Pastilles de notification"</string>
-    <string name="notification_dots_desc_on" msgid="1679848116452218908">"Activé"</string>
-    <string name="notification_dots_desc_off" msgid="1760796511504341095">"Désactivé"</string>
+    <string name="notification_dots_desc_on" msgid="1679848116452218908">"Activées"</string>
+    <string name="notification_dots_desc_off" msgid="1760796511504341095">"Désactivées"</string>
     <string name="title_missing_notification_access" msgid="7503287056163941064">"Accès aux notifications requis"</string>
     <string name="msg_missing_notification_access" msgid="281113995110910548">"Pour afficher les pastilles de notification, activez les notifications de l\'application <xliff:g id="NAME">%1$s</xliff:g>"</string>
     <string name="title_change_settings" msgid="1376365968844349552">"Modifier les paramètres"</string>
@@ -188,14 +189,13 @@
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"Filtre"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"Échec : <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"Espace privé"</string>
-    <!-- no translation found for private_space_secondary_label (9203933341714508907) -->
-    <skip />
+    <string name="private_space_secondary_label" msgid="9203933341714508907">"Appuyer pour ouvrir ou configurer"</string>
     <string name="ps_container_title" msgid="4391796149519594205">"Privé"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"Paramètres d\'Espace privé"</string>
     <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"Verrouiller/Déverrouiller Espace privé"</string>
     <string name="ps_container_lock_title" msgid="2640257399982364682">"Verrouiller"</string>
     <string name="ps_container_transition" msgid="8667331812048014412">"Transition vers Espace privé"</string>
-    <string name="ps_add_button_label" msgid="8611055839242385935">"Installer des applis"</string>
+    <string name="ps_add_button_label" msgid="8611055839242385935">"Installer applis"</string>
     <string name="ps_add_button_content_description" msgid="3254274107740952556">"Installer des applis dans l\'espace privé"</string>
     <string name="bubble_bar_overflow_description" msgid="7410995531938041192">"Dépassement"</string>
 </resources>

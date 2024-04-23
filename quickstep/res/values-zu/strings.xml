@@ -21,6 +21,8 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="recent_task_option_pin" msgid="7929860679018978258">"Phina"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"I-Freeform"</string>
+    <!-- no translation found for recent_task_option_desktop (8280879717125435668) -->
+    <skip />
     <string name="recents_empty_message" msgid="7040467240571714191">"Azikho izinto zakamuva"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"Izilungiselelo zokusetshenziswa kohlelo lokusebenza"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"Sula konke"</string>
@@ -116,6 +118,8 @@
     <string name="taskbar_edu_features" msgid="3320337287472848162">"Yenza okwengeziwe nge-Taskbar"</string>
     <string name="taskbar_edu_pinning_title" msgid="210102174154211712">"Bonisa njalo i-Taskbar"</string>
     <string name="taskbar_edu_pinning_standalone" msgid="2636919474366410467">"Ukuze ubonise njalo i-Taskbar phansi kwesikrini sakho, thinta bese ubamba isihlukanisi"</string>
+    <string name="taskbar_edu_circle_to_search_title" msgid="4322780398403949508">"Thinta uphinde ubambe inkinobho yokufinyelela ukuze useshe lokho okukusikrini sakho"</string>
+    <string name="taskbar_edu_circle_to_search_disclosure" msgid="5841648785867787221">"Lo mkhiqizo usebenzisa ingxenye ekhethiwe yesikrini sakho ukusesha. <xliff:g id="BEGIN_PRIVACY_LINK">&lt;a href="%1$s"&gt;</xliff:g>Inqubomgomo Yobumfihlo<xliff:g id="END_PRIVACY_LINK">&lt;/a&gt;</xliff:g> ye-Google kanye <xliff:g id="BEGIN_TOS_LINK">&lt;a href="%2$s"&gt;</xliff:g>Nemigomo Yesevisi<xliff:g id="END_TOS_LINK">&lt;/a&gt;</xliff:g> iyasebenza."</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"Vala"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"Kwenziwe"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"Ikhaya"</string>

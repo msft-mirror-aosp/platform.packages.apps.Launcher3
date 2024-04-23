@@ -17,7 +17,6 @@
 package com.android.quickstep.util;
 
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
-import static com.android.window.flags.Flags.enableDesktopWindowingMode;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -36,7 +35,6 @@ import android.view.View;
 
 import com.android.internal.jank.Cuj;
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.PendingAnimation;
@@ -47,6 +45,7 @@ import com.android.launcher3.model.data.AppPairInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.quickstep.views.FloatingTaskView;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
@@ -54,13 +53,14 @@ import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 /** Handles when the stage split lands on the home screen. */
 public class SplitToWorkspaceController {
 
-    private final Launcher mLauncher;
+    private final QuickstepLauncher mLauncher;
     private final SplitSelectStateController mController;
 
     private final int mHalfDividerSize;
     private final IconCache mIconCache;
 
-    public SplitToWorkspaceController(Launcher launcher, SplitSelectStateController controller) {
+    public SplitToWorkspaceController(QuickstepLauncher launcher,
+            SplitSelectStateController controller) {
         mLauncher = launcher;
         mController = controller;
         mIconCache = LauncherAppState.getInstanceNoCreate().getIconCache();
@@ -163,6 +163,10 @@ public class SplitToWorkspaceController {
                 new RectF(firstTaskStartingBounds), firstTaskEndingBounds,
                 false /* fadeWithThumbnail */, true /* isStagedTask */);
 
+        View mSplitDividerPlaceholderView = recentsView.getSplitSelectController()
+                .getSplitAnimationController().addDividerPlaceholderViewToAnim(pendingAnimation,
+                        mLauncher, secondTaskEndingBounds, view.getContext());
+
         FloatingTaskView secondFloatingTaskView = FloatingTaskView.getFloatingTaskView(mLauncher,
                 view, bitmap, icon, secondTaskStartingBounds);
         secondFloatingTaskView.setAlpha(1);
@@ -173,6 +177,11 @@ public class SplitToWorkspaceController {
             private boolean mIsCancelled = false;
 
             @Override
+            public void onAnimationStart(Animator animation) {
+                mController.launchSplitTasks(aBoolean -> cleanUp());
+            }
+
+            @Override
             public void onAnimationCancel(Animator animation) {
                 mIsCancelled = true;
                 cleanUp();
@@ -181,7 +190,6 @@ public class SplitToWorkspaceController {
             @Override
             public void onAnimationEnd(Animator animation) {
                 if (!mIsCancelled) {
-                    mController.launchSplitTasks(aBoolean -> cleanUp());
                     InteractionJankMonitorWrapper.end(Cuj.CUJ_SPLIT_SCREEN_ENTER);
                 }
             }
@@ -189,6 +197,7 @@ public class SplitToWorkspaceController {
             private void cleanUp() {
                 mLauncher.getDragLayer().removeView(firstFloatingTaskView);
                 mLauncher.getDragLayer().removeView(secondFloatingTaskView);
+                mLauncher.getDragLayer().removeView(mSplitDividerPlaceholderView);
                 mController.getSplitAnimationController().removeSplitInstructionsView(mLauncher);
                 mController.resetState();
             }
@@ -197,8 +206,6 @@ public class SplitToWorkspaceController {
     }
 
     private boolean shouldIgnoreSecondSplitLaunch() {
-        return (!FeatureFlags.enableSplitContextually()
-                && !enableDesktopWindowingMode())
-                || !mController.isSplitSelectActive();
+        return !FeatureFlags.enableSplitContextually() || !mController.isSplitSelectActive();
     }
 }

@@ -33,6 +33,7 @@
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"Бұл құрылғы қолданбаларды жұптау функциясын қолдамайды."</string>
     <string name="app_pair_needs_unfold" msgid="4588897528143807002">"Қолданбаларды жұптау функциясын пайдалану үшін құрылғыны ашыңыз."</string>
+    <string name="app_pair_not_available" msgid="3556767440808032031">"Қолданбаларды жұптау функциясы қолжетімді емес."</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Виджетті жылжыту үшін басып тұрыңыз."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Виджетті жылжыту үшін екі рет түртіңіз де, ұстап тұрыңыз немесе арнаулы әрекеттерді пайдаланыңыз."</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
@@ -44,10 +45,10 @@
     <string name="added_to_home_screen_accessibility_text" msgid="4451545765448884415">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> виджеті негізгі экранға енгізілді."</string>
     <string name="suggested_widgets_header_title" msgid="1844314680798145222">"Ұсыныстар"</string>
     <string name="productivity_widget_recommendation_category_label" msgid="3811812719618323750">"Ең қажетті"</string>
-    <string name="news_widget_recommendation_category_label" msgid="6756167867113741310">"Газеттер мен журналдар"</string>
+    <string name="news_widget_recommendation_category_label" msgid="6756167867113741310">"Жаңалықтар мен журналдар"</string>
     <string name="social_and_entertainment_widget_recommendation_category_label" msgid="2923840997302308191">"Жанға жайлы жер"</string>
     <string name="entertainment_widget_recommendation_category_label" msgid="3973107268630717874">"Ойын-сауық"</string>
-    <string name="social_widget_recommendation_category_label" msgid="689147679536384717">"Әлеуметтік"</string>
+    <string name="social_widget_recommendation_category_label" msgid="689147679536384717">"Қоғам"</string>
     <string name="fitness_widget_recommendation_category_label" msgid="2756483898236585324">"Денсаулық және фитнес"</string>
     <string name="weather_widget_recommendation_category_label" msgid="3059715991930798039">"Ауа райы"</string>
     <string name="others_widget_recommendation_category_label" msgid="5555987036267226245">"Сізге ұсынылғандар"</string>
@@ -188,8 +189,7 @@
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"Сүзгі"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"Қате шықты: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"Жеке бөлме"</string>
-    <!-- no translation found for private_space_secondary_label (9203933341714508907) -->
-    <skip />
+    <string name="private_space_secondary_label" msgid="9203933341714508907">"Реттеу немесе ашу үшін түртіңіз"</string>
     <string name="ps_container_title" msgid="4391796149519594205">"Жеке"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"Жеке бөлме параметрлері"</string>
     <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"Жеке бөлмені құлыптау/оның құлпын ашу"</string>

@@ -20,6 +20,7 @@ import android.content.Context
 import com.android.launcher3.BubbleTextView.DISPLAY_FOLDER
 import com.android.launcher3.DeviceProfile
 import com.android.launcher3.R
+import com.android.launcher3.util.Themes
 import com.android.launcher3.views.ActivityContext
 
 class AppPairIconDrawingParams(val context: Context, container: Int) {
@@ -62,7 +63,7 @@ class AppPairIconDrawingParams(val context: Context, container: Int) {
     // The app pair icon appears differently in portrait and landscape.
     var isLeftRightSplit: Boolean = true
     // The background paint color (based on container).
-    val bgColor: Int
+    var bgColor: Int = 0
 
     init {
         val activity: ActivityContext = ActivityContext.lookupContext(context)
@@ -77,22 +78,21 @@ class AppPairIconDrawingParams(val context: Context, container: Int) {
         innerPadding = iconSize * INNER_PADDING_SCALE
         memberIconSize = iconSize * MEMBER_ICON_SCALE
         updateOrientation(dp)
-        if (container == DISPLAY_FOLDER) {
-            val ta =
-                context.theme.obtainStyledAttributes(
-                    intArrayOf(R.attr.materialColorSurfaceContainerLowest)
-                )
-            bgColor = ta.getColor(0, 0)
-            ta.recycle()
-        } else {
-            val ta = context.theme.obtainStyledAttributes(R.styleable.FolderIconPreview)
-            bgColor = ta.getColor(R.styleable.FolderIconPreview_folderPreviewColor, 0)
-            ta.recycle()
-        }
+        updateBgColor(container)
     }
 
     /** Checks the device orientation and updates isLeftRightSplit accordingly. */
     fun updateOrientation(dp: DeviceProfile) {
         isLeftRightSplit = dp.isLeftRightSplit
+    }
+
+    fun updateBgColor(container: Int) {
+        if (container == DISPLAY_FOLDER) {
+            bgColor = Themes.getAttrColor(context, R.attr.appPairSurfaceInFolder)
+        } else {
+            val ta = context.theme.obtainStyledAttributes(R.styleable.FolderIconPreview)
+            bgColor = ta.getColor(R.styleable.FolderIconPreview_folderPreviewColor, 0)
+            ta.recycle()
+        }
     }
 }

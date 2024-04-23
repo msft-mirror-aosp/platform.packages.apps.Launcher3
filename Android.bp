@@ -75,7 +75,7 @@ android_library {
         "androidx.test.uiautomator_uiautomator",
         "androidx.preference_preference",
         "SystemUISharedLib",
-        "animationlib",
+        "//frameworks/libs/systemui:animationlib",
         "launcher-testing-shared",
     ],
     srcs: [
@@ -141,6 +141,7 @@ android_library {
     static_libs: [
         "LauncherPluginLib",
         "launcher_quickstep_log_protos_lite",
+        "android.os.flags-aconfig-java",
         "androidx-constraintlayout_constraintlayout",
         "androidx.recyclerview_recyclerview",
         "androidx.dynamicanimation_dynamicanimation",
@@ -150,9 +151,9 @@ android_library {
         "androidx.cardview_cardview",
         "androidx.window_window",
         "com.google.android.material_material",
-        "iconloader_base",
-        "view_capture",
-        "animationlib",
+        "//frameworks/libs/systemui:iconloader_base",
+        "//frameworks/libs/systemui:view_capture",
+        "//frameworks/libs/systemui:animationlib",
         "SystemUI-statsd",
         "launcher-testing-shared",
         "androidx.lifecycle_lifecycle-common-java8",
@@ -339,6 +340,7 @@ android_app {
     name: "Launcher3Go",
 
     static_libs: ["Launcher3GoLib"],
+    resource_dirs: [],
 
     platform_apis: true,
     min_sdk_version: "current",
@@ -374,6 +376,7 @@ android_app {
     name: "Launcher3QuickStepGo",
 
     static_libs: ["Launcher3GoLib"],
+    resource_dirs: [],
 
     platform_apis: true,
     min_sdk_version: "current",

@@ -21,7 +21,7 @@ import static com.android.launcher3.statemanager.BaseState.FLAG_NON_INTERACTIVE;
 import static com.android.launcher3.taskbar.TaskbarEduTooltipControllerKt.TOOLTIP_STEP_FEATURES;
 import static com.android.launcher3.taskbar.TaskbarLauncherStateController.FLAG_VISIBLE;
 import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
-import static com.android.window.flags.Flags.enableDesktopWindowingMode;
+import static com.android.window.flags.Flags.enableDesktopWindowingWallpaperActivity;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
@@ -35,6 +35,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.R;
@@ -49,8 +50,10 @@ import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.OnboardingPrefs;
+import com.android.quickstep.HomeVisibilityState;
 import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.RecentsAnimationCallbacks;
+import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
@@ -79,6 +82,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                     AnimatedFloat.VALUE, DISPLAY_PROGRESS_COUNT, Float::max);
 
     private final QuickstepLauncher mLauncher;
+    private final HomeVisibilityState mHomeState;
 
     private final DeviceProfile.OnDeviceProfileChangeListener mOnDeviceProfileChangeListener =
             dp -> {
@@ -87,6 +91,8 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                     mControllers.taskbarViewController.onRotationChanged(dp);
                 }
             };
+    private final HomeVisibilityState.VisibilityChangeListener  mVisibilityChangeListener =
+            this::onLauncherVisibilityChanged;
 
     // Initialized in init.
     private final TaskbarLauncherStateController
@@ -94,6 +100,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     public LauncherTaskbarUIController(QuickstepLauncher launcher) {
         mLauncher = launcher;
+        mHomeState =  SystemUiProxy.INSTANCE.get(mLauncher).getHomeVisibilityState();
     }
 
     @Override
@@ -104,8 +111,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 mControllers.getSharedState().sysuiStateFlags);
 
         mLauncher.setTaskbarUIController(this);
-
-        onLauncherVisibilityChanged(mLauncher.hasBeenResumed(), true /* fromInit */);
+        mHomeState.addListener(mVisibilityChangeListener);
+        onLauncherVisibilityChanged(
+                Flags.useActivityOverlay()
+                        ? mHomeState.isHomeVisible() : mLauncher.hasBeenResumed(),
+                true /* fromInit */);
 
         onStashedInAppChanged(mLauncher.getDeviceProfile());
         mLauncher.addOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
@@ -129,6 +139,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
         mLauncher.setTaskbarUIController(null);
         mLauncher.removeOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
+        mHomeState.removeListener(mVisibilityChangeListener);
         updateTaskTransitionSpec(true);
     }
 
@@ -208,20 +219,15 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
         DesktopVisibilityController desktopController =
                 LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
-        final boolean onDesktop =
-                enableDesktopWindowingMode()
-                        && desktopController != null
-                        && desktopController.areFreeformTasksVisible();
-        if (onDesktop) {
+        if (!enableDesktopWindowingWallpaperActivity()
+                && desktopController != null
+                && desktopController.areDesktopTasksVisible()) {
+            // TODO: b/333533253 - Remove after flag rollout
             isVisible = false;
         }
 
         mTaskbarLauncherStateController.updateStateForFlag(FLAG_VISIBLE, isVisible);
-        // TODO(b/308851855): Skip animation for launching split from home, will refine later
-        boolean skipAnimForSplit = enableSplitContextually() &&
-                mLauncher.areBothSplitAppsConfirmed() &&
-                mLauncher.getStateManager().getState() == LauncherState.NORMAL;
-        if (skipAnimForSplit || fromInit) {
+        if (fromInit) {
             duration = 0;
         }
         return mTaskbarLauncherStateController.applyState(duration, startAnimation);
@@ -234,7 +240,8 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     @Override
     public void refreshResumedState() {
-        onLauncherVisibilityChanged(mLauncher.hasBeenResumed());
+        onLauncherVisibilityChanged(Flags.useActivityOverlay()
+                ? mHomeState.isHomeVisible() : mLauncher.hasBeenResumed());
     }
 
     @Override
@@ -299,6 +306,8 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      */
     public void showEduOnAppLaunch() {
         if (!shouldShowEduOnAppLaunch()) {
+            // Called in case the edu finishes and circle to search edu is still pending
+            mControllers.taskbarEduTooltipController.maybeShowCircleToSearchEdu();
             return;
         }
 
@@ -310,6 +319,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
         // Transient swipe EDU tooltip.
         mControllers.taskbarEduTooltipController.maybeShowSwipeEdu();
+    }
+
+    /** Will make the next onRecentsAnimationFinished() animation a no-op. */
+    public void setSkipNextRecentsAnimEnd() {
+        mTaskbarLauncherStateController.setSkipNextRecentsAnimEnd();
     }
 
     /**
@@ -409,15 +423,15 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     @Override
-    protected boolean isInOverview() {
-        return mTaskbarLauncherStateController.isInOverview();
+    protected boolean isInOverviewUi() {
+        return mTaskbarLauncherStateController.isInOverviewUi();
     }
 
     @Override
     protected boolean canToggleHomeAllApps() {
         return mLauncher.isResumed()
-                && !mTaskbarLauncherStateController.isInOverview()
-                && !mLauncher.areFreeformTasksVisible();
+                && !mTaskbarLauncherStateController.isInOverviewUi()
+                && !mLauncher.areDesktopTasksVisible();
     }
 
     @Override

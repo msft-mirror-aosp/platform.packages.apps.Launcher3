@@ -33,6 +33,7 @@
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"Ky çift aplikacionesh nuk mbështetet në këtë pajisje"</string>
     <string name="app_pair_needs_unfold" msgid="4588897528143807002">"Shpalose pajisjen për të përdorur këtë çift aplikacionesh"</string>
+    <string name="app_pair_not_available" msgid="3556767440808032031">"Çifti i aplikacioneve nuk ofrohet"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Prek dhe mbaj shtypur një miniaplikacion për ta zhvendosur."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Trokit dy herë dhe mbaje shtypur një miniapliikacion për ta zhvendosur atë ose për të përdorur veprimet e personalizuara."</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
@@ -188,8 +189,7 @@
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"Filtro"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"Dështoi: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"Hapësira private"</string>
-    <!-- no translation found for private_space_secondary_label (9203933341714508907) -->
-    <skip />
+    <string name="private_space_secondary_label" msgid="9203933341714508907">"Trokit për të konfiguruar ose për të hapur"</string>
     <string name="ps_container_title" msgid="4391796149519594205">"Private"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"Cilësimet e \"Hapësirës private\""</string>
     <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"Kyç/Shkyç \"Hapësirën private\""</string>

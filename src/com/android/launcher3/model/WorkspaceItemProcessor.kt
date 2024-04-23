@@ -26,12 +26,15 @@ import android.graphics.Point
 import android.text.TextUtils
 import android.util.Log
 import android.util.LongSparseArray
+import com.android.launcher3.Flags
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.Utilities
 import com.android.launcher3.backuprestore.LauncherRestoreEventLogger.RestoreError
+import com.android.launcher3.config.FeatureFlags
 import com.android.launcher3.logging.FileLog
+import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.model.data.AppPairInfo
 import com.android.launcher3.model.data.FolderInfo
 import com.android.launcher3.model.data.IconRequestInfo
@@ -39,8 +42,9 @@ import com.android.launcher3.model.data.ItemInfoWithIcon
 import com.android.launcher3.model.data.LauncherAppWidgetInfo
 import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.pm.PackageInstallInfo
+import com.android.launcher3.pm.UserCache
 import com.android.launcher3.shortcuts.ShortcutKey
-import com.android.launcher3.uioverrides.ApiWrapper
+import com.android.launcher3.util.ApiWrapper
 import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.PackageManagerHelper
 import com.android.launcher3.util.PackageUserKey
@@ -58,6 +62,7 @@ import com.android.launcher3.widget.util.WidgetSizes
 class WorkspaceItemProcessor(
     private val c: LoaderCursor,
     private val memoryLogger: LoaderMemoryLogger?,
+    private val userCache: UserCache,
     private val userManagerState: UserManagerState,
     private val launcherApps: LauncherApps,
     private val pendingPackages: MutableSet<PackageUserKey>,
@@ -178,6 +183,9 @@ class WorkspaceItemProcessor(
                     return
                 }
             }
+        }
+        if (intent.`package` == null) {
+            intent.`package` = targetPkg
         }
         // else if cn == null => can't infer much, leave it
         // else if !validPkg => could be restored icon or missing sd-card
@@ -324,17 +332,16 @@ class WorkspaceItemProcessor(
             }
             val activityInfo = c.launcherActivityInfo
             if (activityInfo != null) {
-                if (ApiWrapper.isNonResizeableActivity(activityInfo)) {
-                    info.status = info.status or WorkspaceItemInfo.FLAG_NON_RESIZEABLE
-                }
-                info.setProgressLevel(
-                    PackageManagerHelper.getLoadingProgress(activityInfo),
-                    PackageInstallInfo.STATUS_INSTALLED_DOWNLOADING
+                AppInfo.updateRuntimeFlagsForActivityTarget(
+                    info,
+                    activityInfo,
+                    userCache.getUserInfo(c.user),
+                    ApiWrapper.INSTANCE[app.context]
                 )
             }
             if (
                 (c.restoreFlag != 0 ||
-                    Utilities.enableSupportForArchiving() &&
+                    Flags.enableSupportForArchiving() &&
                         activityInfo != null &&
                         activityInfo.applicationInfo.isArchived) && !TextUtils.isEmpty(targetPkg)
             ) {
@@ -346,7 +353,7 @@ class WorkspaceItemProcessor(
                             ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE.inv()
                 } else if (
                     activityInfo == null ||
-                        (Utilities.enableSupportForArchiving() &&
+                        (Flags.enableSupportForArchiving() &&
                             activityInfo.applicationInfo.isArchived)
                 ) {
                     // For archived apps, include progress info in case there is
@@ -372,10 +379,16 @@ class WorkspaceItemProcessor(
         // If we generated a placeholder Folder before this point, it may need to be replaced with
         // an app pair.
         if (c.itemType == Favorites.ITEM_TYPE_APP_PAIR && collection is FolderInfo) {
+            if (!FeatureFlags.enableAppPairs()) {
+                // If app pairs are not enabled, stop loading.
+                Log.e(TAG, "app pairs flag is off, did not load app pair")
+                return
+            }
+
             val folderInfo: FolderInfo = collection
             val newAppPair = AppPairInfo()
             // Move the placeholder's contents over to the new app pair.
-            folderInfo.contents.forEach(newAppPair::add)
+            folderInfo.getContents().forEach(newAppPair::add)
             collection = newAppPair
             // Remove the placeholder and add the app pair into the data model.
             bgDataModel.collections.remove(c.id)
@@ -472,7 +485,7 @@ class WorkspaceItemProcessor(
                         !isSafeMode &&
                         (si == null) &&
                         (lapi == null) &&
-                        !(Utilities.enableSupportForArchiving() &&
+                        !(Flags.enableSupportForArchiving() &&
                             pmHelper.isAppArchived(component.packageName))
                 ) {
                     // Restore never started

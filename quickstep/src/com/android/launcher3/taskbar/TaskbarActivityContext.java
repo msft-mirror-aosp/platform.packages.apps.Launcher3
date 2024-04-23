@@ -113,8 +113,8 @@ import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.touch.ItemClickHandler.ItemClickProxy;
-import com.android.launcher3.uioverrides.ApiWrapper;
 import com.android.launcher3.util.ActivityOptionsWrapper;
+import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
@@ -665,7 +665,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
         LauncherAtom.TaskBarContainer.Builder taskbarBuilder =
                 LauncherAtom.TaskBarContainer.newBuilder();
-        if (mControllers.uiController.isInOverview()) {
+        if (mControllers.uiController.isInOverviewUi()) {
             taskbarBuilder.setTaskSwitcherContainer(
                     LauncherAtom.TaskSwitcherContainer.newBuilder());
         }
@@ -1120,7 +1120,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                         } else if (info.isPromise()) {
                             TestLogging.recordEvent(
                                     TestProtocol.SEQUENCE_MAIN, "start: taskbarPromiseIcon");
-                            intent = ApiWrapper.getAppMarketActivityIntent(this,
+                            intent = ApiWrapper.INSTANCE.get(this).getAppMarketActivityIntent(
                                     info.getTargetPackage(), Process.myUserHandle());
                             startActivity(intent);
 
@@ -1233,13 +1233,13 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             return;
         }
 
-        boolean findExactPairMatch = itemInfos.size() == 2;
+        boolean isLaunchingAppPair = itemInfos.size() == 2;
         // Convert the list of ItemInfo instances to a list of ComponentKeys
         List<ComponentKey> componentKeys =
                 itemInfos.stream().map(ItemInfo::getComponentKey).toList();
         recents.getSplitSelectController().findLastActiveTasksAndRunCallback(
                 componentKeys,
-                findExactPairMatch,
+                isLaunchingAppPair,
                 foundTasks -> {
                     @Nullable Task foundTask = foundTasks[0];
                     if (foundTask != null) {
@@ -1253,10 +1253,18 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                         }
                     }
 
-                    if (findExactPairMatch) {
-                        // We did not find the app pair we were looking for, so launch one.
-                        recents.getSplitSelectController().getAppPairsController().launchAppPair(
-                                (AppPairIcon) launchingIconView, -1 /*cuj*/);
+                    if (isLaunchingAppPair) {
+                        // Finish recents animation if it's running before launching to ensure
+                        // we get both leashes for the animation
+                        mControllers.uiController.setSkipNextRecentsAnimEnd();
+                        recents.switchToScreenshot(() ->
+                                recents.finishRecentsAnimation(true /*toRecents*/,
+                                        false /*shouldPip*/,
+                                        () -> recents
+                                                .getSplitSelectController()
+                                                .getAppPairsController()
+                                                .launchAppPair((AppPairIcon) launchingIconView,
+                                                        -1 /*cuj*/)));
                     } else {
                         startItemInfoActivity(itemInfos.get(0), foundTask);
                     }

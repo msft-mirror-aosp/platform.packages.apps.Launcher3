@@ -21,6 +21,7 @@ import android.graphics.Color
 import android.graphics.Path
 import android.graphics.drawable.ColorDrawable
 import android.view.LayoutInflater
+import android.view.View
 import android.view.View.INVISIBLE
 import android.view.View.VISIBLE
 import android.widget.FrameLayout
@@ -37,6 +38,7 @@ import com.android.launcher3.taskbar.bubbles.BubbleBarView
 import com.android.launcher3.taskbar.bubbles.BubbleStashController
 import com.android.launcher3.taskbar.bubbles.BubbleView
 import com.android.wm.shell.common.bubbles.BubbleInfo
+import com.android.wm.shell.shared.animation.PhysicsAnimator
 import com.android.wm.shell.shared.animation.PhysicsAnimatorTestUtils
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
@@ -86,6 +88,10 @@ class BubbleBarViewAnimatorTest {
         val bubbleStashController = mock<BubbleStashController>()
         whenever(bubbleStashController.isStashed).thenReturn(true)
 
+        val handle = View(context)
+        val handleAnimator = PhysicsAnimator.getInstance(handle)
+        whenever(bubbleStashController.stashedHandlePhysicsAnimator).thenReturn(handleAnimator)
+
         val animator =
             BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
 
@@ -93,29 +99,26 @@ class BubbleBarViewAnimatorTest {
             animator.animateBubbleInForStashed(bubble)
         }
 
+        // let the animation start and wait for it to complete
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
+        assertThat(handle.alpha).isEqualTo(0)
+        assertThat(handle.translationY).isEqualTo(-70)
         assertThat(overflowView.visibility).isEqualTo(INVISIBLE)
         assertThat(bubbleBarView.visibility).isEqualTo(VISIBLE)
         assertThat(bubbleView.visibility).isEqualTo(VISIBLE)
-
-        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(
-            DynamicAnimation.ALPHA,
-            DynamicAnimation.TRANSLATION_Y
-        )
-
         assertThat(bubbleView.alpha).isEqualTo(1)
-        assertThat(bubbleView.translationY).isEqualTo(-50)
+        assertThat(bubbleView.translationY).isEqualTo(-20)
+        assertThat(bubbleView.scaleY).isEqualTo(1)
 
+        // execute the hide bubble animation
         assertThat(animatorScheduler.delayedBlock).isNotNull()
         InstrumentationRegistry.getInstrumentation().runOnMainSync(animatorScheduler.delayedBlock!!)
 
+        // let the animation start and wait for it to complete
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-
-        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(
-            DynamicAnimation.ALPHA,
-            DynamicAnimation.TRANSLATION_Y
-        )
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
         assertThat(bubbleView.alpha).isEqualTo(1)
         assertThat(bubbleView.visibility).isEqualTo(VISIBLE)
@@ -123,6 +126,8 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.alpha).isEqualTo(0)
         assertThat(overflowView.alpha).isEqualTo(1)
         assertThat(overflowView.visibility).isEqualTo(VISIBLE)
+        assertThat(handle.alpha).isEqualTo(1)
+        assertThat(handle.translationY).isEqualTo(0)
     }
 
     private class TestBubbleBarViewAnimatorScheduler : BubbleBarViewAnimator.Scheduler {

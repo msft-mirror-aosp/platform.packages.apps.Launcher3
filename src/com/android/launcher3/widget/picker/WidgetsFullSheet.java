@@ -17,7 +17,6 @@ package com.android.launcher3.widget.picker;
 
 import static com.android.launcher3.Flags.enableCategorizedWidgetSuggestions;
 import static com.android.launcher3.Flags.enableUnfoldedTwoPanePicker;
-import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
 import static com.android.launcher3.LauncherPrefs.WIDGETS_EDUCATION_DIALOG_SEEN;
 import static com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder.SEARCH;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WIDGETSTRAY_SEARCHED;
@@ -39,6 +38,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.animation.AnimationUtils;
@@ -47,6 +47,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.Px;
 import androidx.annotation.VisibleForTesting;
@@ -70,6 +71,7 @@ import com.android.launcher3.views.SpringRelativeLayout;
 import com.android.launcher3.views.StickyHeaderLayout;
 import com.android.launcher3.views.WidgetsEduView;
 import com.android.launcher3.widget.BaseWidgetSheet;
+import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.picker.search.SearchModeListener;
 import com.android.launcher3.widget.picker.search.WidgetsSearchBar;
@@ -548,6 +550,14 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     public void exitSearchMode() {
         if (!mIsInSearchMode) return;
         onSearchResults(new ArrayList<>());
+        WidgetsRecyclerView searchRecyclerView = mAdapters.get(
+                AdapterHolder.SEARCH).mWidgetsRecyclerView;
+        // Remove all views when exiting the search mode; this prevents animating from stale results
+        // to new ones the next time we enter search mode. By the time recycler view is hidden,
+        // layout may not have happened to clear up existing results. So, instead of waiting for it
+        // to happen, we clear the views here.
+        searchRecyclerView.swapAdapter(
+                searchRecyclerView.getAdapter(), /*removeAndRecycleExistingViews=*/ true);
         setViewVisibilityBasedOnSearch(/*isInSearchMode=*/ false);
         if (mHasWorkProfile) {
             mViewPager.snapToPage(AdapterHolder.PRIMARY);
@@ -626,29 +636,21 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     }
 
     @Px
-    private float getMaxAvailableHeightForRecommendations() {
+    protected float getMaxAvailableHeightForRecommendations() {
         // There isn't enough space to show recommendations in landscape orientation on phones with
         // a full sheet design. Tablets use a two pane picker.
-        if (!isTwoPane() && mDeviceProfile.isLandscape) {
+        if (mDeviceProfile.isLandscape) {
             return 0f;
         }
 
         return (mDeviceProfile.heightPx - mDeviceProfile.bottomSheetTopPadding)
-                * getRecommendationSectionHeightRatio();
+                * RECOMMENDATION_TABLE_HEIGHT_RATIO;
     }
 
     /** b/209579563: "Widgets" header should be focused first. */
     @Override
     protected View getAccessibilityInitialFocusView() {
         return mHeaderTitle;
-    }
-
-    /**
-     * Ratio of recommendations section with respect to bottom sheet's height on scale of 0 to 1.
-     */
-    @Px
-    protected float getRecommendationSectionHeightRatio() {
-        return RECOMMENDATION_TABLE_HEIGHT_RATIO;
     }
 
     private void open(boolean animate) {
@@ -726,6 +728,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         // picker and calls save/restore hierarchy state. We save the state of recommendations
         // across those updates.
         bundle.putInt(RECOMMENDATIONS_SAVED_STATE_KEY, mRecommendationsCurrentPage);
+        mWidgetRecommendationsView.saveState(bundle);
         SparseArray<Parcelable> superState = new SparseArray<>();
         super.saveHierarchyState(superState);
         bundle.putSparseParcelableArray(SUPER_SAVED_STATE_KEY, superState);
@@ -737,6 +740,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         Bundle state = (Bundle) sparseArray.get(0);
         mRecommendationsCurrentPage = state.getInt(
                 RECOMMENDATIONS_SAVED_STATE_KEY, /*defaultValue=*/0);
+        mWidgetRecommendationsView.restoreState(state);
         super.restoreHierarchyState(state.getSparseParcelableArray(SUPER_SAVED_STATE_KEY));
     }
 
@@ -806,8 +810,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     @Override
     public void addHintCloseAnim(
             float distanceToMove, Interpolator interpolator, PendingAnimation target) {
-        target.setFloat(getRecyclerView(), VIEW_TRANSLATE_Y, -distanceToMove, interpolator);
-        target.setViewAlpha(getRecyclerView(), 0.5f, interpolator);
+        target.addAnimatedFloat(mSwipeToDismissProgress, 0f, 1f, interpolator);
     }
 
     @Override
@@ -899,11 +902,23 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         return isFoldUnFold || useDifferentLayoutOnOrientationChange;
     }
 
+    /**
+     * In widget search mode, we should scale down content inside widget bottom sheet, rather
+     * than the whole bottom sheet, to indicate we will navigate back within the widget
+     * bottom sheet.
+     */
+    @Override
+    public boolean shouldAnimateContentViewInBackSwipe() {
+        return mIsInSearchMode;
+    }
+
     @Override
     public void onBackInvoked() {
         if (mIsInSearchMode) {
             mSearchBar.reset();
-            animateSlideInViewToNoScale();
+            // Posting animation to next frame will let widget sheet finish updating UI first, and
+            // make animation smoother.
+            post(this::animateSwipeToDismissProgressToStart);
         } else {
             super.onBackInvoked();
         }
@@ -989,6 +1004,60 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     public void openFirstHeader() {
         mAdapters.get(AdapterHolder.PRIMARY).mWidgetsListAdapter.selectFirstHeaderEntry();
         mAdapters.get(AdapterHolder.PRIMARY).mWidgetsRecyclerView.scrollToTop();
+    }
+
+    @Override
+    protected int getHeaderTopClip(@NonNull WidgetCell cell) {
+        StickyHeaderLayout header = findViewById(R.id.search_and_recommendations_container);
+        if (header == null) {
+            return 0;
+        }
+        Rect cellRect = new Rect();
+        boolean cellIsPartiallyVisible = cell.getGlobalVisibleRect(cellRect);
+        if (cellIsPartiallyVisible) {
+            Rect occludingRect = new Rect();
+            for (View headerChild : header.getStickyChildren()) {
+                Rect childRect = new Rect();
+                boolean childVisible = headerChild.getGlobalVisibleRect(childRect);
+                if (childVisible && childRect.intersect(cellRect)) {
+                    occludingRect.union(childRect);
+                }
+            }
+            if (!occludingRect.isEmpty() && cellRect.top < occludingRect.bottom) {
+                return occludingRect.bottom - cellRect.top;
+            }
+        }
+        return 0;
+    }
+
+    @Override
+    protected void scrollCellContainerByY(WidgetCell wc, int scrollByY) {
+        for (ViewParent parent = wc.getParent(); parent != null; parent = parent.getParent()) {
+            if (parent instanceof WidgetsRecyclerView recyclerView) {
+                // Scrollable container for main widget list.
+                recyclerView.smoothScrollBy(0, scrollByY);
+                return;
+            } else if (parent instanceof StickyHeaderLayout header) {
+                // Scrollable container for recommendations. We still scroll on the recycler (even
+                // though the recommendations are not in the recycler view) because the
+                // StickyHeaderLayout scroll is connected to the currently visible recycler view.
+                WidgetsRecyclerView recyclerView = findVisibleRecyclerView();
+                if (recyclerView != null) {
+                    recyclerView.smoothScrollBy(0, scrollByY);
+                }
+                return;
+            } else if (parent == this) {
+                return;
+            }
+        }
+    }
+
+    @Nullable
+    private WidgetsRecyclerView findVisibleRecyclerView() {
+        if (mViewPager != null) {
+            return (WidgetsRecyclerView) mViewPager.getPageAt(mViewPager.getCurrentPage());
+        }
+        return findViewById(R.id.primary_widgets_list_view);
     }
 
     /** A holder class for holding adapters & their corresponding recycler view. */

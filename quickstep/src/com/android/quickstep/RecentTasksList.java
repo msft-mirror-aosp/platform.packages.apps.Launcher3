@@ -97,6 +97,13 @@ public class RecentTasksList {
                     RecentTasksList.this.onRunningTaskVanished(taskInfo);
                 });
             }
+
+            @Override
+            public void onRunningTaskChanged(ActivityManager.RunningTaskInfo taskInfo) {
+                mMainThreadExecutor.execute(() -> {
+                    RecentTasksList.this.onRunningTaskChanged(taskInfo);
+                });
+            }
         });
         // We may receive onRunningTaskAppeared events later for tasks which have already been
         // included in the list returned by mSysUiProxy.getRunningTasks(), or may receive
@@ -244,6 +251,20 @@ public class RecentTasksList {
         }
     }
 
+    private void onRunningTaskChanged(ActivityManager.RunningTaskInfo taskInfo) {
+        // Find the task from the list of running tasks, if it exists
+        for (ActivityManager.RunningTaskInfo existingTask : mRunningTasks) {
+            if (existingTask.taskId != taskInfo.taskId) continue;
+
+            mRunningTasks.remove(existingTask);
+            mRunningTasks.add(taskInfo);
+            if (mRunningTasksListener != null) {
+                mRunningTasksListener.onRunningTasksChanged();
+            }
+            return;
+        }
+    }
+
     /**
      * Loads and creates a list of all the recent tasks.
      */
@@ -270,9 +291,13 @@ public class RecentTasksList {
 
         int numVisibleTasks = 0;
         for (GroupedRecentTaskInfo rawTask : rawTasks) {
-            if (enableDesktopWindowingMode() && rawTask.getType() == TYPE_FREEFORM) {
-                GroupTask desktopTask = createDesktopTask(rawTask);
-                allTasks.add(desktopTask);
+            if (rawTask.getType() == TYPE_FREEFORM) {
+                // TYPE_FREEFORM tasks is only created when enableDesktopWindowingMode() is true,
+                // leftover TYPE_FREEFORM tasks created when flag was on should be ignored.
+                if (enableDesktopWindowingMode()) {
+                    GroupTask desktopTask = createDesktopTask(rawTask);
+                    allTasks.add(desktopTask);
+                }
                 continue;
             }
             ActivityManager.RecentTaskInfo taskInfo1 = rawTask.getTaskInfo1();

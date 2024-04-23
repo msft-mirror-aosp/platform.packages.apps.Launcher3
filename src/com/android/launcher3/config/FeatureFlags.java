@@ -17,32 +17,16 @@
 package com.android.launcher3.config;
 
 import static com.android.launcher3.BuildConfig.WIDGET_ON_FIRST_SCREEN;
-import static com.android.launcher3.LauncherPrefs.LONG_PRESS_NAV_HANDLE_EXTRA_TOUCH_WIDTH_DP;
-import static com.android.launcher3.LauncherPrefs.LONG_PRESS_NAV_HANDLE_HAPTIC_HINT_DELAY;
-import static com.android.launcher3.LauncherPrefs.LONG_PRESS_NAV_HANDLE_HAPTIC_HINT_END_SCALE_PERCENT;
-import static com.android.launcher3.LauncherPrefs.LONG_PRESS_NAV_HANDLE_HAPTIC_HINT_ITERATIONS;
-import static com.android.launcher3.LauncherPrefs.LONG_PRESS_NAV_HANDLE_HAPTIC_HINT_SCALE_EXPONENT;
-import static com.android.launcher3.LauncherPrefs.LONG_PRESS_NAV_HANDLE_HAPTIC_HINT_START_SCALE_PERCENT;
-import static com.android.launcher3.LauncherPrefs.LONG_PRESS_NAV_HANDLE_SLOP_PERCENTAGE;
-import static com.android.launcher3.LauncherPrefs.LONG_PRESS_NAV_HANDLE_TIMEOUT_MS;
-import static com.android.launcher3.config.FeatureFlags.FlagState.DISABLED;
-import static com.android.launcher3.config.FeatureFlags.FlagState.ENABLED;
-import static com.android.launcher3.config.FeatureFlags.FlagState.TEAMFOOD;
-import static com.android.launcher3.uioverrides.flags.FlagsFactory.getDebugFlag;
-import static com.android.launcher3.uioverrides.flags.FlagsFactory.getReleaseFlag;
+import static com.android.launcher3.config.FeatureFlags.BooleanFlag.DISABLED;
+import static com.android.launcher3.config.FeatureFlags.BooleanFlag.ENABLED;
 import static com.android.wm.shell.Flags.enableTaskbarNavbarUnification;
 
 import android.content.res.Resources;
-import android.view.ViewConfiguration;
 
 import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.BuildConfig;
 import com.android.launcher3.Flags;
-import com.android.launcher3.uioverrides.flags.FlagsFactory;
-
-import java.util.function.Predicate;
-import java.util.function.ToIntFunction;
 
 /**
  * Defines a set of flags used to control various launcher behaviors.
@@ -50,11 +34,6 @@ import java.util.function.ToIntFunction;
  * <p>All the flags should be defined here with appropriate default values.
  */
 public final class FeatureFlags {
-
-    @VisibleForTesting
-    public static Predicate<BooleanFlag> sBooleanReader = f -> f.mCurrentValue;
-    @VisibleForTesting
-    public static ToIntFunction<IntFlag> sIntReader = f -> f.mCurrentValue;
 
     private FeatureFlags() { }
 
@@ -101,13 +80,6 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_DISMISS_PREDICTION_UNDO = getDebugFlag(270394476,
             "ENABLE_DISMISS_PREDICTION_UNDO", DISABLED,
             "Show an 'Undo' snackbar when users dismiss a predicted hotseat item");
-
-    public static final BooleanFlag MOVE_STARTUP_DATA_TO_DEVICE_PROTECTED_STORAGE = getDebugFlag(
-            251502424, "ENABLE_BOOT_AWARE_STARTUP_DATA", DISABLED,
-            "Marks LauncherPref data as (and allows it to) available while the device is"
-                    + " locked. Enabling this causes a 1-time movement of certain SharedPreferences"
-                    + " data. Improves startup latency.");
-
     public static final BooleanFlag CONTINUOUS_VIEW_TREE_CAPTURE = getDebugFlag(270395171,
             "CONTINUOUS_VIEW_TREE_CAPTURE", ENABLED, "Capture View tree every frame");
 
@@ -130,34 +102,6 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_ALL_APPS_FROM_OVERVIEW =
             getDebugFlag(275132633, "ENABLE_ALL_APPS_FROM_OVERVIEW", DISABLED,
                     "Allow entering All Apps from Overview (e.g. long swipe up from app)");
-
-    public static final BooleanFlag CUSTOM_LPNH_THRESHOLDS =
-            getReleaseFlag(301680992, "CUSTOM_LPNH_THRESHOLDS", DISABLED,
-                    "Add dev options to customize the LPNH trigger slop and milliseconds");
-
-    public static final BooleanFlag ANIMATE_LPNH =
-            getReleaseFlag(308693847, "ANIMATE_LPNH", TEAMFOOD,
-                    "Animates navbar when long pressing");
-
-    public static final BooleanFlag SHRINK_NAV_HANDLE_ON_PRESS =
-            getReleaseFlag(314158312, "SHRINK_NAV_HANDLE_ON_PRESS", DISABLED,
-                    "Shrinks navbar when long pressing if ANIMATE_LPNH is enabled");
-
-    public static final IntFlag LPNH_SLOP_PERCENTAGE =
-            FlagsFactory.getIntFlag(301680992, "LPNH_SLOP_PERCENTAGE", 100,
-                    "Controls touch slop percentage for lpnh",
-                    LONG_PRESS_NAV_HANDLE_SLOP_PERCENTAGE);
-
-    public static final IntFlag LPNH_EXTRA_TOUCH_WIDTH_DP =
-            FlagsFactory.getIntFlag(301680992, "LPNH_EXTRA_TOUCH_WIDTH_DP", 0,
-                    "Controls extra dp on the nav bar sides to trigger LPNH."
-                            + " Can be negative for a smaller touch region.",
-                    LONG_PRESS_NAV_HANDLE_EXTRA_TOUCH_WIDTH_DP);
-
-    public static final IntFlag LPNH_TIMEOUT_MS =
-            FlagsFactory.getIntFlag(301680992, "LPNH_TIMEOUT_MS",
-                    ViewConfiguration.getLongPressTimeout(),
-                    "Controls lpnh timeout in milliseconds", LONG_PRESS_NAV_HANDLE_TIMEOUT_MS);
 
     public static final BooleanFlag ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS = getReleaseFlag(
             270394468, "ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS", ENABLED,
@@ -222,7 +166,7 @@ public final class FeatureFlags {
 
     // TODO(Block 14): Cleanup flags
     public static final BooleanFlag NOTIFY_CRASHES = getDebugFlag(270393108, "NOTIFY_CRASHES",
-            TEAMFOOD, "Sends a notification whenever launcher encounters an uncaught exception.");
+            DISABLED, "Sends a notification whenever launcher encounters an uncaught exception.");
 
     public static final boolean ENABLE_TASKBAR_NAVBAR_UNIFICATION =
             enableTaskbarNavbarUnification() && !isPhone();
@@ -289,53 +233,10 @@ public final class FeatureFlags {
             "INJECT_FALLBACK_APP_CORPUS_RESULTS", DISABLED,
             "Inject fallback app corpus result when AiAi fails to return it.");
 
-    public static final BooleanFlag ENABLE_LONG_PRESS_NAV_HANDLE =
-            getReleaseFlag(299682306, "ENABLE_LONG_PRESS_NAV_HANDLE", ENABLED,
-                    "Enables long pressing on the bottom bar nav handle to trigger events.");
-
-    public static final BooleanFlag ENABLE_SEARCH_HAPTIC_HINT =
-            getReleaseFlag(314005131, "ENABLE_SEARCH_HAPTIC_HINT", ENABLED,
-                    "Enables haptic hint while long pressing on the bottom bar nav handle.");
-
-    public static final BooleanFlag ENABLE_SEARCH_HAPTIC_COMMIT =
-            getReleaseFlag(314005577, "ENABLE_SEARCH_HAPTIC_COMMIT", ENABLED,
-                    "Enables haptic hint at end of long pressing on the bottom bar nav handle.");
-
-    public static final IntFlag LPNH_HAPTIC_HINT_START_SCALE_PERCENT =
-            FlagsFactory.getIntFlag(309972570,
-                    "LPNH_HAPTIC_HINT_START_SCALE_PERCENT", 0,
-                    "Haptic hint start scale.",
-                    LONG_PRESS_NAV_HANDLE_HAPTIC_HINT_START_SCALE_PERCENT);
-
-    public static final IntFlag LPNH_HAPTIC_HINT_END_SCALE_PERCENT =
-            FlagsFactory.getIntFlag(309972570,
-                    "LPNH_HAPTIC_HINT_END_SCALE_PERCENT", 100,
-                    "Haptic hint end scale.", LONG_PRESS_NAV_HANDLE_HAPTIC_HINT_END_SCALE_PERCENT);
-
-    public static final IntFlag LPNH_HAPTIC_HINT_SCALE_EXPONENT =
-            FlagsFactory.getIntFlag(309972570,
-                    "LPNH_HAPTIC_HINT_SCALE_EXPONENT", 1,
-                    "Haptic hint scale exponent.",
-                    LONG_PRESS_NAV_HANDLE_HAPTIC_HINT_SCALE_EXPONENT);
-
-    public static final IntFlag LPNH_HAPTIC_HINT_ITERATIONS =
-            FlagsFactory.getIntFlag(309972570, "LPNH_HAPTIC_HINT_ITERATIONS",
-                    50,
-                    "Haptic hint number of iterations.",
-                    LONG_PRESS_NAV_HANDLE_HAPTIC_HINT_ITERATIONS);
-
-    public static final BooleanFlag ENABLE_LPNH_DEEP_PRESS =
-            getReleaseFlag(310952290, "ENABLE_LPNH_DEEP_PRESS", ENABLED,
-                    "Long press of nav handle is instantly triggered if deep press is detected.");
-
-    public static final IntFlag LPNH_HAPTIC_HINT_DELAY =
-            FlagsFactory.getIntFlag(309972570, "LPNH_HAPTIC_HINT_DELAY", 0,
-                    "Delay before haptic hint starts.", LONG_PRESS_NAV_HANDLE_HAPTIC_HINT_DELAY);
-
     // TODO(Block 17): Clean up flags
     // Aconfig migration complete for ENABLE_TASKBAR_PINNING.
     private static final BooleanFlag ENABLE_TASKBAR_PINNING = getDebugFlag(296231746,
-            "ENABLE_TASKBAR_PINNING", TEAMFOOD,
+            "ENABLE_TASKBAR_PINNING", DISABLED,
             "Enables taskbar pinning to allow user to switch between transient and persistent "
                     + "taskbar flavors");
 
@@ -375,7 +276,7 @@ public final class FeatureFlags {
 
     // Aconfig migration complete for ENABLE_HOME_TRANSITION_LISTENER.
     public static final BooleanFlag ENABLE_HOME_TRANSITION_LISTENER = getDebugFlag(306053414,
-            "ENABLE_HOME_TRANSITION_LISTENER", TEAMFOOD,
+            "ENABLE_HOME_TRANSITION_LISTENER", DISABLED,
             "Enables launcher to listen to all transitions that include home activity.");
 
     public static boolean enableHomeTransitionListener() {
@@ -470,7 +371,7 @@ public final class FeatureFlags {
     // Aconfig migration complete for ENABLE_RESPONSIVE_WORKSPACE.
     @VisibleForTesting
     public static final BooleanFlag ENABLE_RESPONSIVE_WORKSPACE = getDebugFlag(241386436,
-            "ENABLE_RESPONSIVE_WORKSPACE", TEAMFOOD,
+            "ENABLE_RESPONSIVE_WORKSPACE", DISABLED,
             "Enables new workspace grid calculations method.");
     public static boolean enableResponsiveWorkspace() {
         return ENABLE_RESPONSIVE_WORKSPACE.get() || Flags.enableResponsiveWorkspace();
@@ -484,51 +385,31 @@ public final class FeatureFlags {
             "ALL_APPS_GONE_VISIBILITY", ENABLED,
             "Set all apps container view's hidden visibility to GONE instead of INVISIBLE.");
 
-    // TODO(Block 34): Empty block
-    // Please only add flags to your assigned block. If you do not have a block:
-    // 1. Assign yourself this block
-    // 2. Add your flag to this block
-    // 3. Add a new empty block below this one
-    // 4. Move this comment to that new empty block
-    // This is all to prevent merge conflicts in the future and help keep track of who owns which
-    // flags.
-    // List of assigned blocks can be found: http://go/gnl-flags-block-directory
-
-    public static class BooleanFlag {
-
-        private final boolean mCurrentValue;
-
-        public BooleanFlag(boolean currentValue) {
-            mCurrentValue = currentValue;
-        }
-
-        public boolean get() {
-            return sBooleanReader.test(this);
-        }
+    public static BooleanFlag getDebugFlag(
+            int bugId, String key, BooleanFlag flagState, String description) {
+        return flagState;
     }
 
-    /**
-     * Class representing an integer flag
-     */
-    public static class IntFlag {
-
-        private final int mCurrentValue;
-
-        public IntFlag(int currentValue) {
-            mCurrentValue = currentValue;
-        }
-
-        public int get() {
-            return sIntReader.applyAsInt(this);
-        }
+    public static BooleanFlag getReleaseFlag(
+            int bugId, String key, BooleanFlag flagState, String description) {
+        return flagState;
     }
 
     /**
      * Enabled state for a flag
      */
-    public enum FlagState {
-        ENABLED,
-        DISABLED,
-        TEAMFOOD    // Enabled in team food
+    public enum BooleanFlag {
+        ENABLED(true),
+        DISABLED(false);
+
+        private final boolean mValue;
+
+        BooleanFlag(boolean value) {
+            mValue = value;
+        }
+
+        public boolean get() {
+            return mValue;
+        }
     }
 }

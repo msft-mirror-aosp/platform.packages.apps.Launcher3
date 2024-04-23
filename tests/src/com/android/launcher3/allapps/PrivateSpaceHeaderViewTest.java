@@ -290,6 +290,7 @@ public class PrivateSpaceHeaderViewTest {
         doReturn(0).when(privateProfileManager).addSystemAppsDivider(any());
         when(mAllApps.getHeight()).thenReturn(ALL_APPS_HEIGHT);
         when(mAllApps.getHeaderProtectionHeight()).thenReturn(HEADER_PROTECTION_HEIGHT);
+        when(mAllApps.isUsingTabs()).thenReturn(true);
         mAlphabeticalAppsList = new AlphabeticalAppsList<>(mContext, mAllAppsStore,
                 null, privateProfileManager);
         mAlphabeticalAppsList.setNumAppsPerRowAllApps(NUM_APP_COLS);
@@ -303,7 +304,44 @@ public class PrivateSpaceHeaderViewTest {
         assertEquals(NUM_PRIVATE_SPACE_APPS + 1 + 1,
                 mAlphabeticalAppsList.getAdapterItems().size());
         assertEquals(position,
-                privateProfileManager.scrollForViewToBeVisibleInContainer(
+                privateProfileManager.scrollForHeaderToBeVisibleInContainer(
+                        new AllAppsRecyclerView(mContext),
+                        mAlphabeticalAppsList.getAdapterItems(),
+                        PS_HEADER_HEIGHT,
+                        ALL_APPS_CELL_HEIGHT));
+    }
+
+    @Test
+    public void scrollForViewToBeVisibleInContainer_withHeaderNoTabs() {
+        when(mAllAppsStore.getApps()).thenReturn(createAppInfoList());
+        PrivateProfileManager privateProfileManager = spy(mPrivateProfileManager);
+        when(privateProfileManager.getCurrentState()).thenReturn(STATE_ENABLED);
+        when(privateProfileManager.splitIntoUserInstalledAndSystemApps())
+                .thenReturn(iteminfo -> iteminfo.componentName == null
+                        || !iteminfo.componentName.getPackageName()
+                        .equals(CAMERA_PACKAGE_NAME));
+        doReturn(0).when(privateProfileManager).addPrivateSpaceHeader(any());
+        doAnswer(answer(this::addPrivateSpaceHeader)).when(privateProfileManager)
+                .addPrivateSpaceHeader(any());
+        doNothing().when(privateProfileManager).addPrivateSpaceInstallAppButton(any());
+        doReturn(0).when(privateProfileManager).addSystemAppsDivider(any());
+        when(mAllApps.getHeight()).thenReturn(ALL_APPS_HEIGHT);
+        when(mAllApps.getHeaderProtectionHeight()).thenReturn(HEADER_PROTECTION_HEIGHT);
+        when(mAllApps.isUsingTabs()).thenReturn(false);
+        mAlphabeticalAppsList = new AlphabeticalAppsList<>(mContext, mAllAppsStore,
+                null, privateProfileManager);
+        mAlphabeticalAppsList.setNumAppsPerRowAllApps(NUM_APP_COLS);
+        mAlphabeticalAppsList.updateItemFilter(info -> info != null
+                && info.user.equals(MAIN_HANDLE));
+
+        int rows = (int) (ALL_APPS_HEIGHT - PS_HEADER_HEIGHT - HEADER_PROTECTION_HEIGHT) - 1;
+        int position = rows * NUM_APP_COLS - (NUM_APP_COLS-1) + 1;
+
+        // The number of adapterItems should be the private space apps + one main app + header.
+        assertEquals(NUM_PRIVATE_SPACE_APPS + 1 + 1,
+                mAlphabeticalAppsList.getAdapterItems().size());
+        assertEquals(position,
+                privateProfileManager.scrollForHeaderToBeVisibleInContainer(
                         new AllAppsRecyclerView(mContext),
                         mAlphabeticalAppsList.getAdapterItems(),
                         PS_HEADER_HEIGHT,
@@ -325,6 +363,7 @@ public class PrivateSpaceHeaderViewTest {
         doNothing().when(privateProfileManager).addPrivateSpaceInstallAppButton(any());
         doReturn(0).when(privateProfileManager).addSystemAppsDivider(any());
         when(mAllApps.getHeight()).thenReturn(ALL_APPS_HEIGHT);
+        when(mAllApps.isUsingTabs()).thenReturn(true);
         when(mAllApps.getHeaderProtectionHeight()).thenReturn(HEADER_PROTECTION_HEIGHT);
         mAlphabeticalAppsList = new AlphabeticalAppsList<>(mContext, mAllAppsStore,
                 null, privateProfileManager);
@@ -339,7 +378,7 @@ public class PrivateSpaceHeaderViewTest {
         assertEquals(NUM_PRIVATE_SPACE_APPS + 1 + 1,
                 mAlphabeticalAppsList.getAdapterItems().size());
         assertEquals(position,
-                privateProfileManager.scrollForViewToBeVisibleInContainer(
+                privateProfileManager.scrollForHeaderToBeVisibleInContainer(
                         new AllAppsRecyclerView(mContext),
                         mAlphabeticalAppsList.getAdapterItems(),
                         BIGGER_PS_HEADER_HEIGHT,
@@ -369,7 +408,7 @@ public class PrivateSpaceHeaderViewTest {
         // The number of adapterItems should be the private space apps + one main app.
         assertEquals(NUM_PRIVATE_SPACE_APPS + 1,
                 mAlphabeticalAppsList.getAdapterItems().size());
-        assertEquals(SCROLL_NO_WHERE, privateProfileManager.scrollForViewToBeVisibleInContainer(
+        assertEquals(SCROLL_NO_WHERE, privateProfileManager.scrollForHeaderToBeVisibleInContainer(
                 new AllAppsRecyclerView(mContext),
                 mAlphabeticalAppsList.getAdapterItems(),
                 BIGGER_PS_HEADER_HEIGHT,

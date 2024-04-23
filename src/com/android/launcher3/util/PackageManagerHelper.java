@@ -16,6 +16,8 @@
 
 package com.android.launcher3.util;
 
+import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE;
+
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
@@ -38,6 +40,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.PendingAddItemInfo;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -46,9 +49,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
-import com.android.launcher3.uioverrides.ApiWrapper;
 
-import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
 
@@ -110,7 +111,7 @@ public class PackageManagerHelper {
     @SuppressWarnings("NewApi")
     public boolean isAppArchivedForUser(@NonNull final String packageName,
             @NonNull final UserHandle user) {
-        if (!Utilities.enableSupportForArchiving()) {
+        if (!Flags.enableSupportForArchiving()) {
             return false;
         }
         final ApplicationInfo info = getApplicationInfo(
@@ -167,30 +168,12 @@ public class PackageManagerHelper {
     }
 
     /**
-     * Creates a new market search intent.
-     */
-    public static Intent getMarketSearchIntent(Context context, String query) {
-        try {
-            Intent intent = Intent.parseUri(context.getString(R.string.market_search_intent), 0);
-            if (!TextUtils.isEmpty(query)) {
-                intent.setData(
-                        intent.getData().buildUpon().appendQueryParameter("q", query).build());
-            }
-            return intent;
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
      * Starts the details activity for {@code info}
      */
     public void startDetailsActivityForInfo(ItemInfo info, Rect sourceBounds, Bundle opts) {
-        if (info instanceof ItemInfoWithIcon
-                && (((ItemInfoWithIcon) info).runtimeStatusFlags
-                & ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE) != 0) {
-            ItemInfoWithIcon appInfo = (ItemInfoWithIcon) info;
-            mContext.startActivity(ApiWrapper.getAppMarketActivityIntent(mContext,
+        if (info instanceof ItemInfoWithIcon appInfo
+                && (appInfo.runtimeStatusFlags & FLAG_INSTALL_SESSION_ACTIVE) != 0) {
+            mContext.startActivity(ApiWrapper.INSTANCE.get(mContext).getAppMarketActivityIntent(
                     appInfo.getTargetComponent().getPackageName(), Process.myUserHandle()));
             return;
         }
@@ -291,6 +274,6 @@ public class PackageManagerHelper {
     @SuppressWarnings("NewApi")
     private boolean isPackageInstalledOrArchived(ApplicationInfo info) {
         return (info.flags & ApplicationInfo.FLAG_INSTALLED) != 0 || (
-                Utilities.enableSupportForArchiving() && info.isArchived);
+                Flags.enableSupportForArchiving() && info.isArchived);
     }
 }

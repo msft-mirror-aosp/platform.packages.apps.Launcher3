@@ -33,6 +33,7 @@
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"या ॲपची जोडीला या डिव्हाइसवर सपोर्ट नाही"</string>
     <string name="app_pair_needs_unfold" msgid="4588897528143807002">"ही ॲपची जोडी वापरण्यासाठी डिव्हाइस अनफोल्ड करा"</string>
+    <string name="app_pair_not_available" msgid="3556767440808032031">"ॲपची जोडी उपलब्ध नाही"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"विजेट हलवण्यासाठी स्पर्श करा आणि धरून ठेवा."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"विजेट हलवण्यासाठी किंवा कस्टम कृती वापरण्यासाठी दोनदा टॅप करा आणि धरून ठेवा."</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
@@ -188,8 +189,7 @@
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"फिल्टर"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"हे करता आले नाही: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"खाजगी स्पेस"</string>
-    <!-- no translation found for private_space_secondary_label (9203933341714508907) -->
-    <skip />
+    <string name="private_space_secondary_label" msgid="9203933341714508907">"सेट करण्यासाठी किंवा उघडण्यासाठी टॅप करा"</string>
     <string name="ps_container_title" msgid="4391796149519594205">"खाजगी"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"खाजगी स्पेस ची सेटिंग्ज"</string>
     <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"खाजगी स्पेस लॉक/अनलॉक करा"</string>

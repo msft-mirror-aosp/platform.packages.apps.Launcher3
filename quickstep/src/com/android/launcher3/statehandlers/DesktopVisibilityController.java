@@ -19,7 +19,7 @@ import static android.view.View.VISIBLE;
 
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.window.flags.Flags.enableDesktopWindowingMode;
+import static com.android.window.flags.Flags.enableDesktopWindowingWallpaperActivity;
 
 import android.os.Debug;
 import android.os.SystemProperties;
@@ -49,7 +49,7 @@ public class DesktopVisibilityController {
             "persist.wm.debug.desktop_stashing", false);
     private final Launcher mLauncher;
 
-    private int mVisibleFreeformTasksCount;
+    private int mVisibleDesktopTasksCount;
     private boolean mInOverviewState;
     private boolean mBackgroundStateEnabled;
     private boolean mGestureInProgress;
@@ -74,7 +74,7 @@ public class DesktopVisibilityController {
                         if (DEBUG) {
                             Log.d(TAG, "desktop visible tasks count changed=" + visibleTasksCount);
                         }
-                        setVisibleFreeformTasksCount(visibleTasksCount);
+                        setVisibleDesktopTasksCount(visibleTasksCount);
                     }
                 });
             }
@@ -109,54 +109,52 @@ public class DesktopVisibilityController {
     }
 
     /**
-     * Whether freeform windows are visible in desktop mode.
+     * Whether desktop tasks are visible in desktop mode.
      */
-    public boolean areFreeformTasksVisible() {
-        boolean freeformTasksVisible = mVisibleFreeformTasksCount > 0;
+    public boolean areDesktopTasksVisible() {
+        boolean desktopTasksVisible = mVisibleDesktopTasksCount > 0;
         if (DEBUG) {
-            Log.d(TAG, "areFreeformTasksVisible: freeformVisible=" + freeformTasksVisible
+            Log.d(TAG, "areDesktopTasksVisible: desktopVisible=" + desktopTasksVisible
                     + " overview=" + mInOverviewState);
         }
-        return freeformTasksVisible && !mInOverviewState;
+        return desktopTasksVisible && !mInOverviewState;
     }
 
     /**
-     * Number of visible freeform windows in desktop mode.
+     * Number of visible desktop windows in desktop mode.
      */
-    public int getVisibleFreeformTasksCount() {
-        return mVisibleFreeformTasksCount;
+    public int getVisibleDesktopTasksCount() {
+        return mVisibleDesktopTasksCount;
     }
 
     /**
-     * Sets the number of freeform windows that are visible and updates launcher visibility based on
+     * Sets the number of desktop windows that are visible and updates launcher visibility based on
      * it.
      */
-    public void setVisibleFreeformTasksCount(int visibleTasksCount) {
+    public void setVisibleDesktopTasksCount(int visibleTasksCount) {
         if (DEBUG) {
-            Log.d(TAG, "setVisibleFreeformTasksCount: visibleTasksCount=" + visibleTasksCount
-                    + " currentValue=" + mVisibleFreeformTasksCount);
-        }
-        if (!enableDesktopWindowingMode()) {
-            return;
+            Log.d(TAG, "setVisibleDesktopTasksCount: visibleTasksCount=" + visibleTasksCount
+                    + " currentValue=" + mVisibleDesktopTasksCount);
         }
 
-        if (visibleTasksCount != mVisibleFreeformTasksCount) {
-            final boolean wasVisible = mVisibleFreeformTasksCount > 0;
+        if (visibleTasksCount != mVisibleDesktopTasksCount) {
+            final boolean wasVisible = mVisibleDesktopTasksCount > 0;
             final boolean isVisible = visibleTasksCount > 0;
-            mVisibleFreeformTasksCount = visibleTasksCount;
+            mVisibleDesktopTasksCount = visibleTasksCount;
 
-            if (wasVisible != isVisible) {
-                if (mVisibleFreeformTasksCount > 0) {
+            if (!enableDesktopWindowingWallpaperActivity() && wasVisible != isVisible) {
+                // TODO: b/333533253 - Remove after flag rollout
+                if (mVisibleDesktopTasksCount > 0) {
                     setLauncherViewsVisibility(View.INVISIBLE);
                     if (!mInOverviewState) {
-                        // When freeform is visible & we're not in overview, we want launcher to
-                        // appear paused, this ensures that taskbar displays.
+                        // When desktop tasks are visible & we're not in overview, we want launcher
+                        // to appear paused, this ensures that taskbar displays.
                         markLauncherPaused();
                     }
                 } else {
                     setLauncherViewsVisibility(View.VISIBLE);
-                    // If freeform isn't visible ensure that launcher appears resumed to behave
-                    // normally.
+                    // If desktop tasks aren't visible, ensure that launcher appears resumed to
+                    // behave normally.
                     markLauncherResumed();
                 }
             }
@@ -180,38 +178,39 @@ public class DesktopVisibilityController {
             Log.d(TAG, "setOverviewStateEnabled: enabled=" + overviewStateEnabled
                     + " currentValue=" + mInOverviewState);
         }
-        if (!enableDesktopWindowingMode()) {
-            return;
-        }
         if (overviewStateEnabled != mInOverviewState) {
             mInOverviewState = overviewStateEnabled;
+            if (enableDesktopWindowingWallpaperActivity()) {
+                return;
+            }
+            // TODO: b/333533253 - Clean up after flag rollout
             if (mInOverviewState) {
                 setLauncherViewsVisibility(View.VISIBLE);
                 markLauncherResumed();
-            } else if (areFreeformTasksVisible() && !mGestureInProgress) {
+            } else if (areDesktopTasksVisible() && !mGestureInProgress) {
                 // Switching out of overview state and gesture finished.
-                // If freeform tasks are still visible, hide launcher again.
+                // If desktop tasks are still visible, hide launcher again.
                 setLauncherViewsVisibility(View.INVISIBLE);
                 markLauncherPaused();
             }
         }
     }
 
+    /**
+     * TODO: b/333533253 - Remove after flag rollout
+     */
     private void setBackgroundStateEnabled(boolean backgroundStateEnabled) {
         if (DEBUG) {
             Log.d(TAG, "setBackgroundStateEnabled: enabled=" + backgroundStateEnabled
                     + " currentValue=" + mBackgroundStateEnabled);
-        }
-        if (!enableDesktopWindowingMode()) {
-            return;
         }
         if (backgroundStateEnabled != mBackgroundStateEnabled) {
             mBackgroundStateEnabled = backgroundStateEnabled;
             if (mBackgroundStateEnabled) {
                 setLauncherViewsVisibility(View.VISIBLE);
                 markLauncherResumed();
-            } else if (areFreeformTasksVisible() && !mGestureInProgress) {
-                // Switching out of background state. If freeform tasks are visible, pause launcher.
+            } else if (areDesktopTasksVisible() && !mGestureInProgress) {
+                // Switching out of background state. If desktop tasks are visible, pause launcher.
                 setLauncherViewsVisibility(View.INVISIBLE);
                 markLauncherPaused();
             }
@@ -220,6 +219,8 @@ public class DesktopVisibilityController {
 
     /**
      * Whether recents gesture is currently in progress.
+     *
+     * TODO: b/333533253 - Remove after flag rollout
      */
     public boolean isRecentsGestureInProgress() {
         return mGestureInProgress;
@@ -227,11 +228,10 @@ public class DesktopVisibilityController {
 
     /**
      * Notify controller that recents gesture has started.
+     *
+     * TODO: b/333533253 - Remove after flag rollout
      */
     public void setRecentsGestureStart() {
-        if (!enableDesktopWindowingMode()) {
-            return;
-        }
         if (DEBUG) {
             Log.d(TAG, "setRecentsGestureStart");
         }
@@ -241,11 +241,10 @@ public class DesktopVisibilityController {
     /**
      * Notify controller that recents gesture finished with the given
      * {@link com.android.quickstep.GestureState.GestureEndTarget}
+     *
+     * TODO: b/333533253 - Remove after flag rollout
      */
     public void setRecentsGestureEnd(@Nullable GestureState.GestureEndTarget endTarget) {
-        if (!enableDesktopWindowingMode()) {
-            return;
-        }
         if (DEBUG) {
             Log.d(TAG, "setRecentsGestureEnd: endTarget=" + endTarget);
         }
@@ -257,6 +256,9 @@ public class DesktopVisibilityController {
         }
     }
 
+    /**
+     * TODO: b/333533253 - Remove after flag rollout
+     */
     private void setRecentsGestureInProgress(boolean gestureInProgress) {
         if (gestureInProgress != mGestureInProgress) {
             mGestureInProgress = gestureInProgress;
@@ -267,12 +269,18 @@ public class DesktopVisibilityController {
      * Handle launcher moving to home due to home gesture or home button press.
      */
     public void onHomeActionTriggered() {
-        if (IS_STASHING_ENABLED && areFreeformTasksVisible()) {
+        if (IS_STASHING_ENABLED && areDesktopTasksVisible()) {
             SystemUiProxy.INSTANCE.get(mLauncher).stashDesktopApps(mLauncher.getDisplayId());
         }
     }
 
+    /**
+     * TODO: b/333533253 - Remove after flag rollout
+     */
     private void setLauncherViewsVisibility(int visibility) {
+        if (enableDesktopWindowingWallpaperActivity()) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "setLauncherViewsVisibility: visibility=" + visibility + " "
                     + Debug.getCaller());
@@ -286,12 +294,18 @@ public class DesktopVisibilityController {
             dragLayer.setVisibility(visibility);
         }
         if (mLauncher instanceof QuickstepLauncher ql && ql.getTaskbarUIController() != null
-                && mVisibleFreeformTasksCount != 0) {
+                && mVisibleDesktopTasksCount != 0) {
             ql.getTaskbarUIController().onLauncherVisibilityChanged(visibility == VISIBLE);
         }
     }
 
+    /**
+     * TODO: b/333533253 - Remove after flag rollout
+     */
     private void markLauncherPaused() {
+        if (enableDesktopWindowingWallpaperActivity()) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "markLauncherPaused " + Debug.getCaller());
         }
@@ -302,7 +316,13 @@ public class DesktopVisibilityController {
         }
     }
 
+    /**
+     * TODO: b/333533253 - Remove after flag rollout
+     */
     private void markLauncherResumed() {
+        if (enableDesktopWindowingWallpaperActivity()) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "markLauncherResumed " + Debug.getCaller());
         }

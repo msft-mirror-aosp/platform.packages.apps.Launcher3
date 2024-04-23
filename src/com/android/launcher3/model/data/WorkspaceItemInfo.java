@@ -32,7 +32,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutKey;
-import com.android.launcher3.uioverrides.ApiWrapper;
+import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.ContentWriter;
 
 import java.util.Arrays;
@@ -73,12 +73,6 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
      *
      */
     public static final int FLAG_START_FOR_RESULT = 1 << 4;
-
-    /**
-     * The app is flagged non-resizeable, meaning that it does not support multi-window on small
-     * screens.
-     */
-    public static final int FLAG_NON_RESIZEABLE = 1 << 5;
 
     /**
      * The intent used to start the application.
@@ -201,7 +195,7 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
             runtimeStatusFlags &= ~FLAG_DISABLED_VERSION_LOWER;
         }
 
-        Person[] persons = ApiWrapper.getPersons(shortcutInfo);
+        Person[] persons = ApiWrapper.INSTANCE.get(context).getPersons(shortcutInfo);
         personKeys = persons.length == 0 ? Utilities.EMPTY_STRING_ARRAY
             : Arrays.stream(persons).map(Person::getKey).sorted().toArray(String[]::new);
     }

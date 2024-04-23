@@ -44,6 +44,7 @@ import android.view.View;
 import android.view.animation.Interpolator;
 
 import androidx.annotation.FloatRange;
+import androidx.annotation.Nullable;
 
 import com.android.app.animation.Interpolators;
 import com.android.launcher3.DeviceProfile;
@@ -167,6 +168,8 @@ public class AllAppsTransitionController
     private final AnimatedFloat mAllAppScale = new AnimatedFloat(this::onScaleProgressChanged);
     private final int mNavScrimFlag;
 
+    @Nullable private Animator.AnimatorListener mAllAppsSearchBackAnimationListener;
+
     private boolean mIsVerticalLayout;
 
     // Animation in this class is controlled by a single variable {@link mProgress}.
@@ -280,8 +283,7 @@ public class AllAppsTransitionController
             return;
         }
 
-        float deceleratedProgress =
-                Interpolators.PREDICTIVE_BACK_DECELERATED_EASE.getInterpolation(backProgress);
+        float deceleratedProgress = Interpolators.BACK_GESTURE.getInterpolation(backProgress);
         float scaleProgress = ScrollableLayoutManager.PREDICTIVE_BACK_MIN_SCALE
                 + (1 - ScrollableLayoutManager.PREDICTIVE_BACK_MIN_SCALE)
                 * (1 - deceleratedProgress);
@@ -312,11 +314,25 @@ public class AllAppsTransitionController
         }
     }
 
-    /** Animate all apps view to 1f scale. */
+    /** Set {@link Animator.AnimatorListener} for scaling all apps scale to 1 animation. */
+    public void setAllAppsSearchBackAnimationListener(Animator.AnimatorListener listener) {
+        mAllAppsSearchBackAnimationListener = listener;
+    }
+
+    /**
+     * Animate all apps view to 1f scale. This is called when backing (exiting) from all apps
+     * search view to all apps view.
+     */
     public void animateAllAppsToNoScale() {
-        mAllAppScale.animateToValue(1f)
-                .setDuration(REVERT_SWIPE_ALL_APPS_TO_HOME_ANIMATION_DURATION_MS)
-                .start();
+        if (mAllAppScale.isAnimating()) {
+            return;
+        }
+        Animator animator = mAllAppScale.animateToValue(1f)
+                .setDuration(REVERT_SWIPE_ALL_APPS_TO_HOME_ANIMATION_DURATION_MS);
+        if (mAllAppsSearchBackAnimationListener != null) {
+            animator.addListener(mAllAppsSearchBackAnimationListener);
+        }
+        animator.start();
     }
 
     /**

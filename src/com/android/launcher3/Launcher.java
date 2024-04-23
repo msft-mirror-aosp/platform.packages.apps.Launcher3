@@ -222,7 +222,6 @@ import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.AllAppsSwipeController;
 import com.android.launcher3.touch.ItemLongClickListener;
-import com.android.launcher3.uioverrides.plugins.PluginManagerWrapper;
 import com.android.launcher3.util.ActivityResultInfo;
 import com.android.launcher3.util.ActivityTracker;
 import com.android.launcher3.util.BackPressHandler;
@@ -235,6 +234,7 @@ import com.android.launcher3.util.KeyboardShortcutsDelegate;
 import com.android.launcher3.util.LockedUserState;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.PendingRequestArgs;
+import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.ScreenOnTracker.ScreenOnListener;
@@ -576,8 +576,8 @@ public class Launcher extends StatefulActivity<LauncherState>
                 Themes.getAttrBoolean(this, R.attr.isWorkspaceDarkText));
 
         mOverlayManager = getDefaultOverlay();
-        PluginManagerWrapper.INSTANCE.get(this).addPluginListener(this,
-                LauncherOverlayPlugin.class, false /* allowedMultiple */);
+        PluginManagerWrapper.INSTANCE.get(this)
+                .addPluginListener(this, LauncherOverlayPlugin.class);
 
         mRotationHelper.initialize();
         TraceHelper.INSTANCE.endSection();
@@ -680,7 +680,7 @@ public class Launcher extends StatefulActivity<LauncherState>
 
             @Override
             public void onBackCancelled() {
-                mStateManager.getState().onBackCancelled(Launcher.this);
+                Launcher.this.onBackCancelled();
             }
         };
     }
@@ -1551,7 +1551,13 @@ public class Launcher extends StatefulActivity<LauncherState>
             LauncherAppWidgetInfo launcherInfo,
             CellPos presenterPos) {
         CellLayout cellLayout = getCellLayout(launcherInfo.container, presenterPos.screenId);
-        if (mStateManager.getState() == NORMAL) {
+        // We should wait until launcher is not animating to show resize frame so that
+        // {@link View#hasIdentityMatrix()} returns true (no scale effect) from CellLayout and
+        // Workspace (they are widget's parent view). Otherwise widget's
+        // {@link View#getLocationInWindow(int[])} will set skewed location, causing resize
+        // frame not showing at skewed location in
+        // {@link AppWidgetResizeFrame#snapToWidget(boolean)}.
+        if (mStateManager.getState() == NORMAL && !mStateManager.isInTransition()) {
             AppWidgetResizeFrame.showForWidget(launcherHostView, cellLayout);
         } else {
             mStateManager.addStateListener(new StateManager.StateListener<LauncherState>() {
@@ -1647,7 +1653,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         } else if (Intent.ACTION_ALL_APPS.equals(intent.getAction())) {
             showAllAppsFromIntent(alreadyOnHome);
         } else if (INTENT_ACTION_ALL_APPS_TOGGLE.equals(intent.getAction())) {
-            toggleAllAppsFromIntent(alreadyOnHome);
+            toggleAllAppsSearch(alreadyOnHome);
         } else if (Intent.ACTION_SHOW_WORK_APPS.equals(intent.getAction())) {
             showAllAppsWithSelectedTabFromIntent(alreadyOnHome,
                     ActivityAllAppsContainerView.AdapterHolder.WORK);
@@ -1661,7 +1667,12 @@ public class Launcher extends StatefulActivity<LauncherState>
         // Overridden
     }
 
-    protected void toggleAllAppsFromIntent(boolean alreadyOnHome) {
+    /** Toggles Launcher All Apps with keyboard ready for search. */
+    public void toggleAllAppsSearch() {
+        toggleAllAppsSearch(/* alreadyOnHome= */ true);
+    }
+
+    protected void toggleAllAppsSearch(boolean alreadyOnHome) {
         if (getStateManager().isInStableState(ALL_APPS)) {
             getStateManager().goToState(NORMAL, alreadyOnHome);
         } else {
@@ -2086,6 +2097,10 @@ public class Launcher extends StatefulActivity<LauncherState>
         mStateManager.getState().onBackInvoked(this);
     }
 
+    protected void onBackCancelled() {
+        mStateManager.getState().onBackCancelled(this);
+    }
+
     protected void onScreenOnChanged(boolean isOn) {
         // Reset AllApps to its initial state only if we are not in the middle of
         // processing a multi-step drop
@@ -2493,7 +2508,13 @@ public class Launcher extends StatefulActivity<LauncherState>
         final int itemCount = container.getChildCount();
         for (int itemIdx = 0; itemIdx < itemCount; itemIdx++) {
             View item = container.getChildAt(itemIdx);
-            if (op.test((ItemInfo) item.getTag())) {
+            if (item instanceof ViewGroup viewGroup) {
+                View view = mapOverViewGroup(viewGroup, op);
+                if (view != null) {
+                    return view;
+                }
+            }
+            if (item.getTag() instanceof ItemInfo itemInfo && op.test(itemInfo)) {
                 return item;
             }
         }
@@ -2878,8 +2899,8 @@ public class Launcher extends StatefulActivity<LauncherState>
      * Returns {@code true} if there are visible tasks with windowing mode set to
      * {@link android.app.WindowConfiguration#WINDOWING_MODE_FREEFORM}
      */
-    public boolean areFreeformTasksVisible() {
-        return false; // Base launcher does not track freeform tasks
+    public boolean areDesktopTasksVisible() {
+        return false; // Base launcher does not track desktop tasks
     }
 
     // Getters and Setters

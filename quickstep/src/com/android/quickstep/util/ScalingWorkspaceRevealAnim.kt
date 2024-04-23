@@ -16,11 +16,13 @@
 
 package com.android.quickstep.util
 
+import android.graphics.Matrix
+import android.graphics.RectF
 import android.view.View
+import androidx.core.graphics.transform
 import com.android.app.animation.Interpolators
 import com.android.app.animation.Interpolators.EMPHASIZED
 import com.android.app.animation.Interpolators.LINEAR
-import com.android.launcher3.Launcher
 import com.android.launcher3.LauncherAnimUtils.HOTSEAT_SCALE_PROPERTY_FACTORY
 import com.android.launcher3.LauncherAnimUtils.SCALE_INDEX_WORKSPACE_STATE
 import com.android.launcher3.LauncherAnimUtils.WORKSPACE_SCALE_PROPERTY_FACTORY
@@ -39,7 +41,11 @@ import com.android.quickstep.views.RecentsView
  * Creates an animation where the workspace and hotseat fade in while revealing from the center of
  * the screen outwards radially. This is used in conjunction with the swipe up to home animation.
  */
-class ScalingWorkspaceRevealAnim(launcher: Launcher) {
+class ScalingWorkspaceRevealAnim(
+    launcher: QuickstepLauncher,
+    siblingAnimation: RectFSpringAnim?,
+    windowTargetRect: RectF?
+) {
     companion object {
         private const val FADE_DURATION_MS = 200L
         private const val SCALE_DURATION_MS = 1000L
@@ -53,11 +59,11 @@ class ScalingWorkspaceRevealAnim(launcher: Launcher) {
 
     init {
         // Make sure the starting state is right for the animation.
-        val config = StateAnimationConfig()
-        config.animFlags = SKIP_OVERVIEW.or(SKIP_DEPTH_CONTROLLER).or(SKIP_SCRIM)
-        config.duration = 0
+        val setupConfig = StateAnimationConfig()
+        setupConfig.animFlags = SKIP_OVERVIEW.or(SKIP_DEPTH_CONTROLLER).or(SKIP_SCRIM)
+        setupConfig.duration = 0
         launcher.stateManager
-            .createAtomicAnimation(LauncherState.BACKGROUND_APP, LauncherState.NORMAL, config)
+            .createAtomicAnimation(LauncherState.BACKGROUND_APP, LauncherState.NORMAL, setupConfig)
             .start()
         launcher
             .getOverviewPanel<RecentsView<QuickstepLauncher, LauncherState>>()
@@ -65,7 +71,7 @@ class ScalingWorkspaceRevealAnim(launcher: Launcher) {
         launcher.workspace.stateTransitionAnimation.setScrim(
             PropertySetter.NO_ANIM_PROPERTY_SETTER,
             LauncherState.BACKGROUND_APP,
-            config
+            setupConfig
         )
 
         val workspace = launcher.workspace
@@ -104,11 +110,55 @@ class ScalingWorkspaceRevealAnim(launcher: Launcher) {
             Interpolators.clampToProgress(LINEAR, 0f, fadeClamp)
         )
 
+        val transitionConfig = StateAnimationConfig()
+
         // Match the Wallpaper animation to the rest of the content.
         val depthController = (launcher as? QuickstepLauncher)?.depthController
-        val depthConfig = StateAnimationConfig()
-        depthConfig.setInterpolator(StateAnimationConfig.ANIM_DEPTH, EMPHASIZED)
-        depthController?.setStateWithAnimation(LauncherState.NORMAL, depthConfig, animation)
+        transitionConfig.setInterpolator(StateAnimationConfig.ANIM_DEPTH, EMPHASIZED)
+        depthController?.setStateWithAnimation(LauncherState.NORMAL, transitionConfig, animation)
+
+        // Make sure that the contrast scrim animates correctly if needed.
+        transitionConfig.setInterpolator(StateAnimationConfig.ANIM_SCRIM_FADE, EMPHASIZED)
+        launcher.workspace.stateTransitionAnimation.setScrim(
+            animation,
+            LauncherState.NORMAL,
+            transitionConfig
+        )
+
+        // To avoid awkward jumps in icon position, we want the sibling animation to always be
+        // targeting the current position. Since we can't easily access this, instead we calculate
+        // it using the animation of the whole of home.
+        // We start by caching the final target position, as this is the base for the transforms.
+        val originalTarget = RectF(windowTargetRect)
+        animation.addOnFrameListener {
+            val transformed = RectF(originalTarget)
+
+            // First we scale down using the same pivot as the workspace scale, so we find the
+            // correct position AND size.
+            transformed.transform(
+                Matrix().apply {
+                    setScale(workspace.scaleX, workspace.scaleY, workspace.pivotX, workspace.pivotY)
+                }
+            )
+            // Then we scale back up around the center of the current position. This is because the
+            // icon animation behaves poorly if it is given a target that is smaller than the size
+            // of the icon.
+            transformed.transform(
+                Matrix().apply {
+                    setScale(
+                        1 / workspace.scaleX,
+                        1 / workspace.scaleY,
+                        transformed.centerX(),
+                        transformed.centerY()
+                    )
+                }
+            )
+
+            if (transformed != windowTargetRect) {
+                windowTargetRect?.set(transformed)
+                siblingAnimation?.onTargetPositionChanged()
+            }
+        }
 
         // Needed to avoid text artefacts during the scale animation.
         workspace.setLayerType(View.LAYER_TYPE_HARDWARE, null)

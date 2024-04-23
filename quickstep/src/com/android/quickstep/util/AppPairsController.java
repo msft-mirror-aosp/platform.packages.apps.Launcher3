@@ -42,10 +42,8 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.jank.Cuj;
-import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherSettings;
-import com.android.launcher3.R;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.apppairs.AppPairIcon;
@@ -57,8 +55,10 @@ import com.android.launcher3.model.data.AppPairInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
+import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TopTaskTracker;
 import com.android.quickstep.views.GroupedTaskView;
@@ -153,16 +153,14 @@ public class AppPairsController {
 
         IconCache iconCache = LauncherAppState.getInstance(mContext).getIconCache();
         MODEL_EXECUTOR.execute(() -> {
-            newAppPair.getContents().forEach(member -> {
+            newAppPair.getAppContents().forEach(member -> {
                 member.title = "";
                 member.bitmap = iconCache.getDefaultIcon(newAppPair.user);
                 iconCache.getTitleAndIcon(member, member.usingLowResIcon());
             });
-            newAppPair.title = getDefaultTitle(newAppPair.getFirstApp().title,
-                    newAppPair.getSecondApp().title);
             MAIN_EXECUTOR.execute(() -> {
                 LauncherAccessibilityDelegate delegate =
-                        Launcher.getLauncher(mContext).getAccessibilityDelegate();
+                        QuickstepLauncher.getLauncher(mContext).getAccessibilityDelegate();
                 if (delegate != null) {
                     delegate.addToWorkspace(newAppPair, true, (success) -> {
                         if (success) {
@@ -241,7 +239,8 @@ public class AppPairsController {
             return null;
         }
 
-        AllAppsStore appsStore = Launcher.getLauncher(mContext).getAppsView().getAppsStore();
+        AllAppsStore appsStore = ActivityContext.lookupContext(mContext)
+                .getAppsView().getAppsStore();
 
         // Lookup by ComponentKey
         AppInfo appInfo = appsStore.getApp(key);
@@ -266,9 +265,7 @@ public class AppPairsController {
         }
 
         if (ai != null) {
-            wii.status = ai.resizeMode == ActivityInfo.RESIZE_MODE_UNRESIZEABLE
-                    ? wii.status | WorkspaceItemInfo.FLAG_NON_RESIZEABLE
-                    : wii.status & ~WorkspaceItemInfo.FLAG_NON_RESIZEABLE;
+            wii.setNonResizeable(ai.resizeMode == ActivityInfo.RESIZE_MODE_UNRESIZEABLE);
         }
     }
 
@@ -486,13 +483,6 @@ public class AppPairsController {
      */
     public static int convertRankToSnapPosition(int rank) {
         return rank & BITMASK_FOR_SNAP_POSITION;
-    }
-
-    /**
-     * Returns a formatted default title for the app pair.
-     */
-    public String getDefaultTitle(CharSequence app1, CharSequence app2) {
-        return mContext.getString(R.string.app_pair_default_title, app1, app2);
     }
 
     /**

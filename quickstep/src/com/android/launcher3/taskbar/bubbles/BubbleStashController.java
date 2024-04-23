@@ -23,6 +23,7 @@ import android.animation.AnimatorSet;
 import android.annotation.Nullable;
 import android.view.InsetsController;
 import android.view.MotionEvent;
+import android.view.View;
 
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.taskbar.StashedHandleViewController;
@@ -32,6 +33,7 @@ import com.android.launcher3.taskbar.TaskbarInsetsController;
 import com.android.launcher3.taskbar.TaskbarStashController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.animation.PhysicsAnimator;
 
 /**
  * Coordinates between controllers such as BubbleBarView and BubbleHandleViewController to
@@ -361,5 +363,15 @@ public class BubbleStashController {
     /** Set a bubble bar location */
     public void setBubbleBarLocation(BubbleBarLocation bubbleBarLocation) {
         mHandleViewController.setBubbleBarLocation(bubbleBarLocation);
+    }
+
+    /** Returns the x position of the center of the stashed handle. */
+    public float getStashedHandleCenterX() {
+        return mHandleViewController.getStashedHandleCenterX();
+    }
+
+    /** Returns the [PhysicsAnimator] for the stashed handle view. */
+    public PhysicsAnimator<View> getStashedHandlePhysicsAnimator() {
+        return mHandleViewController.getPhysicsAnimator();
     }
 }

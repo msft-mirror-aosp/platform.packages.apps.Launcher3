@@ -35,6 +35,7 @@ import androidx.recyclerview.widget.RecyclerView.ViewHolder;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
@@ -58,7 +59,7 @@ import java.util.function.Predicate;
 
 @LargeTest
 @RunWith(AndroidJUnit4.class)
-public class TaplWorkProfileTest extends AbstractLauncherUiTest {
+public class TaplWorkProfileTest extends AbstractLauncherUiTest<Launcher> {
 
     private static final int WORK_PAGE = ActivityAllAppsContainerView.AdapterHolder.WORK;
 
@@ -113,7 +114,7 @@ public class TaplWorkProfileTest extends AbstractLauncherUiTest {
         mLauncher.runToState(
                 () -> {
                     try {
-                        mDevice.executeShellCommand("pm remove-user " + mProfileUserId);
+                        mDevice.executeShellCommand("pm remove-user --wait " + mProfileUserId);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
@@ -195,6 +196,7 @@ public class TaplWorkProfileTest extends AbstractLauncherUiTest {
 
     }
 
+    @ScreenRecord // b/322823478
     @Test
     public void testEdu() {
         assumeTrue(mWorkProfileSetupSuccessful);
