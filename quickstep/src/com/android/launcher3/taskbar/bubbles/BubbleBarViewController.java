@@ -138,6 +138,15 @@ public class BubbleBarViewController {
         if (bubble == null) {
             Log.e(TAG, "bubble click listener, bubble was null");
         }
+
+        if (mBarView.isAnimatingNewBubble()) {
+            mBubbleBarViewAnimator.onBubbleClickedWhileAnimating();
+            mBubbleStashController.showBubbleBarImmediate();
+            setExpanded(true);
+            mBubbleBarController.showAndSelectBubble(bubble);
+            return;
+        }
+
         final String currentlySelected = mBubbleBarController.getSelectedBubbleKey();
         if (mBarView.isExpanded() && Objects.equals(bubble.getKey(), currentlySelected)) {
             // Tapping the currently selected bubble while expanded collapses the view.
@@ -180,6 +189,10 @@ public class BubbleBarViewController {
         return mBubbleBarTranslationY;
     }
 
+    float getBubbleBarCollapsedHeight() {
+        return mBarView.getBubbleBarCollapsedHeight();
+    }
+
     /**
      * Whether the bubble bar is visible or not.
      */
@@ -211,6 +224,11 @@ public class BubbleBarViewController {
      */
     public Rect getBubbleBarBounds() {
         return mBarView.getBubbleBarBounds();
+    }
+
+    /** Whether a new bubble is animating. */
+    public boolean isAnimatingNewBubble() {
+        return mBarView.isAnimatingNewBubble();
     }
 
     /** The horizontal margin of the bubble bar from the edge of the screen. */
@@ -373,7 +391,7 @@ public class BubbleBarViewController {
 
             boolean isInApp = mTaskbarStashController.isInApp();
             // only animate the new bubble if we're in an app and not auto expanding
-            if (b instanceof BubbleBarBubble && isInApp && !isExpanding) {
+            if (b instanceof BubbleBarBubble && isInApp && !isExpanding && !isExpanded()) {
                 mBubbleBarViewAnimator.animateBubbleInForStashed((BubbleBarBubble) b);
             }
         } else {

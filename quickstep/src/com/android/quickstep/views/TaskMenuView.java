@@ -22,7 +22,7 @@ import static com.android.launcher3.testing.shared.TestProtocol.TEST_TAPL_OVERVI
 import static com.android.launcher3.testing.shared.TestProtocol.testLogD;
 import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
-import static com.android.quickstep.views.TaskThumbnailView.DIM_ALPHA;
+import static com.android.quickstep.views.TaskThumbnailViewDeprecated.DIM_ALPHA;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
@@ -193,10 +193,6 @@ public class TaskMenuView extends AbstractFloatingView {
 
     /** @return true if successfully able to populate task view menu, false otherwise */
     private boolean populateAndLayoutMenu() {
-        if (mTaskContainer.getTask().icon == null) {
-            // Icon may not be loaded
-            return false;
-        }
         addMenuOptions(mTaskContainer);
         orientAroundTaskView(mTaskContainer);
         return true;

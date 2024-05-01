@@ -117,8 +117,8 @@
     <string name="taskbar_edu_features" msgid="3320337287472848162">"টাস্কবাৰৰ জৰিয়তে অধিক কাৰ্য সম্পাদন কৰক"</string>
     <string name="taskbar_edu_pinning_title" msgid="210102174154211712">"টাস্কবাৰডাল সদায় দেখুৱাওক"</string>
     <string name="taskbar_edu_pinning_standalone" msgid="2636919474366410467">"আপোনাৰ স্ক্ৰীনৰ তলত সদায় টাস্কবাৰডাল দেখুৱাবলৈ বিভাজকডাল স্পৰ্শ কৰি ধৰি ৰাখক"</string>
-    <string name="taskbar_edu_circle_to_search_title" msgid="4322780398403949508">"আপোনাৰ স্ক্ৰীনখনত থকা সমল সন্ধান কৰিবলৈ কাৰ্য কীটো স্পৰ্শ কৰি ধৰি ৰাখক"</string>
-    <string name="taskbar_edu_circle_to_search_disclosure" msgid="5841648785867787221">"এই প্ৰ’ডাক্টটোৱে সন্ধান কৰিবলৈ আপোনাৰ স্ক্ৰীনখনৰ বাছনি কৰা অংশ ব্যৱহাৰ কৰে। Googleৰ <xliff:g id="BEGIN_PRIVACY_LINK">&lt;a href="%1$s"&gt;</xliff:g>গোপনীয়তাৰ নীতি<xliff:g id="END_PRIVACY_LINK">&lt;/a&gt;</xliff:g> আৰু <xliff:g id="BEGIN_TOS_LINK">&lt;a href="%2$s"&gt;</xliff:g>সেৱাৰ চৰ্তাৱলী<xliff:g id="END_TOS_LINK">&lt;/a&gt;</xliff:g> প্ৰযোজ্য।"</string>
+    <string name="taskbar_search_edu_title" msgid="5569194922234364530">"আপোনাৰ স্ক্ৰীনখনত থকা সমল সন্ধান কৰিবলৈ কাৰ্য কীটো স্পৰ্শ কৰি ধৰি ৰাখক"</string>
+    <string name="taskbar_edu_search_disclosure" msgid="8734536088447779686">"এই প্ৰ’ডাক্টটোৱে সন্ধান কৰিবলৈ আপোনাৰ স্ক্ৰীনখনৰ বাছনি কৰা অংশ ব্যৱহাৰ কৰে। Googleৰ <xliff:g id="BEGIN_PRIVACY_LINK">&lt;a href="%1$s"&gt;</xliff:g>গোপনীয়তাৰ নীতি<xliff:g id="END_PRIVACY_LINK">&lt;/a&gt;</xliff:g> আৰু <xliff:g id="BEGIN_TOS_LINK">&lt;a href="%2$s"&gt;</xliff:g>সেৱাৰ চৰ্তাৱলী<xliff:g id="END_TOS_LINK">&lt;/a&gt;</xliff:g> প্ৰযোজ্য।"</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"বন্ধ কৰক"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"হ’ল"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"গৃহপৃষ্ঠা"</string>
@@ -138,6 +138,8 @@
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"ওপৰৰ বাঁওফাললৈ নিয়ক"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"তলৰ সোঁফাললৈ নিয়ক"</string>
     <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{আৰু # টা এপ্‌ দেখুৱাওক।}one{আৰু # টা এপ্‌ দেখুৱাওক।}other{আৰু # টা এপ্‌ দেখুৱাওক।}}"</string>
+    <!-- no translation found for quick_switch_desktop (4834587349322698616) -->
+    <skip />
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> আৰু <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="desktop_select_app_toast" msgid="2306057322833956910">"ডেস্কটপত এপ্ যোগ দি থকা হৈছে"</string>
     <string name="desktop_button_close_app_toast" msgid="5283096349579408560">"বাতিল কৰক"</string>

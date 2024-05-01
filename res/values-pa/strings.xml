@@ -67,10 +67,7 @@
     <string name="widget_category_note_taking" msgid="3469689394504266039">"ਨੋਟ ਬਣਾਉਣਾ"</string>
     <string name="widget_add_button_label" msgid="2761267068711937179">"ਸ਼ਾਮਲ ਕਰੋ"</string>
     <string name="widget_add_button_content_description" msgid="1810530016360039643">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> ਵਿਜੇਟ ਸ਼ਾਮਲ ਕਰੋ"</string>
-    <string name="widget_education_header" msgid="4874760613775913787">"ਮਹੱਤਵਪੂਰਨ ਜਾਣਕਾਰੀ ਤੁਰੰਤ ਪ੍ਰਾਪਤ ਕਰੋ"</string>
-    <string name="widget_education_content" msgid="1731667670753497052">"ਐਪਾਂ ਨੂੰ ਖੋਲ੍ਹੇ ਬਿਨਾਂ ਜਾਣਕਾਰੀ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ, ਤੁਸੀਂ ਆਪਣੀ ਹੋਮ ਸਕ੍ਰੀਨ \'ਤੇ ਵਿਜੇਟ ਸ਼ਾਮਲ ਕਰ ਸਕਦੇ ਹੋ"</string>
     <string name="reconfigurable_widget_education_tip" msgid="6336962690888067057">"ਵਿਜੇਟ ਸੈਟਿੰਗਾਂ ਨੂੰ ਬਦਲਣ ਲਈ ਟੈਪ ਕਰੋ"</string>
-    <string name="widget_education_close_button" msgid="8676165703104836580">"ਸਮਝ ਲਿਆ"</string>
     <string name="widget_reconfigure_button_content_description" msgid="8811472721881205250">"ਵਿਜੇਟ ਸੈਟਿੰਗਾਂ ਬਦਲੋ"</string>
     <string name="all_apps_search_bar_hint" msgid="1390553134053255246">"ਐਪਾਂ ਖੋਜੋ"</string>
     <string name="all_apps_loading_message" msgid="5813968043155271636">"ਐਪਾਂ ਨੂੰ ਲੋਡ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ..."</string>
@@ -192,7 +189,10 @@
     <string name="private_space_secondary_label" msgid="9203933341714508907">"ਸੈੱਟਅੱਪ ਕਰਨ ਜਾਂ ਖੋਲ੍ਹਣ ਲਈ ਟੈਪ ਕਰੋ"</string>
     <string name="ps_container_title" msgid="4391796149519594205">"ਨਿੱਜੀ"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"ਨਿੱਜੀ ਸਪੇਸ ਸੰਬੰਧੀ ਸੈਟਿੰਗਾਂ"</string>
-    <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"ਨਿੱਜੀ ਸਪੇਸ ਨੂੰ ਲਾਕ/ਅਣਲਾਕ ਕਰੋ"</string>
+    <!-- no translation found for ps_container_unlock_button_content_description (9181551784092204234) -->
+    <skip />
+    <!-- no translation found for ps_container_lock_button_content_description (5961993384382649530) -->
+    <skip />
     <string name="ps_container_lock_title" msgid="2640257399982364682">"ਲਾਕ ਕਰੋ"</string>
     <string name="ps_container_transition" msgid="8667331812048014412">"ਨਿੱਜੀ ਸਪੇਸ ਨੂੰ ਤਬਦੀਲ ਕਰਨਾ"</string>
     <string name="ps_add_button_label" msgid="8611055839242385935">"ਐਪਾਂ ਸਥਾਪਤ ਕਰੋ"</string>

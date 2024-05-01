@@ -16,7 +16,6 @@
 package com.android.quickstep;
 
 import static android.app.ActivityManager.RECENT_IGNORE_UNAVAILABLE;
-import static android.content.pm.PackageManager.FEATURE_PC;
 
 import static com.android.launcher3.Flags.enableUnfoldStateAnimation;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
@@ -460,10 +459,11 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     }
 
     @Override
-    public void setOverrideHomeButtonLongPress(long duration, float slopMultiplier) {
+    public void setOverrideHomeButtonLongPress(long duration, float slopMultiplier,
+            boolean haptic) {
         if (mSystemUiProxy != null) {
             try {
-                mSystemUiProxy.setOverrideHomeButtonLongPress(duration, slopMultiplier);
+                mSystemUiProxy.setOverrideHomeButtonLongPress(duration, slopMultiplier, haptic);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call setOverrideHomeButtonLongPress", e);
             }
@@ -1384,8 +1384,7 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
 
     private boolean shouldEnableRunningTasksForDesktopMode() {
         // TODO(b/335401172): unify DesktopMode checks in Launcher
-        return (enableDesktopWindowingMode() && enableDesktopWindowingTaskbarRunningApps())
-                || mContext.getPackageManager().hasSystemFeature(FEATURE_PC);
+        return enableDesktopWindowingMode() && enableDesktopWindowingTaskbarRunningApps();
     }
 
     private boolean handleMessageAsync(Message msg) {

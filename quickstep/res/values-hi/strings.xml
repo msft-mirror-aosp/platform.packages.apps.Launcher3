@@ -21,8 +21,7 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="recent_task_option_pin" msgid="7929860679018978258">"पिन करें"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"फ़्रीफ़ॉर्म"</string>
-    <!-- no translation found for recent_task_option_desktop (8280879717125435668) -->
-    <skip />
+    <string name="recent_task_option_desktop" msgid="8280879717125435668">"डेस्कटॉप"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"हाल ही का कोई आइटम नहीं है"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"ऐप्लिकेशन इस्तेमाल की सेटिंग"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"सभी हटाएं"</string>
@@ -118,8 +117,8 @@
     <string name="taskbar_edu_features" msgid="3320337287472848162">"टास्कबार के साथ कई और काम करें"</string>
     <string name="taskbar_edu_pinning_title" msgid="210102174154211712">"टास्कबार को हमेशा दिखाएं"</string>
     <string name="taskbar_edu_pinning_standalone" msgid="2636919474366410467">"टास्कबार को हमेशा अपनी स्क्रीन के नीचे दिखाने के लिए, डिवाइडर दबाकर रखें"</string>
-    <string name="taskbar_edu_circle_to_search_title" msgid="4322780398403949508">"स्क्रीन में दिख रहे कॉन्टेंट को खोजने के लिए, ऐक्शन बटन को दबाकर रखें"</string>
-    <string name="taskbar_edu_circle_to_search_disclosure" msgid="5841648785867787221">"यह प्रॉडक्ट, कॉन्टेंट खोजने के लिए स्क्रीन पर चुनिंदा हिस्से का इस्तेमाल करता है. Google की <xliff:g id="BEGIN_PRIVACY_LINK">&lt;a href="%1$s"&gt;</xliff:g>निजता नीति<xliff:g id="END_PRIVACY_LINK">&lt;/a&gt;</xliff:g> और <xliff:g id="BEGIN_TOS_LINK">&lt;a href="%2$s"&gt;</xliff:g>सेवा की शर्तें<xliff:g id="END_TOS_LINK">&lt;/a&gt;</xliff:g> लागू होती हैं."</string>
+    <string name="taskbar_search_edu_title" msgid="5569194922234364530">"स्क्रीन पर दिख रहे कॉन्टेंट को खोजने के लिए, ऐक्शन बटन को दबाकर रखें"</string>
+    <string name="taskbar_edu_search_disclosure" msgid="8734536088447779686">"यह प्रॉडक्ट, स्क्रीन के चुनिंदा हिस्से पर कॉन्टेंट खोजता है. Google की <xliff:g id="BEGIN_PRIVACY_LINK">&lt;a href="%1$s"&gt;</xliff:g>निजता नीति<xliff:g id="END_PRIVACY_LINK">&lt;/a&gt;</xliff:g> और <xliff:g id="BEGIN_TOS_LINK">&lt;a href="%2$s"&gt;</xliff:g>सेवा की शर्तें<xliff:g id="END_TOS_LINK">&lt;/a&gt;</xliff:g> लागू."</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"बंद करें"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"हो गया"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"होम"</string>
@@ -139,6 +138,7 @@
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"ऊपर/बाईं तरफ़ ले जाएं"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"नीचे/दाईं तरफ़ ले जाएं"</string>
     <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{# और ऐप्लिकेशन दिखाएं.}one{# और ऐप्लिकेशन दिखाएं.}other{# और ऐप्लिकेशन दिखाएं.}}"</string>
+    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{# डेस्कटॉप ऐप्लिकेशन दिखाएं.}one{# डेस्कटॉप ऐप्लिकेशन दिखाएं.}other{# डेस्कटॉप ऐप्लिकेशन दिखाएं.}}"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> और <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="desktop_select_app_toast" msgid="2306057322833956910">"डेस्कटॉप पर ऐप्लिकेशन जोड़ा जा रहा है"</string>
     <string name="desktop_button_close_app_toast" msgid="5283096349579408560">"रद्द करें"</string>

@@ -47,6 +47,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -233,13 +234,21 @@ public class TaskbarModelCallbacks implements
         }
         hotseatItemInfos = mControllers.taskbarRecentAppsController
                 .updateHotseatItemInfos(hotseatItemInfos);
+        Set<String> runningPackages = mControllers.taskbarRecentAppsController.getRunningApps();
 
         if (mDeferUpdatesForSUW) {
             ItemInfo[] finalHotseatItemInfos = hotseatItemInfos;
-            mDeferredUpdates = () -> mContainer.updateHotseatItems(finalHotseatItemInfos);
+            mDeferredUpdates = () ->
+                    commitHotseatItemUpdates(finalHotseatItemInfos, runningPackages);
         } else {
-            mContainer.updateHotseatItems(hotseatItemInfos);
+            commitHotseatItemUpdates(hotseatItemInfos, runningPackages);
         }
+    }
+
+    private void commitHotseatItemUpdates(
+            ItemInfo[] hotseatItemInfos, Set<String> runningPackages) {
+        mContainer.updateHotseatItems(hotseatItemInfos);
+        mControllers.taskbarViewController.updateIconViewsRunningStates(runningPackages);
     }
 
     /**
@@ -270,7 +279,7 @@ public class TaskbarModelCallbacks implements
 
     /** Call TaskbarRecentAppsController to update running apps with mHotseatItems. */
     public void updateRunningApps() {
-        mControllers.taskbarRecentAppsController.updateRunningApps(mHotseatItems);
+        mControllers.taskbarRecentAppsController.updateRunningApps();
     }
 
     @Override

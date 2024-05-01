@@ -117,8 +117,8 @@
     <string name="taskbar_edu_features" msgid="3320337287472848162">"با «نوار وظیفه» می‌توانید کارهای بیشتر انجام دهید"</string>
     <string name="taskbar_edu_pinning_title" msgid="210102174154211712">"همیشه نشان داده شدن «نوار وظیفه»"</string>
     <string name="taskbar_edu_pinning_standalone" msgid="2636919474366410467">"برای اینکه «نوار وظیفه» همیشه در پایین صفحه نشان داده شود، تقسیم‌کننده را لمس کنید و نگه دارید"</string>
-    <string name="taskbar_edu_circle_to_search_title" msgid="4322780398403949508">"برای جستجوی محتوای صفحه‌نمایش، دکمه کنش را لمس کنید و نگه دارید"</string>
-    <string name="taskbar_edu_circle_to_search_disclosure" msgid="5841648785867787221">"‏این محصول از قسمت انتخاب‌شده صفحه‌نمایش شما برای جستجو استفاده می‌کند. <xliff:g id="BEGIN_PRIVACY_LINK">&lt;a href="%1$s"&gt;</xliff:g>خط‌مشی رازداری<xliff:g id="END_PRIVACY_LINK">&lt;/a&gt;</xliff:g> و <xliff:g id="BEGIN_TOS_LINK">&lt;a href="%2$s"&gt;</xliff:g>شرایط خدمات<xliff:g id="END_TOS_LINK">&lt;/a&gt;</xliff:g> Google اعمال می‌شود."</string>
+    <string name="taskbar_search_edu_title" msgid="5569194922234364530">"برای جستجوی محتوای صفحه‌نمایش، دکمه کنش را لمس کنید و نگه دارید"</string>
+    <string name="taskbar_edu_search_disclosure" msgid="8734536088447779686">"‏این محصول از قسمت انتخاب‌شده صفحه‌نمایش شما برای جستجو استفاده می‌کند. <xliff:g id="BEGIN_PRIVACY_LINK">&lt;a href="%1$s"&gt;</xliff:g>خط‌مشی رازداری<xliff:g id="END_PRIVACY_LINK">&lt;/a&gt;</xliff:g> و <xliff:g id="BEGIN_TOS_LINK">&lt;a href="%2$s"&gt;</xliff:g>شرایط خدمات<xliff:g id="END_TOS_LINK">&lt;/a&gt;</xliff:g> Google اعمال می‌شود."</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"بستن"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"تمام"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"صفحه اصلی"</string>
@@ -138,6 +138,8 @@
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"انتقال به بالا/ چپ"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"انتقال به پایین/ راست"</string>
     <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{نمایش # برنامه دیگر.}one{نمایش # برنامه دیگر.}other{نمایش # برنامه دیگر.}}"</string>
+    <!-- no translation found for quick_switch_desktop (4834587349322698616) -->
+    <skip />
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> و <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="desktop_select_app_toast" msgid="2306057322833956910">"درحال افزودن برنامه به رایانه"</string>
     <string name="desktop_button_close_app_toast" msgid="5283096349579408560">"لغو"</string>
