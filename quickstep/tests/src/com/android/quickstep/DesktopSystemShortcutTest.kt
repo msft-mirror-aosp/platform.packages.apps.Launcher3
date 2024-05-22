@@ -16,12 +16,12 @@
 
 package com.android.quickstep
 
-import com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn
-import com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession
-import com.android.dx.mockito.inline.extended.StaticMockitoSession
 import android.content.ComponentName
 import android.content.Intent
 import android.platform.test.flag.junit.SetFlagsRule
+import com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn
+import com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession
+import com.android.dx.mockito.inline.extended.StaticMockitoSession
 import com.android.launcher3.AbstractFloatingView
 import com.android.launcher3.AbstractFloatingViewHelper
 import com.android.launcher3.logging.StatsLogManager
@@ -30,21 +30,24 @@ import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.uioverrides.QuickstepLauncher
 import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.quickstep.views.LauncherRecentsView
+import com.android.quickstep.views.TaskThumbnailViewDeprecated
 import com.android.quickstep.views.TaskView
+import com.android.quickstep.views.TaskViewIcon
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.Task.TaskKey
 import com.android.window.flags.Flags
+import com.android.wm.shell.shared.DesktopModeStatus
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.mockito.quality.Strictness
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.mockito.quality.Strictness
 
 /** Test for DesktopSystemShortcut */
 class DesktopSystemShortcutTest {
@@ -58,21 +61,26 @@ class DesktopSystemShortcutTest {
     private val taskView: TaskView = mock()
     private val workspaceItemInfo: WorkspaceItemInfo = mock()
     private val abstractFloatingViewHelper: AbstractFloatingViewHelper = mock()
+    private val thumbnailView: TaskThumbnailViewDeprecated = mock()
+    private val iconView: TaskViewIcon = mock()
     private val factory: TaskShortcutFactory =
         DesktopSystemShortcut.createFactory(abstractFloatingViewHelper)
 
     private lateinit var mockitoSession: StaticMockitoSession
 
     @Before
-    fun setUp(){
-        mockitoSession = mockitoSession().strictness(Strictness.LENIENT)
-                .spyStatic(DesktopModeStatus::class.java).startMocking()
+    fun setUp() {
+        mockitoSession =
+            mockitoSession()
+                .strictness(Strictness.LENIENT)
+                .spyStatic(DesktopModeStatus::class.java)
+                .startMocking()
         doReturn(true).`when` { DesktopModeStatus.enforceDeviceRestrictions() }
         doReturn(true).`when` { DesktopModeStatus.isDesktopModeSupported(any()) }
     }
 
     @After
-    fun tearDown(){
+    fun tearDown() {
         mockitoSession.finishMocking()
     }
 
@@ -85,11 +93,12 @@ class DesktopSystemShortcutTest {
                 isDockable = true
             }
         val taskContainer =
-            taskView.TaskIdAttributeContainer(
+            taskView.TaskContainer(
                 task,
-                null,
-                null,
-                SplitConfigurationOptions.STAGE_POSITION_UNDEFINED
+                thumbnailView,
+                iconView,
+                SplitConfigurationOptions.STAGE_POSITION_UNDEFINED,
+                null
             )
 
         val shortcuts = factory.getShortcuts(launcher, taskContainer)
@@ -106,11 +115,12 @@ class DesktopSystemShortcutTest {
                 isDockable = true
             }
         val taskContainer =
-            taskView.TaskIdAttributeContainer(
+            taskView.TaskContainer(
                 task,
-                null,
-                null,
-                SplitConfigurationOptions.STAGE_POSITION_UNDEFINED
+                thumbnailView,
+                iconView,
+                SplitConfigurationOptions.STAGE_POSITION_UNDEFINED,
+                null
             )
 
         val shortcuts = factory.getShortcuts(launcher, taskContainer)
@@ -128,11 +138,12 @@ class DesktopSystemShortcutTest {
                 isDockable = true
             }
         val taskContainer =
-            taskView.TaskIdAttributeContainer(
+            taskView.TaskContainer(
                 task,
-                null,
-                null,
-                SplitConfigurationOptions.STAGE_POSITION_UNDEFINED
+                thumbnailView,
+                iconView,
+                SplitConfigurationOptions.STAGE_POSITION_UNDEFINED,
+                null
             )
 
         val shortcuts = factory.getShortcuts(launcher, taskContainer)
@@ -148,11 +159,12 @@ class DesktopSystemShortcutTest {
                 isDockable = false
             }
         val taskContainer =
-            taskView.TaskIdAttributeContainer(
+            taskView.TaskContainer(
                 task,
-                null,
-                null,
-                SplitConfigurationOptions.STAGE_POSITION_UNDEFINED
+                thumbnailView,
+                iconView,
+                SplitConfigurationOptions.STAGE_POSITION_UNDEFINED,
+                null
             )
 
         val shortcuts = factory.getShortcuts(launcher, taskContainer)
@@ -168,11 +180,12 @@ class DesktopSystemShortcutTest {
                 isDockable = true
             }
         val taskContainer =
-            taskView.TaskIdAttributeContainer(
+            taskView.TaskContainer(
                 task,
-                null,
-                null,
-                SplitConfigurationOptions.STAGE_POSITION_UNDEFINED
+                thumbnailView,
+                iconView,
+                SplitConfigurationOptions.STAGE_POSITION_UNDEFINED,
+                null
             )
 
         whenever(launcher.getOverviewPanel<LauncherRecentsView>()).thenReturn(recentsView)

@@ -103,7 +103,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
-import com.android.app.viewcapture.SettingsAwareViewCapture;
+import com.android.app.viewcapture.ViewCaptureFactory;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
@@ -194,8 +194,11 @@ import com.android.systemui.unfold.UnfoldTransitionFactory;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
 import com.android.systemui.unfold.config.ResourceUnfoldTransitionConfig;
 import com.android.systemui.unfold.config.UnfoldTransitionConfig;
+import com.android.systemui.unfold.dagger.UnfoldMain;
 import com.android.systemui.unfold.progress.RemoteUnfoldTransitionReceiver;
 import com.android.systemui.unfold.updates.RotationChangeProvider;
+
+import kotlin.Unit;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -398,6 +401,12 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
     }
 
     @Override
+    public void startBinding() {
+        super.startBinding();
+        mHotseatPredictionController.verifyUIUpdateNotPaused();
+    }
+
+    @Override
     protected void onActivityFlagsChanged(int changeBits) {
         if ((changeBits & ACTIVITY_STATE_STARTED) != 0) {
             mDepthController.setActivityStarted(isStarted());
@@ -580,6 +589,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
                         } else {
                             getStateManager().moveToRestState();
                         }
+                        return Unit.INSTANCE;
                     });
                 } else {
                     getStateManager().goToState(NORMAL);
@@ -662,7 +672,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
         addMultiWindowModeChangedListener(mDepthController);
         initUnfoldTransitionProgressProvider();
         if (FeatureFlags.CONTINUOUS_VIEW_TREE_CAPTURE.get()) {
-            mViewCapture = SettingsAwareViewCapture.getInstance(this).startCapture(getWindow());
+            mViewCapture = ViewCaptureFactory.getInstance(this).startCapture(getWindow());
         }
         getWindow().addPrivateFlags(PRIVATE_FLAG_OPTIMIZE_MEASURE);
         QuickstepOnboardingPrefs.setup(this);
@@ -1038,6 +1048,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
                         getMainExecutor(),
                         getMainThreadHandler(),
                         /* backgroundExecutor= */ UI_HELPER_EXECUTOR,
+                        /* bgHandler= */ UI_HELPER_EXECUTOR.getHandler(),
                         /* tracingTagPrefix= */ "launcher",
                         getSystemService(DisplayManager.class)
                 );
@@ -1057,7 +1068,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
     }
 
     private void initUnfoldAnimationController(UnfoldTransitionProgressProvider progressProvider,
-            RotationChangeProvider rotationChangeProvider) {
+            @UnfoldMain RotationChangeProvider rotationChangeProvider) {
         mLauncherUnfoldAnimationController = new LauncherUnfoldAnimationController(
                 /* launcher= */ this,
                 getWindowManager(),
@@ -1470,5 +1481,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
             }
         }
         return super.onCreateView(parent, name, context, attrs);
+    }
+
+    @Override
+    public boolean isRecentsViewVisible() {
+        return getStateManager().getState().isRecentsViewVisible;
     }
 }

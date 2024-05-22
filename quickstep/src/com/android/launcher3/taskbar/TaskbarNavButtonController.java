@@ -44,13 +44,12 @@ import androidx.annotation.StringRes;
 
 import com.android.launcher3.R;
 import com.android.launcher3.logging.StatsLogManager;
-import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
-import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.util.AssistUtils;
+import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -66,7 +65,7 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
     /** Allow some time in between the long press for back and recents. */
     static final int SCREEN_PIN_LONG_PRESS_THRESHOLD = 200;
     static final int SCREEN_PIN_LONG_PRESS_RESET = SCREEN_PIN_LONG_PRESS_THRESHOLD + 100;
-    private static final String TAG = TaskbarNavButtonController.class.getSimpleName();
+    private static final String TAG = "TaskbarNavButtonController";
 
     private long mLastScreenPinLongPress;
     private boolean mScreenPinned;
@@ -258,7 +257,7 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
         mLastScreenPinLongPress = 0;
     }
 
-    public void updateSysuiFlags(int sysuiFlags) {
+    public void updateSysuiFlags(@SystemUiStateFlags long sysuiFlags) {
         mScreenPinned = (sysuiFlags & SYSUI_STATE_SCREEN_PINNING) != 0;
     }
 
@@ -284,13 +283,6 @@ public class TaskbarNavButtonController implements TaskbarControllers.LoggableTa
 
     private void navigateHome() {
         TaskUtils.closeSystemWindowsAsync(CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY);
-
-        DesktopVisibilityController desktopVisibilityController =
-                LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
-        if (desktopVisibilityController != null) {
-            desktopVisibilityController.onHomeActionTriggered();
-        }
-
         mCallbacks.onNavigateHome();
     }
 

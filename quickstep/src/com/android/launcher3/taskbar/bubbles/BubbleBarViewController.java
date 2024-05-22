@@ -55,7 +55,7 @@ import java.util.function.Consumer;
  */
 public class BubbleBarViewController {
 
-    private static final String TAG = BubbleBarViewController.class.getSimpleName();
+    private static final String TAG = "BubbleBarViewController";
     private static final float APP_ICON_SMALL_DP = 44f;
     private static final float APP_ICON_MEDIUM_DP = 48f;
     private static final float APP_ICON_LARGE_DP = 52f;
@@ -93,8 +93,6 @@ public class BubbleBarViewController {
     @Nullable
     private BubbleBarBoundsChangeListener mBoundsChangeListener;
 
-    private final Rect mPreviousBubbleBarBounds = new Rect();
-
     public BubbleBarViewController(TaskbarActivityContext activity, BubbleBarView barView) {
         mActivity = activity;
         mBarView = barView;
@@ -122,30 +120,29 @@ public class BubbleBarViewController {
         mBarView.addOnLayoutChangeListener(
                 (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
                     mTaskbarInsetsController.onTaskbarOrBubblebarWindowHeightOrInsetsChanged();
-                    Rect bubbleBarBounds = mBarView.getBubbleBarBounds();
-                    if (!bubbleBarBounds.equals(mPreviousBubbleBarBounds)) {
-                        mPreviousBubbleBarBounds.set(bubbleBarBounds);
-                        if (mBoundsChangeListener != null) {
-                            mBoundsChangeListener.onBoundsChanged(bubbleBarBounds);
-                        }
+                    if (mBoundsChangeListener != null) {
+                        mBoundsChangeListener.onBoundsChanged();
                     }
                 });
 
         mBubbleBarViewAnimator = new BubbleBarViewAnimator(mBarView, mBubbleStashController);
+        mBarView.setController(new BubbleBarView.Controller() {
+            @Override
+            public float getBubbleBarTranslationY() {
+                return mBubbleStashController.getBubbleBarTranslationY();
+            }
+
+            @Override
+            public void onBubbleBarTouchedWhileAnimating() {
+                BubbleBarViewController.this.onBubbleBarTouchedWhileAnimating();
+            }
+        });
     }
 
     private void onBubbleClicked(View v) {
         BubbleBarItem bubble = ((BubbleView) v).getBubble();
         if (bubble == null) {
             Log.e(TAG, "bubble click listener, bubble was null");
-        }
-
-        if (mBarView.isAnimatingNewBubble()) {
-            mBubbleBarViewAnimator.onBubbleClickedWhileAnimating();
-            mBubbleStashController.showBubbleBarImmediate();
-            setExpanded(true);
-            mBubbleBarController.showAndSelectBubble(bubble);
-            return;
         }
 
         final String currentlySelected = mBubbleBarController.getSelectedBubbleKey();
@@ -156,6 +153,11 @@ public class BubbleBarViewController {
         } else {
             mBubbleBarController.showAndSelectBubble(bubble);
         }
+    }
+
+    private void onBubbleBarTouchedWhileAnimating() {
+        mBubbleBarViewAnimator.onBubbleBarTouchedWhileAnimating();
+        mBubbleStashController.onNewBubbleAnimationInterrupted(false, mBarView.getTranslationY());
     }
 
     private void onBubbleBarClicked() {
@@ -169,7 +171,18 @@ public class BubbleBarViewController {
             // Show user education relative to the reference point
             mSystemUiProxy.showUserEducation(position);
         } else {
+            // ensure that the bubble bar has the correct translation. we may have just interrupted
+            // the animation by touching the bubble bar.
+            mBubbleBarTranslationY.animateToValue(mBubbleStashController.getBubbleBarTranslationY())
+                    .start();
             setExpanded(true);
+        }
+    }
+
+    /** Notifies that the stash state is changing. */
+    public void onStashStateChanging() {
+        if (isAnimatingNewBubble()) {
+            mBubbleBarViewAnimator.onStashStateChangingWhileAnimating();
         }
     }
 
@@ -395,17 +408,28 @@ public class BubbleBarViewController {
             b.getView().setOnClickListener(mBubbleClickListener);
             mBubbleDragController.setupBubbleView(b.getView());
 
-            if (suppressAnimation) {
+            if (suppressAnimation || !(b instanceof BubbleBarBubble bubble)) {
                 return;
             }
-
-            boolean isInApp = mTaskbarStashController.isInApp();
-            // only animate the new bubble if we're in an app and not auto expanding
-            if (b instanceof BubbleBarBubble && isInApp && !isExpanding && !isExpanded()) {
-                mBubbleBarViewAnimator.animateBubbleInForStashed((BubbleBarBubble) b);
-            }
+            animateBubbleNotification(bubble, isExpanding);
         } else {
             Log.w(TAG, "addBubble, bubble was null!");
+        }
+    }
+
+    /** Animates the bubble bar to notify the user about a bubble change. */
+    public void animateBubbleNotification(BubbleBarBubble bubble, boolean isExpanding) {
+        boolean isInApp = mTaskbarStashController.isInApp();
+        // if this is the first bubble, animate to the initial state. one bubble is the overflow
+        // so check for at most 2 children.
+        if (mBarView.getChildCount() <= 2) {
+            mBubbleBarViewAnimator.animateToInitialState(bubble, isInApp, isExpanding);
+            return;
+        }
+
+        // only animate the new bubble if we're in an app and not auto expanding
+        if (isInApp && !isExpanding && !isExpanded()) {
+            mBubbleBarViewAnimator.animateBubbleInForStashed(bubble);
         }
     }
 
@@ -467,7 +491,7 @@ public class BubbleBarViewController {
      * that a bubble is being dragged to dismiss.
      * @param bubbleView dragged bubble view
      */
-    public void onDragStart(@NonNull BubbleView bubbleView) {
+    public void onBubbleDragStart(@NonNull BubbleView bubbleView) {
         if (bubbleView.getBubble() == null) return;
 
         mSystemUiProxy.startBubbleDrag(bubbleView.getBubble().getKey());
@@ -476,19 +500,23 @@ public class BubbleBarViewController {
 
     /**
      * Notifies SystemUI to expand the selected bubble when the bubble is released.
-     * @param bubbleView dragged bubble view
      */
-    public void onDragRelease(@NonNull BubbleView bubbleView, BubbleBarLocation location) {
-        if (bubbleView.getBubble() == null) return;
-        // TODO(b/330585402): send new bubble bar bounds to shell for the animation
-        mSystemUiProxy.stopBubbleDrag(bubbleView.getBubble().getKey(), location);
+    public void onBubbleDragRelease(BubbleBarLocation location) {
+        mSystemUiProxy.stopBubbleDrag(location, mBarView.getRestingTopPositionOnScreen());
     }
 
     /**
      * Notifies {@link BubbleBarView} that drag and all animations are finished.
      */
-    public void onDragEnd() {
+    public void onBubbleDragEnd() {
         mBarView.setDraggedBubble(null);
+    }
+
+    /** Notifies that dragging the bubble bar ended. */
+    public void onBubbleBarDragEnd() {
+        // we may have changed the bubble bar translation Y value from the value it had at the
+        // beginning of the drag, so update the translation Y animator state
+        mBubbleBarTranslationY.updateValue(mBarView.getTranslationY());
     }
 
     /**
@@ -498,9 +526,6 @@ public class BubbleBarViewController {
      */
     public PointF getBubbleBarDragReleaseTranslation(PointF initialTranslation,
             BubbleBarLocation location) {
-        if (location == mBarView.getBubbleBarLocation()) {
-            return initialTranslation;
-        }
         return mBarView.getBubbleBarDragReleaseTranslation(initialTranslation, location);
     }
 
@@ -522,7 +547,7 @@ public class BubbleBarViewController {
      * @param bubble dismissed bubble item
      */
     public void onDismissBubbleWhileDragging(@NonNull BubbleBarItem bubble) {
-        mSystemUiProxy.removeBubble(bubble.getKey());
+        mSystemUiProxy.dragBubbleToDismiss(bubble.getKey());
     }
 
     /**
@@ -544,6 +569,6 @@ public class BubbleBarViewController {
      */
     public interface BubbleBarBoundsChangeListener {
         /** Called when bounds have changed */
-        void onBoundsChanged(Rect newBounds);
+        void onBoundsChanged();
     }
 }

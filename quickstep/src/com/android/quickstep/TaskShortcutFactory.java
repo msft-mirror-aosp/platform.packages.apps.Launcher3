@@ -42,10 +42,8 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
 import com.android.launcher3.R;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent;
 import com.android.launcher3.model.WellbeingModel;
-import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.popup.SystemShortcut.AppInfo;
 import com.android.launcher3.util.InstantAppResolver;
@@ -58,14 +56,13 @@ import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskThumbnailViewDeprecated;
 import com.android.quickstep.views.TaskView;
-import com.android.quickstep.views.TaskView.TaskIdAttributeContainer;
+import com.android.quickstep.views.TaskView.TaskContainer;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.view.AppTransitionAnimationSpecCompat;
 import com.android.systemui.shared.recents.view.AppTransitionAnimationSpecsFuture;
 import com.android.systemui.shared.recents.view.RecentsTransition;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
@@ -78,7 +75,7 @@ import java.util.stream.Collectors;
 public interface TaskShortcutFactory {
     @Nullable
     default List<SystemShortcut> getShortcuts(RecentsViewContainer container,
-            TaskIdAttributeContainer taskContainer) {
+            TaskContainer taskContainer) {
         return null;
     }
 
@@ -108,7 +105,7 @@ public interface TaskShortcutFactory {
     TaskShortcutFactory APP_INFO = new TaskShortcutFactory() {
         @Override
         public List<SystemShortcut> getShortcuts(RecentsViewContainer container,
-                TaskIdAttributeContainer taskContainer) {
+                TaskContainer taskContainer) {
             TaskView taskView = taskContainer.getTaskView();
             AppInfo.SplitAccessibilityInfo accessibilityInfo =
                     new AppInfo.SplitAccessibilityInfo(taskView.containsMultipleTasks(),
@@ -176,7 +173,7 @@ public interface TaskShortcutFactory {
         private final LauncherEvent mLauncherEvent;
 
         public FreeformSystemShortcut(int iconRes, int textRes, RecentsViewContainer container,
-                TaskIdAttributeContainer taskContainer, LauncherEvent launcherEvent) {
+                TaskContainer taskContainer, LauncherEvent launcherEvent) {
             super(iconRes, textRes, container, taskContainer.getItemInfo(),
                     taskContainer.getTaskView());
             mLauncherEvent = launcherEvent;
@@ -199,7 +196,7 @@ public interface TaskShortcutFactory {
         }
 
         private void startActivity() {
-            final Task.TaskKey taskKey = mTaskView.getTask().key;
+            final Task.TaskKey taskKey = mTaskView.getFirstTask().key;
             final int taskId = taskKey.id;
             final ActivityOptions options = makeLaunchOptions(mTarget);
             if (options != null) {
@@ -292,7 +289,7 @@ public interface TaskShortcutFactory {
     TaskShortcutFactory SPLIT_SELECT = new TaskShortcutFactory() {
         @Override
         public List<SystemShortcut> getShortcuts(RecentsViewContainer container,
-                TaskIdAttributeContainer taskContainer) {
+                TaskContainer taskContainer) {
             DeviceProfile deviceProfile = container.getDeviceProfile();
             final Task task = taskContainer.getTask();
             final int intentFlags = task.key.baseIntent.getFlags();
@@ -327,7 +324,7 @@ public interface TaskShortcutFactory {
         @Nullable
         @Override
         public List<SystemShortcut> getShortcuts(RecentsViewContainer container,
-                TaskIdAttributeContainer taskContainer) {
+                TaskContainer taskContainer) {
             DeviceProfile deviceProfile = container.getDeviceProfile();
             final TaskView taskView = taskContainer.getTaskView();
             final RecentsView recentsView = taskView.getRecentsView();
@@ -336,24 +333,15 @@ public interface TaskShortcutFactory {
                     recentsView.isTaskInExpectedScrollPosition(recentsView.indexOfChild(taskView));
             boolean shouldShowActionsButtonInstead =
                     isLargeTileFocusedTask && isInExpectedScrollPosition;
-            boolean hasUnpinnableApp = Arrays.stream(taskView.getTaskIdAttributeContainers())
-                    .anyMatch(att -> att != null && att.getItemInfo() != null
-                            && ((att.getItemInfo().runtimeStatusFlags
-                                & ItemInfoWithIcon.FLAG_NOT_PINNABLE) != 0));
 
             // No "save app pair" menu item if:
-            // - app pairs feature is not enabled
             // - we are in 3p launcher
-            // - the task in question is a single task
-            // - at least one app in app pair is unpinnable
             // - the Overview Actions Button should be visible
-            // - the task is not a GroupedTaskView
-            if (!FeatureFlags.enableAppPairs()
-                    || !recentsView.supportsAppPairs()
-                    || !taskView.containsMultipleTasks()
-                    || hasUnpinnableApp
+            // - the task view is not a valid save-able split pair
+            if (!recentsView.supportsAppPairs()
                     || shouldShowActionsButtonInstead
-                    || !(taskView instanceof GroupedTaskView)) {
+                    || !recentsView.getSplitSelectController().getAppPairsController()
+                            .canSaveAppPair(taskView)) {
                 return null;
             }
 
@@ -375,7 +363,7 @@ public interface TaskShortcutFactory {
     TaskShortcutFactory FREE_FORM = new TaskShortcutFactory() {
         @Override
         public List<SystemShortcut> getShortcuts(RecentsViewContainer container,
-                TaskIdAttributeContainer taskContainer) {
+                TaskContainer taskContainer) {
             final Task task = taskContainer.getTask();
             if (!task.isDockable) {
                 return null;
@@ -401,7 +389,7 @@ public interface TaskShortcutFactory {
     TaskShortcutFactory PIN = new TaskShortcutFactory() {
         @Override
         public List<SystemShortcut> getShortcuts(RecentsViewContainer container,
-                TaskIdAttributeContainer taskContainer) {
+                TaskContainer taskContainer) {
             if (!SystemUiProxy.INSTANCE.get(container.asContext()).isActive()) {
                 return null;
             }
@@ -423,7 +411,7 @@ public interface TaskShortcutFactory {
         private final TaskView mTaskView;
 
         public PinSystemShortcut(RecentsViewContainer target,
-                TaskIdAttributeContainer taskContainer) {
+                TaskContainer taskContainer) {
             super(R.drawable.ic_pin, R.string.recent_task_option_pin, target,
                     taskContainer.getItemInfo(), taskContainer.getTaskView());
             mTaskView = taskContainer.getTaskView();
@@ -433,7 +421,7 @@ public interface TaskShortcutFactory {
         public void onClick(View view) {
             if (mTaskView.launchTaskAnimated() != null) {
                 SystemUiProxy.INSTANCE.get(mTarget.asContext()).startScreenPinning(
-                        mTaskView.getTask().key.id);
+                        mTaskView.getFirstTask().key.id);
             }
             dismissTaskMenuView();
             mTarget.getStatsLogManager().logger().withItemInfo(mTaskView.getItemInfo())
@@ -444,7 +432,7 @@ public interface TaskShortcutFactory {
     TaskShortcutFactory INSTALL = new TaskShortcutFactory() {
         @Override
         public List<SystemShortcut> getShortcuts(RecentsViewContainer container,
-                TaskIdAttributeContainer taskContainer) {
+                TaskContainer taskContainer) {
             Task t = taskContainer.getTask();
             return InstantAppResolver.newInstance(container.asContext()).isInstantApp(
                     t.getTopComponent().getPackageName(), t.getKey().userId)
@@ -457,7 +445,7 @@ public interface TaskShortcutFactory {
     TaskShortcutFactory WELLBEING = new TaskShortcutFactory() {
         @Override
         public List<SystemShortcut> getShortcuts(RecentsViewContainer container,
-                TaskIdAttributeContainer taskContainer) {
+                TaskContainer taskContainer) {
             SystemShortcut<ActivityContext> wellbeingShortcut =
                     WellbeingModel.SHORTCUT_FACTORY.getShortcut(container,
                             taskContainer.getItemInfo(), taskContainer.getTaskView());
@@ -468,13 +456,12 @@ public interface TaskShortcutFactory {
     TaskShortcutFactory SCREENSHOT = new TaskShortcutFactory() {
         @Override
         public List<SystemShortcut> getShortcuts(RecentsViewContainer container,
-                TaskIdAttributeContainer taskContainer) {
+                TaskContainer taskContainer) {
             boolean isTablet = container.getDeviceProfile().isTablet;
             boolean isGridOnlyOverview = isTablet && Flags.enableGridOnlyOverview();
             // Extra conditions if it's not grid-only overview
             if (!isGridOnlyOverview) {
-                RecentsOrientedState orientedState =
-                        taskContainer.getTaskView().getRecentsView().getPagedViewOrientedState();
+                RecentsOrientedState orientedState = taskContainer.getTaskView().getOrientedState();
                 boolean isFakeLandscape = !orientedState.isRecentsActivityRotationAllowed()
                         && orientedState.getTouchRotation() != ROTATION_0;
                 if (!isFakeLandscape) {
@@ -498,13 +485,12 @@ public interface TaskShortcutFactory {
     TaskShortcutFactory MODAL = new TaskShortcutFactory() {
         @Override
         public List<SystemShortcut> getShortcuts(RecentsViewContainer container,
-                TaskIdAttributeContainer taskContainer) {
+                TaskContainer taskContainer) {
             boolean isTablet = container.getDeviceProfile().isTablet;
             boolean isGridOnlyOverview = isTablet && Flags.enableGridOnlyOverview();
             // Extra conditions if it's not grid-only overview
             if (!isGridOnlyOverview) {
-                RecentsOrientedState orientedState =
-                        taskContainer.getTaskView().getRecentsView().getPagedViewOrientedState();
+                RecentsOrientedState orientedState = taskContainer.getTaskView().getOrientedState();
                 boolean isFakeLandscape = !orientedState.isRecentsActivityRotationAllowed()
                         && orientedState.getTouchRotation() != ROTATION_0;
                 if (!isFakeLandscape) {

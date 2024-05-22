@@ -43,6 +43,7 @@ import androidx.dynamicanimation.animation.SpringForce;
 
 import com.android.launcher3.R;
 import com.android.launcher3.anim.SpringAnimationBuilder;
+import com.android.launcher3.util.DisplayController;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 
 import java.util.List;
@@ -76,7 +77,7 @@ import java.util.function.Consumer;
  */
 public class BubbleBarView extends FrameLayout {
 
-    private static final String TAG = BubbleBarView.class.getSimpleName();
+    private static final String TAG = "BubbleBarView";
 
     // TODO: (b/273594744) calculate the amount of space we have and base the max on that
     //  if it's smaller than 5.
@@ -96,23 +97,6 @@ public class BubbleBarView extends FrameLayout {
     private static final float FADE_IN_ANIM_POSITION_SPRING_STIFFNESS = 400f;
     // During fade in animation we shift the bubble bar 1/60th of the screen width
     private static final float FADE_IN_ANIM_POSITION_SHIFT = 1 / 60f;
-
-    /**
-     * Custom property to set translationX value for the bar view while a bubble is being dragged.
-     * Skips applying translation to the dragged bubble.
-     */
-    private static final FloatProperty<BubbleBarView> BUBBLE_DRAG_TRANSLATION_X =
-            new FloatProperty<>("bubbleDragTranslationX") {
-                @Override
-                public void setValue(BubbleBarView bubbleBarView, float translationX) {
-                    bubbleBarView.setTranslationXDuringBubbleDrag(translationX);
-                }
-
-                @Override
-                public Float get(BubbleBarView bubbleBarView) {
-                    return bubbleBarView.mTranslationXDuringDrag;
-                }
-            };
 
     /**
      * Custom property to set alpha value for the bar view while a bubble is being dragged.
@@ -189,8 +173,9 @@ public class BubbleBarView extends FrameLayout {
 
     @Nullable
     private BubbleView mDraggedBubbleView;
-    private float mTranslationXDuringDrag = 0f;
-    private float mAlphaDuringDrag = 0f;
+    private float mAlphaDuringDrag = 1f;
+
+    private Controller mController;
 
     private int mPreviousLayoutDirection = LayoutDirection.UNDEFINED;
 
@@ -264,6 +249,17 @@ public class BubbleBarView extends FrameLayout {
         });
     }
 
+    @Override
+    public void setTranslationX(float translationX) {
+        super.setTranslationX(translationX);
+        if (mDraggedBubbleView != null) {
+            // Apply reverse of the translation as an offset to the dragged view. This ensures
+            // that the dragged bubble stays at the current location on the screen and its
+            // position is not affected by the parent translation.
+            mDraggedBubbleView.setOffsetX(-translationX);
+        }
+    }
+
     /**
      * Sets new icon size and spacing between icons and bubble bar borders.
      *
@@ -322,11 +318,9 @@ public class BubbleBarView extends FrameLayout {
         final boolean onLeft = mBubbleBarLocation.isOnLeft(isLayoutRtl());
         mBubbleBarBackground.setAnchorLeft(onLeft);
         mRelativePivotX = onLeft ? 0f : 1f;
-        if (getLayoutParams() instanceof LayoutParams lp) {
-            lp.gravity = Gravity.BOTTOM | (onLeft ? Gravity.LEFT : Gravity.RIGHT);
-            setLayoutParams(lp);
-        }
-        invalidate();
+        LayoutParams lp = (LayoutParams) getLayoutParams();
+        lp.gravity = Gravity.BOTTOM | (onLeft ? Gravity.LEFT : Gravity.RIGHT);
+        setLayoutParams(lp); // triggers a relayout
     }
 
     /**
@@ -340,11 +334,6 @@ public class BubbleBarView extends FrameLayout {
      * Update {@link BubbleBarLocation}
      */
     public void setBubbleBarLocation(BubbleBarLocation bubbleBarLocation) {
-        if (mBubbleBarLocationAnimator != null) {
-            mBubbleBarLocationAnimator.removeAllListeners();
-            mBubbleBarLocationAnimator.cancel();
-            mBubbleBarLocationAnimator = null;
-        }
         resetDragAnimation();
         if (bubbleBarLocation != mBubbleBarLocation) {
             mBubbleBarLocation = bubbleBarLocation;
@@ -361,6 +350,10 @@ public class BubbleBarView extends FrameLayout {
         }
         mDragging = dragging;
         setElevation(dragging ? mDragElevation : mBubbleElevation);
+        if (!mDragging) {
+            // Relayout after dragging to ensure that the dragged bubble is positioned correctly
+            requestLayout();
+        }
     }
 
     /**
@@ -376,22 +369,23 @@ public class BubbleBarView extends FrameLayout {
      */
     public PointF getBubbleBarDragReleaseTranslation(PointF initialTranslation,
             BubbleBarLocation location) {
-        // Start with the initial translation. Value on y-axis can be reused.
-        final PointF dragEndTranslation = new PointF(initialTranslation);
-        // Bubble bar is laid out on left or right side of the screen. And the desired new
-        // location is on the other side. Calculate x translation value required to shift
-        // bubble bar from one side to the other.
-        final float shift = getDistanceFromOtherSide();
-        if (location.isOnLeft(isLayoutRtl())) {
-            // New location is on the left, shift left
-            // before -> |......ooo.| after -> |.ooo......|
-            dragEndTranslation.x = -shift;
-        } else {
-            // New location is on the right, shift right
-            // before -> |.ooo......| after -> |......ooo.|
-            dragEndTranslation.x = shift;
+        float dragEndTranslationX = initialTranslation.x;
+        if (getBubbleBarLocation().isOnLeft(isLayoutRtl()) != location.isOnLeft(isLayoutRtl())) {
+            // Bubble bar is laid out on left or right side of the screen. And the desired new
+            // location is on the other side. Calculate x translation value required to shift
+            // bubble bar from one side to the other.
+            final float shift = getDistanceFromOtherSide();
+            if (location.isOnLeft(isLayoutRtl())) {
+                // New location is on the left, shift left
+                // before -> |......ooo.| after -> |.ooo......|
+                dragEndTranslationX = -shift;
+            } else {
+                // New location is on the right, shift right
+                // before -> |.ooo......| after -> |......ooo.|
+                dragEndTranslationX = shift;
+            }
         }
-        return dragEndTranslation;
+        return new PointF(dragEndTranslationX, mController.getBubbleBarTranslationY());
     }
 
     /**
@@ -401,21 +395,24 @@ public class BubbleBarView extends FrameLayout {
      * from the internal location that was used during bubble bar layout, translation values are
      * calculated to position the bar at the desired location.
      *
-     * @param initialTranslation initial bubble bar translation at the start of drag
+     * @param initialTranslation initial bubble translation inside the bar at the start of drag
      * @param location           desired location of the bubble bar when drag is released
      * @return point with x and y values representing translation on x and y-axis
      */
     public PointF getDraggedBubbleReleaseTranslation(PointF initialTranslation,
             BubbleBarLocation location) {
-        // Start with bubble bar translation
-        final PointF dragEndTranslation = new PointF(
-                getBubbleBarDragReleaseTranslation(initialTranslation, location));
-        // Apply individual bubble translation, as the order may have changed
-        int viewIndex = indexOfChild(mDraggedBubbleView);
-        dragEndTranslation.x += getExpandedBubbleTranslationX(viewIndex,
-                getChildCount(),
-                location.isOnLeft(isLayoutRtl()));
-        return dragEndTranslation;
+        float dragEndTranslationX = initialTranslation.x;
+        boolean newLocationOnLeft = location.isOnLeft(isLayoutRtl());
+        if (getBubbleBarLocation().isOnLeft(isLayoutRtl()) != newLocationOnLeft) {
+            // Calculate translationX based on bar and bubble translations
+            float bubbleBarTx = getBubbleBarDragReleaseTranslation(initialTranslation, location).x;
+            float bubbleTx =
+                    getExpandedBubbleTranslationX(
+                            indexOfChild(mDraggedBubbleView), getChildCount(), newLocationOnLeft);
+            dragEndTranslationX = bubbleBarTx + bubbleTx;
+        }
+        // translationY does not change during drag and can be reused
+        return new PointF(dragEndTranslationX, initialTranslation.y);
     }
 
     private float getDistanceFromOtherSide() {
@@ -459,14 +456,13 @@ public class BubbleBarView extends FrameLayout {
     }
 
     private Animator getLocationUpdateFadeOutAnimator(BubbleBarLocation newLocation) {
-        final FloatProperty<? super BubbleBarView> txProp = getLocationAnimTranslationXProperty();
         final float shift =
                 getResources().getDisplayMetrics().widthPixels * FADE_OUT_ANIM_POSITION_SHIFT;
         final boolean onLeft = newLocation.isOnLeft(isLayoutRtl());
-        final float tx = txProp.get(this) + (onLeft ? -shift : shift);
+        final float tx = getTranslationX() + (onLeft ? -shift : shift);
 
-        ObjectAnimator positionAnim = ObjectAnimator.ofFloat(this, txProp, tx).setDuration(
-                FADE_OUT_ANIM_POSITION_DURATION_MS);
+        ObjectAnimator positionAnim = ObjectAnimator.ofFloat(this, VIEW_TRANSLATE_X, tx)
+                .setDuration(FADE_OUT_ANIM_POSITION_DURATION_MS);
         positionAnim.setInterpolator(EMPHASIZED_ACCELERATE);
 
         ObjectAnimator alphaAnim = ObjectAnimator.ofFloat(this, getLocationAnimAlphaProperty(), 0f)
@@ -505,7 +501,7 @@ public class BubbleBarView extends FrameLayout {
                 .setEndValue(finalTx)
                 .setDampingRatio(SpringForce.DAMPING_RATIO_LOW_BOUNCY)
                 .setStiffness(FADE_IN_ANIM_POSITION_SPRING_STIFFNESS)
-                .build(this, getLocationAnimTranslationXProperty());
+                .build(this, VIEW_TRANSLATE_X);
 
         ObjectAnimator alphaAnim = ObjectAnimator.ofFloat(this, getLocationAnimAlphaProperty(), 1f)
                 .setDuration(FADE_IN_ANIM_ALPHA_DURATION_MS);
@@ -516,46 +512,12 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /**
-     * Get property that can be used to animate the translation-x value for the bar.
-     * When a bubble is being dragged, uses {@link #BUBBLE_DRAG_TRANSLATION_X}.
-     * Falls back to {@link com.android.launcher3.LauncherAnimUtils#VIEW_TRANSLATE_X} otherwise.
-     */
-    private FloatProperty<? super BubbleBarView> getLocationAnimTranslationXProperty() {
-        return mDraggedBubbleView == null ? VIEW_TRANSLATE_X : BUBBLE_DRAG_TRANSLATION_X;
-    }
-
-    /**
      * Get property that can be used to animate the alpha value for the bar.
      * When a bubble is being dragged, uses {@link #BUBBLE_DRAG_ALPHA}.
      * Falls back to {@link com.android.launcher3.LauncherAnimUtils#VIEW_ALPHA} otherwise.
      */
     private FloatProperty<? super BubbleBarView> getLocationAnimAlphaProperty() {
         return mDraggedBubbleView == null ? VIEW_ALPHA : BUBBLE_DRAG_ALPHA;
-    }
-
-    /**
-     * Set translation-x value for the bar while a bubble is being dragged.
-     * We can not update translation on the bar directly because the dragged bubble would be
-     * affected as well. As it is a child view.
-     * Instead, while a bubble is being dragged, set translation on each child view, that is not the
-     * dragged view. And set a translation on the background.
-     * This allows for the dragged bubble view to remain in position while the bar moves during
-     * animation.
-     */
-    private void setTranslationXDuringBubbleDrag(float translationX) {
-        mTranslationXDuringDrag = translationX;
-        final int childCount = getChildCount();
-        for (int i = 0; i < childCount; i++) {
-            BubbleView view = (BubbleView) getChildAt(i);
-            if (view != mDraggedBubbleView) {
-                view.setBubbleBarTranslationX(translationX);
-            }
-        }
-        if (mBubbleBarBackground != null) {
-            mTempBackgroundBounds.set(mBubbleBarBackground.getBounds());
-            mTempBackgroundBounds.offsetTo((int) translationX, 0);
-            mBubbleBarBackground.setBounds(mTempBackgroundBounds);
-        }
     }
 
     /**
@@ -587,10 +549,18 @@ public class BubbleBarView extends FrameLayout {
             mBubbleBarLocationAnimator.cancel();
             mBubbleBarLocationAnimator = null;
         }
-        setTranslationXDuringBubbleDrag(0f);
         setAlphaDuringBubbleDrag(1f);
         setTranslationX(0f);
         setAlpha(1f);
+    }
+
+    /**
+     * Get bubble bar top coordinate on screen when bar is resting
+     */
+    public int getRestingTopPositionOnScreen() {
+        int displayHeight = DisplayController.INSTANCE.get(getContext()).getInfo().currentSize.y;
+        int bubbleBarHeight = getBubbleBarBounds().height();
+        return displayHeight - bubbleBarHeight + (int) mController.getBubbleBarTranslationY();
     }
 
     /**
@@ -706,6 +676,10 @@ public class BubbleBarView extends FrameLayout {
                 // Skip the dragged bubble. Its translation is managed by the drag controller.
                 continue;
             }
+            // Clear out drag translation and offset
+            bv.setDragTranslationX(0f);
+            bv.setOffsetX(0f);
+
             bv.setTranslationY(ty);
 
             // the position of the bubble when the bar is fully expanded
@@ -833,6 +807,10 @@ public class BubbleBarView extends FrameLayout {
         mUpdateSelectedBubbleAfterCollapse = updateSelectedBubbleAfterCollapse;
     }
 
+    void setController(Controller controller) {
+        mController = controller;
+    }
+
     /**
      * Sets which bubble view should be shown as selected.
      */
@@ -851,10 +829,6 @@ public class BubbleBarView extends FrameLayout {
     public void setDraggedBubble(@Nullable BubbleView view) {
         if (mDraggedBubbleView != null) {
             mDraggedBubbleView.setZ(0);
-            if (view == null) {
-                // We are clearing the dragged bubble, reset drag
-                resetDragAnimation();
-            }
         }
         mDraggedBubbleView = view;
         if (view != null) {
@@ -1009,7 +983,10 @@ public class BubbleBarView extends FrameLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (!mIsBarExpanded && !mIsAnimatingNewBubble) {
+        if (mIsAnimatingNewBubble) {
+            mController.onBubbleBarTouchedWhileAnimating();
+        }
+        if (!mIsBarExpanded) {
             // When the bar is collapsed, all taps on it should expand it.
             return true;
         }
@@ -1019,5 +996,15 @@ public class BubbleBarView extends FrameLayout {
     /** Whether a new bubble is currently animating. */
     public boolean isAnimatingNewBubble() {
         return mIsAnimatingNewBubble;
+    }
+
+    /** Interface for BubbleBarView to communicate with its controller. */
+    interface Controller {
+
+        /** Returns the translation Y that the bubble bar should have. */
+        float getBubbleBarTranslationY();
+
+        /** Notifies the controller that the bubble bar was touched while it was animating. */
+        void onBubbleBarTouchedWhileAnimating();
     }
 }

@@ -61,15 +61,6 @@ public final class FeatureFlags {
      * and set a default value for the flag. This will be the default value on Debug builds.
      * <p>
      */
-    // TODO(Block 1): Clean up flags
-    public static final BooleanFlag ENABLE_SEARCH_RESULT_BACKGROUND_DRAWABLES = getReleaseFlag(
-            270394041, "ENABLE_SEARCH_RESULT_BACKGROUND_DRAWABLES", ENABLED,
-            "Enable option to replace decorator-based search result backgrounds with drawables");
-
-    public static final BooleanFlag ENABLE_SEARCH_RESULT_LAUNCH_TRANSITION = getReleaseFlag(
-            270394392, "ENABLE_SEARCH_RESULT_LAUNCH_TRANSITION", ENABLED,
-            "Enable option to launch search results using the new view container transitions");
-
     // TODO(Block 2): Clean up flags
     public static final BooleanFlag ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH = getDebugFlag(270395073,
             "ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH", DISABLED,
@@ -202,9 +193,6 @@ public final class FeatureFlags {
     public static final BooleanFlag ENABLE_EXPANDING_PAUSE_WORK_BUTTON = getDebugFlag(270390779,
             "ENABLE_EXPANDING_PAUSE_WORK_BUTTON", DISABLED,
             "Expand and collapse pause work button while scrolling");
-
-    public static final BooleanFlag COLLECT_SEARCH_HISTORY = getReleaseFlag(270391455,
-            "COLLECT_SEARCH_HISTORY", DISABLED, "Allow launcher to collect search history for log");
 
     // Aconfig migration complete for ENABLE_TWOLINE_ALLAPPS.
     public static final BooleanFlag ENABLE_TWOLINE_ALLAPPS = getDebugFlag(270390937,

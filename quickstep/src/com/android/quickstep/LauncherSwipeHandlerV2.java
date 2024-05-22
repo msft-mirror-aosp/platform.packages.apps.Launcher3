@@ -304,9 +304,7 @@ public class LauncherSwipeHandlerV2 extends
             // Disable if swiping to PIP
             return null;
         }
-        if (sourceTaskView == null
-                || sourceTaskView.getTask() == null
-                || sourceTaskView.getTask().key.getComponent() == null) {
+        if (sourceTaskView == null || sourceTaskView.getFirstTask().key.getComponent() == null) {
             // Disable if it's an invalid task
             return null;
         }
@@ -323,8 +321,8 @@ public class LauncherSwipeHandlerV2 extends
         }
 
         return mContainer.getFirstMatchForAppClose(launchCookieItemId,
-                sourceTaskView.getTask().key.getComponent().getPackageName(),
-                UserHandle.of(sourceTaskView.getTask().key.userId),
+                sourceTaskView.getFirstTask().key.getComponent().getPackageName(),
+                UserHandle.of(sourceTaskView.getFirstTask().key.userId),
                 false /* supportsAllAppsState */);
     }
 

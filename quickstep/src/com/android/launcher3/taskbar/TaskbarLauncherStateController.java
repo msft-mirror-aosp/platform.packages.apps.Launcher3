@@ -54,6 +54,7 @@ import com.android.quickstep.RecentsAnimationController;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.animation.ViewRootSync;
 import com.android.systemui.shared.recents.model.ThumbnailData;
+import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 
 import java.io.PrintWriter;
 import java.util.HashMap;
@@ -65,7 +66,7 @@ import java.util.StringJoiner;
  */
 public class TaskbarLauncherStateController {
 
-    private static final String TAG = TaskbarLauncherStateController.class.getSimpleName();
+    private static final String TAG = "TaskbarLauncherStateController";
     private static final boolean DEBUG = false;
 
     /** Launcher activity is visible and focused. */
@@ -226,7 +227,7 @@ public class TaskbarLauncherStateController {
 
     /** Initializes the controller instance, and applies the initial state immediately. */
     public void init(TaskbarControllers controllers, QuickstepLauncher launcher,
-            int sysuiStateFlags) {
+            @SystemUiStateFlags long sysuiStateFlags) {
         mCanSyncViews = false;
 
         mControllers = controllers;
@@ -325,11 +326,12 @@ public class TaskbarLauncherStateController {
     }
 
     /** SysUI flags updated, see QuickStepContract.SYSUI_STATE_* values. */
-    public void updateStateForSysuiFlags(int systemUiStateFlags) {
+    public void updateStateForSysuiFlags(@SystemUiStateFlags long systemUiStateFlags) {
         updateStateForSysuiFlags(systemUiStateFlags, /* applyState */ true);
     }
 
-    private void updateStateForSysuiFlags(int systemUiStateFlags, boolean applyState) {
+    private void updateStateForSysuiFlags(@SystemUiStateFlags long systemUiStateFlags,
+            boolean applyState) {
         final boolean prevIsAwake = hasAnyFlag(FLAG_AWAKE);
         final boolean currIsAwake = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_AWAKE);
 
@@ -389,11 +391,11 @@ public class TaskbarLauncherStateController {
         }
     }
 
-    private boolean hasAnyFlag(int flagMask) {
+    private boolean hasAnyFlag(long flagMask) {
         return hasAnyFlag(mState, flagMask);
     }
 
-    private boolean hasAnyFlag(int flags, int flagMask) {
+    private boolean hasAnyFlag(long flags, long flagMask) {
         return (flags & flagMask) != 0;
     }
 
@@ -667,7 +669,7 @@ public class TaskbarLauncherStateController {
     }
 
     boolean isInOverviewUi() {
-        return mLauncherState.overviewUi;
+        return mLauncherState.isRecentsViewVisible;
     }
 
     private void playStateTransitionAnim(AnimatorSet animatorSet, long duration,

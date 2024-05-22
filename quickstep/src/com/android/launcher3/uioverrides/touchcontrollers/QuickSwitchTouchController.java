@@ -84,7 +84,7 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
 
     @Override
     protected LauncherState getTargetState(LauncherState fromState, boolean isDragTowardPositive) {
-        int stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();
+        long stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();
         if ((stateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0) {
             return NORMAL;
         }
@@ -151,7 +151,7 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
             int sysuiFlags = 0;
             TaskView tv = mOverviewPanel.getTaskViewAt(0);
             if (tv != null) {
-                sysuiFlags = tv.getThumbnail().getSysUiStatusNavFlags();
+                sysuiFlags = tv.getFirstThumbnailView().getSysUiStatusNavFlags();
             }
             mLauncher.getSystemUiController().updateUiState(UI_STATE_FULLSCREEN_TASK, sysuiFlags);
         } else {

@@ -53,6 +53,8 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SystemUiController;
 import com.android.launcher3.util.SystemUiController.SystemUiControllerFlags;
+import com.android.launcher3.util.ViewPool;
+import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskOverlayFactory.TaskOverlay;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 import com.android.quickstep.views.TaskView.FullscreenDrawParams;
@@ -66,7 +68,7 @@ import com.android.systemui.shared.recents.utilities.PreviewPositionHelper;
  * @deprecated This class will be replaced by the new [TaskThumbnailView].
  */
 @Deprecated
-public class TaskThumbnailViewDeprecated extends View {
+public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusable {
     private static final MainThreadInitializedObject<FullscreenDrawParams> TEMP_PARAMS =
             new MainThreadInitializedObject<>(FullscreenDrawParams::new);
 
@@ -127,6 +129,7 @@ public class TaskThumbnailViewDeprecated extends View {
             };
 
     private final RecentsViewContainer mContainer;
+    private TaskOverlayFactory mTaskOverlayFactory;
     @Nullable
     private TaskOverlay mOverlay;
     private final Paint mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -187,7 +190,8 @@ public class TaskThumbnailViewDeprecated extends View {
     /**
      * Updates the thumbnail to draw the provided task
      */
-    public void bind(Task task) {
+    public void bind(Task task, TaskOverlayFactory taskOverlayFactory) {
+        mTaskOverlayFactory = taskOverlayFactory;
         getTaskOverlay().reset();
         mTask = task;
         int color = task == null ? Color.BLACK : task.colorBackground | 0xFF000000;
@@ -195,6 +199,17 @@ public class TaskThumbnailViewDeprecated extends View {
         mBackgroundPaint.setColor(color);
         mSplashBackgroundPaint.setColor(color);
         updateSplashView(mTask.icon);
+    }
+
+    /**
+     * Sets TaskOverlayFactory without binding a task.
+     *
+     * @deprecated Should only be used when using new
+     * {@link com.android.quickstep.task.thumbnail.TaskThumbnailView}.
+     */
+    @Deprecated
+    public void setTaskOverlayFactory(TaskOverlayFactory taskOverlayFactory) {
+        mTaskOverlayFactory = taskOverlayFactory;
     }
 
     /**
@@ -211,8 +226,8 @@ public class TaskThumbnailViewDeprecated extends View {
             boolean refreshNow) {
         mTask = task;
         boolean thumbnailWasNull = mThumbnailData == null;
-        mThumbnailData =
-                (thumbnailData != null && thumbnailData.thumbnail != null) ? thumbnailData : null;
+        mThumbnailData = (thumbnailData != null && thumbnailData.getThumbnail() != null)
+                ? thumbnailData : null;
         if (mTask != null) {
             updateSplashView(mTask.icon);
         }
@@ -237,8 +252,8 @@ public class TaskThumbnailViewDeprecated extends View {
      * @param shouldRefreshOverlay whether to re-initialize overlay
      */
     private void refresh(boolean shouldRefreshOverlay) {
-        if (mThumbnailData != null && mThumbnailData.thumbnail != null) {
-            Bitmap bm = mThumbnailData.thumbnail;
+        if (mThumbnailData != null && mThumbnailData.getThumbnail() != null) {
+            Bitmap bm = mThumbnailData.getThumbnail();
             bm.prepareToDraw();
             mBitmapShader = new BitmapShader(bm, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
             mPaint.setShader(mBitmapShader);
@@ -280,7 +295,7 @@ public class TaskThumbnailViewDeprecated extends View {
 
     public TaskOverlay getTaskOverlay() {
         if (mOverlay == null) {
-            mOverlay = getTaskView().getRecentsView().getTaskOverlayFactory().createOverlay(this);
+            mOverlay = mTaskOverlayFactory.createOverlay(this);
         }
         return mOverlay;
     }
@@ -302,8 +317,10 @@ public class TaskThumbnailViewDeprecated extends View {
         }
 
         RectF bitmapRect = new RectF(
-                0, 0,
-                mThumbnailData.thumbnail.getWidth(), mThumbnailData.thumbnail.getHeight());
+                0,
+                0,
+                mThumbnailData.getThumbnail().getWidth(),
+                mThumbnailData.getThumbnail().getHeight());
         RectF viewRect = new RectF(0, 0, getMeasuredWidth(), getMeasuredHeight());
 
         // The position helper matrix tells us how to transform the bitmap to fit the view, the
@@ -347,7 +364,7 @@ public class TaskThumbnailViewDeprecated extends View {
         canvas.save();
         // Draw the insets if we're being drawn fullscreen (we do this for quick switch).
         drawOnCanvas(canvas, 0, 0, getMeasuredWidth(), getMeasuredHeight(),
-                mFullscreenParams.mCurrentDrawnCornerRadius);
+                mFullscreenParams.getCurrentDrawnCornerRadius());
         canvas.restore();
     }
 
@@ -363,7 +380,8 @@ public class TaskThumbnailViewDeprecated extends View {
 
     public void drawOnCanvas(Canvas canvas, float x, float y, float width, float height,
             float cornerRadius) {
-        if (mTask != null && getTaskView().isRunningTask() && !getTaskView().showScreenshot()) {
+        if (mTask != null && getTaskView().isRunningTask()
+                && !getTaskView().getShouldShowScreenshot()) {
             canvas.drawRoundRect(x, y, width, height, cornerRadius, cornerRadius, mClearPaint);
             canvas.drawRoundRect(x, y, width, height, cornerRadius, cornerRadius,
                     mDimmingPaintAfterClearing);
@@ -501,13 +519,13 @@ public class TaskThumbnailViewDeprecated extends View {
     }
 
     private boolean isThumbnailAspectRatioDifferentFromThumbnailData() {
-        if (mThumbnailData == null || mThumbnailData.thumbnail == null) {
+        if (mThumbnailData == null || mThumbnailData.getThumbnail() == null) {
             return false;
         }
 
         float thumbnailViewAspect = getWidth() / (float) getHeight();
-        float thumbnailDataAspect =
-                mThumbnailData.thumbnail.getWidth() / (float) mThumbnailData.thumbnail.getHeight();
+        float thumbnailDataAspect = mThumbnailData.getThumbnail().getWidth()
+                / (float) mThumbnailData.getThumbnail().getHeight();
 
         return isRelativePercentDifferenceGreaterThan(thumbnailViewAspect,
                 thumbnailDataAspect, MAX_PCT_BEFORE_ASPECT_RATIOS_CONSIDERED_DIFFERENT);
@@ -558,10 +576,9 @@ public class TaskThumbnailViewDeprecated extends View {
         DeviceProfile dp = mContainer.getDeviceProfile();
         mPreviewPositionHelper.setOrientationChanged(false);
         if (mBitmapShader != null && mThumbnailData != null) {
-            mPreviewRect.set(0, 0, mThumbnailData.thumbnail.getWidth(),
-                    mThumbnailData.thumbnail.getHeight());
-            int currentRotation = getTaskView().getRecentsView().getPagedViewOrientedState()
-                    .getRecentsActivityRotation();
+            mPreviewRect.set(0, 0, mThumbnailData.getThumbnail().getWidth(),
+                    mThumbnailData.getThumbnail().getHeight());
+            int currentRotation = getTaskView().getOrientedState().getRecentsActivityRotation();
             boolean isRtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
             mPreviewPositionHelper.updateThumbnailMatrix(mPreviewRect, mThumbnailData,
                     getMeasuredWidth(), getMeasuredHeight(), dp.isTablet, currentRotation, isRtl);
@@ -593,7 +610,7 @@ public class TaskThumbnailViewDeprecated extends View {
         if (mThumbnailData == null) {
             return null;
         }
-        return mThumbnailData.thumbnail;
+        return mThumbnailData.getThumbnail();
     }
 
     /**
@@ -605,5 +622,10 @@ public class TaskThumbnailViewDeprecated extends View {
             return false;
         }
         return mThumbnailData.isRealSnapshot && !mTask.isLocked;
+    }
+
+    @Override
+    public void onRecycle() {
+        // Do nothing
     }
 }

@@ -18,8 +18,6 @@ package com.android.quickstep.views;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.launcher3.Flags.enableOverviewIconMenu;
-import static com.android.launcher3.testing.shared.TestProtocol.TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE;
-import static com.android.launcher3.testing.shared.TestProtocol.testLogD;
 import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.quickstep.views.TaskThumbnailViewDeprecated.DIM_ALPHA;
@@ -56,7 +54,7 @@ import com.android.quickstep.TaskOverlayFactory;
 import com.android.quickstep.TaskUtils;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
 import com.android.quickstep.util.TaskCornerRadius;
-import com.android.quickstep.views.TaskView.TaskIdAttributeContainer;
+import com.android.quickstep.views.TaskView.TaskContainer;
 
 /**
  * Contains options for a recent task when long-pressing its icon.
@@ -76,7 +74,7 @@ public class TaskMenuView extends AbstractFloatingView {
     private ValueAnimator mRevealAnimator;
     @Nullable private Runnable mOnClosingStartCallback;
     private TaskView mTaskView;
-    private TaskIdAttributeContainer mTaskContainer;
+    private TaskContainer mTaskContainer;
     private LinearLayout mOptionLayout;
     private float mMenuTranslationYBeforeOpen;
     private float mMenuTranslationXBeforeOpen;
@@ -163,7 +161,10 @@ public class TaskMenuView extends AbstractFloatingView {
         }
     }
 
-    public static boolean showForTask(TaskIdAttributeContainer taskContainer,
+    /**
+     * Show a task menu for the given taskContainer.
+     */
+    public static boolean showForTask(TaskContainer taskContainer,
             @Nullable Runnable onClosingStartCallback) {
         RecentsViewContainer container = RecentsViewContainer.containerFromContext(
                 taskContainer.getTaskView().getContext());
@@ -173,11 +174,14 @@ public class TaskMenuView extends AbstractFloatingView {
         return taskMenuView.populateAndShowForTask(taskContainer);
     }
 
-    public static boolean showForTask(TaskIdAttributeContainer taskContainer) {
+    /**
+     * Show a task menu for the given taskContainer.
+     */
+    public static boolean showForTask(TaskContainer taskContainer) {
         return showForTask(taskContainer, null);
     }
 
-    private boolean populateAndShowForTask(TaskIdAttributeContainer taskContainer) {
+    private boolean populateAndShowForTask(TaskContainer taskContainer) {
         if (isAttachedToWindow()) {
             return false;
         }
@@ -198,7 +202,7 @@ public class TaskMenuView extends AbstractFloatingView {
         return true;
     }
 
-    private void addMenuOptions(TaskIdAttributeContainer taskContainer) {
+    private void addMenuOptions(TaskContainer taskContainer) {
         if (enableOverviewIconMenu()) {
             removeView(mTaskName);
         } else {
@@ -226,7 +230,7 @@ public class TaskMenuView extends AbstractFloatingView {
         mOptionLayout.addView(menuOptionView);
     }
 
-    private void orientAroundTaskView(TaskIdAttributeContainer taskContainer) {
+    private void orientAroundTaskView(TaskContainer taskContainer) {
         RecentsView recentsView = mContainer.getOverviewPanel();
         RecentsPagedOrientationHandler orientationHandler =
                 recentsView.getPagedOrientationHandler();
@@ -301,7 +305,6 @@ public class TaskMenuView extends AbstractFloatingView {
 
     private void animateOpenOrClosed(boolean closing) {
         if (mOpenCloseAnimator != null && mOpenCloseAnimator.isRunning()) {
-            testLogD(TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE, "getting canceled");
             mOpenCloseAnimator.cancel();
         }
         mOpenCloseAnimator = new AnimatorSet();
@@ -358,14 +361,10 @@ public class TaskMenuView extends AbstractFloatingView {
                     iconAppChip.getMenuTranslationX(),
                     MULTI_PROPERTY_VALUE, closing ? 0 : -additionalTranslationX);
             menuTranslationXAnim.setInterpolator(EMPHASIZED);
-            testLogD(TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE,
-                    "TaskMenuView.java.animateOpenOrClosed: running translation animations");
 
             mOpenCloseAnimator.playTogether(translationYAnim, translationXAnim,
                     menuTranslationXAnim, menuTranslationYAnim);
         }
-        testLogD(TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE,
-                "TaskMenuView.java.animateOpenOrClosed: running animation 2");
         mOpenCloseAnimator.playTogether(mRevealAnimator,
                 ObjectAnimator.ofFloat(
                         mTaskContainer.getThumbnailView(), DIM_ALPHA,
@@ -374,8 +373,6 @@ public class TaskMenuView extends AbstractFloatingView {
         mOpenCloseAnimator.addListener(new AnimationSuccessListener() {
             @Override
             public void onAnimationStart(Animator animation) {
-                testLogD(TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE,
-                        "TaskMenuView.java.animateOpenOrClosed: onAnimationStart");
                 setVisibility(VISIBLE);
                 if (closing && mOnClosingStartCallback != null) {
                     mOnClosingStartCallback.run();
@@ -383,16 +380,7 @@ public class TaskMenuView extends AbstractFloatingView {
             }
 
             @Override
-            public void onAnimationCancel(Animator animation) {
-                super.onAnimationCancel(animation);
-                testLogD(TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE,
-                        "TaskMenuView.java.animateOpenOrClosed: onAnimationCancel");
-            }
-
-            @Override
             public void onAnimationSuccess(Animator animator) {
-                testLogD(TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE,
-                        "TaskMenuView.java.animateOpenOrClosed: onAnimationSuccess");
                 if (closing) {
                     closeComplete();
                 }
@@ -403,7 +391,6 @@ public class TaskMenuView extends AbstractFloatingView {
     }
 
     private void closeComplete() {
-        testLogD(TEST_TAPL_OVERVIEW_ACTIONS_MENU_FAILURE, "TaskMenuView.java.closeComplete");
         mIsOpen = false;
         mContainer.getDragLayer().removeView(this);
         mRevealAnimator = null;

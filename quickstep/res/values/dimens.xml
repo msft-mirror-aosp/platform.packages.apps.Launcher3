@@ -177,6 +177,8 @@
     <dimen name="gesture_tutorial_menu_done_button_top_spacing">0dp</dimen>
     <dimen name="gesture_tutorial_menu_back_shape_bottom_margin">0dp</dimen>
     <dimen name="gesture_tutorial_menu_done_button_spacing">72dp</dimen>
+    <dimen name="gesture_tutorial_done_button_bottom_margin">40dp</dimen>
+    <dimen name="gesture_tutorial_done_button_end_margin">24dp</dimen>
 
     <!-- Gesture Tutorial mock conversations -->
     <dimen name="gesture_tutorial_message_icon_size">44dp</dimen>
@@ -456,8 +458,10 @@
 
     <!-- Bubble bar drop target -->
     <dimen name="bubblebar_drop_target_corner_radius">36dp</dimen>
-    <dimen name="bubble_expanded_view_drop_target_corner_radius">16dp</dimen>
-    <dimen name="bubble_expanded_view_drop_target_width">412dp</dimen>
+    <dimen name="bubble_expanded_view_drop_target_default_width">412dp</dimen>
+    <dimen name="bubble_expanded_view_drop_target_default_height">600dp</dimen>
+    <dimen name="bubble_expanded_view_drop_target_corner_radius">28dp</dimen>
+    <dimen name="bubble_expanded_view_drop_target_padding">24dp</dimen>
     <dimen name="bubble_expanded_view_drop_target_margin">16dp</dimen>
 
     <!-- Launcher splash screen -->
@@ -479,12 +483,5 @@
     <dimen name="keyboard_quick_switch_task_view_radius">16dp</dimen>
     <dimen name="keyboard_quick_switch_no_recent_items_icon_size">24dp</dimen>
     <dimen name="keyboard_quick_switch_no_recent_items_icon_margin">8dp</dimen>
-
-    <!-- Desktop mode -->
-    <dimen name="desktop_mode_floating_app_select_height">56dp</dimen>
-    <dimen name="desktop_mode_floating_app_select_elevation">4dp</dimen>
-    <dimen name="desktop_mode_floating_app_select_margin">16dp</dimen>
-    <dimen name="desktop_mode_floating_app_select_text_size">14sp</dimen>
-    <dimen name="desktop_mode_floating_app_select_text_margin">8dp</dimen>
 
 </resources>

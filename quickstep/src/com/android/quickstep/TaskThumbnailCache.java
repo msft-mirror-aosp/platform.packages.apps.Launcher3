@@ -148,12 +148,12 @@ public class TaskThumbnailCache {
      * @param callback The callback to receive the task after its data has been populated.
      * @return A cancelable handle to the request
      */
-    public CancellableTask updateThumbnailInBackground(
+    public CancellableTask<ThumbnailData> updateThumbnailInBackground(
             Task task, Consumer<ThumbnailData> callback) {
         Preconditions.assertUIThread();
 
         boolean lowResolution = !mHighResLoadingState.isEnabled();
-        if (task.thumbnail != null && task.thumbnail.thumbnail != null
+        if (task.thumbnail != null && task.thumbnail.getThumbnail() != null
                 && (!task.thumbnail.reducedResolution || lowResolution)) {
             // Nothing to load, the thumbnail is already high-resolution or matches what the
             // request, so just callback
@@ -184,12 +184,12 @@ public class TaskThumbnailCache {
         return newSize > oldSize;
     }
 
-    private CancellableTask updateThumbnailInBackground(TaskKey key, boolean lowResolution,
-            Consumer<ThumbnailData> callback) {
+    private CancellableTask<ThumbnailData> updateThumbnailInBackground(TaskKey key,
+            boolean lowResolution, Consumer<ThumbnailData> callback) {
         Preconditions.assertUIThread();
 
         ThumbnailData cachedThumbnail = mCache.getAndInvalidateIfModified(key);
-        if (cachedThumbnail != null &&  cachedThumbnail.thumbnail != null
+        if (cachedThumbnail != null &&  cachedThumbnail.getThumbnail() != null
                 && (!cachedThumbnail.reducedResolution || lowResolution)) {
             // Already cached, lets use that thumbnail
             callback.accept(cachedThumbnail);
@@ -200,7 +200,7 @@ public class TaskThumbnailCache {
                 () -> {
                     ThumbnailData thumbnailData = ActivityManagerWrapper.getInstance()
                             .getTaskThumbnail(key.id, lowResolution);
-                    return thumbnailData.thumbnail != null ? thumbnailData
+                    return thumbnailData.getThumbnail() != null ? thumbnailData
                             : ActivityManagerWrapper.getInstance().takeTaskThumbnail(key.id);
                 },
                 MAIN_EXECUTOR,
@@ -210,7 +210,7 @@ public class TaskThumbnailCache {
                     if (enableGridOnlyOverview() && result.reducedResolution
                             && getHighResLoadingState().isEnabled()) {
                         ThumbnailData newCachedThumbnail = mCache.getAndInvalidateIfModified(key);
-                        if (newCachedThumbnail != null && newCachedThumbnail.thumbnail != null
+                        if (newCachedThumbnail != null && newCachedThumbnail.getThumbnail() != null
                                 && !newCachedThumbnail.reducedResolution) {
                             return;
                         }

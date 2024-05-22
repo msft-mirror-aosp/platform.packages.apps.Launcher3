@@ -33,6 +33,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DREAMING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DIALOG_SHOWING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DISABLE_GESTURE_SPLIT_INVOCATION;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_HOME_DISABLED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_MAGNIFICATION_OVERLAP;
@@ -90,7 +91,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
     static final String SUPPORT_ONE_HANDED_MODE = "ro.support_one_handed_mode";
 
     // TODO: Move to quickstep contract
-    private static final float QUICKSTEP_TOUCH_SLOP_RATIO_TWO_BUTTON = 3f;
+    public static final float QUICKSTEP_TOUCH_SLOP_RATIO_TWO_BUTTON = 3f;
     private static final float QUICKSTEP_TOUCH_SLOP_RATIO_GESTURAL = 1.414f;
 
     private final Context mContext;
@@ -107,7 +108,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
 
     private final ArrayList<Runnable> mOnDestroyActions = new ArrayList<>();
 
-    private @SystemUiStateFlags int mSystemUiStateFlags = QuickStepContract.SYSUI_STATE_AWAKE;
+    private @SystemUiStateFlags long mSystemUiStateFlags = QuickStepContract.SYSUI_STATE_AWAKE;
     private NavigationMode mMode = THREE_BUTTONS;
     private NavBarPosition mNavBarPosition;
 
@@ -351,7 +352,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
     /**
      * Updates the system ui state flags from SystemUI.
      */
-    public void setSystemUiFlags(int stateFlags) {
+    public void setSystemUiFlags(@SystemUiStateFlags long stateFlags) {
         mSystemUiStateFlags = stateFlags;
     }
 
@@ -359,7 +360,8 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
      * @return the system ui state flags.
      */
     // TODO(141886704): See if we can remove this
-    public int getSystemUiStateFlags() {
+    @SystemUiStateFlags
+    public long getSystemUiStateFlags() {
         return mSystemUiStateFlags;
     }
 
@@ -399,7 +401,8 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
                 && (mSystemUiStateFlags & SYSUI_STATE_MAGNIFICATION_OVERLAP) == 0
                 && ((mSystemUiStateFlags & SYSUI_STATE_HOME_DISABLED) == 0
                         || (mSystemUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) == 0)
-                && (mSystemUiStateFlags & SYSUI_STATE_DEVICE_DREAMING) == 0;
+                && (mSystemUiStateFlags & SYSUI_STATE_DEVICE_DREAMING) == 0
+                && (mSystemUiStateFlags & SYSUI_STATE_DISABLE_GESTURE_SPLIT_INVOCATION) == 0;
     }
 
     /**
@@ -604,6 +607,16 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
      */
     public float getSquaredTouchSlop() {
         float touchSlop = getTouchSlop();
+        return touchSlop * touchSlop;
+    }
+
+    /**
+     * Returns the squared touch slop using the given base slop multiplier {@code slopMultiplier}
+     * and custom slop multiplier {@code customSlopMultiplier}.
+     */
+    public float getSquaredTouchSlop(float slopMultiplier, float customSlopMultiplier) {
+        float systemTouchSlop = ViewConfiguration.get(mContext).getScaledTouchSlop();
+        float touchSlop = customSlopMultiplier * slopMultiplier * systemTouchSlop;
         return touchSlop * touchSlop;
     }
 

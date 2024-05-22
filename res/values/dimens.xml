@@ -167,7 +167,6 @@
     <!-- (x) icon button inside work edu card -->
     <dimen name="rounded_button_width">24dp</dimen>
     <dimen name="x_icon_size">16dp</dimen>
-    <dimen name="x_icon_padding">4dp</dimen>
 
     <!-- rounded button shown inside card views, and snack bars  -->
     <dimen name="padded_rounded_button_height">48dp</dimen>
@@ -516,7 +515,7 @@
     <dimen name="default_ime_height">300dp</dimen>
 
     <!-- Private Space parameters -->
-    <dimen name="ps_container_corner_radius">24dp</dimen>
+    <dimen name="ps_container_corner_radius">28dp</dimen>
     <dimen name="ps_header_height">72dp</dimen>
     <dimen name="ps_header_relative_layout_height">48dp</dimen>
     <dimen name="ps_header_image_height">48dp</dimen>
@@ -536,6 +535,8 @@
     <dimen name="ps_lock_icon_text_margin_start_expanded">8dp</dimen>
     <dimen name="ps_lock_icon_text_margin_end_expanded">6dp</dimen>
     <dimen name="ps_lock_button_background_padding">10dp</dimen>
+    <dimen name="ps_floating_mask_corner_radius">28dp</dimen>
+    <dimen name="ps_floating_mask_end_padding">16dp</dimen>
 
     <!-- WindowManagerProxy -->
     <dimen name="max_width_and_height_of_small_display_cutout">136px</dimen>

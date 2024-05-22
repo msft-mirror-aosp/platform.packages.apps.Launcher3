@@ -19,6 +19,7 @@ package com.android.launcher3;
 import static android.app.admin.DevicePolicyManager.ACTION_DEVICE_POLICY_RESOURCE_UPDATED;
 
 import static com.android.launcher3.LauncherAppState.ACTION_FORCE_ROLOAD;
+import static com.android.launcher3.LauncherPrefs.WORK_EDU_STEP;
 import static com.android.launcher3.config.FeatureFlags.IS_STUDIO_BUILD;
 import static com.android.launcher3.icons.cache.BaseIconCache.EMPTY_CLASS_NAME;
 import static com.android.launcher3.model.PackageUpdatedTask.OP_UPDATE;
@@ -98,6 +99,8 @@ public class LauncherModel implements InstallSessionTracker.Callback {
     @NonNull
     private final LauncherAppState mApp;
     @NonNull
+    private final PackageManagerHelper mPmHelper;
+    @NonNull
     private final ModelDbController mModelDbController;
     @NonNull
     private final Object mLock = new Object();
@@ -152,12 +155,13 @@ public class LauncherModel implements InstallSessionTracker.Callback {
 
     LauncherModel(@NonNull final Context context, @NonNull final LauncherAppState app,
             @NonNull final IconCache iconCache, @NonNull final AppFilter appFilter,
-            final boolean isPrimaryInstance) {
+            @NonNull final PackageManagerHelper pmHelper, final boolean isPrimaryInstance) {
         mApp = app;
+        mPmHelper = pmHelper;
         mModelDbController = new ModelDbController(context);
         mBgAllAppsList = new AllAppsList(iconCache, appFilter);
-        mModelDelegate = ModelDelegate.newInstance(context, app, mBgAllAppsList, mBgDataModel,
-                isPrimaryInstance);
+        mModelDelegate = ModelDelegate.newInstance(context, app, mPmHelper, mBgAllAppsList,
+                mBgDataModel, isPrimaryInstance);
     }
 
     @NonNull
@@ -272,6 +276,9 @@ public class LauncherModel implements InstallSessionTracker.Callback {
              */
             enqueueModelUpdateTask(new PackageUpdatedTask(
                     PackageUpdatedTask.OP_USER_AVAILABILITY_CHANGE, user));
+        }
+        if (Intent.ACTION_MANAGED_PROFILE_REMOVED.equals(action)) {
+            LauncherPrefs.get(mApp.getContext()).put(WORK_EDU_STEP, 0);
         }
     }
 

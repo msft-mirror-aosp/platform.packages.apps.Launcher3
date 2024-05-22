@@ -51,6 +51,7 @@ import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
+import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -379,7 +380,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     @Override
-    public void updateStateForSysuiFlags(int sysuiFlags) {
+    public void updateStateForSysuiFlags(@SystemUiStateFlags long sysuiFlags) {
         mTaskbarLauncherStateController.updateStateForSysuiFlags(sysuiFlags);
     }
 
@@ -445,5 +446,10 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
                 "SYSUI_SURFACE_PROGRESS_INDEX");
 
         mTaskbarLauncherStateController.dumpLogs(prefix + "\t", pw);
+    }
+
+    @Override
+    protected String getTaskbarUIControllerName() {
+        return "LauncherTaskbarUIController";
     }
 }

@@ -42,7 +42,7 @@ import com.android.wm.shell.shared.animation.PhysicsAnimator;
  */
 public class BubbleStashController {
 
-    private static final String TAG = BubbleStashController.class.getSimpleName();
+    private static final String TAG = "BubbleStashController";
 
     /**
      * How long to stash/unstash.
@@ -123,21 +123,17 @@ public class BubbleStashController {
     }
 
     /**
-     * Animates the bubble bar and handle to their initial state, transitioning from the state where
-     * both views are invisible. Called when the first bubble is added or when the device is
+     * Animates the handle (or bubble bar depending on state) to be visible after the device is
      * unlocked.
      *
      * <p>Normally either the bubble bar or the handle is visible,
      * and {@link #showBubbleBar(boolean)} and {@link #stashBubbleBar()} are used to transition
      * between these two states. But the transition from the state where both the bar and handle
      * are invisible is slightly different.
-     *
-     * <p>The initial state will depend on the current state of the device, i.e. overview, home etc
-     * and whether bubbles are requested to be expanded.
      */
-    public void animateToInitialState(boolean expanding) {
+    private void animateAfterUnlock() {
         AnimatorSet animatorSet = new AnimatorSet();
-        if (expanding || mBubblesShowingOnHome || mBubblesShowingOnOverview) {
+        if (mBubblesShowingOnHome || mBubblesShowingOnOverview) {
             mIsStashed = false;
             animatorSet.playTogether(mIconScaleForStash.animateToValue(1),
                     mIconTranslationYForStash.animateToValue(getBubbleBarTranslationY()),
@@ -217,7 +213,7 @@ public class BubbleStashController {
         if (isSysuiLocked != mIsSysuiLocked) {
             mIsSysuiLocked = isSysuiLocked;
             if (!mIsSysuiLocked && mBarViewController.hasBubbles()) {
-                animateToInitialState(false /* expanding */);
+                animateAfterUnlock();
             }
         }
     }
@@ -250,6 +246,11 @@ public class BubbleStashController {
                 && !mBubblesShowingOnHome
                 && !mBubblesShowingOnOverview;
         if (mIsStashed != isStashed) {
+            // notify the view controller that the stash state is about to change so that it can
+            // cancel an ongoing animation if there is one.
+            // note that this has to be called before updating mIsStashed with the new value,
+            // otherwise interrupting an ongoing animation may update it again with the wrong state
+            mBarViewController.onStashStateChanging();
             mIsStashed = isStashed;
             if (mAnimator != null) {
                 mAnimator.cancel();
@@ -422,5 +423,35 @@ public class BubbleStashController {
         mIconScaleForStash.updateValue(STASHED_BAR_SCALE);
         mIsStashed = true;
         onIsStashedChanged();
+    }
+
+    /**
+     * Updates the values of the internal animators after the new bubble animation was interrupted
+     *
+     * @param isStashed whether the current state should be stashed
+     * @param bubbleBarTranslationY the current bubble bar translation. this is only used if the
+     *                              bubble bar is showing to ensure that the stash animator runs
+     *                              smoothly.
+     */
+    public void onNewBubbleAnimationInterrupted(boolean isStashed, float bubbleBarTranslationY) {
+        if (isStashed) {
+            mBubbleStashedHandleAlpha.setValue(1);
+            mIconAlphaForStash.setValue(0);
+            mIconScaleForStash.updateValue(STASHED_BAR_SCALE);
+            mIconTranslationYForStash.updateValue(getStashTranslation());
+        } else {
+            mBubbleStashedHandleAlpha.setValue(0);
+            mHandleViewController.setTranslationYForSwipe(0);
+            mIconAlphaForStash.setValue(1);
+            mIconScaleForStash.updateValue(1);
+            mIconTranslationYForStash.updateValue(bubbleBarTranslationY);
+        }
+        mIsStashed = isStashed;
+        onIsStashedChanged();
+    }
+
+    /** Set the translation Y for the stashed handle. */
+    public void setHandleTranslationY(float ty) {
+        mHandleViewController.setTranslationYForSwipe(ty);
     }
 }

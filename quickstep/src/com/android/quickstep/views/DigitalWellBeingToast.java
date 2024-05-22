@@ -79,7 +79,7 @@ public final class DigitalWellBeingToast {
     static final Intent OPEN_APP_USAGE_SETTINGS_TEMPLATE = new Intent(ACTION_APP_USAGE_SETTINGS);
     static final int MINUTE_MS = 60000;
 
-    private static final String TAG = DigitalWellBeingToast.class.getSimpleName();
+    private static final String TAG = "DigitalWellBeingToast";
 
     private final RecentsViewContainer mContainer;
     private final TaskView mTaskView;
@@ -320,12 +320,12 @@ public final class DigitalWellBeingToast {
                 (FrameLayout.LayoutParams) mBanner.getLayoutParams();
         DeviceProfile deviceProfile = mContainer.getDeviceProfile();
         layoutParams.bottomMargin = ((ViewGroup.MarginLayoutParams)
-                mTaskView.getThumbnail().getLayoutParams()).bottomMargin;
+                mTaskView.getFirstThumbnailView().getLayoutParams()).bottomMargin;
         RecentsPagedOrientationHandler orientationHandler = mTaskView.getPagedOrientationHandler();
         Pair<Float, Float> translations = orientationHandler
                 .getDwbLayoutTranslations(mTaskView.getMeasuredWidth(),
                         mTaskView.getMeasuredHeight(), mSplitBounds, deviceProfile,
-                        mTaskView.getThumbnails(), mTask.key.id, mBanner);
+                        mTaskView.getThumbnailViews(), mTask.key.id, mBanner);
         mSplitOffsetTranslationX = translations.first;
         mSplitOffsetTranslationY = translations.second;
         updateTranslationY();
