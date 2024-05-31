@@ -542,18 +542,16 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
         if (mDesktopVisibilityController != null) {
             mDesktopVisibilityController.unregisterSystemUiListener();
         }
-        mDesktopVisibilityController = null;
 
         if (mSplitSelectStateController != null) {
-            removeBackAnimationCallback(mSplitSelectStateController.getSplitBackHandler());
             mSplitSelectStateController.onDestroy();
         }
-        mSplitSelectStateController = null;
 
         super.onDestroy();
         mHotseatPredictionController.destroy();
         mSplitWithKeyboardShortcutController.onDestroy();
         if (mViewCapture != null) mViewCapture.close();
+        removeBackAnimationCallback(mSplitSelectStateController.getSplitBackHandler());
     }
 
     @Override
@@ -758,6 +756,9 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
 
     @Override
     public boolean isSplitSelectionActive() {
+        if (mSplitSelectStateController == null) {
+            return false;
+        }
         return mSplitSelectStateController.isSplitSelectActive();
     }
 
@@ -1275,7 +1276,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
         if ((flags & CHANGE_NAVIGATION_MODE) != 0) {
             getDragLayer().recreateControllers();
             if (mActionsView != null) {
-                mActionsView.updateVerticalMargin(info.navigationMode);
+                mActionsView.updateVerticalMargin(info.getNavigationMode());
             }
         }
     }
