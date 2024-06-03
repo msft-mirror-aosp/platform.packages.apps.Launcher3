@@ -21,6 +21,7 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="recent_task_option_pin" msgid="7929860679018978258">"Przypnij"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"Tryb dowolny"</string>
+    <string name="recent_task_option_desktop" msgid="8280879717125435668">"Pulpit"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"Brak ostatnich elementów"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"Ustawienia użycia aplikacji"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"Wyczyść wszystko"</string>
@@ -89,7 +90,7 @@
     <string name="allset_title" msgid="5021126669778966707">"Wszystko gotowe"</string>
     <string name="allset_hint" msgid="459504134589971527">"Aby przejść na stronę główną, przesuń w górę"</string>
     <string name="allset_button_hint" msgid="2395219947744706291">"Kliknij przycisk ekranu głównego, aby otworzyć ekran główny"</string>
-    <string name="allset_description_generic" msgid="5385500062202019855">"Teraz możesz zacząć używać urządzenia <xliff:g id="DEVICE">%1$s</xliff:g>"</string>
+    <string name="allset_description_generic" msgid="5385500062202019855">"<xliff:g id="DEVICE">%1$s</xliff:g> jest gotowe – możesz zacząć z niego korzystać"</string>
     <string name="default_device_name" msgid="6660656727127422487">"urządzenie"</string>
     <string name="allset_navigation_settings" msgid="4713404605961476027"><annotation id="link">"Ustawienia nawigacji w systemie"</annotation></string>
     <string name="action_share" msgid="2648470652637092375">"Udostępnij"</string>
@@ -116,6 +117,8 @@
     <string name="taskbar_edu_features" msgid="3320337287472848162">"Wykorzystaj potencjał paska aplikacji"</string>
     <string name="taskbar_edu_pinning_title" msgid="210102174154211712">"Zawsze wyświetlaj pasek aplikacji"</string>
     <string name="taskbar_edu_pinning_standalone" msgid="2636919474366410467">"Aby zawsze wyświetlać pasek aplikacji u dołu ekranu, naciśnij i przytrzymaj linię dzielenia ekranu"</string>
+    <string name="taskbar_search_edu_title" msgid="5569194922234364530">"Aby rozpocząć wyszukiwanie na podstawie zawartości ekranu, naciśnij i przytrzymaj klawisz działania"</string>
+    <string name="taskbar_edu_search_disclosure" msgid="8734536088447779686">"Usługa przy wyszukiwaniu używa zaznaczonego fragmentu ekranu. Obowiązują zapisy <xliff:g id="BEGIN_PRIVACY_LINK">&lt;a href="%1$s"&gt;</xliff:g>Polityki prywatności<xliff:g id="END_PRIVACY_LINK">&lt;/a&gt;</xliff:g> i <xliff:g id="BEGIN_TOS_LINK">&lt;a href="%2$s"&gt;</xliff:g>Warunków korzystania z usług<xliff:g id="END_TOS_LINK">&lt;/a&gt;</xliff:g> Google."</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"Zamknij"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"Gotowe"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"Ekran główny"</string>
@@ -135,7 +138,6 @@
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Przesuń w górny lewy róg"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Przesuń w dolny prawy róg"</string>
     <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{Pokaż jeszcze # aplikację.}few{Pokaż jeszcze # aplikacje.}many{Pokaż jeszcze # aplikacji.}other{Pokaż jeszcze # aplikacji.}}"</string>
+    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{Pokaż # aplikację komputerową.}few{Pokaż # aplikacje komputerowe.}many{Pokaż # aplikacji komputerowych.}other{Pokaż # aplikacji komputerowej.}}"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> i <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
-    <string name="desktop_select_app_toast" msgid="2306057322833956910">"Dodaję aplikację do komputera"</string>
-    <string name="desktop_button_close_app_toast" msgid="5283096349579408560">"Anuluj"</string>
 </resources>

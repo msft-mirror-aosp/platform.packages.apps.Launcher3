@@ -23,7 +23,8 @@ filegroup {
     srcs: [
         "src/**/*.java",
         "src/**/*.kt",
-        ":launcher3-robo-src",
+        "multivalentTests/src/**/*.java",
+        "multivalentTests/src/**/*.kt",
     ],
     exclude_srcs: [
         ":launcher-non-quickstep-tests-src",
@@ -37,6 +38,8 @@ filegroup {
     srcs: [
         "multivalentTests/src/**/*.java",
         "multivalentTests/src/**/*.kt",
+        "src_deviceless/**/*.java",
+        "src_deviceless/**/*.kt",
     ],
 }
 
@@ -86,6 +89,7 @@ android_library {
         "mockito-target-extended-minus-junit4",
         "launcher_log_protos_lite",
         "truth",
+        "kotlinx_coroutines_test",
         "platform-test-rules",
         "testables",
         "com_android_launcher3_flags_lib",
@@ -101,6 +105,7 @@ android_library {
 android_library {
     name: "Launcher3TestResources",
     resource_dirs: ["res"],
+    asset_dirs: ["assets"],
     // TODO(b/319712088): re-enable use_resource_processor
     use_resource_processor: false,
 }
@@ -168,20 +173,6 @@ filegroup {
     ],
 }
 
-android_library {
-    name: "Launcher3Lib",
-    srcs: [
-        ":launcher-src",
-        ":launcher-src_shortcuts_overrides",
-        ":launcher-src_ui_overrides",
-    ],
-    static_libs: [
-        "Launcher3CommonDepsLib",
-    ],
-    // TODO(b/319712088): re-enable use_resource_processor
-    use_resource_processor: false,
-}
-
 android_robolectric_test {
     enabled: true,
     name: "Launcher3RoboTests",
@@ -201,14 +192,21 @@ android_robolectric_test {
     java_resource_dirs: ["config"],
     static_libs: [
         "flag-junit-base",
+        "flag-junit",
         "com_android_launcher3_flags_lib",
         "com_android_wm_shell_flags_lib",
         "androidx.test.uiautomator_uiautomator",
         "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",
-        "mockito-robolectric-prebuilt",
-        "mockito-kotlin2",
+        "androidx.test.espresso.core",
+        "androidx.test.espresso.contrib",
+        "androidx.test.espresso.intents",
+        "androidx.test.rules",
+        "uiautomator-helpers",
+        "inline-mockito-robolectric-prebuilt",
+        "mockito-kotlin-nodeps",
         "platform-parametric-runner-lib",
+        "platform-test-rules-deviceless",
         "testables",
         "Launcher3TestResources",
         "SystemUISharedLib",
@@ -222,4 +220,5 @@ android_robolectric_test {
     ],
     instrumentation_for: "Launcher3",
     upstream: true,
+    strict_mode: false,
 }

@@ -23,27 +23,30 @@ import static com.android.launcher3.UtilitiesKt.modifyAttributesOnViewTree;
 import static com.android.launcher3.UtilitiesKt.restoreAttributesOnViewTree;
 
 import android.content.Context;
-import android.graphics.Outline;
 import android.graphics.Rect;
 import android.os.Process;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewOutlineProvider;
+import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.Px;
 
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.recyclerview.ViewHolderBinder;
 import com.android.launcher3.util.PackageUserKey;
+import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
@@ -64,7 +67,7 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
 
     // This ratio defines the max percentage of content area that the recommendations can display
     // with respect to the bottom sheet's height.
-    private static final float RECOMMENDATION_SECTION_HEIGHT_RATIO_TWO_PANE = 0.75f;
+    private static final float RECOMMENDATION_SECTION_HEIGHT_RATIO_TWO_PANE = 0.60f;
     private FrameLayout mSuggestedWidgetsContainer;
     private WidgetsListHeader mSuggestedWidgetsHeader;
     private PackageUserKey mSuggestedWidgetsPackageUserKey;
@@ -74,24 +77,10 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     private ScrollView mRightPaneScrollView;
     private WidgetsListTableViewHolderBinder mWidgetsListTableViewHolderBinder;
 
-    private boolean mOldIsBackSwipeProgressing;
+    private boolean mOldIsSwipeToDismissInProgress;
     private int mActivePage = -1;
+    @Nullable
     private PackageUserKey mSelectedHeader;
-
-    private final ViewOutlineProvider mViewOutlineProviderRightPane = new ViewOutlineProvider() {
-        @Override
-        public void getOutline(View view, Outline outline) {
-            outline.setRoundRect(
-                    0,
-                    0,
-                    view.getMeasuredWidth(),
-                    view.getMeasuredHeight() - getResources().getDimensionPixelSize(
-                            R.dimen.widget_list_horizontal_margin_two_pane),
-                    view.getResources().getDimensionPixelSize(
-                            R.dimen.widget_list_top_bottom_corner_radius)
-            );
-        }
-    };
 
     public WidgetsTwoPaneSheet(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
@@ -136,32 +125,48 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
 
         mHeaderTitle = mContent.findViewById(R.id.title);
         mRightPane = mContent.findViewById(R.id.right_pane);
-        mRightPane.setOutlineProvider(mViewOutlineProviderRightPane);
         mRightPaneScrollView = mContent.findViewById(R.id.right_pane_scroll_view);
         mRightPaneScrollView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        mRightPaneScrollView.setOutlineProvider(mViewOutlineProvider);
-        mRightPaneScrollView.setClipToOutline(true);
 
         mPrimaryWidgetListView = findViewById(R.id.primary_widgets_list_view);
         mPrimaryWidgetListView.setOutlineProvider(mViewOutlineProvider);
         mPrimaryWidgetListView.setClipToOutline(true);
 
         onWidgetsBound();
-        setUpEducationViewsIfNeeded();
 
         // Set the fast scroller as not visible for two pane layout.
         mFastScroller.setVisibility(GONE);
     }
 
     @Override
-    protected void onScaleProgressChanged() {
-        super.onScaleProgressChanged();
-        boolean isBackSwipeProgressing = mSlideInViewScale.value > 0;
-        if (isBackSwipeProgressing == mOldIsBackSwipeProgressing) {
+    protected int getTabletHorizontalMargin(DeviceProfile deviceProfile) {
+        if (enableCategorizedWidgetSuggestions()) {
+            // two pane picker is full width for fold as well as tablet.
+            return getResources().getDimensionPixelSize(
+                    R.dimen.widget_picker_two_panels_left_right_margin);
+        }
+        if (deviceProfile.isTwoPanels && enableUnfoldedTwoPanePicker()) {
+            // enableUnfoldedTwoPanePicker made two pane picker full-width for fold only.
+            return getResources().getDimensionPixelSize(
+                    R.dimen.widget_picker_two_panels_left_right_margin);
+        }
+        if (deviceProfile.isLandscape && !deviceProfile.isTwoPanels) {
+            // non-fold tablet landscape margins (ag/22163531)
+            return getResources().getDimensionPixelSize(
+                    R.dimen.widget_picker_landscape_tablet_left_right_margin);
+        }
+        return deviceProfile.allAppsLeftRightMargin;
+    }
+
+    @Override
+    protected void onUserSwipeToDismissProgressChanged() {
+        super.onUserSwipeToDismissProgressChanged();
+        boolean isSwipeToDismissInProgress = mSwipeToDismissProgress.value > 0;
+        if (isSwipeToDismissInProgress == mOldIsSwipeToDismissInProgress) {
             return;
         }
-        mOldIsBackSwipeProgressing = isBackSwipeProgressing;
-        if (isBackSwipeProgressing) {
+        mOldIsSwipeToDismissInProgress = isSwipeToDismissInProgress;
+        if (isSwipeToDismissInProgress) {
             modifyAttributesOnViewTree(mPrimaryWidgetListView, (ViewParent) mContent,
                     CLIP_CHILDREN_FALSE_MODIFIER);
             modifyAttributesOnViewTree(mRightPaneScrollView,  (ViewParent) mContent,
@@ -193,15 +198,21 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                 layoutParams.width = 0;
             }
             layoutParams.weight = layoutParams.width == 0 ? 0.33F : 0;
-            leftPane.setLayoutParams(layoutParams);
-            requestApplyInsets();
-            if (mSelectedHeader != null) {
-                if (mSelectedHeader.equals(mSuggestedWidgetsPackageUserKey)) {
-                    mSuggestedWidgetsHeader.callOnClick();
-                } else {
-                    getHeaderChangeListener().onHeaderChanged(mSelectedHeader);
+
+            post(() -> {
+                // The following calls all trigger requestLayout, so we post them to avoid
+                // calling requestLayout during a layout pass. This also fixes the related warnings
+                // in logcat.
+                leftPane.setLayoutParams(layoutParams);
+                requestApplyInsets();
+                if (mSelectedHeader != null) {
+                    if (mSelectedHeader.equals(mSuggestedWidgetsPackageUserKey)) {
+                        mSuggestedWidgetsHeader.callOnClick();
+                    } else {
+                        getHeaderChangeListener().onHeaderChanged(mSelectedHeader);
+                    }
                 }
-            }
+            });
         }
     }
 
@@ -221,6 +232,10 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
         if (mSuggestedWidgetsContainer == null && mRecommendedWidgetsCount > 0) {
             setupSuggestedWidgets(LayoutInflater.from(getContext()));
             mSuggestedWidgetsHeader.callOnClick();
+        } else if (mSelectedHeader != null
+                && mSelectedHeader.equals(mSuggestedWidgetsPackageUserKey)) {
+            // Reselect widget if we are reloading recommendations while it is currently showing.
+            selectWidgetCell(mWidgetRecommendationsContainer, getLastSelectedWidgetItem());
         }
     }
 
@@ -268,6 +283,16 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
             mRightPaneScrollView.setScrollY(0);
             mRightPane.setAccessibilityPaneTitle(suggestionsRightPaneTitle);
             mSuggestedWidgetsPackageUserKey = PackageUserKey.fromPackageItemInfo(packageItemInfo);
+            final boolean isChangingHeaders = mSelectedHeader == null
+                    || !mSelectedHeader.equals(mSuggestedWidgetsPackageUserKey);
+            if (isChangingHeaders)  {
+                // If switching from another header, unselect any WidgetCells. This is necessary
+                // because we do not clear/recycle the WidgetCells in the recommendations container
+                // when the header is clicked, only when onRecommendationsBound is called. That
+                // means a WidgetCell in the recommendations container may still be selected from
+                // the last time the recommendations were shown.
+                unselectWidgetCell(mWidgetRecommendationsContainer, getLastSelectedWidgetItem());
+            }
             mSelectedHeader = mSuggestedWidgetsPackageUserKey;
         });
         mSuggestedWidgetsContainer.addView(mSuggestedWidgetsHeader);
@@ -276,8 +301,15 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
 
     @Override
     @Px
-    protected float getRecommendationSectionHeightRatio() {
-        return RECOMMENDATION_SECTION_HEIGHT_RATIO_TWO_PANE;
+    protected float getMaxAvailableHeightForRecommendations() {
+        if (mRecommendedWidgetsCount > 0) {
+            // If widgets were already selected for display, we show them all on orientation change
+            // in a two pane picker
+            return Float.MAX_VALUE;
+        }
+
+        return (mDeviceProfile.heightPx - mDeviceProfile.bottomSheetTopPadding)
+                * RECOMMENDATION_SECTION_HEIGHT_RATIO_TWO_PANE;
     }
 
     @Override
@@ -349,6 +381,8 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
         return new HeaderChangeListener() {
             @Override
             public void onHeaderChanged(@NonNull PackageUserKey selectedHeader) {
+                final boolean isSameHeader = mSelectedHeader != null
+                        && mSelectedHeader.equals(selectedHeader);
                 mSelectedHeader = selectedHeader;
                 WidgetsListContentEntry contentEntry = mActivityContext.getPopupDataProvider()
                         .getSelectedAppWidgets(selectedHeader);
@@ -376,11 +410,20 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                         contentEntryToBind,
                         ViewHolderBinder.POSITION_FIRST | ViewHolderBinder.POSITION_LAST,
                         Collections.EMPTY_LIST);
+                if (isSameHeader) {
+                    // Reselect the last selected widget if we are reloading the same header.
+                    selectWidgetCell(widgetsRowViewHolder.tableContainer,
+                            getLastSelectedWidgetItem());
+                }
                 widgetsRowViewHolder.mDataCallback = data -> {
                     mWidgetsListTableViewHolderBinder.bindViewHolder(widgetsRowViewHolder,
                             contentEntryToBind,
                             ViewHolderBinder.POSITION_FIRST | ViewHolderBinder.POSITION_LAST,
                             Collections.singletonList(data));
+                    if (isSameHeader) {
+                        selectWidgetCell(widgetsRowViewHolder.tableContainer,
+                                getLastSelectedWidgetItem());
+                    }
                 };
                 mRightPane.removeAllViews();
                 mRightPane.addView(widgetsRowViewHolder.itemView);
@@ -391,6 +434,24 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                                 contentEntry.mPkgItem.title));
             }
         };
+    }
+
+    private static void selectWidgetCell(ViewGroup parent, WidgetItem item) {
+        if (parent == null || item == null) return;
+        WidgetCell cell = Utilities.findViewByPredicate(parent, v -> v instanceof WidgetCell wc
+                && wc.matchesItem(item));
+        if (cell != null && !cell.isShowingAddButton()) {
+            cell.callOnClick();
+        }
+    }
+
+    private static void unselectWidgetCell(ViewGroup parent, WidgetItem item) {
+        if (parent == null || item == null) return;
+        WidgetCell cell = Utilities.findViewByPredicate(parent, v -> v instanceof WidgetCell wc
+                && wc.matchesItem(item));
+        if (cell != null && cell.isShowingAddButton()) {
+            cell.hideAddButton(/* animate= */ false);
+        }
     }
 
     @Override
@@ -414,6 +475,23 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     @Override
     protected boolean isTwoPane() {
         return true;
+    }
+
+    @Override
+    protected int getHeaderTopClip(@NonNull WidgetCell cell) {
+        return 0;
+    }
+
+    @Override
+    protected void scrollCellContainerByY(WidgetCell wc, int scrollByY) {
+        for (ViewParent parent = wc.getParent(); parent != null; parent = parent.getParent()) {
+            if (parent instanceof ScrollView scrollView) {
+                scrollView.smoothScrollBy(0, scrollByY);
+                return;
+            } else if (parent == this) {
+                return;
+            }
+        }
     }
 
     /**

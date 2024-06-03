@@ -27,7 +27,7 @@ import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_O
 import static com.android.quickstep.OverviewComponentObserver.startHomeIntentSafely;
 import static com.android.quickstep.TaskUtils.taskIsATargetWithMode;
 import static com.android.quickstep.TaskViewUtils.createRecentsWindowAnimator;
-import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
+import static com.android.window.flags.Flags.enableDesktopWindowingMode;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -85,6 +85,7 @@ import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskView;
 
 import java.io.FileDescriptor;
@@ -95,7 +96,8 @@ import java.util.List;
  * A recents activity that shows the recently launched tasks as swipable task cards.
  * See {@link com.android.quickstep.views.RecentsView}.
  */
-public final class RecentsActivity extends StatefulActivity<RecentsState> {
+public final class RecentsActivity extends StatefulActivity<RecentsState> implements
+        RecentsViewContainer {
     private static final String TAG = "RecentsActivity";
 
     public static final ActivityTracker<RecentsActivity> ACTIVITY_TRACKER =
@@ -109,7 +111,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     private RecentsDragLayer mDragLayer;
     private ScrimView mScrimView;
     private FallbackRecentsView mFallbackRecentsView;
-    private OverviewActionsView mActionsView;
+    private OverviewActionsView<?> mActionsView;
     private TISBindHelper mTISBindHelper;
     private @Nullable FallbackTaskbarUIController mTaskbarUIController;
 
@@ -144,7 +146,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
                         systemUiProxy, RecentsModel.INSTANCE.get(this),
                         null /*activityBackCallback*/);
         mDragLayer.recreateControllers();
-        if (isDesktopModeSupported()) {
+        if (enableDesktopWindowingMode()) {
             mDesktopRecentsTransitionController = new DesktopRecentsTransitionController(
                     getStateManager(), systemUiProxy, getIApplicationThread(),
                     null /* depthController */
@@ -224,11 +226,12 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     }
 
     @Override
-    public <T extends View> T getOverviewPanel() {
-        return (T) mFallbackRecentsView;
+    public FallbackRecentsView getOverviewPanel() {
+        return mFallbackRecentsView;
     }
 
-    public OverviewActionsView getActionsView() {
+    @Override
+    public OverviewActionsView<?> getActionsView() {
         return mActionsView;
     }
 
@@ -368,6 +371,9 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         getSystemUiController().updateUiState(SystemUiController.UI_STATE_BASE_WINDOW,
                 Themes.getAttrBoolean(this, R.attr.isWorkspaceDarkText));
         ACTIVITY_TRACKER.handleCreate(this);
+
+        // Set screen title for Talkback
+        setTitle(R.string.accessibility_recent_apps);
     }
 
     @Override
@@ -502,5 +508,10 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     @NonNull
     public TISBindHelper getTISBindHelper() {
         return mTISBindHelper;
+    }
+
+    @Override
+    public boolean isRecentsViewVisible() {
+        return getStateManager().getState().isRecentsViewVisible();
     }
 }

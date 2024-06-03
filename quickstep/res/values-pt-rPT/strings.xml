@@ -21,6 +21,7 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="recent_task_option_pin" msgid="7929860679018978258">"Fixar"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"Forma livre"</string>
+    <string name="recent_task_option_desktop" msgid="8280879717125435668">"Computador"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"Nenhum item recente"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"Definições de utilização de aplicações"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"Limpar tudo"</string>
@@ -36,7 +37,7 @@
     <string name="hotseat_edu_message_migrate" msgid="8927179260533775320">"Aceda facilmente às suas apps mais utilizadas, diretamente no ecrã principal. As sugestões mudam em função das suas rotinas. As apps na última fila passam para o ecrã principal."</string>
     <string name="hotseat_edu_message_migrate_landscape" msgid="4248943380443387697">"Aceda facilmente às suas apps mais utilizadas no ecrã principal. As sugestões mudam em função das suas rotinas. As apps na fila dos favoritos passam para o ecrã principal."</string>
     <string name="hotseat_edu_accept" msgid="1611544083278999837">"Obter sugestões de apps"</string>
-    <string name="hotseat_edu_dismiss" msgid="2781161822780201689">"Não, obrigado"</string>
+    <string name="hotseat_edu_dismiss" msgid="2781161822780201689">"Não"</string>
     <string name="hotseat_prediction_settings" msgid="6246554993566070818">"Definições"</string>
     <string name="hotseat_auto_enrolled" msgid="522100018967146807">"As apps mais utilizadas aparecem aqui e mudam em função das rotinas."</string>
     <string name="hotseat_tip_no_empty_slots" msgid="1325212677738179185">"Arraste as apps para fora da última fila para ver sugestões de apps."</string>
@@ -110,12 +111,14 @@
     <string name="accessibility_rotate_button" msgid="4771825231336502943">"Rodar ecrã"</string>
     <string name="taskbar_edu_a11y_title" msgid="5417986057866415355">"Educação da Barra de tarefas"</string>
     <string name="taskbar_edu_splitscreen" msgid="5605512479258053350">"Arraste uma app para o lado para usar 2 apps em simultâneo"</string>
-    <string name="taskbar_edu_stashing" msgid="5645461372669217294">"Deslize lentamente para cima para mostrar a Barra de tarefas"</string>
+    <string name="taskbar_edu_stashing" msgid="5645461372669217294">"Deslize lentamente para cima para ver a Barra de tarefas"</string>
     <string name="taskbar_edu_suggestions" msgid="8215044496435527982">"Receba sugestões de apps baseadas na sua rotina"</string>
     <string name="taskbar_edu_pinning" msgid="6708550858580071558">"Mantenha o divisor premido para fixar a Barra de tarefas"</string>
     <string name="taskbar_edu_features" msgid="3320337287472848162">"Faça mais com a Barra de tarefas"</string>
     <string name="taskbar_edu_pinning_title" msgid="210102174154211712">"Mostre sempre a Barra de tarefas"</string>
     <string name="taskbar_edu_pinning_standalone" msgid="2636919474366410467">"Para mostrar sempre a Barra de tarefas no fundo do ecrã, toque sem soltar no divisor"</string>
+    <string name="taskbar_search_edu_title" msgid="5569194922234364530">"Toque sem soltar na tecla de ação para pesquisar o que está no ecrã"</string>
+    <string name="taskbar_edu_search_disclosure" msgid="8734536088447779686">"Este produto usa a parte selecionada do ecrã para pesquisar. Aplicam-se a <xliff:g id="BEGIN_PRIVACY_LINK">&lt;a href="%1$s"&gt;</xliff:g>Política de Privacidade<xliff:g id="END_PRIVACY_LINK">&lt;/a&gt;</xliff:g> e os <xliff:g id="BEGIN_TOS_LINK">&lt;a href="%2$s"&gt;</xliff:g>Termos de Utilização<xliff:g id="END_TOS_LINK">&lt;/a&gt;</xliff:g> da Google."</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"Fechar"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"Concluir"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"Início"</string>
@@ -135,7 +138,6 @@
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Mover para a parte superior esquerda"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Mover para a part superior direita"</string>
     <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{Mostrar mais # app.}other{Mostrar mais # apps.}}"</string>
+    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{Mostrar # app para computador.}other{Mostrar # apps para computador.}}"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> e <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
-    <string name="desktop_select_app_toast" msgid="2306057322833956910">"A adicionar a app ao computador"</string>
-    <string name="desktop_button_close_app_toast" msgid="5283096349579408560">"Cancelar"</string>
 </resources>

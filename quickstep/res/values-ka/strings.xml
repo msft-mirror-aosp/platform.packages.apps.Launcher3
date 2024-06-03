@@ -21,6 +21,7 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="recent_task_option_pin" msgid="7929860679018978258">"ჩამაგრება"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"თავისუფალი ფორმა"</string>
+    <string name="recent_task_option_desktop" msgid="8280879717125435668">"დესკტოპი"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"ბოლოს გამოყენებული ერთეულები არ არის"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"აპების გამოყენების პარამეტრები"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"ყველას გასუფთავება"</string>
@@ -116,6 +117,8 @@
     <string name="taskbar_edu_features" msgid="3320337287472848162">"გააკეთეთ მეტი ამოცანათა ზოლის მეშვეობით"</string>
     <string name="taskbar_edu_pinning_title" msgid="210102174154211712">"ამოცანათა ზოლის მუდმივად ჩვენება"</string>
     <string name="taskbar_edu_pinning_standalone" msgid="2636919474366410467">"თქვენი ეკრანის ქვედა ნაწილში ამოცანათა ზოლის მუდმივად საჩვენებლად, ხანგრძლივად შეეხეთ გამყოფს"</string>
+    <string name="taskbar_search_edu_title" msgid="5569194922234364530">"შეეხეთ და გეჭიროთ მოქმედების ღილაკი, რათა მოძებნოთ ის, რაც თქვენს ეკრანზეა"</string>
+    <string name="taskbar_edu_search_disclosure" msgid="8734536088447779686">"ეს პროდუქტი ძიებისთვის იყენებს თქვენი ეკრანის არჩეულ ნაწილს. მოქმედებს Google-ის <xliff:g id="BEGIN_PRIVACY_LINK">&lt;a href="%1$s"&gt;</xliff:g>კონფიდენციალურობის დებულება<xliff:g id="END_PRIVACY_LINK">&lt;/a&gt;</xliff:g> და <xliff:g id="BEGIN_TOS_LINK">&lt;a href="%2$s"&gt;</xliff:g>მომსახურებს პირობები<xliff:g id="END_TOS_LINK">&lt;/a&gt;</xliff:g>."</string>
     <string name="taskbar_edu_close" msgid="887022990168191073">"დახურვა"</string>
     <string name="taskbar_edu_done" msgid="6880178093977704569">"მზადაა"</string>
     <string name="taskbar_button_home" msgid="2151398979630664652">"მთავარი"</string>
@@ -135,7 +138,6 @@
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"ზემოთ/მარცხნივ გადატანა"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"ქვემოთ/მარჯვნივ გადატანა"</string>
     <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{#-ით მეტი აპის ჩენება}other{#-ით მეტი აპის ჩვენება.}}"</string>
+    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{# დესკტოპის აპის ჩვენება.}other{# დესკტოპის აპის ჩვენება.}}"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> და <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
-    <string name="desktop_select_app_toast" msgid="2306057322833956910">"მიმდინარეობს აპის დესკტოპზე დამატება"</string>
-    <string name="desktop_button_close_app_toast" msgid="5283096349579408560">"გაუქმება"</string>
 </resources>

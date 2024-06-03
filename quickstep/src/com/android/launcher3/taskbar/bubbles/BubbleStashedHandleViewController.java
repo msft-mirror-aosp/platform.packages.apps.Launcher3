@@ -39,6 +39,7 @@ import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.systemui.shared.navigationbar.RegionSamplingHelper;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.animation.PhysicsAnimator;
 
 /**
  * Handles properties/data collection, then passes the results to our stashed handle View to render.
@@ -47,7 +48,7 @@ public class BubbleStashedHandleViewController {
 
     private final TaskbarActivityContext mActivity;
     private final StashedHandleView mStashedHandleView;
-    private final MultiValueAlpha mTaskbarStashedHandleAlpha;
+    private final MultiValueAlpha mStashedHandleAlpha;
 
     // Initialized in init.
     private BubbleBarViewController mBarViewController;
@@ -75,7 +76,7 @@ public class BubbleStashedHandleViewController {
             StashedHandleView stashedHandleView) {
         mActivity = activity;
         mStashedHandleView = stashedHandleView;
-        mTaskbarStashedHandleAlpha = new MultiValueAlpha(mStashedHandleView, 1);
+        mStashedHandleAlpha = new MultiValueAlpha(mStashedHandleView, 1);
     }
 
     public void init(TaskbarControllers controllers, BubbleControllers bubbleControllers) {
@@ -93,7 +94,7 @@ public class BubbleStashedHandleViewController {
                 R.dimen.transient_taskbar_bottom_margin);
         mStashedHandleView.getLayoutParams().height = mBarSize + bottomMargin;
 
-        mTaskbarStashedHandleAlpha.get(0).setValue(0);
+        mStashedHandleAlpha.get(0).setValue(0);
 
         mStashedTaskbarHeight = resources.getDimensionPixelSize(
                 R.dimen.bubblebar_stashed_size);
@@ -120,6 +121,11 @@ public class BubbleStashedHandleViewController {
 
         mStashedHandleView.addOnLayoutChangeListener((view, i, i1, i2, i3, i4, i5, i6, i7) ->
                 updateBounds(mBarViewController.getBubbleBarLocation()));
+    }
+
+    /** Returns the [PhysicsAnimator] for the stashed handle view. */
+    public PhysicsAnimator<View> getPhysicsAnimator() {
+        return PhysicsAnimator.getInstance(mStashedHandleView);
     }
 
     private void updateBounds(BubbleBarLocation bubbleBarLocation) {
@@ -242,7 +248,7 @@ public class BubbleStashedHandleViewController {
      * Used by {@link BubbleStashController} to animate the handle when stashing or un stashing.
      */
     public MultiPropertyFactory<View> getStashedHandleAlpha() {
-        return mTaskbarStashedHandleAlpha;
+        return mStashedHandleAlpha;
     }
 
     /**

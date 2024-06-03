@@ -84,7 +84,6 @@ import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.util.MotionPauseDetector;
 import com.android.quickstep.util.WorkspaceRevealAnim;
-import com.android.quickstep.views.LauncherRecentsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
@@ -108,9 +107,9 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
     private final float mMaxYProgress;
     private final MotionPauseDetector mMotionPauseDetector;
     private final float mMotionPauseMinDisplacement;
-    private final LauncherRecentsView mRecentsView;
+    private final RecentsView mRecentsView;
     protected final AnimatorListener mClearStateOnCancelListener =
-            newCancelListener(this::clearState);
+            newCancelListener(this::clearState, /* isSingleUse = */ false);
 
     private boolean mNoIntercept;
     private LauncherState mStartState;
@@ -173,7 +172,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         if ((ev.getEdgeFlags() & Utilities.EDGE_NAV_BAR) == 0) {
             return false;
         }
-        int stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();
+        long stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();
         if ((stateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0) {
             return false;
         }
@@ -249,7 +248,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         TASK_THUMBNAIL_SPLASH_ALPHA.set(mRecentsView, fromState.showTaskThumbnailSplash() ? 1f : 0);
         mRecentsView.setContentAlpha(1);
         mRecentsView.setFullscreenProgress(fromState.getOverviewFullscreenProgress());
-        mLauncher.getActionsView().getVisibilityAlpha().setValue(
+        mLauncher.getActionsView().getVisibilityAlpha().updateValue(
                 (fromState.getVisibleElements(mLauncher) & OVERVIEW_ACTIONS) != 0 ? 1f : 0f);
         mRecentsView.setTaskIconScaledDown(true);
 

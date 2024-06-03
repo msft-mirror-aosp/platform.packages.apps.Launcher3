@@ -29,23 +29,17 @@ import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.allapps.SearchRecyclerView;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 @LargeTest
 @RunWith(AndroidJUnit4.class)
-public class LauncherIntentTest extends AbstractLauncherUiTest {
+public class LauncherIntentTest extends AbstractLauncherUiTest<Launcher> {
 
     public final Intent allAppsIntent = new Intent(Intent.ACTION_ALL_APPS);
 
     @Test
-    @Ignore("b/329152799")
     public void testAllAppsIntent() {
-        // setup by moving to home
-        mLauncher.goHome();
-        assertTrue("Launcher internal state is not Home", isInState(() -> LauncherState.NORMAL));
-
         // Try executing ALL_APPS intent
         executeOnLauncher(launcher -> launcher.onNewIntent(allAppsIntent));
         // A-Z view with Main adapter should be loaded
@@ -58,16 +52,10 @@ public class LauncherIntentTest extends AbstractLauncherUiTest {
         executeOnLauncher(launcher -> launcher.onNewIntent(allAppsIntent));
         // A-Z view with Main adapter should be loaded
         assertOnMainAdapterAToZView();
-
-        // finish
-        mLauncher.goHome();
-        assertTrue("Launcher internal state is not Home", isInState(() -> LauncherState.NORMAL));
     }
 
     // Highlights the search bar, then fills text to display the SearchView.
     private void moveToSearchView() {
-        mLauncher.goHome().switchToAllApps();
-
         // All Apps view should be loaded
         assertTrue("Launcher internal state is not All Apps",
                 isInState(() -> LauncherState.ALL_APPS));

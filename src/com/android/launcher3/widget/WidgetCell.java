@@ -23,10 +23,14 @@ import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_WIDGETS
 import static com.android.launcher3.widget.LauncherAppWidgetProviderInfo.fromProviderInfo;
 import static com.android.launcher3.widget.util.WidgetSizes.getWidgetItemSizePx;
 
+import android.animation.Animator;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.animation.TimeInterpolator;
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.os.Process;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -39,7 +43,6 @@ import android.view.ViewPropertyAnimator;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RemoteViews;
 import android.widget.TextView;
@@ -47,11 +50,13 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.app.animation.Interpolators;
 import com.android.launcher3.CheckLongPressHelper;
 import com.android.launcher3.Flags;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.R;
+import com.android.launcher3.anim.AnimatedPropertySetter;
 import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.icons.RoundDrawableWrapper;
 import com.android.launcher3.model.WidgetItem;
@@ -79,7 +84,7 @@ public class WidgetCell extends LinearLayout {
     private static final boolean DEBUG = false;
 
     private static final int FADE_IN_DURATION_MS = 90;
-    private static final int ADD_BUTTON_FADE_DURATION_MS = 300;
+    private static final int ADD_BUTTON_FADE_DURATION_MS = 100;
 
     /**
      * The requested scale of the preview container. It can be lower than this as well.
@@ -88,7 +93,6 @@ public class WidgetCell extends LinearLayout {
     private Size mPreviewContainerSize = new Size(0, 0);
     private FrameLayout mWidgetImageContainer;
     private WidgetImageView mWidgetImage;
-    private ImageView mWidgetBadge;
     private TextView mWidgetName;
     private TextView mWidgetDims;
     private TextView mWidgetDescription;
@@ -113,6 +117,7 @@ public class WidgetCell extends LinearLayout {
     private int mSourceContainer = CONTAINER_WIDGETS_TRAY;
 
     private CancellableTask mIconLoadRequest;
+    private boolean mIsShowingAddButton = false;
 
     public WidgetCell(Context context) {
         this(context, null);
@@ -142,7 +147,6 @@ public class WidgetCell extends LinearLayout {
 
         mWidgetImageContainer = findViewById(R.id.widget_preview_container);
         mWidgetImage = findViewById(R.id.widget_preview);
-        mWidgetBadge = findViewById(R.id.widget_badge);
         mWidgetName = findViewById(R.id.widget_name);
         mWidgetDims = findViewById(R.id.widget_dims);
         mWidgetDescription = findViewById(R.id.widget_description);
@@ -182,8 +186,6 @@ public class WidgetCell extends LinearLayout {
         mWidgetImage.animate().cancel();
         mWidgetImage.setDrawable(null);
         mWidgetImage.setVisibility(View.VISIBLE);
-        mWidgetBadge.setImageDrawable(null);
-        mWidgetBadge.setVisibility(View.GONE);
         mWidgetName.setText(null);
         mWidgetDims.setText(null);
         mWidgetDescription.setText(null);
@@ -397,17 +399,6 @@ public class WidgetCell extends LinearLayout {
         }
     }
 
-    /** Used to show the badge when the widget is in the recommended section
-     */
-    public void showBadge() {
-        if (Process.myUserHandle().equals(mItem.user)) {
-            mWidgetBadge.setVisibility(View.GONE);
-        } else {
-            mWidgetBadge.setVisibility(View.VISIBLE);
-            mWidgetBadge.setImageResource(R.drawable.ic_work_app_badge);
-        }
-    }
-
     /**
      * Shows or hides the long description displayed below each widget.
      *
@@ -512,6 +503,15 @@ public class WidgetCell extends LinearLayout {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
+
+        if (changed && isShowingAddButton()) {
+            post(this::setupIconOrTextButton);
+        }
+    }
+
     /**
      * Loads a high resolution package icon to show next to the widget title.
      */
@@ -551,30 +551,57 @@ public class WidgetCell extends LinearLayout {
      * @param callback Callback to be set on the button.
      */
     public void showAddButton(View.OnClickListener callback) {
-        mWidgetAddButton.setAlpha(0F);
-        mWidgetAddButton.setVisibility(VISIBLE);
-        mWidgetAddButton.setOnClickListener(callback);
-        mWidgetAddButton.animate().cancel();
-        mWidgetAddButton.animate()
-                .alpha(1F)
-                .setDuration(ADD_BUTTON_FADE_DURATION_MS);
+        if (mIsShowingAddButton) return;
+        mIsShowingAddButton = true;
 
-        mWidgetTextContainer.animate().cancel();
-        mWidgetTextContainer.animate()
-                .alpha(0F)
-                .setDuration(ADD_BUTTON_FADE_DURATION_MS)
-                .withEndAction(() -> {
-                    mWidgetTextContainer.setVisibility(INVISIBLE);
-                });
+        setupIconOrTextButton();
+        mWidgetAddButton.setOnClickListener(callback);
+        fadeThrough(/* hide= */ mWidgetTextContainer, /* show= */ mWidgetAddButton,
+                ADD_BUTTON_FADE_DURATION_MS, Interpolators.LINEAR);
+    }
+
+    /**
+     * Depending on the width of the cell, set up the add button to be icon-only or icon+text.
+     */
+    private void setupIconOrTextButton() {
+        String addText = getResources().getString(R.string.widget_add_button_label);
+        Rect textSize = new Rect();
+        mWidgetAddButton.getPaint().getTextBounds(addText, 0, addText.length(), textSize);
+        int startPadding = getResources()
+                .getDimensionPixelSize(R.dimen.widget_cell_add_button_start_padding);
+        int endPadding = getResources()
+                .getDimensionPixelSize(R.dimen.widget_cell_add_button_end_padding);
+        int drawableWidth = getResources()
+                .getDimensionPixelSize(R.dimen.widget_cell_add_button_drawable_width);
+        int drawablePadding = getResources()
+                .getDimensionPixelSize(R.dimen.widget_cell_add_button_drawable_padding);
+        int textButtonWidth = textSize.width() + startPadding + endPadding + drawableWidth
+                + drawablePadding;
+        if (textButtonWidth > getMeasuredWidth()) {
+            // Setup icon-only button
+            mWidgetAddButton.setText(null);
+            int startIconPadding = getResources()
+                    .getDimensionPixelSize(R.dimen.widget_cell_add_icon_button_start_padding);
+            mWidgetAddButton.setPaddingRelative(/* start= */ startIconPadding, /* top= */ 0,
+                    /* end= */ endPadding, /* bottom= */ 0);
+            mWidgetAddButton.setCompoundDrawablePadding(0);
+        } else {
+            // Setup icon + text button
+            mWidgetAddButton.setText(addText);
+            mWidgetAddButton.setPaddingRelative(/* start= */ startPadding, /* top= */ 0,
+                    /* end= */ endPadding, /* bottom= */ 0);
+            mWidgetAddButton.setCompoundDrawablePadding(drawablePadding);
+        }
     }
 
     /**
      * Hide tap to add button.
      */
     public void hideAddButton(boolean animate) {
+        if (!mIsShowingAddButton) return;
+        mIsShowingAddButton = false;
+
         mWidgetAddButton.setOnClickListener(null);
-        mWidgetAddButton.animate().cancel();
-        mWidgetTextContainer.animate().cancel();
 
         if (!animate) {
             mWidgetAddButton.setVisibility(INVISIBLE);
@@ -583,17 +610,45 @@ public class WidgetCell extends LinearLayout {
             return;
         }
 
-        mWidgetAddButton.animate()
-                .alpha(0F)
-                .setDuration(ADD_BUTTON_FADE_DURATION_MS)
-                .withEndAction(() -> {
-                    mWidgetAddButton.setVisibility(INVISIBLE);
-                });
+        fadeThrough(/* hide= */ mWidgetAddButton, /* show= */ mWidgetTextContainer,
+                ADD_BUTTON_FADE_DURATION_MS, Interpolators.LINEAR);
+    }
 
-        mWidgetTextContainer.setAlpha(0F);
-        mWidgetTextContainer.setVisibility(VISIBLE);
-        mWidgetTextContainer.animate()
-                .alpha(1F)
-                .setDuration(ADD_BUTTON_FADE_DURATION_MS);
+    public boolean isShowingAddButton() {
+        return mIsShowingAddButton;
+    }
+
+    private static void fadeThrough(View hide, View show, int durationMs,
+            TimeInterpolator interpolator) {
+        AnimatedPropertySetter setter = new AnimatedPropertySetter();
+
+        Animator hideAnim = setter.setViewAlpha(hide, 0F, interpolator).setDuration(durationMs);
+        if (hideAnim instanceof ObjectAnimator anim) {
+            anim.setAutoCancel(true);
+        }
+
+        Animator showAnim = setter.setViewAlpha(show, 1F, interpolator).setDuration(durationMs);
+        if (showAnim instanceof ObjectAnimator anim) {
+            anim.setAutoCancel(true);
+        }
+
+        AnimatorSet set = new AnimatorSet();
+        set.playSequentially(hideAnim, showAnim);
+        set.start();
+    }
+
+    /**
+     * Returns true if this WidgetCell is displaying the same item as info.
+     */
+    public boolean matchesItem(WidgetItem info) {
+        if (info == null || mItem == null) return false;
+        if (info.widgetInfo != null && mItem.widgetInfo != null) {
+            return info.widgetInfo.getUser().equals(mItem.widgetInfo.getUser())
+                    && info.widgetInfo.getComponent().equals(mItem.widgetInfo.getComponent());
+        } else if (info.activityInfo != null && mItem.activityInfo != null) {
+            return info.activityInfo.getUser().equals(mItem.activityInfo.getUser())
+                    && info.activityInfo.getComponent().equals(mItem.activityInfo.getComponent());
+        }
+        return false;
     }
 }

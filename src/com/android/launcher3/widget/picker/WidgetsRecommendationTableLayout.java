@@ -58,12 +58,13 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
 
     public WidgetsRecommendationTableLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
-        // There are 1 row for title, 1 row for dimension and 2 rows for description.
+        // There are 1 row for title, 1 row for dimension and max 3 rows for description.
         mWidgetsRecommendationTableVerticalPadding = 2 * getResources()
                 .getDimensionPixelSize(R.dimen.widget_recommendations_table_vertical_padding);
         mWidgetCellVerticalPadding = 2 * getResources()
                 .getDimensionPixelSize(R.dimen.widget_cell_vertical_padding);
-        mWidgetCellTextViewsHeight = 4 * getResources().getDimension(R.dimen.widget_cell_font_size);
+        mWidgetCellTextViewsHeight =
+                getResources().getDimension(R.dimen.widget_cell_title_line_height);
     }
 
     /** Sets a {@link android.view.View.OnLongClickListener} for all widget cells in this table. */
@@ -83,14 +84,15 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
      * <p>If the content can't fit {@code recommendationTableMaxHeight}, this view will remove a
      * last row from the {@code recommendedWidgets} until it fits or only one row left.
      *
-     * <p>Returns {@code false} if none of the widgets could fit</p>
+     * <p>Returns the list of widgets that could fit</p>
      */
-    public int setRecommendedWidgets(List<ArrayList<WidgetItem>> recommendedWidgets,
+    public List<ArrayList<WidgetItem>> setRecommendedWidgets(
+            List<ArrayList<WidgetItem>> recommendedWidgets,
             DeviceProfile deviceProfile, float recommendationTableMaxHeight) {
         List<ArrayList<WidgetItem>> rows = selectRowsThatFitInAvailableHeight(recommendedWidgets,
                 recommendationTableMaxHeight, deviceProfile);
         bindData(rows);
-        return rows.stream().mapToInt(ArrayList::size).sum();
+        return rows;
     }
 
     private void bindData(List<ArrayList<WidgetItem>> recommendationTable) {
@@ -109,7 +111,6 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
                 WidgetCell widgetCell = addItemCell(tableRow);
                 widgetCell.applyFromCellItem(widgetItem);
                 widgetCell.showAppIconInWidgetTitle(true);
-                widgetCell.showBadge();
                 if (enableCategorizedWidgetSuggestions()) {
                     widgetCell.showDescription(false);
                     widgetCell.showDimensions(false);
@@ -123,6 +124,7 @@ public final class WidgetsRecommendationTableLayout extends TableLayout {
     private WidgetCell addItemCell(ViewGroup parent) {
         WidgetCell widget = (WidgetCell) LayoutInflater.from(
                 getContext()).inflate(R.layout.widget_cell, parent, false);
+        widget.setOnClickListener(mWidgetCellOnClickListener);
 
         View previewContainer = widget.findViewById(R.id.widget_preview_container);
         previewContainer.setOnClickListener(mWidgetCellOnClickListener);

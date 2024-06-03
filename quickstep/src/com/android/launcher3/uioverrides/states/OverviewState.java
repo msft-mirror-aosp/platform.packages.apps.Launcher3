@@ -47,7 +47,7 @@ public class OverviewState extends LauncherState {
     protected static final Rect sTempRect = new Rect();
 
     private static final int STATE_FLAGS = FLAG_WORKSPACE_ICONS_CAN_BE_DRAGGED
-            | FLAG_DISABLE_RESTORE | FLAG_OVERVIEW_UI | FLAG_WORKSPACE_INACCESSIBLE
+            | FLAG_DISABLE_RESTORE | FLAG_RECENTS_VIEW_VISIBLE | FLAG_WORKSPACE_INACCESSIBLE
             | FLAG_CLOSE_POPUPS;
 
     public OverviewState(int id) {
@@ -182,6 +182,11 @@ public class OverviewState extends LauncherState {
         return launcher.getString(R.string.accessibility_recent_apps);
     }
 
+    @Override
+    public int getTitle() {
+        return R.string.accessibility_recent_apps;
+    }
+
     public static float getDefaultSwipeHeight(Launcher launcher) {
         return LayoutUtils.getDefaultSwipeHeight(launcher, launcher.getDeviceProfile());
     }
@@ -199,7 +204,7 @@ public class OverviewState extends LauncherState {
     }
 
     @Override
-    public void onBackPressed(Launcher launcher) {
+    public void onBackInvoked(Launcher launcher) {
         RecentsView recentsView = launcher.getOverviewPanel();
         TaskView taskView = recentsView.getRunningTaskView();
         if (taskView != null) {
@@ -209,7 +214,7 @@ public class OverviewState extends LauncherState {
                 recentsView.snapToPage(recentsView.indexOfChild(taskView));
             }
         } else {
-            super.onBackPressed(launcher);
+            super.onBackInvoked(launcher);
         }
     }
 

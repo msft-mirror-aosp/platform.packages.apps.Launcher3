@@ -31,11 +31,12 @@ import com.android.launcher3.logging.StatsLogManager.StatsLogger
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.statehandlers.DepthController
 import com.android.launcher3.statemanager.StateManager
-import com.android.launcher3.statemanager.StatefulActivity
 import com.android.launcher3.util.ComponentKey
 import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.SystemUiProxy
+import com.android.quickstep.util.SplitSelectStateController.SplitFromDesktopController
+import com.android.quickstep.views.RecentsViewContainer
 import com.android.systemui.shared.recents.model.Task
 import com.android.wm.shell.common.split.SplitScreenConstants.SNAP_TO_50_50
 import java.util.function.Consumer
@@ -62,9 +63,10 @@ class SplitSelectStateControllerTest {
     private val statsLogger: StatsLogger = mock()
     private val stateManager: StateManager<LauncherState> = mock()
     private val handler: Handler = mock()
-    private val context: StatefulActivity<*> = mock()
+    private val context: RecentsViewContainer = mock()
     private val recentsModel: RecentsModel = mock()
     private val pendingIntent: PendingIntent = mock()
+    private val splitFromDesktopController: SplitFromDesktopController = mock()
 
     private lateinit var splitSelectStateController: SplitSelectStateController
 
@@ -118,7 +120,7 @@ class SplitSelectStateControllerTest {
 
         // Capture callback from recentsModel#getTasks()
         val consumer =
-            argumentCaptor<Consumer<ArrayList<GroupTask>>> {
+            argumentCaptor<Consumer<List<GroupTask>>> {
                     splitSelectStateController.findLastActiveTasksAndRunCallback(
                         listOf(nonMatchingComponent),
                         false /* findExactPairMatch */,
@@ -171,7 +173,7 @@ class SplitSelectStateControllerTest {
 
         // Capture callback from recentsModel#getTasks()
         val consumer =
-            argumentCaptor<Consumer<ArrayList<GroupTask>>> {
+            argumentCaptor<Consumer<List<GroupTask>>> {
                     splitSelectStateController.findLastActiveTasksAndRunCallback(
                         listOf(matchingComponent),
                         false /* findExactPairMatch */,
@@ -212,7 +214,7 @@ class SplitSelectStateControllerTest {
 
         // Capture callback from recentsModel#getTasks()
         val consumer =
-            argumentCaptor<Consumer<ArrayList<GroupTask>>> {
+            argumentCaptor<Consumer<List<GroupTask>>> {
                     splitSelectStateController.findLastActiveTasksAndRunCallback(
                         listOf(nonPrimaryUserComponent),
                         false /* findExactPairMatch */,
@@ -268,7 +270,7 @@ class SplitSelectStateControllerTest {
 
         // Capture callback from recentsModel#getTasks()
         val consumer =
-            argumentCaptor<Consumer<ArrayList<GroupTask>>> {
+            argumentCaptor<Consumer<List<GroupTask>>> {
                     splitSelectStateController.findLastActiveTasksAndRunCallback(
                         listOf(nonPrimaryUserComponent),
                         false /* findExactPairMatch */,
@@ -321,7 +323,7 @@ class SplitSelectStateControllerTest {
 
         // Capture callback from recentsModel#getTasks()
         val consumer =
-            argumentCaptor<Consumer<ArrayList<GroupTask>>> {
+            argumentCaptor<Consumer<List<GroupTask>>> {
                     splitSelectStateController.findLastActiveTasksAndRunCallback(
                         listOf(matchingComponent),
                         false /* findExactPairMatch */,
@@ -375,7 +377,7 @@ class SplitSelectStateControllerTest {
 
         // Capture callback from recentsModel#getTasks()
         val consumer =
-            argumentCaptor<Consumer<ArrayList<GroupTask>>> {
+            argumentCaptor<Consumer<List<GroupTask>>> {
                     splitSelectStateController.findLastActiveTasksAndRunCallback(
                         listOf(nonMatchingComponent, matchingComponent),
                         false /* findExactPairMatch */,
@@ -428,7 +430,7 @@ class SplitSelectStateControllerTest {
 
         // Capture callback from recentsModel#getTasks()
         val consumer =
-            argumentCaptor<Consumer<ArrayList<GroupTask>>> {
+            argumentCaptor<Consumer<List<GroupTask>>> {
                     splitSelectStateController.findLastActiveTasksAndRunCallback(
                         listOf(matchingComponent, matchingComponent),
                         false /* findExactPairMatch */,
@@ -494,7 +496,7 @@ class SplitSelectStateControllerTest {
 
         // Capture callback from recentsModel#getTasks()
         val consumer =
-            argumentCaptor<Consumer<ArrayList<GroupTask>>> {
+            argumentCaptor<Consumer<List<GroupTask>>> {
                     splitSelectStateController.findLastActiveTasksAndRunCallback(
                         listOf(matchingComponent, matchingComponent),
                         false /* findExactPairMatch */,
@@ -546,7 +548,7 @@ class SplitSelectStateControllerTest {
 
         // Capture callback from recentsModel#getTasks()
         val consumer =
-            argumentCaptor<Consumer<ArrayList<GroupTask>>> {
+            argumentCaptor<Consumer<List<GroupTask>>> {
                     splitSelectStateController.findLastActiveTasksAndRunCallback(
                         listOf(matchingComponent2, matchingComponent),
                         true /* findExactPairMatch */,
@@ -605,6 +607,18 @@ class SplitSelectStateControllerTest {
         splitSelectStateController.setInitialTaskSelect(null, 0, itemInfo, null, 1)
         splitSelectStateController.setSecondTask(pendingIntent, itemInfo2)
         assertTrue(splitSelectStateController.isBothSplitAppsConfirmed)
+    }
+
+    @Test
+    fun splitSelectStateControllerDestroyed_SplitFromDesktopControllerAlsoDestroyed() {
+        // Initiate split from desktop controller
+        splitSelectStateController.initSplitFromDesktopController(splitFromDesktopController)
+
+        // Simulate default controller being destroyed
+        splitSelectStateController.onDestroy()
+
+        // Verify desktop controller is also destroyed
+        verify(splitFromDesktopController).onDestroy()
     }
 
     // Generate GroupTask with default userId.

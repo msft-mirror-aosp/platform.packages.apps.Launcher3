@@ -29,6 +29,7 @@ import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.content.ComponentName;
+import android.util.Log;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.ViewGroup;
@@ -80,6 +81,7 @@ public class HotseatPredictionController implements DragController.DragListener,
         SystemShortcut.Factory<QuickstepLauncher>, DeviceProfile.OnDeviceProfileChangeListener,
         DragSource, ViewGroup.OnHierarchyChangeListener {
 
+    private static final String TAG = "HotseatPredictionController";
     private static final int FLAG_UPDATE_PAUSED = 1 << 0;
     private static final int FLAG_DRAG_IN_PROGRESS = 1 << 1;
     private static final int FLAG_FILL_IN_PROGRESS = 1 << 2;
@@ -292,6 +294,16 @@ public class HotseatPredictionController implements DragController.DragListener,
     }
 
     /**
+     * Ensures that if the flag FLAG_UPDATE_PAUSED is active we set it to false.
+     */
+    public void verifyUIUpdateNotPaused() {
+        if ((mPauseFlags & FLAG_UPDATE_PAUSED) != 0) {
+            setPauseUIUpdate(false);
+            Log.e(TAG, "FLAG_UPDATE_PAUSED should not be set to true (see b/339700174)");
+        }
+    }
+
+    /**
      * Sets or updates the predicted items
      */
     public void setPredictedItems(FixedContainerItems items) {
@@ -499,7 +511,7 @@ public class HotseatPredictionController implements DragController.DragListener,
 
         @Override
         public void onClick(View view) {
-            dismissTaskMenuView(mTarget);
+            dismissTaskMenuView();
             pinPrediction(mItemInfo);
         }
     }
@@ -521,7 +533,7 @@ public class HotseatPredictionController implements DragController.DragListener,
     }
 
     public void dump(String prefix, PrintWriter writer) {
-        writer.println(prefix + this.getClass().getSimpleName());
+        writer.println(prefix + "HotseatPredictionController");
         writer.println(prefix + "\tFlags: " + getStateString(mPauseFlags));
         writer.println(prefix + "\tmHotSeatItemsCount: " + mHotSeatItemsCount);
         writer.println(prefix + "\tmPredictedItems: " + mPredictedItems);

@@ -32,6 +32,8 @@ import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.util.BaseDepthController;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 
+import java.util.concurrent.TimeUnit;
+
 /**
  * Definition for AllApps state
  */
@@ -39,6 +41,8 @@ public class AllAppsState extends LauncherState {
 
     private static final int STATE_FLAGS =
             FLAG_WORKSPACE_INACCESSIBLE | FLAG_CLOSE_POPUPS | FLAG_HOTSEAT_INACCESSIBLE;
+    private static final long BACK_CUJ_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
+
 
     public AllAppsState(int id) {
         super(id, LAUNCHER_STATE_ALLAPPS, STATE_FLAGS);
@@ -53,14 +57,36 @@ public class AllAppsState extends LauncherState {
     }
 
     @Override
-    public void onBackPressed(Launcher launcher) {
+    public void onBackStarted(Launcher launcher) {
+        // Because the back gesture can take longer time depending on when user release the finger,
+        // we pass BACK_CUJ_TIMEOUT_MS as timeout to the jank monitor.
         InteractionJankMonitorWrapper.begin(launcher.getAppsView(),
-                Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK);
-        super.onBackPressed(launcher);
+                Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK, BACK_CUJ_TIMEOUT_MS);
+        super.onBackStarted(launcher);
     }
 
     @Override
-    protected void onBackPressCompleted(boolean success) {
+    public void onBackInvoked(Launcher launcher) {
+        // In predictive back swipe, onBackInvoked() will be called after onBackStarted().
+        // In 3 button mode, onBackStarted() is not called but onBackInvoked() will be called.
+        // Thus In onBackInvoked(), we should only begin instrumenting if we didn't call
+        // onBackStarted() to start instrumenting CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK.
+        if (!InteractionJankMonitorWrapper.isInstrumenting(Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK)) {
+            InteractionJankMonitorWrapper.begin(
+                    launcher.getAppsView(), Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK);
+        }
+        super.onBackInvoked(launcher);
+    }
+
+    /** Called when predictive back swipe is cancelled. */
+    @Override
+    public void onBackCancelled(Launcher launcher) {
+        super.onBackCancelled(launcher);
+        InteractionJankMonitorWrapper.cancel(Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK);
+    }
+
+    @Override
+    protected void onBackAnimationCompleted(boolean success) {
         if (success) {
             // Animation was successful.
             InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_CLOSE_ALL_APPS_BACK);
@@ -73,6 +99,11 @@ public class AllAppsState extends LauncherState {
     @Override
     public String getDescription(Launcher launcher) {
         return launcher.getAppsView().getDescription();
+    }
+
+    @Override
+    public int getTitle() {
+        return R.string.all_apps_label;
     }
 
     @Override

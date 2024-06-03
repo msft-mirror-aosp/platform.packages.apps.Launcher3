@@ -29,9 +29,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.SessionCommitReceiver;
-import com.android.launcher3.Utilities;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.ItemInstallQueue;
 import com.android.launcher3.util.IntArray;
@@ -40,6 +40,7 @@ import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.Preconditions;
+import com.android.launcher3.util.SafeCloseable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,7 +52,7 @@ import java.util.Objects;
  * Utility class to tracking install sessions
  */
 @SuppressWarnings("NewApi")
-public class InstallSessionHelper {
+public class InstallSessionHelper implements SafeCloseable {
 
     @NonNull
     private static final String LOG = "InstallSessionHelper";
@@ -87,6 +88,9 @@ public class InstallSessionHelper {
         mAppContext = context.getApplicationContext();
         mLauncherApps = context.getSystemService(LauncherApps.class);
     }
+
+    @Override
+    public void close() { }
 
     @WorkerThread
     @NonNull
@@ -167,7 +171,7 @@ public class InstallSessionHelper {
         synchronized (mSessionVerifiedMap) {
             if (!mSessionVerifiedMap.containsKey(pkg)) {
                 boolean hasSystemFlag = DEBUG || mAppContext.getPackageName().equals(pkg)
-                        || new PackageManagerHelper(mAppContext)
+                        || PackageManagerHelper.INSTANCE.get(mAppContext)
                                 .getApplicationInfo(pkg, user, ApplicationInfo.FLAG_SYSTEM) != null;
                 mSessionVerifiedMap.put(pkg, hasSystemFlag);
             }
@@ -217,7 +221,7 @@ public class InstallSessionHelper {
                 && !promiseIconAddedForId(sessionInfo.getSessionId())) {
             // In case of unarchival, we do not want to add a workspace promise icon if one is
             // not already present. For general app installations however, we do support it.
-            if (!Utilities.enableSupportForArchiving() || !sessionInfo.isUnarchival()) {
+            if (!Flags.enableSupportForArchiving() || !sessionInfo.isUnarchival()) {
                 FileLog.d(LOG, "Adding package name to install queue: "
                         + sessionInfo.getAppPackageName());
 
@@ -232,7 +236,7 @@ public class InstallSessionHelper {
 
     public boolean verifySessionInfo(@Nullable final PackageInstaller.SessionInfo sessionInfo) {
         // For archived apps we always want to show promise icons and the checks below don't apply.
-        if (Utilities.enableSupportForArchiving() && sessionInfo != null
+        if (Flags.enableSupportForArchiving() && sessionInfo != null
                 && sessionInfo.isUnarchival()) {
             return true;
         }
@@ -241,7 +245,7 @@ public class InstallSessionHelper {
                 && sessionInfo.getInstallReason() == PackageManager.INSTALL_REASON_USER
                 && sessionInfo.getAppIcon() != null
                 && !TextUtils.isEmpty(sessionInfo.getAppLabel())
-                && !new PackageManagerHelper(mAppContext).isAppInstalled(
+                && !PackageManagerHelper.INSTANCE.get(mAppContext).isAppInstalled(
                         sessionInfo.getAppPackageName(), getUserHandle(sessionInfo));
     }
 

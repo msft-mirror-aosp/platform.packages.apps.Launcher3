@@ -73,6 +73,7 @@ import java.util.Optional;
  * Represents an item in the launcher.
  */
 public class ItemInfo {
+    private static final String TAG = "ItemInfo";
 
     public static final boolean DEBUG = false;
     public static final int NO_ID = -1;
@@ -285,7 +286,7 @@ public class ItemInfo {
     @Override
     @NonNull
     public final String toString() {
-        return getClass().getSimpleName() + "(" + dumpProperties() + ")";
+        return TAG + "(" + dumpProperties() + ")";
     }
 
     @NonNull
@@ -349,10 +350,9 @@ public class ItemInfo {
 
     /**
      * Creates {@link LauncherAtom.ItemInfo} with important fields and parent container info.
-     * @param fInfo
      */
     @NonNull
-    public LauncherAtom.ItemInfo buildProto(@Nullable final FolderInfo fInfo) {
+    public LauncherAtom.ItemInfo buildProto(@Nullable final CollectionInfo cInfo) {
         LauncherAtom.ItemInfo.Builder itemBuilder = getDefaultItemInfoBuilder();
         Optional<ComponentName> nullableComponent = Optional.ofNullable(getTargetComponent());
         switch (itemType) {
@@ -398,21 +398,21 @@ public class ItemInfo {
             default:
                 break;
         }
-        if (fInfo != null) {
+        if (cInfo != null) {
             LauncherAtom.FolderContainer.Builder folderBuilder =
                     LauncherAtom.FolderContainer.newBuilder();
             folderBuilder.setGridX(cellX).setGridY(cellY).setPageIndex(screenId);
 
-            switch (fInfo.container) {
+            switch (cInfo.container) {
                 case CONTAINER_HOTSEAT:
                 case CONTAINER_HOTSEAT_PREDICTION:
                     folderBuilder.setHotseat(LauncherAtom.HotseatContainer.newBuilder()
-                            .setIndex(fInfo.screenId));
+                            .setIndex(cInfo.screenId));
                     break;
                 case CONTAINER_DESKTOP:
                     folderBuilder.setWorkspace(LauncherAtom.WorkspaceContainer.newBuilder()
-                            .setPageIndex(fInfo.screenId)
-                            .setGridX(fInfo.cellX).setGridY(fInfo.cellY));
+                            .setPageIndex(cInfo.screenId)
+                            .setGridX(cInfo.cellX).setGridY(cInfo.cellY));
                     break;
             }
             itemBuilder.setContainerInfo(ContainerInfo.newBuilder().setFolder(folderBuilder));
@@ -428,12 +428,10 @@ public class ItemInfo {
     @NonNull
     protected LauncherAtom.ItemInfo.Builder getDefaultItemInfoBuilder() {
         LauncherAtom.ItemInfo.Builder itemBuilder = LauncherAtom.ItemInfo.newBuilder();
-        UserIconInfo info = getUserInfo();
-        itemBuilder.setIsWork(info != null && info.isWork());
-        itemBuilder.setUserType(getUserType(info));
-        SettingsCache settingsCache = SettingsCache.INSTANCE.getNoCreate();
-        boolean isKidsMode = settingsCache != null && settingsCache.getValue(NAV_BAR_KIDS_MODE, 0);
-        itemBuilder.setIsKidsMode(isKidsMode);
+        SettingsCache.INSTANCE.executeIfCreated(cache ->
+                itemBuilder.setIsKidsMode(cache.getValue(NAV_BAR_KIDS_MODE, 0)));
+        UserCache.INSTANCE.executeIfCreated(cache ->
+                itemBuilder.setUserType(getUserType(cache.getUserInfo(user))));
         itemBuilder.setRank(rank);
         return itemBuilder;
     }
@@ -525,15 +523,6 @@ public class ItemInfo {
     public void setTitle(@Nullable final CharSequence title,
             @Nullable final ModelWriter modelWriter) {
         this.title = title;
-    }
-
-    private UserIconInfo getUserInfo() {
-        UserCache userCache = UserCache.INSTANCE.getNoCreate();
-        if (userCache == null) {
-            return null;
-        }
-
-        return userCache.getUserInfo(user);
     }
 
     private int getUserType(UserIconInfo info) {

@@ -38,12 +38,12 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_O
 
 import android.view.MotionEvent;
 
-import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.touch.AbstractStateChangeTouchController;
 import com.android.launcher3.touch.SingleAxisSwipeDetector;
+import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.quickstep.SystemUiProxy;
@@ -58,11 +58,12 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
 
     protected final RecentsView mOverviewPanel;
 
-    public QuickSwitchTouchController(Launcher launcher) {
+    public QuickSwitchTouchController(QuickstepLauncher launcher) {
         this(launcher, SingleAxisSwipeDetector.HORIZONTAL);
     }
 
-    protected QuickSwitchTouchController(Launcher l, SingleAxisSwipeDetector.Direction dir) {
+    protected QuickSwitchTouchController(QuickstepLauncher l,
+            SingleAxisSwipeDetector.Direction dir) {
         super(l, dir);
         mOverviewPanel = l.getOverviewPanel();
     }
@@ -83,7 +84,7 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
 
     @Override
     protected LauncherState getTargetState(LauncherState fromState, boolean isDragTowardPositive) {
-        int stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();
+        long stateFlags = SystemUiProxy.INSTANCE.get(mLauncher).getLastSystemUiStateFlags();
         if ((stateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0) {
             return NORMAL;
         }
@@ -150,7 +151,7 @@ public class QuickSwitchTouchController extends AbstractStateChangeTouchControll
             int sysuiFlags = 0;
             TaskView tv = mOverviewPanel.getTaskViewAt(0);
             if (tv != null) {
-                sysuiFlags = tv.getThumbnail().getSysUiStatusNavFlags();
+                sysuiFlags = tv.getFirstThumbnailViewDeprecated().getSysUiStatusNavFlags();
             }
             mLauncher.getSystemUiController().updateUiState(UI_STATE_FULLSCREEN_TASK, sysuiFlags);
         } else {

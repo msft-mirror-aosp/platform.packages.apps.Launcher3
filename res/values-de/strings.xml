@@ -33,30 +33,22 @@
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"Dieses App-Paar wird auf diesem Gerät nicht unterstützt"</string>
     <string name="app_pair_needs_unfold" msgid="4588897528143807002">"Gerät aufklappen, um dieses App-Paar zu verwenden"</string>
+    <string name="app_pair_not_available" msgid="3556767440808032031">"App-Paar nicht verfügbar"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Zum Verschieben des Widgets berühren und halten"</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Doppeltippen und halten, um ein Widget zu bewegen oder benutzerdefinierte Aktionen zu nutzen."</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"%1$d breit und %2$d hoch"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"Widget „<xliff:g id="WIDGET_NAME">%1$s</xliff:g>“"</string>
+    <string name="widget_preview_name_and_dims_content_description" msgid="8489038126122831595">"Widget „<xliff:g id="WIDGET_NAME">%1$s</xliff:g>“, %2$d breit und %3$d hoch"</string>
     <string name="add_item_request_drag_hint" msgid="8730547755622776606">"Wenn du das Widget auf dem Startbildschirm verschieben möchtest, halte es gedrückt"</string>
     <string name="add_to_home_screen" msgid="9168649446635919791">"Zum Startbildschirm hinzufügen"</string>
     <string name="added_to_home_screen_accessibility_text" msgid="4451545765448884415">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g>-Widget zum Startbildschirm hinzugefügt"</string>
     <string name="suggested_widgets_header_title" msgid="1844314680798145222">"Vorschläge"</string>
-    <!-- no translation found for productivity_widget_recommendation_category_label (3811812719618323750) -->
-    <skip />
-    <!-- no translation found for news_widget_recommendation_category_label (6756167867113741310) -->
-    <skip />
-    <string name="social_and_entertainment_widget_recommendation_category_label" msgid="2923840997302308191">"Zum Entspannen"</string>
-    <!-- no translation found for entertainment_widget_recommendation_category_label (3973107268630717874) -->
-    <skip />
-    <!-- no translation found for social_widget_recommendation_category_label (689147679536384717) -->
-    <skip />
-    <!-- no translation found for fitness_widget_recommendation_category_label (2756483898236585324) -->
-    <skip />
-    <!-- no translation found for weather_widget_recommendation_category_label (3059715991930798039) -->
-    <skip />
-    <!-- no translation found for others_widget_recommendation_category_label (5555987036267226245) -->
-    <skip />
+    <string name="productivity_widget_recommendation_category_label" msgid="3811812719618323750">"Must-haves"</string>
+    <string name="news_widget_recommendation_category_label" msgid="6756167867113741310">"Nachrichten und Zeitschriften"</string>
+    <string name="entertainment_widget_recommendation_category_label" msgid="3973107268630717874">"Unterhaltung"</string>
+    <string name="social_widget_recommendation_category_label" msgid="689147679536384717">"Soziale Netzwerke"</string>
+    <string name="others_widget_recommendation_category_label" msgid="5555987036267226245">"Vorschläge für dich"</string>
     <string name="widget_picker_right_pane_accessibility_title" msgid="1673313931455067502">"<xliff:g id="SELECTED_HEADER">%1$s</xliff:g>-Widgets rechts, Suche und Optionen links"</string>
     <string name="widgets_count" msgid="6467746476364652096">"{count,plural, =1{# Widget}other{# Widgets}}"</string>
     <string name="shortcuts_count" msgid="8471715556199592381">"{count,plural, =1{# Verknüpfung}other{# Verknüpfungen}}"</string>
@@ -70,10 +62,9 @@
     <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"Geschäftlich"</string>
     <string name="widget_category_conversations" msgid="8894438636213590446">"Unterhaltungen"</string>
     <string name="widget_category_note_taking" msgid="3469689394504266039">"Notizen"</string>
-    <string name="widget_education_header" msgid="4874760613775913787">"Praktische Informationen – immer zur Hand"</string>
-    <string name="widget_education_content" msgid="1731667670753497052">"Wenn du Informationen erhalten möchtest, ohne Apps zu öffnen, kannst du deinem Startbildschirm Widgets hinzufügen"</string>
+    <string name="widget_add_button_label" msgid="2761267068711937179">"Hinzufügen"</string>
+    <string name="widget_add_button_content_description" msgid="1810530016360039643">"Widget „<xliff:g id="WIDGET_NAME">%1$s</xliff:g>“ hinzufügen"</string>
     <string name="reconfigurable_widget_education_tip" msgid="6336962690888067057">"Tippen, um die Widget-Einstellungen zu ändern"</string>
-    <string name="widget_education_close_button" msgid="8676165703104836580">"OK"</string>
     <string name="widget_reconfigure_button_content_description" msgid="8811472721881205250">"Widget-Einstellungen ändern"</string>
     <string name="all_apps_search_bar_hint" msgid="1390553134053255246">"Apps finden"</string>
     <string name="all_apps_loading_message" msgid="5813968043155271636">"Apps werden geladen…"</string>
@@ -92,7 +83,8 @@
     <string name="remove_drop_target_label" msgid="7812859488053230776">"Entfernen"</string>
     <string name="uninstall_drop_target_label" msgid="4722034217958379417">"Deinstallieren"</string>
     <string name="app_info_drop_target_label" msgid="692894985365717661">"App-Info"</string>
-    <string name="install_private_system_shortcut_label" msgid="1616889277073184841">"Privat installieren"</string>
+    <string name="install_private_system_shortcut_label" msgid="1616889277073184841">"Vertraul. installieren"</string>
+    <string name="uninstall_private_system_shortcut_label" msgid="8423460530441627982">"App deinstallieren"</string>
     <string name="install_drop_target_label" msgid="2539096853673231757">"Installieren"</string>
     <string name="dismiss_prediction_label" msgid="3357562989568808658">"App nicht vorschlagen"</string>
     <string name="pin_prediction" msgid="4196423321649756498">"Vorgeschlagene App fixieren"</string>
@@ -144,7 +136,7 @@
     <string name="app_installing_title" msgid="5864044122733792085">"<xliff:g id="NAME">%1$s</xliff:g> wird installiert, <xliff:g id="PROGRESS">%2$s</xliff:g> abgeschlossen"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g> wird heruntergeladen, <xliff:g id="PROGRESS">%2$s</xliff:g> abgeschlossen"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"Warten auf Installation von <xliff:g id="NAME">%1$s</xliff:g>"</string>
-    <string name="app_archived_title" msgid="9124290918876665128">"<xliff:g id="NAME">%1$s</xliff:g> ist archiviert. Zum Herunterladen tippen."</string>
+    <string name="app_archived_title" msgid="7717956158562544081">"<xliff:g id="NAME">%1$s</xliff:g> ist archiviert. Tippe, um die App herunterzuladen und wiederherzustellen."</string>
     <string name="dialog_update_title" msgid="114234265740994042">"App-Update erforderlich"</string>
     <string name="dialog_update_message" msgid="4176784553982226114">"Die App für dieses Symbol wurde noch nicht aktualisiert. Du kannst sie manuell aktualisieren, um die Verknüpfung wieder zu aktivieren, oder das Symbol entfernen."</string>
     <string name="dialog_update" msgid="2178028071796141234">"Aktualisieren"</string>
@@ -191,14 +183,15 @@
     <string name="work_apps_enable_btn_text" msgid="1736198302467317371">"Nicht mehr pausieren"</string>
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"Filter"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"Fehler: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
-    <string name="private_space_label" msgid="2359721649407947001">"Privates Profil"</string>
-    <string name="private_space_secondary_label" msgid="611902414159280263">"Hier kannst du deine privaten Apps verstecken und sperren"</string>
+    <string name="private_space_label" msgid="2359721649407947001">"Vertrauliches Profil"</string>
+    <string name="private_space_secondary_label" msgid="9203933341714508907">"Zum Einrichten oder Öffnen tippen"</string>
     <string name="ps_container_title" msgid="4391796149519594205">"Privat"</string>
-    <string name="ps_container_settings" msgid="6059734123353320479">"Einstellungen für privaten Bereich"</string>
-    <string name="ps_container_lock_unlock_button" msgid="7605602332253423755">"Privaten Bereich sperren/entsperren"</string>
+    <string name="ps_container_settings" msgid="6059734123353320479">"Einstellungen für vertrauliches Profil"</string>
+    <string name="ps_container_unlock_button_content_description" msgid="9181551784092204234">"Privat, entsperrt."</string>
+    <string name="ps_container_lock_button_content_description" msgid="5961993384382649530">"Privat, gesperrt."</string>
     <string name="ps_container_lock_title" msgid="2640257399982364682">"Sperren"</string>
-    <string name="ps_container_transition" msgid="8667331812048014412">"Sperrzustand des privaten Bereichs wird gerade geändert"</string>
-    <string name="ps_add_button_label" msgid="8611055839242385935">"Apps installieren"</string>
-    <string name="ps_add_button_content_description" msgid="3254274107740952556">"Apps im privaten Bereich installieren"</string>
+    <string name="ps_container_transition" msgid="8667331812048014412">"Sperrzustand des vertraulichen Profils wird gerade geändert"</string>
+    <string name="ps_add_button_label" msgid="8127988716897128773">"Installieren"</string>
+    <string name="ps_add_button_content_description" msgid="3254274107740952556">"Apps im vertraulichen Profil installieren"</string>
     <string name="bubble_bar_overflow_description" msgid="7410995531938041192">"Weitere Optionen"</string>
 </resources>

@@ -58,6 +58,7 @@ import static com.android.launcher3.config.FeatureFlags.SEPARATE_RECENTS_ACTIVIT
 import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.testing.shared.TestProtocol.WALLPAPER_OPEN_ANIMATION_FINISHED_MESSAGE;
 import static com.android.launcher3.util.DisplayController.isTransientTaskbar;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.ORDERED_BG_EXECUTOR;
 import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE;
 import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
@@ -173,6 +174,7 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map.Entry;
 
 /**
  * Manages the opening and closing app transitions from Launcher
@@ -373,7 +375,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
      */
     protected boolean isLaunchingFromRecents(@NonNull View v,
             @Nullable RemoteAnimationTarget[] targets) {
-        return mLauncher.getStateManager().getState().overviewUi
+        return mLauncher.getStateManager().getState().isRecentsViewVisible
                 && findTaskViewToLaunch(mLauncher.getOverviewPanel(), v, targets) != null;
     }
 
@@ -1880,7 +1882,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
 
             return new ContainerAnimationRunner(
                     new ActivityTransitionAnimator.AnimationDelegate(
-                            controller, callback, listener));
+                            MAIN_EXECUTOR, controller, callback, listener));
         }
 
         /**

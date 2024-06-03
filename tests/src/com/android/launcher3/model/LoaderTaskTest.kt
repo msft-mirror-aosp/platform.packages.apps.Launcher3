@@ -46,7 +46,7 @@ class LoaderTaskTest {
     @Mock private lateinit var app: LauncherAppState
     @Mock private lateinit var bgAllAppsList: AllAppsList
     @Mock private lateinit var modelDelegate: ModelDelegate
-    @Mock private lateinit var launcherBinder: LauncherBinder
+    @Mock private lateinit var launcherBinder: BaseLauncherBinder
     @Mock private lateinit var launcherModel: LauncherModel
     @Mock private lateinit var transaction: LoaderTransaction
     @Mock private lateinit var iconCache: IconCache
@@ -56,7 +56,7 @@ class LoaderTaskTest {
 
     @Spy private var userManagerState: UserManagerState? = UserManagerState()
 
-    @get:Rule val setFlagsRule = SetFlagsRule().apply { initAllFlagsToReleaseConfigDefault() }
+    @get:Rule val setFlagsRule = SetFlagsRule()
 
     @Before
     fun setup() {
@@ -103,7 +103,7 @@ class LoaderTaskTest {
                 .runSyncOnBackgroundThread()
             Truth.assertThat(workspaceItems.size).isAtLeast(25)
             Truth.assertThat(appWidgets.size).isAtLeast(7)
-            Truth.assertThat(folders.size()).isAtLeast(8)
+            Truth.assertThat(collections.size()).isAtLeast(8)
             Truth.assertThat(itemsIdMap.size()).isAtLeast(40)
         }
 

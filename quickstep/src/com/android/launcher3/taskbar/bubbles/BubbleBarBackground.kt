@@ -15,30 +15,31 @@
  */
 package com.android.launcher3.taskbar.bubbles
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.ShapeDrawable
 import com.android.app.animation.Interpolators
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.Utilities.mapToRange
 import com.android.launcher3.icons.GraphicsUtils.setColorAlphaBound
-import com.android.launcher3.taskbar.TaskbarActivityContext
-import com.android.wm.shell.common.TriangleShape
+import com.android.launcher3.popup.RoundedArrowDrawable
 
 /** Drawable for the background of the bubble bar. */
-class BubbleBarBackground(context: TaskbarActivityContext, private val backgroundHeight: Float) :
-    Drawable() {
+class BubbleBarBackground(context: Context, private var backgroundHeight: Float) : Drawable() {
 
     private val DARK_THEME_SHADOW_ALPHA = 51f
     private val LIGHT_THEME_SHADOW_ALPHA = 25f
 
     private val paint: Paint = Paint()
-    private val pointerSize: Float
+    private val pointerWidth: Float
+    private val pointerHeight: Float
+    private val pointerTipRadius: Float
+    private val pointerVisibleHeight: Float
 
     private val shadowAlpha: Float
     private var shadowBlur = 0f
@@ -46,8 +47,9 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
 
     var arrowPositionX: Float = 0f
         private set
+
     private var showingArrow: Boolean = false
-    private var arrowDrawable: ShapeDrawable
+    private var arrowDrawable: RoundedArrowDrawable
 
     var width: Float = 0f
 
@@ -75,7 +77,10 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
         val res = context.resources
         shadowBlur = res.getDimension(R.dimen.transient_taskbar_shadow_blur)
         keyShadowDistance = res.getDimension(R.dimen.transient_taskbar_key_shadow_distance)
-        pointerSize = res.getDimension(R.dimen.bubblebar_pointer_size)
+        pointerWidth = res.getDimension(R.dimen.bubblebar_pointer_width)
+        pointerHeight = res.getDimension(R.dimen.bubblebar_pointer_height)
+        pointerVisibleHeight = res.getDimension(R.dimen.bubblebar_pointer_visible_size)
+        pointerTipRadius = res.getDimension(R.dimen.bubblebar_pointer_radius)
 
         shadowAlpha =
             if (Utilities.isDarkTheme(context)) {
@@ -85,11 +90,14 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
             }
 
         arrowDrawable =
-            ShapeDrawable(TriangleShape.create(pointerSize, pointerSize, /* pointUp= */ true))
-        arrowDrawable.setBounds(0, 0, pointerSize.toInt(), pointerSize.toInt())
-        arrowDrawable.paint.flags = Paint.ANTI_ALIAS_FLAG
-        arrowDrawable.paint.style = Paint.Style.FILL
-        arrowDrawable.paint.color = context.getColor(R.color.taskbar_background)
+            RoundedArrowDrawable.createVerticalRoundedArrow(
+                pointerWidth,
+                pointerHeight,
+                pointerTipRadius,
+                /* isPointingUp= */ true,
+                context.getColor(R.color.taskbar_background)
+            )
+        arrowDrawable.setBounds(0, 0, pointerWidth.toInt(), pointerHeight.toInt())
     }
 
     fun showArrow(show: Boolean) {
@@ -114,7 +122,7 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
             keyShadowDistance,
             setColorAlphaBound(Color.BLACK, Math.round(newShadowAlpha))
         )
-        arrowDrawable.paint.setShadowLayer(
+        arrowDrawable.setShadowLayer(
             shadowBlur,
             0f,
             keyShadowDistance,
@@ -123,24 +131,16 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
 
         // Draw background.
         val radius = backgroundHeight / 2f
-        val left = if (anchorLeft) 0f else bounds.width().toFloat() - width
-        val right = if (anchorLeft) width else bounds.width().toFloat()
-        canvas.drawRoundRect(
-            left,
-            pointerSize,
-            right,
-            bounds.height().toFloat(),
-            radius,
-            radius,
-            paint
-        )
+        val left = bounds.left + (if (anchorLeft) 0f else bounds.width().toFloat() - width)
+        val right = bounds.left + (if (anchorLeft) width else bounds.width().toFloat())
+        val top = bounds.top + pointerVisibleHeight
+        val bottom = bounds.top + bounds.height().toFloat()
+        canvas.drawRoundRect(left, top, right, bottom, radius, radius, paint)
 
         if (showingArrow) {
             // Draw arrow.
-            val transX = arrowPositionX - pointerSize / 2f
-            // Shift arrow down by 1 pixel. Rounded rect has a 1 pixel border which will show up
-            // between background and arrow otherwise.
-            canvas.translate(transX, 1f)
+            val transX = bounds.left + arrowPositionX - pointerWidth / 2f
+            canvas.translate(transX, 0f)
             arrowDrawable.draw(canvas)
         }
 
@@ -157,7 +157,8 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
 
     override fun setAlpha(alpha: Int) {
         paint.alpha = alpha
-        arrowDrawable.paint.alpha = alpha
+        arrowDrawable.alpha = alpha
+        invalidateSelf()
     }
 
     override fun getAlpha(): Int {
@@ -169,6 +170,10 @@ class BubbleBarBackground(context: TaskbarActivityContext, private val backgroun
     }
 
     fun setArrowAlpha(alpha: Int) {
-        arrowDrawable.paint.alpha = alpha
+        arrowDrawable.alpha = alpha
+    }
+
+    fun setHeight(newHeight: Float) {
+        backgroundHeight = newHeight
     }
 }

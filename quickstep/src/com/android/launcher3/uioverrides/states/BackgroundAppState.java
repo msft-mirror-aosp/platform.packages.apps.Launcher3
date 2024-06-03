@@ -18,12 +18,10 @@ package com.android.launcher3.uioverrides.states;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
-import static com.android.quickstep.views.DesktopTaskView.isDesktopModeSupported;
 
 import android.content.Context;
 import android.graphics.Color;
 
-import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.allapps.AllAppsTransitionController;
@@ -36,7 +34,7 @@ import com.android.quickstep.views.RecentsView;
  */
 public class BackgroundAppState extends OverviewState {
 
-    private static final int STATE_FLAGS = FLAG_DISABLE_RESTORE | FLAG_OVERVIEW_UI
+    private static final int STATE_FLAGS = FLAG_DISABLE_RESTORE | FLAG_RECENTS_VIEW_VISIBLE
             | FLAG_WORKSPACE_INACCESSIBLE | FLAG_NON_INTERACTIVE | FLAG_CLOSE_POPUPS;
 
     public BackgroundAppState(int id) {
@@ -64,7 +62,7 @@ public class BackgroundAppState extends OverviewState {
 
     @Override
     public float[] getOverviewScaleAndOffset(Launcher launcher) {
-        return getOverviewScaleAndOffsetForBackgroundState(launcher);
+        return getOverviewScaleAndOffsetForBackgroundState(launcher.getOverviewPanel());
     }
 
     @Override
@@ -92,8 +90,8 @@ public class BackgroundAppState extends OverviewState {
 
     @Override
     protected float getDepthUnchecked(Context context) {
-        if (isDesktopModeSupported() && Launcher.getLauncher(context).areFreeformTasksVisible()) {
-            // Don't blur the background while freeform tasks are visible
+        if (Launcher.getLauncher(context).areDesktopTasksVisible()) {
+            // Don't blur the background while desktop tasks are visible
             return BaseDepthController.DEPTH_0_PERCENT;
         } else if (enableScalingRevealHomeAnimation()) {
             return BaseDepthController.DEPTH_70_PERCENT;
@@ -126,9 +124,7 @@ public class BackgroundAppState extends OverviewState {
     }
 
     public static float[] getOverviewScaleAndOffsetForBackgroundState(
-            BaseDraggingActivity activity) {
-        return new float[] {
-                ((RecentsView) activity.getOverviewPanel()).getMaxScaleForFullScreen(),
-                NO_OFFSET};
+            RecentsView recentsView) {
+        return new float[] {recentsView.getMaxScaleForFullScreen(), NO_OFFSET};
     }
 }

@@ -16,6 +16,9 @@
 
 package com.android.launcher3.util;
 
+import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE;
+import static android.view.WindowManager.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI;
+
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
@@ -38,6 +41,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.PendingAddItemInfo;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -46,18 +50,20 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
-import com.android.launcher3.uioverrides.ApiWrapper;
 
-import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
 
 /**
  * Utility methods using package manager
  */
-public class PackageManagerHelper {
+public class PackageManagerHelper implements SafeCloseable{
 
     private static final String TAG = "PackageManagerHelper";
+
+    @NonNull
+    public static final MainThreadInitializedObject<PackageManagerHelper> INSTANCE =
+            new MainThreadInitializedObject<>(PackageManagerHelper::new);
 
     @NonNull
     private final Context mContext;
@@ -68,11 +74,18 @@ public class PackageManagerHelper {
     @NonNull
     private final LauncherApps mLauncherApps;
 
+    private final String[] mLegacyMultiInstanceSupportedApps;
+
     public PackageManagerHelper(@NonNull final Context context) {
         mContext = context;
         mPm = context.getPackageManager();
         mLauncherApps = Objects.requireNonNull(context.getSystemService(LauncherApps.class));
+        mLegacyMultiInstanceSupportedApps = mContext.getResources().getStringArray(
+                R.array.config_appsSupportMultiInstancesSplit);
     }
+
+    @Override
+    public void close() { }
 
     /**
      * Returns true if the app can possibly be on the SDCard. This is just a workaround and doesn't
@@ -110,7 +123,7 @@ public class PackageManagerHelper {
     @SuppressWarnings("NewApi")
     public boolean isAppArchivedForUser(@NonNull final String packageName,
             @NonNull final UserHandle user) {
-        if (!Utilities.enableSupportForArchiving()) {
+        if (!Flags.enableSupportForArchiving()) {
             return false;
         }
         final ApplicationInfo info = getApplicationInfo(
@@ -151,11 +164,23 @@ public class PackageManagerHelper {
         }
     }
 
+    /**
+     * Returns the preferred launch activity intent for a given package.
+     */
     @Nullable
     public Intent getAppLaunchIntent(@Nullable final String pkg, @NonNull final UserHandle user) {
+        LauncherActivityInfo info = getAppLaunchInfo(pkg, user);
+        return info != null ? AppInfo.makeLaunchIntent(info) : null;
+    }
+
+    /**
+     * Returns the preferred launch activity for a given package.
+     */
+    @Nullable
+    public LauncherActivityInfo getAppLaunchInfo(@Nullable final String pkg,
+            @NonNull final UserHandle user) {
         List<LauncherActivityInfo> activities = mLauncherApps.getActivityList(pkg, user);
-        return activities.isEmpty() ? null :
-                AppInfo.makeLaunchIntent(activities.get(0));
+        return activities.isEmpty() ? null : activities.get(0);
     }
 
     /**
@@ -167,30 +192,13 @@ public class PackageManagerHelper {
     }
 
     /**
-     * Creates a new market search intent.
-     */
-    public static Intent getMarketSearchIntent(Context context, String query) {
-        try {
-            Intent intent = Intent.parseUri(context.getString(R.string.market_search_intent), 0);
-            if (!TextUtils.isEmpty(query)) {
-                intent.setData(
-                        intent.getData().buildUpon().appendQueryParameter("q", query).build());
-            }
-            return intent;
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
      * Starts the details activity for {@code info}
      */
-    public void startDetailsActivityForInfo(ItemInfo info, Rect sourceBounds, Bundle opts) {
-        if (info instanceof ItemInfoWithIcon
-                && (((ItemInfoWithIcon) info).runtimeStatusFlags
-                & ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE) != 0) {
-            ItemInfoWithIcon appInfo = (ItemInfoWithIcon) info;
-            mContext.startActivity(ApiWrapper.getAppMarketActivityIntent(mContext,
+    public static void startDetailsActivityForInfo(Context context, ItemInfo info,
+            Rect sourceBounds, Bundle opts) {
+        if (info instanceof ItemInfoWithIcon appInfo
+                && (appInfo.runtimeStatusFlags & FLAG_INSTALL_SESSION_ACTIVE) != 0) {
+            context.startActivity(ApiWrapper.INSTANCE.get(context).getAppMarketActivityIntent(
                     appInfo.getTargetComponent().getPackageName(), Process.myUserHandle()));
             return;
         }
@@ -206,9 +214,10 @@ public class PackageManagerHelper {
         }
         if (componentName != null) {
             try {
-                mLauncherApps.startAppDetailsActivity(componentName, info.user, sourceBounds, opts);
+                context.getSystemService(LauncherApps.class).startAppDetailsActivity(componentName,
+                        info.user, sourceBounds, opts);
             } catch (SecurityException | ActivityNotFoundException e) {
-                Toast.makeText(mContext, R.string.activity_not_found, Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, R.string.activity_not_found, Toast.LENGTH_SHORT).show();
                 Log.e(TAG, "Unable to launch settings", e);
             }
         }
@@ -291,6 +300,49 @@ public class PackageManagerHelper {
     @SuppressWarnings("NewApi")
     private boolean isPackageInstalledOrArchived(ApplicationInfo info) {
         return (info.flags & ApplicationInfo.FLAG_INSTALLED) != 0 || (
-                Utilities.enableSupportForArchiving() && info.isArchived);
+                Flags.enableSupportForArchiving() && info.isArchived);
+    }
+
+    /**
+     * Returns whether the given component or its application has the multi-instance property set.
+     */
+    public boolean supportsMultiInstance(@NonNull ComponentName component) {
+        // Check the legacy hardcoded allowlist first
+        for (String pkg : mLegacyMultiInstanceSupportedApps) {
+            if (pkg.equals(component.getPackageName())) {
+                return true;
+            }
+        }
+
+        // Check app multi-instance properties after V
+        if (!Utilities.ATLEAST_V) {
+            return false;
+        }
+
+        try {
+            // Check if the component has the multi-instance property
+            return mPm.getProperty(PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI, component)
+                    .getBoolean();
+        } catch (PackageManager.NameNotFoundException e1) {
+            try {
+                // Check if the application has the multi-instance property
+                return mPm.getProperty(PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI,
+                                component.getPackageName())
+                    .getBoolean();
+            } catch (PackageManager.NameNotFoundException e2) {
+                // Fall through
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns whether two apps should be considered the same for multi-instance purposes, which
+     * requires additional checks to ensure they can be started as multiple instances.
+     */
+    public static boolean isSameAppForMultiInstance(@NonNull ItemInfo app1,
+            @NonNull ItemInfo app2) {
+        return app1.getTargetPackage().equals(app2.getTargetPackage())
+                && app1.user.equals(app2.user);
     }
 }

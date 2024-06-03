@@ -25,6 +25,7 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -33,9 +34,8 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.R;
-import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.util.DisplayController;
-import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.launcher3.util.NavigationMode;
 import com.android.quickstep.TaskOverlayFactory.OverlayUICallbacks;
@@ -44,14 +44,13 @@ import com.android.quickstep.util.LayoutUtils;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
-import java.util.stream.Collectors;
 
 /**
  * View for showing action buttons in Overview
  */
 public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayout
         implements OnClickListener, Insettable {
-
+    public static final String TAG = "OverviewActionsView";
     private final Rect mInsets = new Rect();
 
     @IntDef(flag = true, value = {
@@ -91,30 +90,33 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     private static final int INDEX_HIDDEN_FLAGS_ALPHA = 3;
     private static final int INDEX_SHARE_TARGET_ALPHA = 4;
     private static final int INDEX_SCROLL_ALPHA = 5;
-    private static final int NUM_ALPHAS = 6;
-
-    public @interface ScreenshotButtonHiddenFlags { }
-    public static final int FLAG_MULTIPLE_TASKS_HIDE_SCREENSHOT = 1 << 0;
+    private static final int INDEX_GROUPED_ALPHA = 6;
+    private static final int INDEX_3P_LAUNCHER = 7;
+    private static final int NUM_ALPHAS = 8;
 
     public @interface SplitButtonHiddenFlags { }
     public static final int FLAG_SMALL_SCREEN_HIDE_SPLIT = 1 << 0;
-    public static final int FLAG_MULTIPLE_TASKS_HIDE_SPLIT = 1 << 1;
 
-    public @interface SplitButtonDisabledFlags { }
-    public static final int FLAG_SINGLE_TASK_DISABLE_SPLIT = 1 << 0;
+    /**
+     * Holds an AnimatedFloat for each alpha property, used to set or animate alpha values in
+     * {@link #mMultiValueAlphas}.
+     */
+    private final AnimatedFloat[] mAlphaProperties = new AnimatedFloat[NUM_ALPHAS];
 
-    public @interface AppPairButtonHiddenFlags { }
-    public static final int FLAG_SINGLE_TASK_HIDE_APP_PAIR = 1 << 0;
-    public static final int FLAG_SMALL_SCREEN_HIDE_APP_PAIR = 1 << 1;
-    public static final int FLAG_3P_LAUNCHER_HIDE_APP_PAIR = 1 << 2;
+    /** Holds MultiValueAlpha values for all actions bars */
+    private final MultiValueAlpha[] mMultiValueAlphas = new MultiValueAlpha[2];
+    /** Index used for single-task actions in the mMultiValueAlphas array */
+    private static final int ACTIONS_ALPHAS = 0;
+    /** Index used for grouped-task actions in the mMultiValueAlphas array */
+    private static final int GROUP_ACTIONS_ALPHAS = 1;
 
-    private MultiValueAlpha mMultiValueAlpha;
-
-    // The screenshot button is implemented as a Button in launcher3 and NexusLauncher, but is an
-    // ImageButton in go launcher (does not share a common class with Button). Take care when
-    // casting this.
-    private View mScreenshotButton;
+    /** Container for the action buttons below a focused, non-split Overview tile. */
+    protected LinearLayout mActionButtons;
     private Button mSplitButton;
+    /**
+     * The "save app pair" button. Currently this is the only button that is not contained in
+     * mActionButtons, since it is the sole button that appears for a grouped task.
+     */
     private Button mSaveAppPairButton;
 
     @ActionsHiddenFlags
@@ -123,14 +125,8 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     @ActionsDisabledFlags
     protected int mDisabledFlags;
 
-    @ScreenshotButtonHiddenFlags
-    private int mScreenshotButtonHiddenFlags;
-
     @SplitButtonHiddenFlags
     private int mSplitButtonHiddenFlags;
-
-    @AppPairButtonHiddenFlags
-    private int mAppPairButtonHiddenFlags;
 
     @Nullable
     protected T mCallbacks;
@@ -138,6 +134,8 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     @Nullable
     protected DeviceProfile mDp;
     private final Rect mTaskSize = new Rect();
+    private boolean mIsGroupedTask = false;
+    private boolean mCanSaveAppPair = false;
 
     public OverviewActionsView(Context context) {
         this(context, null);
@@ -154,14 +152,34 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        mMultiValueAlpha = new MultiValueAlpha(findViewById(R.id.action_buttons), NUM_ALPHAS);
-        mMultiValueAlpha.setUpdateVisibility(true);
+        // Initialize 2 view containers: one for single tasks, one for grouped tasks.
+        // These will take up the same space on the screen and alternate visibility as needed.
+        // Currently, the only grouped task action is "save app pairs".
+        mActionButtons = findViewById(R.id.action_buttons);
+        mSaveAppPairButton = findViewById(R.id.action_save_app_pair);
+        // Initialize a list to hold alphas for mActionButtons and any group action buttons.
+        mMultiValueAlphas[ACTIONS_ALPHAS] = new MultiValueAlpha(mActionButtons, NUM_ALPHAS);
+        mMultiValueAlphas[GROUP_ACTIONS_ALPHAS] =
+                new MultiValueAlpha(mSaveAppPairButton, NUM_ALPHAS);
+        Arrays.stream(mMultiValueAlphas).forEach(a -> a.setUpdateVisibility(true));
+        // To control alpha simultaneously on mActionButtons and any group action buttons, we set up
+        // an AnimatedFloat for each alpha property.
+        for (int i = 0; i < NUM_ALPHAS; i++) {
+            final int index = i;
+            mAlphaProperties[index] = new AnimatedFloat(() -> {
+                for (MultiValueAlpha multiValueAlpha : mMultiValueAlphas) {
+                    multiValueAlpha.get(index).setValue(mAlphaProperties[index].value);
+                }
+            }, 1f /* initialValue */);
+        }
 
-        mScreenshotButton = findViewById(R.id.action_screenshot);
-        mScreenshotButton.setOnClickListener(this);
+        // The screenshot button is implemented as a Button in launcher3 and NexusLauncher, but is
+        // an ImageButton in go launcher (does not share a common class with Button). Take care when
+        // casting this.
+        View screenshotButton = findViewById(R.id.action_screenshot);
+        screenshotButton.setOnClickListener(this);
         mSplitButton = findViewById(R.id.action_split);
         mSplitButton.setOnClickListener(this);
-        mSaveAppPairButton = findViewById(R.id.action_save_app_pair);
         mSaveAppPairButton.setOnClickListener(this);
     }
 
@@ -209,7 +227,7 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
             mHiddenFlags &= ~visibilityFlags;
         }
         boolean isHidden = mHiddenFlags != 0;
-        mMultiValueAlpha.get(INDEX_HIDDEN_FLAGS_ALPHA).setValue(isHidden ? 0 : 1);
+        mAlphaProperties[INDEX_HIDDEN_FLAGS_ALPHA].updateValue(isHidden ? 0 : 1);
     }
 
     /**
@@ -234,50 +252,50 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
      * Updates a batch of flags to hide and show actions buttons when a grouped task (split screen)
      * is focused.
      * @param isGroupedTask True if the focused task is a grouped task.
+     * @param canSaveAppPair True if the focused task is a grouped task and can be saved as an app
+     *                      pair.
      */
-    public void updateForGroupedTask(boolean isGroupedTask) {
-        // Update flags to see if split button should be hidden.
-        updateSplitButtonHiddenFlags(FLAG_MULTIPLE_TASKS_HIDE_SPLIT, isGroupedTask);
-        // Update flags to see if screenshot button should be hidden.
-        updateScreenshotButtonHiddenFlags(FLAG_MULTIPLE_TASKS_HIDE_SCREENSHOT, isGroupedTask);
-        // Update flags to see if save app pair button should be hidden.
-        updateAppPairButtonHiddenFlags(FLAG_SINGLE_TASK_HIDE_APP_PAIR, !isGroupedTask);
+    public void updateForGroupedTask(boolean isGroupedTask, boolean canSaveAppPair) {
+        Log.d(TAG, "updateForGroupedTask() called with: isGroupedTask = [" + isGroupedTask
+                + "], canSaveAppPair = [" + canSaveAppPair + "]");
+        mIsGroupedTask = isGroupedTask;
+        mCanSaveAppPair = canSaveAppPair;
+        updateActionButtonsVisibility();
     }
 
     /**
      * Updates a batch of flags to hide and show actions buttons for tablet/non tablet case.
-     * @param isSmallScreen True if the current display is a small screen.
      */
-    public void updateForSmallScreen(boolean isSmallScreen) {
+    private void updateForIsTablet() {
+        assert mDp != null;
         // Update flags to see if split button should be hidden.
-        updateSplitButtonHiddenFlags(FLAG_SMALL_SCREEN_HIDE_SPLIT, isSmallScreen);
-        // Update flags to see if save app pair button should be hidden.
-        updateAppPairButtonHiddenFlags(FLAG_SMALL_SCREEN_HIDE_APP_PAIR, isSmallScreen);
+        updateSplitButtonHiddenFlags(FLAG_SMALL_SCREEN_HIDE_SPLIT, !mDp.isTablet);
+        updateActionButtonsVisibility();
+    }
+
+    private void updateActionButtonsVisibility() {
+        assert mDp != null;
+        boolean showSingleTaskActions = !mIsGroupedTask;
+        boolean showGroupActions = mIsGroupedTask && mDp.isTablet && mCanSaveAppPair;
+        Log.d(TAG, "updateActionButtonsVisibility() called: showSingleTaskActions = ["
+                + showSingleTaskActions + ", showGroupActions = [" + showGroupActions + "]");
+        getActionsAlphas().get(INDEX_GROUPED_ALPHA).setValue(showSingleTaskActions ? 1 : 0);
+        getGroupActionsAlphas().get(INDEX_GROUPED_ALPHA).setValue(showGroupActions ? 1 : 0);
     }
 
     /**
      * Updates flags to hide and show actions buttons for 1p/3p launchers.
      */
     public void updateFor3pLauncher(boolean is3pLauncher) {
-        updateAppPairButtonHiddenFlags(FLAG_3P_LAUNCHER_HIDE_APP_PAIR, is3pLauncher);
+        getGroupActionsAlphas().get(INDEX_3P_LAUNCHER).setValue(is3pLauncher ? 0 : 1);
     }
 
-    /**
-     * Updates the proper flags to indicate whether the "Screenshot" button should be hidden.
-     *
-     * @param flag   The flag to update.
-     * @param enable Whether to enable the hidden flag: True will cause view to be hidden.
-     */
-    private void updateScreenshotButtonHiddenFlags(@ScreenshotButtonHiddenFlags int flag,
-            boolean enable) {
-        if (mScreenshotButton == null) return;
-        if (enable) {
-            mScreenshotButtonHiddenFlags |= flag;
-        } else {
-            mScreenshotButtonHiddenFlags &= ~flag;
-        }
-        int desiredVisibility = mScreenshotButtonHiddenFlags == 0 ? VISIBLE : GONE;
-        mScreenshotButton.setVisibility(desiredVisibility);
+    private MultiValueAlpha getActionsAlphas() {
+        return mMultiValueAlphas[ACTIONS_ALPHAS];
+    }
+
+    private MultiValueAlpha getGroupActionsAlphas() {
+        return mMultiValueAlphas[GROUP_ACTIONS_ALPHAS];
     }
 
     /**
@@ -295,68 +313,38 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
             mSplitButtonHiddenFlags &= ~flag;
         }
         int desiredVisibility = mSplitButtonHiddenFlags == 0 ? VISIBLE : GONE;
-        mSplitButton.setVisibility(desiredVisibility);
-        findViewById(R.id.action_split_space).setVisibility(desiredVisibility);
-
-        String callStack = Arrays.stream(
-                        Log.getStackTraceString(new Exception("thread stacktrace"))
-                                .split("\\n"))
-                .limit(5)
-                .skip(1) // Removes the line "java.lang.Exception: thread stacktrace"
-                .collect(Collectors.joining("\n"));
-        Log.d("b/321291049", "updateSplitButtonHiddenFlags called with flag: " + flag
-                + " enabled: " + enable
-                + " visibility: " + desiredVisibility
-                + " partial trace: \n" + callStack);
-    }
-
-    /**
-     * Updates the proper flags to indicate whether the "Save app pair" button should be disabled.
-     *
-     * @param flag   The flag to update.
-     * @param enable Whether to enable the hidden flag: True will cause view to be hidden.
-     */
-    private void updateAppPairButtonHiddenFlags(
-            @AppPairButtonHiddenFlags int flag, boolean enable) {
-        if (!FeatureFlags.enableAppPairs()) {
-            return;
+        if (mSplitButton.getVisibility() != desiredVisibility) {
+            mSplitButton.setVisibility(desiredVisibility);
+            mActionButtons.requestLayout();
         }
-
-        if (mSaveAppPairButton == null) return;
-        if (enable) {
-            mAppPairButtonHiddenFlags |= flag;
-        } else {
-            mAppPairButtonHiddenFlags &= ~flag;
-        }
-        int desiredVisibility = mAppPairButtonHiddenFlags == 0 ? VISIBLE : GONE;
-        mSaveAppPairButton.setVisibility(desiredVisibility);
     }
 
-    public MultiProperty getContentAlpha() {
-        return mMultiValueAlpha.get(INDEX_CONTENT_ALPHA);
+    public AnimatedFloat getContentAlpha() {
+        return mAlphaProperties[INDEX_CONTENT_ALPHA];
     }
 
-    public MultiProperty getVisibilityAlpha() {
-        return mMultiValueAlpha.get(INDEX_VISIBILITY_ALPHA);
+    public AnimatedFloat getVisibilityAlpha() {
+        return mAlphaProperties[INDEX_VISIBILITY_ALPHA];
     }
 
-    public MultiProperty getFullscreenAlpha() {
-        return mMultiValueAlpha.get(INDEX_FULLSCREEN_ALPHA);
+    public AnimatedFloat getFullscreenAlpha() {
+        return mAlphaProperties[INDEX_FULLSCREEN_ALPHA];
     }
 
-    public MultiProperty getShareTargetAlpha() {
-        return mMultiValueAlpha.get(INDEX_SHARE_TARGET_ALPHA);
+    public AnimatedFloat getShareTargetAlpha() {
+        return mAlphaProperties[INDEX_SHARE_TARGET_ALPHA];
     }
 
-    public MultiProperty getIndexScrollAlpha() {
-        return mMultiValueAlpha.get(INDEX_SCROLL_ALPHA);
+    public AnimatedFloat getIndexScrollAlpha() {
+        return mAlphaProperties[INDEX_SCROLL_ALPHA];
     }
 
     /**
      * Returns the visibility of the overview actions buttons.
      */
-    public @Visibility int getActionsButtonVisibility() {
-        return findViewById(R.id.action_buttons).getVisibility();
+    public boolean areActionsButtonsVisible() {
+        return mActionButtons.getVisibility() == View.VISIBLE
+                || mSaveAppPairButton.getVisibility() == View.VISIBLE;
     }
 
     /**
@@ -369,11 +357,17 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
 
     /** Updates vertical margins for different navigation mode or configuration changes. */
     public void updateVerticalMargin(NavigationMode mode) {
+        updateActionBarPosition(mActionButtons);
+        updateActionBarPosition(mSaveAppPairButton);
+    }
+
+    /** Positions actions buttons according to device settings and insets. */
+    private void updateActionBarPosition(View actionBar) {
         if (mDp == null) {
             return;
         }
-        LayoutParams actionParams = (LayoutParams) findViewById(
-                R.id.action_buttons).getLayoutParams();
+
+        LayoutParams actionParams = (LayoutParams) actionBar.getLayoutParams();
         actionParams.setMargins(
                 actionParams.leftMargin, mDp.overviewActionsTopMarginPx,
                 actionParams.rightMargin, getBottomMargin());
@@ -400,6 +394,7 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
         mDp = dp;
         mTaskSize.set(taskSize);
         updateVerticalMargin(DisplayController.getNavigationMode(getContext()));
+        updateForIsTablet();
 
         requestLayout();
 
@@ -407,7 +402,11 @@ public class OverviewActionsView<T extends OverlayUICallbacks> extends FrameLayo
                 ? R.drawable.ic_split_horizontal
                 : R.drawable.ic_split_vertical;
         mSplitButton.setCompoundDrawablesRelativeWithIntrinsicBounds(splitIconRes, 0, 0, 0);
+
+        int appPairIconRes = dp.isLeftRightSplit
+                ? R.drawable.ic_save_app_pair_left_right
+                : R.drawable.ic_save_app_pair_up_down;
         mSaveAppPairButton.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                R.drawable.ic_save_app_pair, 0, 0, 0);
+                appPairIconRes, 0, 0, 0);
     }
 }

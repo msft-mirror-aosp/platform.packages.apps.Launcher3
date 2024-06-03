@@ -25,13 +25,13 @@ import android.platform.test.annotations.PlatinumTest;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.LargeTest;
 
+import com.android.launcher3.Launcher;
 import com.android.launcher3.celllayout.FavoriteItemsTransaction;
 import com.android.launcher3.tapl.Widget;
 import com.android.launcher3.tapl.WidgetResizeFrame;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
 import com.android.launcher3.ui.PortraitLandscapeRunner.PortraitLandscape;
 import com.android.launcher3.ui.TestViewHelpers;
-import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 import com.android.launcher3.util.rule.ShellCommandRule;
 import com.android.launcher3.util.rule.TestStabilityRule.Stability;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
@@ -46,14 +46,13 @@ import org.junit.runner.RunWith;
  */
 @LargeTest
 @RunWith(AndroidJUnit4.class)
-public class TaplAddWidgetTest extends AbstractLauncherUiTest {
+public class TaplAddWidgetTest extends AbstractLauncherUiTest<Launcher> {
 
     @Rule
     public ShellCommandRule mGrantWidgetRule = ShellCommandRule.grantWidgetBind();
 
     @Test
     @PortraitLandscape
-    @ScreenRecord // b/316910614
     public void testDragIcon() throws Throwable {
         mLauncher.enableDebugTracing(); // b/289161193
         commitTransactionAndLoadHome(new FavoriteItemsTransaction(mTargetContext));
@@ -85,7 +84,6 @@ public class TaplAddWidgetTest extends AbstractLauncherUiTest {
      * A custom shortcut is a 1x1 widget that launches a specific intent when user tap on it.
      * Custom shortcuts are replaced by deep shortcuts after api 25.
      */
-    @Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT)
     @Test
     @PortraitLandscape
     public void testDragCustomShortcut() throws Throwable {
@@ -104,9 +102,9 @@ public class TaplAddWidgetTest extends AbstractLauncherUiTest {
     /**
      * Test dragging a widget to the workspace and resize it.
      */
+    @Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/316910614
     @PlatinumTest(focusArea = "launcher")
     @Test
-    @ScreenRecord // b/316910614
     public void testResizeWidget() throws Throwable {
         commitTransactionAndLoadHome(new FavoriteItemsTransaction(mTargetContext));
 

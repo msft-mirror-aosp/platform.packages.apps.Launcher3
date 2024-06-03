@@ -51,11 +51,13 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.util.Pair;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.icons.ComponentWithLabel.ComponentCachingLogic;
 import com.android.launcher3.icons.cache.BaseIconCache;
 import com.android.launcher3.icons.cache.CachingLogic;
+import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.IconRequestInfo;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
@@ -248,7 +250,7 @@ public class IconCache extends BaseIconCache {
     @SuppressWarnings("NewApi")
     public synchronized void getTitleAndIcon(ItemInfoWithIcon info,
             LauncherActivityInfo activityInfo, boolean useLowResIcon) {
-        boolean isAppArchived = Utilities.enableSupportForArchiving() && activityInfo != null
+        boolean isAppArchived = Flags.enableSupportForArchiving() && activityInfo != null
                 && activityInfo.getActivityInfo().isArchived;
         // If we already have activity info, no need to use package icon
         getTitleAndIcon(info, () -> activityInfo, isAppArchived, useLowResIcon,
@@ -372,8 +374,13 @@ public class IconCache extends BaseIconCache {
                     infoInOut.user, activityInfoProvider, mLauncherActivityInfoCachingLogic,
                     usePkgIcon, useLowResIcon);
             applyPackageEntry(packageEntry, infoInOut, entry);
-        } else {
+        } else if (useLowResIcon || !entry.bitmap.isNullOrLowRes()
+                || infoInOut.bitmap.isNullOrLowRes()) {
+            // Only use cache entry if it will not downgrade the current bitmap in infoInOut
             applyCacheEntry(entry, infoInOut);
+        } else {
+            Log.d(TAG, "getTitleAndIcon: Cache entry bitmap was a downgrade of existing bitmap"
+                    + " in ItemInfo. Skipping.");
         }
     }
 
@@ -571,7 +578,7 @@ public class IconCache extends BaseIconCache {
         try (LauncherIcons li = LauncherIcons.obtain(mContext)) {
             final BitmapInfo tempBitmap = li.createBadgedIconBitmap(
                     mContext.getDrawable(widgetSection.mSectionDrawable),
-                    new BaseIconFactory.IconOptions().setShrinkNonAdaptiveIcons(false));
+                    new BaseIconFactory.IconOptions());
             mWidgetCategoryBitmapInfos.put(infoInOut.widgetCategory, tempBitmap);
             infoInOut.bitmap = getBadgedIcon(tempBitmap, infoInOut.user);
         } catch (Exception e) {
@@ -634,5 +641,11 @@ public class IconCache extends BaseIconCache {
     public interface ItemInfoUpdateReceiver {
 
         void reapplyItemInfo(ItemInfoWithIcon info);
+    }
+
+    /** Log persistently to FileLog.d for debugging. */
+    @Override
+    protected void logdPersistently(String tag, String message, @Nullable Exception e) {
+        FileLog.d(tag, message, e);
     }
 }

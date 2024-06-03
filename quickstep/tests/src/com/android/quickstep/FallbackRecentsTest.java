@@ -32,8 +32,6 @@ import static com.android.launcher3.ui.TaplTestsLauncher3Test.getAppPackageName;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.rule.ShellCommandRule.disableHeadsUpNotification;
 import static com.android.launcher3.util.rule.ShellCommandRule.getLauncherCommand;
-import static com.android.launcher3.util.rule.TestStabilityRule.LOCAL;
-import static com.android.launcher3.util.rule.TestStabilityRule.PLATFORM_POSTSUBMIT;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -59,6 +57,7 @@ import com.android.launcher3.tapl.TestHelpers;
 import com.android.launcher3.testcomponent.TestCommandReceiver;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
 import com.android.launcher3.util.Wait;
+import com.android.launcher3.util.rule.ExtendedLongPressTimeoutRule;
 import com.android.launcher3.util.rule.FailureWatcher;
 import com.android.launcher3.util.rule.SamplerRule;
 import com.android.launcher3.util.rule.ScreenRecordRule;
@@ -105,6 +104,9 @@ public class FallbackRecentsTest {
     @Rule
     public ScreenRecordRule mScreenRecordRule = new ScreenRecordRule();
 
+    @Rule
+    public ExtendedLongPressTimeoutRule mLongPressTimeoutRule = new ExtendedLongPressTimeoutRule();
+
     public FallbackRecentsTest() throws RemoteException {
         Instrumentation instrumentation = getInstrumentation();
         Context context = instrumentation.getContext();
@@ -112,8 +114,6 @@ public class FallbackRecentsTest {
         mDevice.setOrientationNatural();
         mLauncher = AbstractLauncherUiTest.createLauncherInstrumentation();
         mLauncher.enableDebugTracing();
-        // b/143488140
-        //mLauncher.enableCheckEventsForSuccessfulGestures();
 
         if (TestHelpers.isInLauncherProcess()) {
             Utilities.enableRunningInTestHarnessForTests();
@@ -136,7 +136,6 @@ public class FallbackRecentsTest {
                     TestCommandReceiver.callCommand(TestCommandReceiver.DISABLE_TEST_LAUNCHER);
                     UiDevice.getInstance(getInstrumentation()).executeShellCommand(
                             getLauncherCommand(getLauncherInMyProcess()));
-                    // b/143488140
                     pressHomeAndWaitForOverviewClose();
                 }
             }
@@ -180,8 +179,6 @@ public class FallbackRecentsTest {
         }
     }
 
-    // b/143488140
-    //@NavigationModeSwitch
     @Test
     public void goToOverviewFromHome() {
         mDevice.pressHome();
@@ -190,9 +187,6 @@ public class FallbackRecentsTest {
 
         mLauncher.getLaunchedAppState().switchToOverview();
     }
-
-    // Staging; will be promoted to presubmit if stable
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT)
 
     //@NavigationModeSwitch
     @Test
@@ -253,10 +247,7 @@ public class FallbackRecentsTest {
                 DEFAULT_UI_TIMEOUT, mLauncher);
     }
 
-    // b/143488140
-    //@NavigationModeSwitch
     @Test
-    @ScreenRecordRule.ScreenRecord // b/321775748
     public void testOverview() throws IOException {
         startAppFast(getAppPackageName());
         startAppFast(resolveSystemApp(Intent.CATEGORY_APP_CALCULATOR));

@@ -66,6 +66,7 @@ import com.android.launcher3.util.LooperExecutor;
 import com.android.launcher3.util.SimpleBroadcastReceiver;
 import com.android.launcher3.util.TestUtil;
 import com.android.launcher3.util.Wait;
+import com.android.launcher3.util.rule.ExtendedLongPressTimeoutRule;
 import com.android.launcher3.util.rule.FailureWatcher;
 import com.android.launcher3.util.rule.SamplerRule;
 import com.android.launcher3.util.rule.ScreenRecordRule;
@@ -94,10 +95,10 @@ import java.util.function.Supplier;
 /**
  * Base class for all instrumentation tests providing various utility methods.
  */
-public abstract class AbstractLauncherUiTest {
+public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
 
     public static final long DEFAULT_ACTIVITY_TIMEOUT = TimeUnit.SECONDS.toMillis(10);
-    public static final long DEFAULT_BROADCAST_TIMEOUT_SECS = 5;
+    public static final long DEFAULT_BROADCAST_TIMEOUT_SECS = 10;
 
     public static final long DEFAULT_UI_TIMEOUT = TestUtil.DEFAULT_UI_TIMEOUT;
     private static final String TAG = "AbstractLauncherUiTest";
@@ -219,6 +220,9 @@ public abstract class AbstractLauncherUiTest {
     @Rule
     public SetFlagsRule mSetFlagsRule = new SetFlagsRule(DEVICE_DEFAULT);
 
+    @Rule
+    public ExtendedLongPressTimeoutRule mLongPressTimeoutRule = new ExtendedLongPressTimeoutRule();
+
     public static void initialize(AbstractLauncherUiTest test) throws Exception {
         test.reinitializeLauncherData();
         test.mDevice.pressHome();
@@ -247,7 +251,7 @@ public abstract class AbstractLauncherUiTest {
         final ViewCaptureRule viewCaptureRule = new ViewCaptureRule(
                 Launcher.ACTIVITY_TRACKER::getCreatedActivity);
         final RuleChain inner = RuleChain
-                .outerRule(new PortraitLandscapeRunner(this))
+                .outerRule(new PortraitLandscapeRunner<LAUNCHER_TYPE>(this))
                 .around(new FailureWatcher(mLauncher, viewCaptureRule::getViewCaptureData))
                 // .around(viewCaptureRule) // b/315482167
                 .around(new TestIsolationRule(mLauncher, true));
@@ -296,7 +300,8 @@ public abstract class AbstractLauncherUiTest {
         if (userManager != null) {
             for (UserHandle userHandle : userManager.getUserProfiles()) {
                 if (!userHandle.isSystem()) {
-                    mDevice.executeShellCommand("pm remove-user " + userHandle.getIdentifier());
+                    mDevice.executeShellCommand(
+                            "pm remove-user --wait " + userHandle.getIdentifier());
                 }
             }
         }
@@ -422,12 +427,12 @@ public abstract class AbstractLauncherUiTest {
         }
     }
 
-    protected <T> T getFromLauncher(Function<Launcher, T> f) {
+    protected <T> T getFromLauncher(Function<LAUNCHER_TYPE, T> f) {
         if (!TestHelpers.isInLauncherProcess()) return null;
         return getOnUiThread(() -> f.apply(Launcher.ACTIVITY_TRACKER.getCreatedActivity()));
     }
 
-    protected void executeOnLauncher(Consumer<Launcher> f) {
+    protected void executeOnLauncher(Consumer<LAUNCHER_TYPE> f) {
         getFromLauncher(launcher -> {
             f.accept(launcher);
             return null;
@@ -437,7 +442,7 @@ public abstract class AbstractLauncherUiTest {
     // Execute an action on Launcher, but forgive it when launcher is null.
     // Launcher can be null if teardown is happening after a failed setup step where launcher
     // activity failed to be created.
-    protected void executeOnLauncherInTearDown(Consumer<Launcher> f) {
+    protected void executeOnLauncherInTearDown(Consumer<LAUNCHER_TYPE> f) {
         executeOnLauncher(launcher -> {
             if (launcher != null) f.accept(launcher);
         });
@@ -465,20 +470,20 @@ public abstract class AbstractLauncherUiTest {
     // Cannot be used in TaplTests after injecting any gesture using Tapl because this can hide
     // flakiness.
     protected void waitForLauncherCondition(String
-            message, Function<Launcher, Boolean> condition) {
+            message, Function<LAUNCHER_TYPE, Boolean> condition) {
         waitForLauncherCondition(message, condition, DEFAULT_ACTIVITY_TIMEOUT);
     }
 
     // Cannot be used in TaplTests after injecting any gesture using Tapl because this can hide
     // flakiness.
-    protected <T> T getOnceNotNull(String message, Function<Launcher, T> f) {
+    protected <O> O getOnceNotNull(String message, Function<LAUNCHER_TYPE, O> f) {
         return getOnceNotNull(message, f, DEFAULT_ACTIVITY_TIMEOUT);
     }
 
     // Cannot be used in TaplTests after injecting any gesture using Tapl because this can hide
     // flakiness.
     protected void waitForLauncherCondition(
-            String message, Function<Launcher, Boolean> condition, long timeout) {
+            String message, Function<LAUNCHER_TYPE, Boolean> condition, long timeout) {
         verifyKeyguardInvisible();
         if (!TestHelpers.isInLauncherProcess()) return;
         Wait.atMost(message, () -> getFromLauncher(condition), timeout, mLauncher);
@@ -486,7 +491,7 @@ public abstract class AbstractLauncherUiTest {
 
     // Cannot be used in TaplTests after injecting any gesture using Tapl because this can hide
     // flakiness.
-    protected <T> T getOnceNotNull(String message, Function<Launcher, T> f, long timeout) {
+    protected <T> T getOnceNotNull(String message, Function<LAUNCHER_TYPE, T> f, long timeout) {
         if (!TestHelpers.isInLauncherProcess()) return null;
 
         final Object[] output = new Object[1];
@@ -502,7 +507,7 @@ public abstract class AbstractLauncherUiTest {
     // flakiness.
     protected void waitForLauncherCondition(
             String message,
-            Runnable testThreadAction, Function<Launcher, Boolean> condition,
+            Runnable testThreadAction, Function<LAUNCHER_TYPE, Boolean> condition,
             long timeout) {
         if (!TestHelpers.isInLauncherProcess()) return;
         Wait.atMost(message, () -> {
@@ -543,7 +548,7 @@ public abstract class AbstractLauncherUiTest {
         public Intent blockingGetIntent() throws InterruptedException {
             Log.d(WIDGET_CONFIG_NULL_EXTRA_INTENT,
                     "AbstractLauncherUiTest.blockingGetIntent()");
-            latch.await(DEFAULT_BROADCAST_TIMEOUT_SECS, TimeUnit.SECONDS);
+            assertTrue("Timed Out", latch.await(DEFAULT_BROADCAST_TIMEOUT_SECS, TimeUnit.SECONDS));
             mTargetContext.unregisterReceiver(this);
             Log.d(WIDGET_CONFIG_NULL_EXTRA_INTENT, mIntent == null
                     ? "AbstractLauncherUiTest.onReceive(): mIntent NULL"
@@ -644,7 +649,7 @@ public abstract class AbstractLauncherUiTest {
                 "Launcher still active", launcher -> launcher == null, DEFAULT_UI_TIMEOUT);
     }
 
-    protected boolean isInLaunchedApp(Launcher launcher) {
+    protected boolean isInLaunchedApp(LAUNCHER_TYPE launcher) {
         return launcher == null || !launcher.hasBeenResumed();
     }
 
@@ -654,11 +659,11 @@ public abstract class AbstractLauncherUiTest {
                 launcher -> launcher.getStateManager().getState() == state.get());
     }
 
-    protected int getAllAppsScroll(Launcher launcher) {
+    protected int getAllAppsScroll(LAUNCHER_TYPE launcher) {
         return launcher.getAppsView().getActiveRecyclerView().computeVerticalScrollOffset();
     }
 
-    protected void onLauncherActivityClose(Launcher launcher) {
+    protected void onLauncherActivityClose(LAUNCHER_TYPE launcher) {
     }
 
     protected HomeAppIcon createShortcutInCenterIfNotExist(String name) {
