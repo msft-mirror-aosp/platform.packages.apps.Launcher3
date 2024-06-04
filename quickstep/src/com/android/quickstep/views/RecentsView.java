@@ -188,6 +188,7 @@ import com.android.quickstep.TaskViewUtils;
 import com.android.quickstep.TopTaskTracker;
 import com.android.quickstep.ViewUtils;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
+import com.android.quickstep.recents.data.TasksRepository;
 import com.android.quickstep.recents.viewmodel.RecentsViewData;
 import com.android.quickstep.util.ActiveGestureErrorDetector;
 import com.android.quickstep.util.ActiveGestureLog;
@@ -216,6 +217,7 @@ import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.PackageManagerWrapper;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
+import com.android.wm.shell.common.desktopmode.DesktopModeTransitionSource;
 import com.android.wm.shell.common.pip.IPipAnimationListener;
 import com.android.wm.shell.shared.DesktopModeStatus;
 
@@ -305,6 +307,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     public static final float SCROLL_VIBRATION_PRIMITIVE_SCALE = 0.6f;
     public static final VibrationEffect SCROLL_VIBRATION_FALLBACK =
             VibrationConstants.EFFECT_TEXTURE_TICK;
+    public static final int UNBOUND_TASK_VIEW_ID = -1;
 
     /**
      * Can be used to tint the color of the RecentsView to simulate a scrim that can views
@@ -456,6 +459,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     private static final float FOREGROUND_SCRIM_TINT = 0.32f;
 
     public final RecentsViewData mRecentsViewData = new RecentsViewData();
+    public final TasksRepository mTasksRepository;
 
     protected final RecentsOrientedState mOrientationState;
     protected final BaseContainerInterface<STATE_TYPE, CONTAINER_TYPE> mSizeStrategy;
@@ -800,6 +804,12 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 .getDimensionPixelSize(R.dimen.recents_fast_fling_velocity);
         mModel = RecentsModel.INSTANCE.get(context);
         mIdp = InvariantDeviceProfile.INSTANCE.get(context);
+        if (enableRefactorTaskThumbnail()) {
+            mTasksRepository = new TasksRepository(
+                    mModel, mModel.getThumbnailCache(), mModel.getIconCache());
+        } else {
+            mTasksRepository = null;
+        }
 
         mClearAllButton = (ClearAllButton) LayoutInflater.from(context)
                 .inflate(R.layout.overview_clear_all_button, this, false);
@@ -1165,7 +1175,6 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
             } else {
                 mTaskViewPool.recycle(taskView);
             }
-            taskView.setTaskViewId(-1);
             mActionsView.updateHiddenFlags(HIDDEN_NO_TASKS, getTaskViewCount() == 0);
         }
     }
@@ -2362,6 +2371,8 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
             upper = Math.min(centerPageIndex + 2, numChildren - 1);
         }
 
+        List<Integer> visibleTaskIds = new ArrayList<>();
+
         // Update the task data for the in/visible children
         for (int i = 0; i < getTaskViewCount(); i++) {
             TaskView taskView = requireTaskViewAt(i);
@@ -2381,6 +2392,10 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 List<Task> tasksToUpdate = containers.stream()
                         .map(TaskContainer::getTask)
                         .collect(Collectors.toCollection(ArrayList::new));
+                if (enableRefactorTaskThumbnail()) {
+                    visibleTaskIds.addAll(
+                            tasksToUpdate.stream().map((task) -> task.key.id).toList());
+                }
                 if (mTmpRunningTasks != null) {
                     for (Task t : mTmpRunningTasks) {
                         // Skip loading if this is the task that we are animating into
@@ -2415,6 +2430,9 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                     mHasVisibleTaskData.delete(container.getTask().key.id);
                 }
             }
+        }
+        if (enableRefactorTaskThumbnail()) {
+            mTasksRepository.setVisibleTasks(visibleTaskIds);
         }
     }
 
@@ -2602,6 +2620,9 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         if (!mModel.isTaskListValid(mTaskListChangeId)) {
             mTaskListChangeId = mModel.getTasks(this::applyLoadPlan, RecentsFilterState
                     .getFilter(mFilterState.getPackageNameToFilter()));
+            if (enableRefactorTaskThumbnail()) {
+                mTasksRepository.getAllTaskData(/* forceRefresh = */ true);
+            }
         }
     }
 
@@ -2655,17 +2676,9 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
         pa.start();
     }
 
-    public AnimatorSet setRecentsChangedOrientation(boolean fadeInChildren) {
-        getRunningTaskIndex();
-        int runningIndex = getCurrentPage();
+    public AnimatorSet setRecentsChangedOrientation(boolean fadeOut) {
         AnimatorSet as = new AnimatorSet();
-        for (int i = 0; i < getTaskViewCount(); i++) {
-            View taskView = requireTaskViewAt(i);
-            if (runningIndex == i && taskView.getAlpha() != 0) {
-                continue;
-            }
-            as.play(ObjectAnimator.ofFloat(taskView, View.ALPHA, fadeInChildren ? 0 : 1));
-        }
+        as.play(ObjectAnimator.ofFloat(this, View.ALPHA, fadeOut ? 0 : 1));
         return as;
     }
 
@@ -6284,20 +6297,22 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      * Moves the provided task into desktop mode, and invoke {@code successCallback} if succeeded.
      */
     public void moveTaskToDesktop(TaskContainer taskContainer,
+            DesktopModeTransitionSource transitionSource,
             Runnable successCallback) {
         if (!DesktopModeStatus.canEnterDesktopMode(mContext)) {
             return;
         }
         switchToScreenshot(() -> finishRecentsAnimation(/* toRecents= */true, /* shouldPip= */false,
-                () -> moveTaskToDesktopInternal(taskContainer, successCallback)));
+                () -> moveTaskToDesktopInternal(taskContainer, successCallback, transitionSource)));
     }
 
     private void moveTaskToDesktopInternal(TaskContainer taskContainer,
-            Runnable successCallback) {
+            Runnable successCallback, DesktopModeTransitionSource transitionSource) {
         if (mDesktopRecentsTransitionController == null) {
             return;
         }
-        mDesktopRecentsTransitionController.moveToDesktop(taskContainer.getTask().key.id);
+        mDesktopRecentsTransitionController.moveToDesktop(taskContainer.getTask().key.id,
+                transitionSource);
         successCallback.run();
     }
 
