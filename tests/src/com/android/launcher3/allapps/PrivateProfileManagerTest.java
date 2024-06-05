@@ -130,7 +130,7 @@ public class PrivateProfileManagerTest {
     public void lockPrivateProfile_requestsQuietModeAsTrue() throws Exception {
         when(mAllAppsStore.hasModelFlag(FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED)).thenReturn(false);
 
-        mPrivateProfileManager.lockPrivateProfile();
+        mPrivateProfileManager.setQuietMode(true /* lock */);
 
         awaitTasksCompleted();
         Mockito.verify(mUserManager).requestQuietModeEnabled(true, PRIVATE_HANDLE);
@@ -140,7 +140,7 @@ public class PrivateProfileManagerTest {
     public void unlockPrivateProfile_requestsQuietModeAsFalse() throws Exception {
         when(mAllAppsStore.hasModelFlag(FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED)).thenReturn(true);
 
-        mPrivateProfileManager.unlockPrivateProfile();
+        mPrivateProfileManager.setQuietMode(false /* unlock */);
 
         awaitTasksCompleted();
         Mockito.verify(mUserManager).requestQuietModeEnabled(false, PRIVATE_HANDLE);
@@ -149,7 +149,7 @@ public class PrivateProfileManagerTest {
     @Test
     public void quietModeFlagPresent_privateSpaceIsResetToDisabled() {
         PrivateProfileManager privateProfileManager = spy(mPrivateProfileManager);
-        doNothing().when(privateProfileManager).resetPrivateSpaceDecorator(anyInt());
+        doNothing().when(privateProfileManager).addPrivateSpaceDecorator(anyInt());
         doNothing().when(privateProfileManager).executeLock();
         doReturn(mAllAppsRecyclerView).when(privateProfileManager).getMainRecyclerView();
         when(mAllAppsStore.hasModelFlag(FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED))
@@ -169,14 +169,14 @@ public class PrivateProfileManagerTest {
     @Test
     public void transitioningToUnlocked_resetCallsPostUnlock() throws Exception {
         PrivateProfileManager privateProfileManager = spy(mPrivateProfileManager);
-        doNothing().when(privateProfileManager).resetPrivateSpaceDecorator(anyInt());
+        doNothing().when(privateProfileManager).addPrivateSpaceDecorator(anyInt());
         doReturn(mAllAppsRecyclerView).when(privateProfileManager).getMainRecyclerView();
         when(mAllAppsStore.hasModelFlag(FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED))
                 .thenReturn(false);
         doNothing().when(privateProfileManager).expandPrivateSpace();
         when(privateProfileManager.getCurrentState()).thenReturn(STATE_DISABLED);
 
-        privateProfileManager.unlockPrivateProfile();
+        privateProfileManager.setQuietMode(false /* unlock */);
         privateProfileManager.reset();
 
         awaitTasksCompleted();
@@ -186,7 +186,7 @@ public class PrivateProfileManagerTest {
     @Test
     public void transitioningToLocked_resetCallsExecuteLock() throws Exception {
         PrivateProfileManager privateProfileManager = spy(mPrivateProfileManager);
-        doNothing().when(privateProfileManager).resetPrivateSpaceDecorator(anyInt());
+        doNothing().when(privateProfileManager).addPrivateSpaceDecorator(anyInt());
         doNothing().when(privateProfileManager).executeLock();
         doReturn(mAllAppsRecyclerView).when(privateProfileManager).getMainRecyclerView();
         when(mAllAppsStore.hasModelFlag(FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED))
@@ -194,7 +194,7 @@ public class PrivateProfileManagerTest {
         doNothing().when(privateProfileManager).expandPrivateSpace();
         when(privateProfileManager.getCurrentState()).thenReturn(STATE_ENABLED);
 
-        privateProfileManager.lockPrivateProfile();
+        privateProfileManager.setQuietMode(true /* lock */);
         privateProfileManager.reset();
 
         awaitTasksCompleted();
@@ -208,7 +208,7 @@ public class PrivateProfileManagerTest {
         ArgumentCaptor<Intent> acIntent = ArgumentCaptor.forClass(Intent.class);
         mPrivateProfileManager.setPrivateSpaceSettingsAvailable(true);
 
-        mPrivateProfileManager.openPrivateSpaceSettings(null);
+        mContext.startActivity(expectedIntent);
 
         Mockito.verify(mContext).startActivity(acIntent.capture());
         assertEquals("Intent Action is different",
