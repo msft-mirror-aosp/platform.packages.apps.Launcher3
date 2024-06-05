@@ -22,11 +22,12 @@ import static android.view.RemoteAnimationTarget.MODE_OPENING;
 import static com.android.launcher3.QuickstepTransitionManager.RECENTS_LAUNCH_DURATION;
 import static com.android.launcher3.QuickstepTransitionManager.STATUS_BAR_TRANSITION_DURATION;
 import static com.android.launcher3.QuickstepTransitionManager.STATUS_BAR_TRANSITION_PRE_DELAY;
-import static com.android.launcher3.graphics.SysUiScrim.SYSUI_PROGRESS;
+import static com.android.launcher3.testing.shared.TestProtocol.LAUNCHER_ACTIVITY_STOPPED_MESSAGE;
 import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_ORDINAL;
 import static com.android.quickstep.OverviewComponentObserver.startHomeIntentSafely;
 import static com.android.quickstep.TaskUtils.taskIsATargetWithMode;
 import static com.android.quickstep.TaskViewUtils.createRecentsWindowAnimator;
+import static com.android.window.flags.Flags.enableDesktopWindowingMode;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -46,8 +47,10 @@ import android.view.View;
 import android.window.RemoteTransition;
 import android.window.SplashScreen;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.app.animation.Interpolators;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile;
@@ -56,9 +59,9 @@ import com.android.launcher3.LauncherAnimationRunner.AnimationResult;
 import com.android.launcher3.LauncherAnimationRunner.RemoteAnimationFactory;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorPlaybackController;
-import com.android.launcher3.anim.Interpolators;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
+import com.android.launcher3.desktop.DesktopRecentsTransitionController;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory;
@@ -82,6 +85,7 @@ import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskView;
 
 import java.io.FileDescriptor;
@@ -92,7 +96,9 @@ import java.util.List;
  * A recents activity that shows the recently launched tasks as swipable task cards.
  * See {@link com.android.quickstep.views.RecentsView}.
  */
-public final class RecentsActivity extends StatefulActivity<RecentsState> {
+public final class RecentsActivity extends StatefulActivity<RecentsState> implements
+        RecentsViewContainer {
+    private static final String TAG = "RecentsActivity";
 
     public static final ActivityTracker<RecentsActivity> ACTIVITY_TRACKER =
             new ActivityTracker<>();
@@ -105,9 +111,8 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     private RecentsDragLayer mDragLayer;
     private ScrimView mScrimView;
     private FallbackRecentsView mFallbackRecentsView;
-    private OverviewActionsView mActionsView;
+    private OverviewActionsView<?> mActionsView;
     private TISBindHelper mTISBindHelper;
-    private @Nullable TaskbarManager mTaskbarManager;
     private @Nullable FallbackTaskbarUIController mTaskbarUIController;
 
     private StateManager<RecentsState> mStateManager;
@@ -119,6 +124,9 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     // animation callback
     private final Handler mHandler = new Handler();
     private final Runnable mAnimationStartTimeoutRunnable = this::onAnimationStartTimeout;
+    private SplitSelectStateController mSplitSelectStateController;
+    @Nullable
+    private DesktopRecentsTransitionController mDesktopRecentsTransitionController;
 
     /**
      * Init drag layer and overview panel views.
@@ -130,22 +138,30 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         mScrimView = findViewById(R.id.scrim_view);
         mFallbackRecentsView = findViewById(R.id.overview_panel);
         mActionsView = findViewById(R.id.overview_actions_view);
-        SYSUI_PROGRESS.set(getRootView().getSysUiScrim(), 0f);
-
-        SplitSelectStateController controller =
+        getRootView().getSysUiScrim().getSysUIProgress().updateValue(0);
+        SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(this);
+        mSplitSelectStateController =
                 new SplitSelectStateController(this, mHandler, getStateManager(),
-                         null /* depthController */, getStatsLogManager(),
-                        SystemUiProxy.INSTANCE.get(this), RecentsModel.INSTANCE.get(this));
+                        null /* depthController */, getStatsLogManager(),
+                        systemUiProxy, RecentsModel.INSTANCE.get(this),
+                        null /*activityBackCallback*/);
         mDragLayer.recreateControllers();
-        mFallbackRecentsView.init(mActionsView, controller);
+        if (enableDesktopWindowingMode()) {
+            mDesktopRecentsTransitionController = new DesktopRecentsTransitionController(
+                    getStateManager(), systemUiProxy, getIApplicationThread(),
+                    null /* depthController */
+            );
+        }
+        mFallbackRecentsView.init(mActionsView, mSplitSelectStateController,
+                mDesktopRecentsTransitionController);
 
         mTISBindHelper = new TISBindHelper(this, this::onTISConnected);
     }
 
     private void onTISConnected(TouchInteractionService.TISBinder binder) {
-        mTaskbarManager = binder.getTaskbarManager();
-        if (mTaskbarManager != null) {
-            mTaskbarManager.setActivity(this);
+        TaskbarManager taskbarManager = binder.getTaskbarManager();
+        if (taskbarManager != null) {
+            taskbarManager.setActivity(this);
         }
     }
 
@@ -210,11 +226,12 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     }
 
     @Override
-    public <T extends View> T getOverviewPanel() {
-        return (T) mFallbackRecentsView;
+    public FallbackRecentsView getOverviewPanel() {
+        return mFallbackRecentsView;
     }
 
-    public OverviewActionsView getActionsView() {
+    @Override
+    public OverviewActionsView<?> getActionsView() {
         return mActionsView;
     }
 
@@ -241,6 +258,11 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         }
 
         final TaskView taskView = (TaskView) v;
+        final RecentsView recentsView = taskView.getRecentsView();
+        if (recentsView == null) {
+            return super.getActivityLaunchOptions(v, item);
+        }
+
         RunnableList onEndCallback = new RunnableList();
 
         mActivityLaunchAnimationRunner = new RemoteAnimationFactory() {
@@ -249,7 +271,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
                     RemoteAnimationTarget[] wallpaperTargets,
                     RemoteAnimationTarget[] nonAppTargets, AnimationResult result) {
                 mHandler.removeCallbacks(mAnimationStartTimeoutRunnable);
-                AnimatorSet anim = composeRecentsLaunchAnimator(taskView, appTargets,
+                AnimatorSet anim = composeRecentsLaunchAnimator(recentsView, taskView, appTargets,
                         wallpaperTargets, nonAppTargets);
                 anim.addListener(resetStateListener());
                 result.setAnimation(anim, RecentsActivity.this, onEndCallback::executeAllAndDestroy,
@@ -277,6 +299,8 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         activityOptions.options.setLaunchDisplayId(
                 (v != null && v.getDisplay() != null) ? v.getDisplay().getDisplayId()
                         : Display.DEFAULT_DISPLAY);
+        activityOptions.options.setPendingIntentBackgroundActivityStartMode(
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
         mHandler.postDelayed(mAnimationStartTimeoutRunnable, RECENTS_ANIMATION_TIMEOUT);
         return activityOptions;
     }
@@ -284,14 +308,16 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
     /**
      * Composes the animations for a launch from the recents list if possible.
      */
-    private AnimatorSet  composeRecentsLaunchAnimator(TaskView taskView,
+    private AnimatorSet  composeRecentsLaunchAnimator(
+            @NonNull RecentsView recentsView,
+            @NonNull TaskView taskView,
             RemoteAnimationTarget[] appTargets,
             RemoteAnimationTarget[] wallpaperTargets,
             RemoteAnimationTarget[] nonAppTargets) {
         AnimatorSet target = new AnimatorSet();
         boolean activityClosing = taskIsATargetWithMode(appTargets, getTaskId(), MODE_CLOSING);
         PendingAnimation pa = new PendingAnimation(RECENTS_LAUNCH_DURATION);
-        createRecentsWindowAnimator(taskView, !activityClosing, appTargets,
+        createRecentsWindowAnimator(recentsView, taskView, !activityClosing, appTargets,
                 wallpaperTargets, nonAppTargets, null /* depthController */, pa);
         target.play(pa.buildAnim());
 
@@ -299,7 +325,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         if (activityClosing) {
             Animator adjacentAnimation = mFallbackRecentsView
                     .createAdjacentPageAnimForTaskLaunch(taskView);
-            adjacentAnimation.setInterpolator(Interpolators.TOUCH_RESPONSE_INTERPOLATOR);
+            adjacentAnimation.setInterpolator(Interpolators.TOUCH_RESPONSE);
             adjacentAnimation.setDuration(RECENTS_LAUNCH_DURATION);
             adjacentAnimation.addListener(resetStateListener());
             target.play(adjacentAnimation);
@@ -323,6 +349,8 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         // Workaround for b/78520668, explicitly trim memory once UI is hidden
         onTrimMemory(TRIM_MEMORY_UI_HIDDEN);
         mFallbackRecentsView.updateLocusId();
+        AccessibilityManagerCompat.sendTestProtocolEventToTest(
+                this, LAUNCHER_ACTIVITY_STOPPED_MESSAGE);
     }
 
     @Override
@@ -343,6 +371,9 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         getSystemUiController().updateUiState(SystemUiController.UI_STATE_BASE_WINDOW,
                 Themes.getAttrBoolean(this, R.attr.isWorkspaceDarkText));
         ACTIVITY_TRACKER.handleCreate(this);
+
+        // Set screen title for Talkback
+        setTitle(R.string.accessibility_recent_apps);
     }
 
     @Override
@@ -384,11 +415,8 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
         super.onDestroy();
         ACTIVITY_TRACKER.onActivityDestroyed(this);
         mActivityLaunchAnimationRunner = null;
-
+        mSplitSelectStateController.onDestroy();
         mTISBindHelper.onDestroy();
-        if (mTaskbarManager != null) {
-            mTaskbarManager.clearActivity(this);
-        }
     }
 
     @Override
@@ -410,7 +438,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
                 new RemoteAnimationAdapter(runner, HOME_APPEAR_DURATION, 0),
                 new RemoteTransition(runner.toRemoteTransition(), getIApplicationThread(),
                         "StartHomeFromRecents"));
-        startHomeIntentSafely(this, options.toBundle());
+        startHomeIntentSafely(this, options.toBundle(), TAG);
     }
 
     private final RemoteAnimationFactory mAnimationToHomeFactory =
@@ -470,5 +498,20 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> {
                 mStateManager.reapplyState();
             }
         };
+    }
+
+    public boolean canStartHomeSafely() {
+        OverviewCommandHelper overviewCommandHelper = mTISBindHelper.getOverviewCommandHelper();
+        return overviewCommandHelper == null || overviewCommandHelper.canStartHomeSafely();
+    }
+
+    @NonNull
+    public TISBindHelper getTISBindHelper() {
+        return mTISBindHelper;
+    }
+
+    @Override
+    public boolean isRecentsViewVisible() {
+        return getStateManager().getState().isRecentsViewVisible();
     }
 }

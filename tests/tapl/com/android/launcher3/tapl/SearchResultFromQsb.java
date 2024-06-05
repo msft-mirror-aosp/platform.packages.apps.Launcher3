@@ -15,6 +15,9 @@
  */
 package com.android.launcher3.tapl;
 
+import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
+
+import android.text.TextUtils;
 import android.widget.TextView;
 
 import androidx.test.uiautomator.By;
@@ -25,51 +28,46 @@ import java.util.ArrayList;
 /**
  * Operations on search result page opened from qsb.
  */
-public class SearchResultFromQsb {
-    // The input resource id in the search box.
-    private static final String INPUT_RES = "input";
+public class SearchResultFromQsb implements SearchInputSource {
     private static final String BOTTOM_SHEET_RES_ID = "bottom_sheet_background";
 
     // This particular ID change should happen with caution
     private static final String SEARCH_CONTAINER_RES_ID = "search_results_list_view";
-    private final LauncherInstrumentation mLauncher;
+    protected final LauncherInstrumentation mLauncher;
 
     SearchResultFromQsb(LauncherInstrumentation launcher) {
         mLauncher = launcher;
         mLauncher.waitForLauncherObject("search_container_all_apps");
     }
 
-    /** Set the input to the search input edit text and update search results. */
-    public void searchForInput(String input) {
-        try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
-                "want to search for result with an input");
-             LauncherInstrumentation.Closable e = mLauncher.eventsCheck()) {
-            mLauncher.waitForLauncherObject(INPUT_RES).setText(input);
-        }
+    /** Find the app from search results with app name. */
+    public AppIcon findAppIcon(String appName) {
+        UiObject2 icon = mLauncher.waitForLauncherObject(AppIcon.getAppIconSelector(appName));
+        return createAppIcon(icon);
     }
 
-    /** Find the app from search results with app name. */
-    public Launchable findAppIcon(String appName) {
-        UiObject2 icon = mLauncher.waitForLauncherObject(By.clazz(TextView.class).text(appName));
+    protected AppIcon createAppIcon(UiObject2 icon) {
         return new AllAppsAppIcon(mLauncher, icon);
     }
 
     /** Find the web suggestion from search suggestion's title text */
-    public void verifyWebSuggestIsPresent(String text) {
-        ArrayList<UiObject2> goldenGateResults =
+    public SearchWebSuggestion findWebSuggestion(String text) {
+        ArrayList<UiObject2> webSuggestions =
                 new ArrayList<>(mLauncher.waitForObjectsInContainer(
                         mLauncher.waitForSystemLauncherObject(SEARCH_CONTAINER_RES_ID),
                         By.clazz(TextView.class)));
-        boolean found = false;
-        for(UiObject2 uiObject: goldenGateResults) {
+        for (UiObject2 uiObject: webSuggestions) {
             String currentString = uiObject.getText();
             if (currentString.equals(text)) {
-                found = true;
+                return createWebSuggestion(uiObject);
             }
         }
-        if (!found) {
-            throw new IllegalStateException("Web suggestion title: " + text + " not found");
-        }
+        mLauncher.fail("Web suggestion title: " + text + " not found");
+        return null;
+    }
+
+    protected SearchWebSuggestion createWebSuggestion(UiObject2 webSuggestion) {
+        return new SearchWebSuggestion(mLauncher, webSuggestion);
     }
 
     /** Find the total amount of views being displayed and return the size */
@@ -85,18 +83,63 @@ public class SearchResultFromQsb {
      * Taps outside bottom sheet to dismiss and return to workspace. Available on tablets only.
      * @param tapRight Tap on the right of bottom sheet if true, or left otherwise.
      */
-    public Workspace dismissByTappingOutsideForTablet(boolean tapRight) {
+    public void dismissByTappingOutsideForTablet(boolean tapRight) {
         try (LauncherInstrumentation.Closable e = mLauncher.eventsCheck();
              LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
                      "want to tap outside AllApps bottom sheet on the "
                              + (tapRight ? "right" : "left"))) {
             final UiObject2 allAppsBottomSheet =
                     mLauncher.waitForLauncherObject(BOTTOM_SHEET_RES_ID);
-            mLauncher.touchOutsideContainer(allAppsBottomSheet, tapRight);
+            tapOutside(tapRight, allAppsBottomSheet);
             try (LauncherInstrumentation.Closable tapped = mLauncher.addContextLayer(
                     "tapped outside AllApps bottom sheet")) {
-                return mLauncher.getWorkspace();
+                verifyVisibleContainerOnDismiss();
             }
+        }
+    }
+
+    protected void tapOutside(boolean tapRight, UiObject2 allAppsBottomSheet) {
+        mLauncher.runToState(
+                () -> mLauncher.touchOutsideContainer(allAppsBottomSheet, tapRight),
+                NORMAL_STATE_ORDINAL,
+                "tappig outside");
+    }
+
+    protected void verifyVisibleContainerOnDismiss() {
+        mLauncher.getWorkspace();
+    }
+
+    @Override
+    public LauncherInstrumentation getLauncher() {
+        return mLauncher;
+    }
+
+    @Override
+    public SearchResultFromQsb getSearchResultForInput() {
+        return this;
+    }
+
+    /** Verify a tile is present by checking its title and subtitle. */
+    public void verifyTileIsPresent(String title, String subtitle) {
+        ArrayList<UiObject2> searchResults =
+                new ArrayList<>(mLauncher.waitForObjectsInContainer(
+                        mLauncher.waitForSystemLauncherObject(SEARCH_CONTAINER_RES_ID),
+                        By.clazz(TextView.class)));
+        boolean foundTitle = false;
+        boolean foundSubtitle = false;
+        for (UiObject2 uiObject: searchResults) {
+            String currentString = uiObject.getText();
+            if (TextUtils.equals(currentString, title)) {
+                foundTitle = true;
+            } else if (TextUtils.equals(currentString, subtitle)) {
+                foundSubtitle = true;
+            }
+        }
+        if (!foundTitle) {
+            mLauncher.fail("Tile not found for title: " + title);
+        }
+        if (!foundSubtitle) {
+            mLauncher.fail("Tile not found for subtitle: " + subtitle);
         }
     }
 }

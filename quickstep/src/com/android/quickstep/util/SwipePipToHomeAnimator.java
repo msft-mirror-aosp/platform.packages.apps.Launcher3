@@ -16,8 +16,6 @@
 
 package com.android.quickstep.util;
 
-import static com.android.systemui.shared.system.InteractionJankMonitorWrapper.CUJ_APP_CLOSE_TO_PIP;
-
 import android.animation.Animator;
 import android.animation.RectEvaluator;
 import android.content.ComponentName;
@@ -26,7 +24,6 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.os.SystemProperties;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceControl;
@@ -36,6 +33,7 @@ import android.window.PictureInPictureSurfaceTransaction;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.internal.jank.Cuj;
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.icons.IconProvider;
 import com.android.quickstep.TaskAnimationManager;
@@ -48,7 +46,7 @@ import com.android.wm.shell.pip.PipContentOverlay;
  * when swiping up (in gesture navigation mode).
  */
 public class SwipePipToHomeAnimator extends RectFSpringAnim {
-    private static final String TAG = SwipePipToHomeAnimator.class.getSimpleName();
+    private static final String TAG = "SwipePipToHomeAnimator";
 
     private static final float END_PROGRESS = 1.0f;
 
@@ -114,7 +112,7 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
             @NonNull ActivityInfo activityInfo,
             int appIconSizePx,
             @NonNull SurfaceControl leash,
-            @Nullable Rect sourceRectHint,
+            @NonNull Rect sourceRectHint,
             @NonNull Rect appBounds,
             @NonNull Matrix homeToWindowPositionMap,
             @NonNull RectF startBounds,
@@ -137,32 +135,37 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         mDestinationBoundsTransformed.set(destinationBoundsTransformed);
         mSurfaceTransactionHelper = new PipSurfaceTransactionHelper(cornerRadius, shadowRadius);
 
-        if (sourceRectHint != null && (sourceRectHint.width() < destinationBounds.width()
-                || sourceRectHint.height() < destinationBounds.height())) {
+        String reasonForCreateOverlay = null; // For debugging purpose.
+        if (sourceRectHint.isEmpty()) {
+            reasonForCreateOverlay = "Source rect hint is empty";
+        } else if (sourceRectHint.width() < destinationBounds.width()
+                || sourceRectHint.height() < destinationBounds.height()) {
             // This is a situation in which the source hint rect on at least one axis is smaller
             // than the destination bounds, which presents a problem because we would have to scale
             // up that axis to fit the bounds. So instead, just fallback to the non-source hint
             // animation in this case.
-            sourceRectHint = null;
+            reasonForCreateOverlay = "Source rect hint is too small " + sourceRectHint;
+            sourceRectHint.setEmpty();
+        } else if (!appBounds.contains(sourceRectHint)) {
+            // This is a situation in which the source hint rect is outside the app bounds, so it is
+            // not a valid rectangle to use for cropping app surface
+            sourceRectHint.setEmpty();
+            reasonForCreateOverlay = "Source rect hint exceeds display bounds " + sourceRectHint;
         }
 
-        if (sourceRectHint == null) {
+        if (sourceRectHint.isEmpty()) {
             mSourceRectHint.setEmpty();
             mSourceHintRectInsets = null;
 
             // Create a new overlay layer. We do not call detach on this instance, it's propagated
             // to other classes like PipTaskOrganizer / RecentsAnimationController to complete
             // the cleanup.
-            if (SystemProperties.getBoolean(
-                    "persist.wm.debug.enable_pip_app_icon_overlay", true)) {
-                mPipContentOverlay = new PipContentOverlay.PipAppIconOverlay(view.getContext(),
-                        mAppBounds, new IconProvider(context).getIcon(mActivityInfo),
-                        appIconSizePx);
-            }  else {
-                mPipContentOverlay = new PipContentOverlay.PipColorOverlay(view.getContext());
-            }
+            mPipContentOverlay = new PipContentOverlay.PipAppIconOverlay(view.getContext(),
+                    mAppBounds, mDestinationBounds,
+                    new IconProvider(context).getIcon(mActivityInfo), appIconSizePx);
             final SurfaceControl.Transaction tx = new SurfaceControl.Transaction();
             mPipContentOverlay.attach(tx, mLeash);
+            Log.d(TAG, getContentOverlay() + " is created: " + reasonForCreateOverlay);
         } else {
             mSourceRectHint.set(sourceRectHint);
             mSourceHintRectInsets = new Rect(sourceRectHint.left - appBounds.left,
@@ -174,19 +177,19 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
         addAnimatorListener(new AnimationSuccessListener() {
             @Override
             public void onAnimationStart(Animator animation) {
-                InteractionJankMonitorWrapper.begin(view, CUJ_APP_CLOSE_TO_PIP);
+                InteractionJankMonitorWrapper.begin(view, Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_PIP);
                 super.onAnimationStart(animation);
             }
 
             @Override
             public void onAnimationCancel(Animator animation) {
                 super.onAnimationCancel(animation);
-                InteractionJankMonitorWrapper.cancel(CUJ_APP_CLOSE_TO_PIP);
+                InteractionJankMonitorWrapper.cancel(Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_PIP);
             }
 
             @Override
             public void onAnimationSuccess(Animator animator) {
-                InteractionJankMonitorWrapper.end(CUJ_APP_CLOSE_TO_PIP);
+                InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_PIP);
             }
 
             @Override
@@ -263,6 +266,10 @@ public class SwipePipToHomeAnimator extends RectFSpringAnim {
 
     public Rect getDestinationBounds() {
         return mDestinationBounds;
+    }
+
+    public Rect getAppBounds() {
+        return mAppBounds;
     }
 
     @Nullable
