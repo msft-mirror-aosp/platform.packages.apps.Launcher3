@@ -41,6 +41,7 @@
     <!-- Title for an option to enter split screen mode for a given app -->
     <string name="recent_task_option_split_screen">Split screen</string>
     <string name="split_app_info_accessibility">App info for %1$s</string>
+    <string name="split_app_usage_settings">Usage settings for %1$s</string>
 
     <!-- App pairs -->
     <string name="save_app_pair">Save app pair</string>
@@ -497,8 +498,4 @@
     <string name="ps_add_button_label">Install</string>
     <!-- Content description for install app icon -->
     <string name="ps_add_button_content_description">Install apps to Private Space</string>
-
-    <!-- Strings for bubble bar -->
-    <!-- content description for the overflow bubble [CHAR_LIMIT=none] -->
-    <string name="bubble_bar_overflow_description">Overflow</string>
 </resources>
