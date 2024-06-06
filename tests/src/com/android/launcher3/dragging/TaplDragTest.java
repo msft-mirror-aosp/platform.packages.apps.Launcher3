@@ -41,6 +41,7 @@ import com.android.launcher3.tapl.Workspace;
 import com.android.launcher3.ui.AbstractLauncherUiTest;
 import com.android.launcher3.ui.PortraitLandscapeRunner.PortraitLandscape;
 import com.android.launcher3.util.TestUtil;
+import com.android.launcher3.util.rule.ScreenRecordRule;
 
 import org.junit.Test;
 
@@ -194,6 +195,7 @@ public class TaplDragTest extends AbstractLauncherUiTest<Launcher> {
     @PlatinumTest(focusArea = "launcher")
     @Test
     @PortraitLandscape
+    @ScreenRecordRule.ScreenRecord // b/343953783
     public void testDragAppIcon() {
 
         final HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();
@@ -221,24 +223,7 @@ public class TaplDragTest extends AbstractLauncherUiTest<Launcher> {
     public void testDragAppIconToMultipleWorkspaceCells() throws Exception {
         long startTime, endTime, elapsedTime;
         Point[] targets = TestUtil.getCornersAndCenterPositions(mLauncher);
-
-        for (Point target : targets) {
-            startTime = SystemClock.uptimeMillis();
-            final HomeAllApps allApps = mLauncher.getWorkspace().switchToAllApps();
-            allApps.freeze();
-            try {
-                allApps.getAppIcon(TEST_APP_NAME).dragToWorkspace(target.x, target.y);
-            } finally {
-                allApps.unfreeze();
-            }
-            // Reset the workspace for the next shortcut creation.
-            reinitializeLauncherData(true);
-            endTime = SystemClock.uptimeMillis();
-            elapsedTime = endTime - startTime;
-            Log.d("testDragAppIconToWorkspaceCellTime",
-                    "Milliseconds taken to drag app icon to workspace cell: " + elapsedTime);
-        }
-
+        reinitializeLauncherData(true);
         // test to move a shortcut to other cell.
         final HomeAppIcon launcherTestAppIcon = createShortcutInCenterIfNotExist(TEST_APP_NAME);
         for (Point target : targets) {
