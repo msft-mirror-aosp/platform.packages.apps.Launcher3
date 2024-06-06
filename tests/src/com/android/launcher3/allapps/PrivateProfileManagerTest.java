@@ -149,7 +149,7 @@ public class PrivateProfileManagerTest {
     @Test
     public void quietModeFlagPresent_privateSpaceIsResetToDisabled() {
         PrivateProfileManager privateProfileManager = spy(mPrivateProfileManager);
-        doNothing().when(privateProfileManager).resetPrivateSpaceDecorator(anyInt());
+        doNothing().when(privateProfileManager).addPrivateSpaceDecorator(anyInt());
         doNothing().when(privateProfileManager).executeLock();
         doReturn(mAllAppsRecyclerView).when(privateProfileManager).getMainRecyclerView();
         when(mAllAppsStore.hasModelFlag(FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED))
@@ -169,7 +169,7 @@ public class PrivateProfileManagerTest {
     @Test
     public void transitioningToUnlocked_resetCallsPostUnlock() throws Exception {
         PrivateProfileManager privateProfileManager = spy(mPrivateProfileManager);
-        doNothing().when(privateProfileManager).resetPrivateSpaceDecorator(anyInt());
+        doNothing().when(privateProfileManager).addPrivateSpaceDecorator(anyInt());
         doReturn(mAllAppsRecyclerView).when(privateProfileManager).getMainRecyclerView();
         when(mAllAppsStore.hasModelFlag(FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED))
                 .thenReturn(false);
@@ -186,7 +186,7 @@ public class PrivateProfileManagerTest {
     @Test
     public void transitioningToLocked_resetCallsExecuteLock() throws Exception {
         PrivateProfileManager privateProfileManager = spy(mPrivateProfileManager);
-        doNothing().when(privateProfileManager).resetPrivateSpaceDecorator(anyInt());
+        doNothing().when(privateProfileManager).addPrivateSpaceDecorator(anyInt());
         doNothing().when(privateProfileManager).executeLock();
         doReturn(mAllAppsRecyclerView).when(privateProfileManager).getMainRecyclerView();
         when(mAllAppsStore.hasModelFlag(FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED))
@@ -208,7 +208,7 @@ public class PrivateProfileManagerTest {
         ArgumentCaptor<Intent> acIntent = ArgumentCaptor.forClass(Intent.class);
         mPrivateProfileManager.setPrivateSpaceSettingsAvailable(true);
 
-        mPrivateProfileManager.openPrivateSpaceSettings(null);
+        mContext.startActivity(expectedIntent);
 
         Mockito.verify(mContext).startActivity(acIntent.capture());
         assertEquals("Intent Action is different",
