@@ -21,14 +21,13 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Outline;
 import android.graphics.Rect;
+import android.text.TextUtils;
 import android.util.AttributeSet;
-import android.util.FloatProperty;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.widget.ImageView;
 
-import androidx.annotation.NonNull;
 import androidx.constraintlayout.widget.ConstraintLayout;
 
 import com.android.launcher3.R;
@@ -47,25 +46,6 @@ import java.util.EnumSet;
 public class BubbleView extends ConstraintLayout {
 
     public static final int DEFAULT_PATH_SIZE = 100;
-
-    /**
-     * Property to update drag translation value.
-     *
-     * @see BubbleView#getDragTranslationX()
-     * @see BubbleView#setDragTranslationX(float)
-     */
-    public static final FloatProperty<BubbleView> DRAG_TRANSLATION_X = new FloatProperty<>(
-            "dragTranslationX") {
-        @Override
-        public void setValue(@NonNull BubbleView bubbleView, float value) {
-            bubbleView.setDragTranslationX(value);
-        }
-
-        @Override
-        public Float get(BubbleView bubbleView) {
-            return bubbleView.getDragTranslationX();
-        }
-    };
 
     /**
      * Flags that suppress the visibility of the 'new' dot or the app badge, for one reason or
@@ -208,6 +188,16 @@ public class BubbleView extends ConstraintLayout {
         mAppIcon.setImageBitmap(bubble.getBadge());
         mDotColor = bubble.getDotColor();
         mDotRenderer = new DotRenderer(mBubbleSize, bubble.getDotPath(), DEFAULT_PATH_SIZE);
+        String contentDesc = bubble.getInfo().getTitle();
+        if (TextUtils.isEmpty(contentDesc)) {
+            contentDesc = getResources().getString(R.string.bubble_bar_bubble_fallback_description);
+        }
+        String appName = bubble.getInfo().getAppName();
+        if (!TextUtils.isEmpty(appName)) {
+            contentDesc = getResources().getString(R.string.bubble_bar_bubble_description,
+                    contentDesc, appName);
+        }
+        setContentDescription(contentDesc);
     }
 
     /**
