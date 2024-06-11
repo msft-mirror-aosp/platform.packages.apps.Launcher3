@@ -169,19 +169,20 @@ public final class TestProtocol {
     public static final String REQUEST_MOCK_SENSOR_ROTATION = "mock-sensor-rotation";
 
     public static final String PERMANENT_DIAG_TAG = "TaplTarget";
-    public static final String TWO_NEXUS_LAUNCHER_ACTIVITY_WHILE_UNLOCKING = "b/273347463";
     public static final String ICON_MISSING = "b/282963545";
     public static final String UIOBJECT_STALE_ELEMENT = "b/319501259";
     public static final String TEST_DRAG_APP_ICON_TO_MULTIPLE_WORKSPACES_FAILURE = "b/326908466";
     public static final String WIDGET_CONFIG_NULL_EXTRA_INTENT = "b/324419890";
     public static final String OVERVIEW_SELECT_TOOLTIP_MISALIGNED = "b/332485341";
-    public static final String CLOCK_ICON_DRAWABLE_LEAKING = "b/319168409";
 
     public static final String REQUEST_FLAG_ENABLE_GRID_ONLY_OVERVIEW = "enable-grid-only-overview";
     public static final String REQUEST_FLAG_ENABLE_APP_PAIRS = "enable-app-pairs";
 
     public static final String REQUEST_UNSTASH_BUBBLE_BAR_IF_STASHED =
             "unstash-bubble-bar-if-stashed";
+
+    public static final String REQUEST_INJECT_FAKE_TRACKPAD = "inject-fake-trackpad";
+    public static final String REQUEST_EJECT_FAKE_TRACKPAD = "eject-fake-trackpad";
 
     /** Logs {@link Log#d(String, String)} if {@link #sDebugTracing} is true. */
     public static void testLogD(String tag, String message) {

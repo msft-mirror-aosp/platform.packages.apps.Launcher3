@@ -711,7 +711,7 @@ public final class LauncherInstrumentation {
             final LogEventChecker eventChecker = mEventChecker;
             mEventChecker = null;
             if (checkEvents) {
-                final String eventMismatch = eventChecker.verify(0, false);
+                final String eventMismatch = eventChecker.verify(0);
                 if (eventMismatch != null) {
                     message = message + ";\n" + eventMismatch;
                 }
@@ -2318,6 +2318,14 @@ public final class LauncherInstrumentation {
         getTestInfo(TestProtocol.REQUEST_UNSTASH_BUBBLE_BAR_IF_STASHED);
     }
 
+    public void injectFakeTrackpad() {
+        getTestInfo(TestProtocol.REQUEST_INJECT_FAKE_TRACKPAD);
+    }
+
+    public void ejectFakeTrackpad() {
+        getTestInfo(TestProtocol.REQUEST_EJECT_FAKE_TRACKPAD);
+    }
+
     /** Blocks the taskbar from automatically stashing based on time. */
     public void enableBlockTimeout(boolean enable) {
         getTestInfo(enable
@@ -2408,7 +2416,7 @@ public final class LauncherInstrumentation {
             if (mEventChecker != null) {
                 mEventChecker = null;
                 if (mCheckEventsForSuccessfulGestures) {
-                    final String message = eventChecker.verify(WAIT_TIME_MS, true);
+                    final String message = eventChecker.verify(WAIT_TIME_MS);
                     if (message != null) {
                         dumpDiagnostics(message);
                         checkForAnomaly();
