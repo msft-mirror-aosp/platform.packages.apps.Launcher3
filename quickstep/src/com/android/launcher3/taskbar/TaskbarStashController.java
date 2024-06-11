@@ -25,7 +25,6 @@ import static com.android.internal.jank.InteractionJankMonitor.Configuration;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TRANSIENT_TASKBAR_HIDE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TRANSIENT_TASKBAR_SHOW;
-import static com.android.launcher3.taskbar.TaskbarKeyguardController.MASK_ANY_SYSUI_LOCKED;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
@@ -35,7 +34,6 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_I
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_GOING_AWAY;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -66,6 +64,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.SystemUiProxy;
+import com.android.quickstep.util.SystemUiFlagUtils;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -100,7 +99,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     // If we're in an app and any of these flags are enabled, taskbar should be stashed.
     private static final int FLAGS_STASHED_IN_APP = FLAG_STASHED_IN_APP_SYSUI
             | FLAG_STASHED_IN_APP_SETUP | FLAG_STASHED_IN_TASKBAR_ALL_APPS
-            | FLAG_STASHED_SMALL_SCREEN | FLAG_STASHED_IN_APP_AUTO;
+            | FLAG_STASHED_SMALL_SCREEN | FLAG_STASHED_IN_APP_AUTO | FLAG_STASHED_IME;
+
+    // If we're in overview and any of these flags are enabled, taskbar should be stashed.
+    private static final int FLAGS_STASHED_IN_OVERVIEW = FLAG_STASHED_IME;
 
     // If any of these flags are enabled, inset apps by our stashed height instead of our unstashed
     // height. This way the reported insets are consistent even during transitions out of the app.
@@ -111,7 +113,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     // If any of these flags are enabled, the taskbar must be stashed.
     private static final int FLAGS_FORCE_STASHED = FLAG_STASHED_SYSUI | FLAG_STASHED_DEVICE_LOCKED
-            | FLAG_STASHED_IN_TASKBAR_ALL_APPS | FLAG_STASHED_SMALL_SCREEN | FLAG_STASHED_IME;
+            | FLAG_STASHED_IN_TASKBAR_ALL_APPS | FLAG_STASHED_SMALL_SCREEN;
 
     /**
      * How long to stash/unstash when manually invoked via long press.
@@ -244,8 +246,13 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         boolean inApp = hasAnyFlag(flags, FLAGS_IN_APP);
         boolean stashedInApp = hasAnyFlag(flags, FLAGS_STASHED_IN_APP);
         boolean stashedLauncherState = hasAnyFlag(flags, FLAG_IN_STASHED_LAUNCHER_STATE);
+        boolean inOverview = hasAnyFlag(flags, FLAG_IN_OVERVIEW);
+        boolean stashedInOverview = hasAnyFlag(flags, FLAGS_STASHED_IN_OVERVIEW);
         boolean forceStashed = hasAnyFlag(flags, FLAGS_FORCE_STASHED);
-        return (inApp && stashedInApp) || (!inApp && stashedLauncherState) || forceStashed;
+        return (inApp && stashedInApp)
+                || (!inApp && stashedLauncherState)
+                || (inOverview && stashedInOverview)
+                || forceStashed;
     };
     private final StatePropertyHolder mStatePropertyHolder = new StatePropertyHolder(
             mIsStashedPredicate);
@@ -942,9 +949,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 && DisplayController.isTransientTaskbar(mActivity);
         updateStateForFlag(FLAG_STASHED_SYSUI,
                 hasAnyFlag(systemUiStateFlags, SYSUI_STATE_SCREEN_PINNING) || stashForBubbles);
-        boolean isLocked = hasAnyFlag(systemUiStateFlags, MASK_ANY_SYSUI_LOCKED)
-                && !hasAnyFlag(systemUiStateFlags, SYSUI_STATE_STATUS_BAR_KEYGUARD_GOING_AWAY);
-        updateStateForFlag(FLAG_STASHED_DEVICE_LOCKED, isLocked);
+        updateStateForFlag(FLAG_STASHED_DEVICE_LOCKED,
+                SystemUiFlagUtils.isLocked(systemUiStateFlags));
 
         mIsImeShowing = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_IME_SHOWING);
         mIsImeSwitcherShowing = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_IME_SWITCHER_SHOWING);
