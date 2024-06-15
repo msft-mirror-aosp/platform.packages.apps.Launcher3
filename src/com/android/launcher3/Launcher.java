@@ -38,6 +38,7 @@ import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_BIND
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_BIND_PENDING_APPWIDGET;
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_CREATE_APPWIDGET;
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_CREATE_SHORTCUT;
+import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_HOME_ROLE;
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_PICK_APPWIDGET;
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_RECONFIGURE_APPWIDGET;
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE;
@@ -151,6 +152,7 @@ import android.view.WindowInsetsAnimation;
 import android.view.WindowManager.LayoutParams;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.OvershootInterpolator;
+import android.widget.Toast;
 import android.window.BackEvent;
 import android.window.OnBackAnimationCallback;
 
@@ -164,6 +166,7 @@ import androidx.annotation.VisibleForTesting;
 import androidx.core.os.BuildCompat;
 import androidx.window.embedding.RuleController;
 
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DropTarget.DragObject;
 import com.android.launcher3.accessibility.LauncherAccessibilityDelegate;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
@@ -309,7 +312,7 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     private static boolean sIsNewProcess = true;
 
-    private StateManager<LauncherState> mStateManager;
+    private StateManager<LauncherState, Launcher> mStateManager;
 
     private static final int ON_ACTIVITY_RESULT_ANIMATION_DELAY = 500;
 
@@ -890,6 +893,17 @@ public class Launcher extends StatefulActivity<LauncherState>
             return;
         }
         mPendingActivityResult = null;
+
+        if (requestCode == REQUEST_HOME_ROLE) {
+            if (resultCode != RESULT_OK) {
+                Toast.makeText(
+                        this,
+                        this.getString(R.string.set_default_home_app,
+                                this.getString(R.string.derived_app_name)),
+                        Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
 
         // Reset the startActivity waiting flag
         final PendingRequestArgs requestArgs = mPendingRequestArgs;
@@ -2761,7 +2775,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
-    protected void collectStateHandlers(List<StateHandler> out) {
+     public void collectStateHandlers(List<StateHandler<LauncherState>> out) {
         out.add(getAllAppsController());
         out.add(getWorkspace());
     }
@@ -2783,7 +2797,8 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     private void updateDisallowBack() {
-        if (BuildCompat.isAtLeastV() && Flags.enableDesktopWindowingMode()) {
+        if (BuildCompat.isAtLeastV() && Flags.enableDesktopWindowingMode()
+            && mDeviceProfile.isTablet) {
             // TODO(b/330183377) disable back in launcher when when we productionize
             return;
         }
@@ -2981,7 +2996,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
-    public StateManager<LauncherState> getStateManager() {
+    public StateManager<LauncherState, Launcher> getStateManager() {
         return mStateManager;
     }
 
