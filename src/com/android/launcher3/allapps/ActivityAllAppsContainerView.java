@@ -96,6 +96,7 @@ import com.android.launcher3.views.RecyclerViewFastScroller;
 import com.android.launcher3.views.ScrimView;
 import com.android.launcher3.views.SpringRelativeLayout;
 import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip;
+import com.android.systemui.plugins.AllAppsRow;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -166,6 +167,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     private final RectF mTmpRectF = new RectF();
     protected AllAppsPagedView mViewPager;
     protected FloatingHeaderView mHeader;
+    protected final List<AllAppsRow> mAdditionalHeaderRows = new ArrayList<>();
     protected View mBottomSheetBackground;
     protected RecyclerViewFastScroller mFastScroller;
     private ConstraintLayout mFastScrollLetterLayout;
@@ -278,6 +280,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
         getLayoutInflater().inflate(R.layout.all_apps_content, this);
         mHeader = findViewById(R.id.all_apps_header);
+        mAdditionalHeaderRows.clear();
+        mAdditionalHeaderRows.addAll(getAdditionalHeaderRows());
         mBottomSheetBackground = findViewById(R.id.bottom_sheet_background);
         mBottomSheetHandleArea = findViewById(R.id.bottom_sheet_handle_area);
         mSearchRecyclerView = findViewById(R.id.search_results_list_view);
@@ -298,6 +302,10 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             addView(mSearchContainer);
         }
         mSearchUiManager = (SearchUiManager) mSearchContainer;
+    }
+
+    public List<AllAppsRow> getAdditionalHeaderRows() {
+        return List.of();
     }
 
     @Override
@@ -740,6 +748,8 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     void setupHeader() {
+        mAdditionalHeaderRows.forEach(row -> mHeader.onPluginDisconnected(row));
+
         mHeader.setVisibility(View.VISIBLE);
         boolean tabsHidden = !mUsingTabs;
         mHeader.setup(
@@ -757,6 +767,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 adapterHolder.mRecyclerView.scrollToTop();
             }
         });
+        mAdditionalHeaderRows.forEach(row -> mHeader.onPluginConnected(row, mActivityContext));
 
         removeCustomRules(mHeader);
         if (isSearchBarFloating()) {
