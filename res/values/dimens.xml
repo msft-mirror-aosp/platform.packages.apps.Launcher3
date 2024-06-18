@@ -320,6 +320,8 @@
     <dimen name="bg_popup_item_height">52dp</dimen>
     <dimen name="bg_popup_item_vertical_padding">12dp</dimen>
     <dimen name="pre_drag_view_scale">6dp</dimen>
+    <!-- Minimum size of the widget dragged view to keep it visible under the finger. -->
+    <dimen name="widget_drag_view_min_scale_down_size">70dp</dimen>
     <!-- an icon with shortcuts must be dragged this far before the container is removed. -->
     <dimen name="deep_shortcuts_start_drag_threshold">16dp</dimen>
     <!-- Possibly related to b/235886078, icon needs to be scaled up to match expected visual size of 32 dp -->
@@ -445,6 +447,9 @@
 
     <!-- Size of the maximum radius for the enforced rounded rectangles. -->
     <dimen name="enforced_rounded_corner_max_radius">16dp</dimen>
+
+    <!-- Size of the radius for the rounded corners of Persistent Taskbar. -->
+    <dimen name="persistent_taskbar_corner_radius">16dp</dimen>
 
     <!-- Base Swipe Detector, speed in dp/s -->
     <dimen name="base_swift_detector_fling_release_velocity">1dp</dimen>

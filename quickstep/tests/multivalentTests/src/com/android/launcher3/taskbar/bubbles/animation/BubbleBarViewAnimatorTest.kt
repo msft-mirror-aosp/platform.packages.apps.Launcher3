@@ -24,6 +24,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.View.VISIBLE
 import android.widget.FrameLayout
+import androidx.core.animation.AnimatorTestRule
 import androidx.core.graphics.drawable.toBitmap
 import androidx.dynamicanimation.animation.DynamicAnimation
 import androidx.test.core.app.ApplicationProvider
@@ -41,6 +42,7 @@ import com.android.wm.shell.shared.animation.PhysicsAnimator
 import com.android.wm.shell.shared.animation.PhysicsAnimatorTestUtils
 import com.google.common.truth.Truth.assertThat
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
@@ -52,6 +54,8 @@ import org.mockito.kotlin.whenever
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class BubbleBarViewAnimatorTest {
+
+    @get:Rule val animatorTestRule = AnimatorTestRule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private lateinit var animatorScheduler: TestBubbleBarViewAnimatorScheduler
@@ -380,6 +384,45 @@ class BubbleBarViewAnimatorTest {
         verify(bubbleStashController).showBubbleBarImmediate()
     }
 
+    @Test
+    fun animateBubbleBarForCollapsed() {
+        setUpBubbleBar()
+        setUpBubbleStashController()
+        bubbleBarView.translationY = BAR_TRANSLATION_Y_FOR_HOTSEAT
+
+        val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
+
+        val animator =
+            BubbleBarViewAnimator(bubbleBarView, bubbleStashController, animatorScheduler)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.animateBubbleBarForCollapsed(bubble)
+        }
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        // verify we started animating
+        assertThat(bubbleBarView.isAnimatingNewBubble).isTrue()
+
+        // advance the animation handler by the duration of the initial lift
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animatorTestRule.advanceTimeBy(250)
+        }
+
+        // the lift animation is complete; the spring back animation should start now
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        barAnimator.assertIsRunning()
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
+
+        assertThat(animatorScheduler.delayedBlock).isNotNull()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(animatorScheduler.delayedBlock!!)
+
+        assertThat(bubbleBarView.isAnimatingNewBubble).isFalse()
+        // the bubble bar translation y should be back to its initial value
+        assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
+
+        verify(bubbleStashController).showBubbleBarImmediate()
+    }
+
     private fun setUpBubbleBar() {
         bubbleBarView = BubbleBarView(context)
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -392,7 +435,8 @@ class BubbleBarViewAnimatorTest {
             overflowView.setOverflow(BubbleBarOverflow(overflowView), bitmap)
             bubbleBarView.addView(overflowView)
 
-            val bubbleInfo = BubbleInfo("key", 0, null, null, 0, context.packageName, null, false)
+            val bubbleInfo =
+                BubbleInfo("key", 0, null, null, 0, context.packageName, null, null, false)
             bubbleView =
                 inflater.inflate(R.layout.bubblebar_item_view, bubbleBarView, false) as BubbleView
             bubble =

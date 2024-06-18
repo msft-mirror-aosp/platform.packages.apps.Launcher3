@@ -24,6 +24,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -44,6 +45,7 @@ import androidx.dynamicanimation.animation.SpringForce;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.SpringAnimationBuilder;
 import com.android.launcher3.util.DisplayController;
+import com.android.wm.shell.Flags;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 
 import java.util.List;
@@ -85,6 +87,7 @@ public class BubbleBarView extends FrameLayout {
     private static final int MAX_VISIBLE_BUBBLES_COLLAPSED = 2;
     private static final int ARROW_POSITION_ANIMATION_DURATION_MS = 200;
     private static final int WIDTH_ANIMATION_DURATION_MS = 200;
+    private static final int SCALE_ANIMATION_DURATION_MS = 200;
 
     private static final long FADE_OUT_ANIM_ALPHA_DURATION_MS = 50L;
     private static final long FADE_OUT_ANIM_ALPHA_DELAY_MS = 50L;
@@ -97,6 +100,8 @@ public class BubbleBarView extends FrameLayout {
     private static final float FADE_IN_ANIM_POSITION_SPRING_STIFFNESS = 400f;
     // During fade in animation we shift the bubble bar 1/60th of the screen width
     private static final float FADE_IN_ANIM_POSITION_SHIFT = 1 / 60f;
+
+    private static final int SCALE_IN_ANIMATION_DURATION_MS = 250;
 
     /**
      * Custom property to set alpha value for the bar view while a bubble is being dragged.
@@ -133,13 +138,12 @@ public class BubbleBarView extends FrameLayout {
     private float mBubbleBarPadding;
     // The size of a bubble in the bar
     private float mIconSize;
+    // The scale of bubble icons
+    private float mIconScale = 1f;
     // The elevation of the bubbles within the bar
     private final float mBubbleElevation;
     private final float mDragElevation;
     private final int mPointerSize;
-
-    private final Rect mTempBackgroundBounds = new Rect();
-
     // Whether the bar is expanded (i.e. the bubble activity is being displayed).
     private boolean mIsBarExpanded = false;
     // The currently selected bubble view.
@@ -157,6 +161,11 @@ public class BubbleBarView extends FrameLayout {
     // collapsed state and 1 to the fully expanded state.
     private final ValueAnimator mWidthAnimator = ValueAnimator.ofFloat(0, 1);
 
+    /** An animator used for scaling in a new bubble to the bubble bar while expanded. */
+    @Nullable
+    private ValueAnimator mNewBubbleScaleInAnimator = null;
+    @Nullable
+    private ValueAnimator mScalePaddingAnimator;
     @Nullable
     private Animator mBubbleBarLocationAnimator = null;
 
@@ -211,42 +220,75 @@ public class BubbleBarView extends FrameLayout {
         setBackgroundDrawable(mBubbleBarBackground);
 
         mWidthAnimator.setDuration(WIDTH_ANIMATION_DURATION_MS);
-        mWidthAnimator.addUpdateListener(animation -> {
-            updateChildrenRenderNodeProperties(mBubbleBarLocation);
-            invalidate();
-        });
-        mWidthAnimator.addListener(new Animator.AnimatorListener() {
-            @Override
-            public void onAnimationCancel(Animator animation) {
-            }
 
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                mBubbleBarBackground.showArrow(mIsBarExpanded);
-                if (!mIsBarExpanded && mReorderRunnable != null) {
-                    mReorderRunnable.run();
-                    mReorderRunnable = null;
-                }
-                // If the bar was just collapsed and the overflow was the last bubble that was
-                // selected, set the first bubble as selected.
-                if (!mIsBarExpanded && mUpdateSelectedBubbleAfterCollapse != null
-                        && mSelectedBubbleView != null
-                        && mSelectedBubbleView.getBubble() instanceof BubbleBarOverflow) {
-                    BubbleView firstBubble = (BubbleView) getChildAt(0);
-                    mUpdateSelectedBubbleAfterCollapse.accept(firstBubble.getBubble().getKey());
-                }
-                updateWidth();
-            }
+        addAnimationCallBacks(mWidthAnimator,
+                /* onStart= */ () -> mBubbleBarBackground.showArrow(true),
+                /* onEnd= */ () -> {
+                    mBubbleBarBackground.showArrow(mIsBarExpanded);
+                    if (!mIsBarExpanded && mReorderRunnable != null) {
+                        mReorderRunnable.run();
+                        mReorderRunnable = null;
+                    }
+                    // If the bar was just collapsed and the overflow was the last bubble that was
+                    // selected, set the first bubble as selected.
+                    if (!mIsBarExpanded && mUpdateSelectedBubbleAfterCollapse != null
+                            && mSelectedBubbleView != null
+                            && mSelectedBubbleView.getBubble() instanceof BubbleBarOverflow) {
+                        BubbleView firstBubble = (BubbleView) getChildAt(0);
+                        mUpdateSelectedBubbleAfterCollapse.accept(firstBubble.getBubble().getKey());
+                    }
+                    updateWidth();
+                },
+                /* onUpdate= */ animator -> {
+                    updateBubblesLayoutProperties(mBubbleBarLocation);
+                    invalidate();
+                });
+    }
 
-            @Override
-            public void onAnimationRepeat(Animator animation) {
-            }
 
-            @Override
-            public void onAnimationStart(Animator animation) {
-                mBubbleBarBackground.showArrow(true);
-            }
-        });
+    /**
+     * Animates icon sizes and spacing between icons and bubble bar borders.
+     *
+     * @param newIconSize         new icon size
+     * @param newBubbleBarPadding spacing between icons and bubble bar borders.
+     */
+    public void animateBubbleBarIconSize(float newIconSize, float newBubbleBarPadding) {
+        if (!isIconSizeOrPaddingUpdated(newIconSize, newBubbleBarPadding)) {
+            return;
+        }
+        if (!Flags.animateBubbleSizeChange()) {
+            setIconSizeAndPadding(newIconSize, newBubbleBarPadding);
+            return;
+        }
+        if (mScalePaddingAnimator != null && mScalePaddingAnimator.isRunning()) {
+            mScalePaddingAnimator.cancel();
+        }
+        ValueAnimator scalePaddingAnimator = ValueAnimator.ofFloat(0f, 1f);
+        scalePaddingAnimator.setDuration(SCALE_ANIMATION_DURATION_MS);
+        boolean isPaddingUpdated = isPaddingUpdated(newBubbleBarPadding);
+        boolean isIconSizeUpdated = isIconSizeUpdated(newIconSize);
+        float initialScale = mIconScale;
+        float initialPadding = mBubbleBarPadding;
+        float targetScale = newIconSize / getScaledIconSize();
+
+        addAnimationCallBacks(scalePaddingAnimator,
+                /* onStart= */ null,
+                /* onEnd= */ () -> setIconSizeAndPadding(newIconSize, newBubbleBarPadding),
+                /* onUpdate= */ animator -> {
+                    float transitionProgress = (float) animator.getAnimatedValue();
+                    if (isIconSizeUpdated) {
+                        mIconScale =
+                                initialScale + (targetScale - initialScale) * transitionProgress;
+                    }
+                    if (isPaddingUpdated) {
+                        mBubbleBarPadding = initialPadding
+                                + (newBubbleBarPadding - initialPadding) * transitionProgress;
+                    }
+                    updateBubblesLayoutProperties(mBubbleBarLocation);
+                    invalidate();
+                });
+        scalePaddingAnimator.start();
+        mScalePaddingAnimator = scalePaddingAnimator;
     }
 
     @Override
@@ -261,26 +303,35 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /**
-     * Sets new icon size and spacing between icons and bubble bar borders.
+     * Sets new icon sizes and newBubbleBarPadding between icons and bubble bar borders.
      *
-     * @param newIconSize new icon size
-     * @param spacing     spacing between icons and bubble bar borders.
+     * @param newIconSize         new icon size
+     * @param newBubbleBarPadding newBubbleBarPadding between icons and bubble bar borders.
      */
-    // TODO(b/335575529): animate bubble bar icons size change
-    public void setIconSizeAndPadding(float newIconSize, float spacing) {
+    public void setIconSizeAndPadding(float newIconSize, float newBubbleBarPadding) {
         // TODO(b/335457839): handle new bubble animation during the size change
-        mBubbleBarPadding = spacing;
+        if (!isIconSizeOrPaddingUpdated(newIconSize, newBubbleBarPadding)) {
+            return;
+        }
+        mIconScale = 1f;
+        mBubbleBarPadding = newBubbleBarPadding;
         mIconSize = newIconSize;
         int childCount = getChildCount();
         for (int i = 0; i < childCount; i++) {
             View childView = getChildAt(i);
+            childView.setScaleY(mIconScale);
+            childView.setScaleY(mIconScale);
             FrameLayout.LayoutParams params = (LayoutParams) childView.getLayoutParams();
             params.height = (int) mIconSize;
             params.width = (int) mIconSize;
             childView.setLayoutParams(params);
         }
-        mBubbleBarBackground.setHeight(getBubbleBarExpandedHeight());
+        mBubbleBarBackground.setBackgroundHeight(getBubbleBarHeight());
         updateLayoutParams();
+    }
+
+    private float getScaledIconSize() {
+        return mIconSize * mIconScale;
     }
 
     @Override
@@ -298,7 +349,7 @@ public class BubbleBarView extends FrameLayout {
 
         if (!mDragging) {
             // Position the views when not dragging
-            updateChildrenRenderNodeProperties(mBubbleBarLocation);
+            updateBubblesLayoutProperties(mBubbleBarLocation);
         }
     }
 
@@ -444,7 +495,7 @@ public class BubbleBarView extends FrameLayout {
         mBubbleBarLocationAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                updateChildrenRenderNodeProperties(bubbleBarLocation);
+                updateBubblesLayoutProperties(bubbleBarLocation);
                 mBubbleBarBackground.setAnchorLeft(bubbleBarLocation.isOnLeft(isLayoutRtl()));
 
                 // Animate it in
@@ -613,6 +664,45 @@ public class BubbleBarView extends FrameLayout {
         mIsAnimatingNewBubble = false;
     }
 
+    /** Add a new bubble to the bubble bar. */
+    public void addBubble(View bubble, FrameLayout.LayoutParams lp) {
+        if (isExpanded()) {
+            // if we're expanded scale the new bubble in
+            bubble.setScaleX(0f);
+            bubble.setScaleY(0f);
+            addView(bubble, 0, lp);
+            createNewBubbleScaleInAnimator(bubble);
+            mNewBubbleScaleInAnimator.start();
+        } else {
+            addView(bubble, 0, lp);
+        }
+    }
+
+    private void createNewBubbleScaleInAnimator(View bubble) {
+        mNewBubbleScaleInAnimator = ValueAnimator.ofFloat(0, 1);
+        mNewBubbleScaleInAnimator.setDuration(SCALE_IN_ANIMATION_DURATION_MS);
+        mNewBubbleScaleInAnimator.addUpdateListener(animation -> {
+            float animatedFraction = animation.getAnimatedFraction();
+            bubble.setScaleX(animatedFraction);
+            bubble.setScaleY(animatedFraction);
+            updateBubblesLayoutProperties(mBubbleBarLocation);
+            invalidate();
+        });
+        mNewBubbleScaleInAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                bubble.setScaleX(1);
+                bubble.setScaleY(1);
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                updateWidth();
+                mNewBubbleScaleInAnimator = null;
+            }
+        });
+    }
+
     // TODO: (b/280605790) animate it
     @Override
     public void addView(View child, int index, ViewGroup.LayoutParams params) {
@@ -623,6 +713,8 @@ public class BubbleBarView extends FrameLayout {
         }
         super.addView(child, index, params);
         updateWidth();
+        updateBubbleAccessibilityStates();
+        updateContentDescription();
     }
 
     // TODO: (b/283309949) animate it
@@ -634,6 +726,8 @@ public class BubbleBarView extends FrameLayout {
             mBubbleBarBackground.showArrow(false);
         }
         updateWidth();
+        updateBubbleAccessibilityStates();
+        updateContentDescription();
     }
 
     private void updateWidth() {
@@ -649,6 +743,11 @@ public class BubbleBarView extends FrameLayout {
         setLayoutParams(lp);
     }
 
+    private float getBubbleBarHeight() {
+        return mIsBarExpanded ? getBubbleBarExpandedHeight()
+                : getBubbleBarCollapsedHeight();
+    }
+
     /** @return the horizontal margin between the bubble bar and the edge of the screen. */
     int getHorizontalMargin() {
         LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
@@ -659,13 +758,16 @@ public class BubbleBarView extends FrameLayout {
      * Updates the z order, positions, and badge visibility of the bubble views in the bar based
      * on the expanded state.
      */
-    private void updateChildrenRenderNodeProperties(BubbleBarLocation bubbleBarLocation) {
+    private void updateBubblesLayoutProperties(BubbleBarLocation bubbleBarLocation) {
         final float widthState = (float) mWidthAnimator.getAnimatedValue();
         final float currentWidth = getWidth();
         final float expandedWidth = expandedWidth();
         final float collapsedWidth = collapsedWidth();
         int bubbleCount = getChildCount();
-        final float ty = (mBubbleBarBounds.height() - mIconSize) / 2f;
+        float viewBottom = mBubbleBarBounds.height() + (isExpanded() ? mPointerSize : 0);
+        float bubbleBarAnimatedTop = viewBottom - getBubbleBarHeight();
+        // When translating X & Y the scale is ignored, so need to deduct it from the translations
+        final float ty = bubbleBarAnimatedTop + mBubbleBarPadding - getScaleIconShift();
         final boolean animate = getVisibility() == VISIBLE;
         final boolean onLeft = bubbleBarLocation.isOnLeft(isLayoutRtl());
         // elevation state is opposite to widthState - when expanded all icons are flat
@@ -680,8 +782,9 @@ public class BubbleBarView extends FrameLayout {
             bv.setDragTranslationX(0f);
             bv.setOffsetX(0f);
 
+            bv.setScaleX(mIconScale);
+            bv.setScaleY(mIconScale);
             bv.setTranslationY(ty);
-
             // the position of the bubble when the bar is fully expanded
             final float expandedX = getExpandedBubbleTranslationX(i, bubbleCount, onLeft);
             // the position of the bubble when the bar is fully collapsed
@@ -715,6 +818,8 @@ public class BubbleBarView extends FrameLayout {
                     } else if (i == MAX_VISIBLE_BUBBLES_COLLAPSED - 1
                             && bubbleCount == MAX_VISIBLE_BUBBLES_COLLAPSED) {
                         bv.setAlpha(0);
+                    } else {
+                        bv.setAlpha(1);
                     }
                 }
             }
@@ -742,21 +847,74 @@ public class BubbleBarView extends FrameLayout {
             }
         }
         mBubbleBarBackground.setArrowPosition(arrowPosition);
-        mBubbleBarBackground.setArrowAlpha((int) (255 * widthState));
+        mBubbleBarBackground.setArrowHeightFraction(widthState);
         mBubbleBarBackground.setWidth(interpolatedWidth);
+        mBubbleBarBackground.setBackgroundHeight(getBubbleBarExpandedHeight());
     }
 
-    private float getExpandedBubbleTranslationX(int bubbleIndex, int bubbleCount,
-            boolean onLeft) {
+    private float getScaleIconShift() {
+        return (mIconSize - getScaledIconSize()) / 2;
+    }
+
+    private float getExpandedBubbleTranslationX(int bubbleIndex, int bubbleCount, boolean onLeft) {
         if (bubbleIndex < 0 || bubbleIndex >= bubbleCount) {
             return 0;
         }
-        if (onLeft) {
-            // If bar is on the left, bubbles are ordered right to left
-            return (bubbleCount - bubbleIndex - 1) * (mIconSize + mExpandedBarIconsSpacing);
+        final float iconAndSpacing = getScaledIconSize() + mExpandedBarIconsSpacing;
+        float translationX;
+        if (mNewBubbleScaleInAnimator != null && mNewBubbleScaleInAnimator.isRunning()) {
+            translationX = getExpandedBubbleTranslationXDuringScaleAnimation(
+                    bubbleIndex, bubbleCount, onLeft);
+        } else if (onLeft) {
+            translationX = mBubbleBarPadding + (bubbleCount - bubbleIndex - 1) * iconAndSpacing;
         } else {
-            // Bubbles ordered left to right, don't move the first bubble
-            return bubbleIndex * (mIconSize + mExpandedBarIconsSpacing);
+            translationX = mBubbleBarPadding + bubbleIndex * iconAndSpacing;
+        }
+        return translationX - getScaleIconShift();
+    }
+
+    /**
+     * Returns the translation X for the bubble at index {@code bubbleIndex} when the bubble bar is
+     * expanded <b>and</b> a new bubble is animating in.
+     *
+     * <p>This method assumes that the animation is running so callers are expected to verify that
+     * before calling it.
+     */
+    private float getExpandedBubbleTranslationXDuringScaleAnimation(
+            int bubbleIndex, int bubbleCount, boolean onLeft) {
+        // when the new bubble scale animation is running, a new bubble is animating in while the
+        // bubble bar is expanded, so we have at least 2 bubbles in the bubble bar - the expanded
+        // one, and the new one animating in.
+
+        if (mNewBubbleScaleInAnimator == null) {
+            // callers of this method are expected to verify that the animation is running, but the
+            // compiler doesn't know that.
+            return 0;
+        }
+        final float iconAndSpacing = getScaledIconSize() + mExpandedBarIconsSpacing;
+        final float newBubbleScale = mNewBubbleScaleInAnimator.getAnimatedFraction();
+        // the new bubble is scaling in from the center, so we need to adjust its translation so
+        // that the distance to the adjacent bubble scales at the same rate.
+        final float pivotAdjustment = -(1 - newBubbleScale) * getScaledIconSize() / 2f;
+
+        if (onLeft) {
+            if (bubbleIndex == 0) {
+                // this is the animating bubble. use scaled spacing between it and the bubble to
+                // its left
+                return (bubbleCount - 1) * getScaledIconSize()
+                        + (bubbleCount - 2) * mExpandedBarIconsSpacing
+                        + newBubbleScale * mExpandedBarIconsSpacing
+                        + pivotAdjustment;
+            }
+            // when the bubble bar is on the left, only the translation of the right-most bubble
+            // is affected by the scale animation.
+            return (bubbleCount - bubbleIndex - 1) * iconAndSpacing;
+        } else if (bubbleIndex == 0) {
+            // the bubble bar is on the right, and this is the animating bubble. it only needs
+            // to be adjusted for the scaling pivot.
+            return pivotAdjustment;
+        } else {
+            return iconAndSpacing * (bubbleIndex - 1 + newBubbleScale);
         }
     }
 
@@ -765,13 +923,16 @@ public class BubbleBarView extends FrameLayout {
         if (bubbleIndex < 0 || bubbleIndex >= bubbleCount) {
             return 0;
         }
+        float translationX;
         if (onLeft) {
             // Shift the first bubble only if there are more bubbles in addition to overflow
-            return bubbleIndex == 0 && bubbleCount > MAX_VISIBLE_BUBBLES_COLLAPSED
-                    ? mIconOverlapAmount : 0;
+            translationX = mBubbleBarPadding + (
+                    bubbleIndex == 0 && bubbleCount > MAX_VISIBLE_BUBBLES_COLLAPSED
+                            ? mIconOverlapAmount : 0);
         } else {
-            return bubbleIndex == 0 ? 0 : mIconOverlapAmount;
+            translationX = mBubbleBarPadding + (bubbleIndex == 0 ? 0 : mIconOverlapAmount);
         }
+        return translationX - getScaleIconShift();
     }
 
     /**
@@ -798,7 +959,8 @@ public class BubbleBarView extends FrameLayout {
                     addViewInLayout(child, i, child.getLayoutParams());
                 }
             }
-            updateChildrenRenderNodeProperties(mBubbleBarLocation);
+            updateBubblesLayoutProperties(mBubbleBarLocation);
+            updateContentDescription();
         }
     }
 
@@ -876,15 +1038,9 @@ public class BubbleBarView extends FrameLayout {
 
     private float arrowPositionForSelectedWhenExpanded(BubbleBarLocation bubbleBarLocation) {
         final int index = indexOfChild(mSelectedBubbleView);
-        final int bubblePosition;
-        if (bubbleBarLocation.isOnLeft(isLayoutRtl())) {
-            // Bubble positions are reversed. First bubble is on the right.
-            bubblePosition = getChildCount() - index - 1;
-        } else {
-            bubblePosition = index;
-        }
-        return getPaddingStart() + bubblePosition * (mIconSize + mExpandedBarIconsSpacing)
-                + mIconSize / 2f;
+        final float selectedBubbleTranslationX = getExpandedBubbleTranslationX(
+                index, getChildCount(), bubbleBarLocation.isOnLeft(isLayoutRtl()));
+        return selectedBubbleTranslationX + mIconSize / 2f;
     }
 
     private float arrowPositionForSelectedWhenCollapsed(BubbleBarLocation bubbleBarLocation) {
@@ -895,9 +1051,10 @@ public class BubbleBarView extends FrameLayout {
             // bubbles than the current bubble and overflow.
             bubblePosition = index == 0 && getChildCount() > MAX_VISIBLE_BUBBLES_COLLAPSED ? 1 : 0;
         } else {
-            bubblePosition = index;
+            bubblePosition = index >= MAX_VISIBLE_BUBBLES_COLLAPSED
+                    ? MAX_VISIBLE_BUBBLES_COLLAPSED - 1 : index;
         }
-        return getPaddingStart() + bubblePosition * (mIconOverlapAmount) + mIconSize / 2f;
+        return mBubbleBarPadding + bubblePosition * (mIconOverlapAmount) + getScaledIconSize() / 2f;
     }
 
     @Override
@@ -927,6 +1084,7 @@ public class BubbleBarView extends FrameLayout {
             } else {
                 mWidthAnimator.reverse();
             }
+            updateBubbleAccessibilityStates();
         }
     }
 
@@ -944,20 +1102,30 @@ public class BubbleBarView extends FrameLayout {
      */
     public float expandedWidth() {
         final int childCount = getChildCount();
-        final int horizontalPadding = getPaddingStart() + getPaddingEnd();
         // spaces amount is less than child count by 1, or 0 if no child views
-        int spacesCount = Math.max(childCount - 1, 0);
-        return childCount * mIconSize + spacesCount * mExpandedBarIconsSpacing + horizontalPadding;
+        final float totalSpace;
+        final float totalIconSize;
+        if (mNewBubbleScaleInAnimator != null && mNewBubbleScaleInAnimator.isRunning()) {
+            // when this animation is running, a new bubble is animating in while the bubble bar is
+            // expanded, so we have at least 2 bubbles in the bubble bar.
+            final float newBubbleScale = mNewBubbleScaleInAnimator.getAnimatedFraction();
+            totalSpace = (childCount - 2 + newBubbleScale) * mExpandedBarIconsSpacing;
+            totalIconSize = (childCount - 1 + newBubbleScale) * getScaledIconSize();
+        } else {
+            totalSpace = Math.max(childCount - 1, 0) * mExpandedBarIconsSpacing;
+            totalIconSize = childCount * getScaledIconSize();
+        }
+        return totalIconSize + totalSpace + 2 * mBubbleBarPadding;
     }
 
     private float collapsedWidth() {
         final int childCount = getChildCount();
-        final int horizontalPadding = getPaddingStart() + getPaddingEnd();
+        final float horizontalPadding = 2 * mBubbleBarPadding;
         // If there are more than 2 bubbles, the first 2 should be visible when collapsed.
         // Otherwise just the first bubble should be visible because we don't show the overflow.
         return childCount > MAX_VISIBLE_BUBBLES_COLLAPSED
-                ? mIconSize + mIconOverlapAmount + horizontalPadding
-                : mIconSize + horizontalPadding;
+                ? getScaledIconSize() + mIconOverlapAmount + horizontalPadding
+                : getScaledIconSize() + horizontalPadding;
     }
 
     private float getBubbleBarExpandedHeight() {
@@ -966,7 +1134,7 @@ public class BubbleBarView extends FrameLayout {
 
     float getBubbleBarCollapsedHeight() {
         // the pointer is invisible when collapsed
-        return mIconSize + mBubbleBarPadding * 2;
+        return getScaledIconSize() + mBubbleBarPadding * 2;
     }
 
     /**
@@ -996,6 +1164,88 @@ public class BubbleBarView extends FrameLayout {
     /** Whether a new bubble is currently animating. */
     public boolean isAnimatingNewBubble() {
         return mIsAnimatingNewBubble;
+    }
+
+
+    private boolean hasOverview() {
+        // Overview is always the last bubble
+        View lastChild = getChildAt(getChildCount() - 1);
+        if (lastChild instanceof BubbleView bubbleView) {
+            return bubbleView.getBubble() instanceof BubbleBarOverflow;
+        }
+        return false;
+    }
+
+    private void updateBubbleAccessibilityStates() {
+        final int childA11y;
+        if (mIsBarExpanded) {
+            // Bar is expanded, focus on the bubbles
+            setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+            childA11y = View.IMPORTANT_FOR_ACCESSIBILITY_YES;
+        } else {
+            // Bar is collapsed, only focus on the bar
+            setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+            childA11y = View.IMPORTANT_FOR_ACCESSIBILITY_NO;
+        }
+        for (int i = 0; i < getChildCount(); i++) {
+            getChildAt(i).setImportantForAccessibility(childA11y);
+            // Only allowing focusing on bubbles when bar is expanded. Otherwise, in talkback mode,
+            // bubbles can be navigates to in collapsed mode.
+            getChildAt(i).setFocusable(mIsBarExpanded);
+        }
+    }
+
+    private void updateContentDescription() {
+        View firstChild = getChildAt(0);
+        CharSequence contentDesc = firstChild != null ? firstChild.getContentDescription() : "";
+
+        // Don't count overflow if it exists
+        int bubbleCount = getChildCount() - (hasOverview() ? 1 : 0);
+        if (bubbleCount > 1) {
+            contentDesc = getResources().getString(R.string.bubble_bar_description_multiple_bubbles,
+                    contentDesc, bubbleCount - 1);
+        }
+        setContentDescription(contentDesc);
+    }
+
+    private boolean isIconSizeOrPaddingUpdated(float newIconSize, float newBubbleBarPadding) {
+        return isIconSizeUpdated(newIconSize) || isPaddingUpdated(newBubbleBarPadding);
+    }
+
+    private boolean isIconSizeUpdated(float newIconSize) {
+        return Float.compare(mIconSize, newIconSize) != 0;
+    }
+
+    private boolean isPaddingUpdated(float newBubbleBarPadding) {
+        return Float.compare(mBubbleBarPadding, newBubbleBarPadding) != 0;
+    }
+
+    private void addAnimationCallBacks(@NonNull ValueAnimator animator,
+            @Nullable Runnable onStart,
+            @Nullable Runnable onEnd,
+            @Nullable ValueAnimator.AnimatorUpdateListener onUpdate) {
+        if (onUpdate != null) animator.addUpdateListener(onUpdate);
+        animator.addListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationCancel(Animator animator) {
+
+            }
+
+            @Override
+            public void onAnimationStart(Animator animator) {
+                if (onStart != null) onStart.run();
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animator) {
+                if (onEnd != null) onEnd.run();
+            }
+
+            @Override
+            public void onAnimationRepeat(Animator animator) {
+
+            }
+        });
     }
 
     /** Interface for BubbleBarView to communicate with its controller. */

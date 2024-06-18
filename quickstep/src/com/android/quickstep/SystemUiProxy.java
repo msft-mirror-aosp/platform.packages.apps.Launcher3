@@ -85,6 +85,7 @@ import com.android.wm.shell.back.IBackAnimation;
 import com.android.wm.shell.bubbles.IBubbles;
 import com.android.wm.shell.bubbles.IBubblesListener;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
+import com.android.wm.shell.common.desktopmode.DesktopModeTransitionSource;
 import com.android.wm.shell.common.pip.IPip;
 import com.android.wm.shell.common.pip.IPipAnimationListener;
 import com.android.wm.shell.common.split.SplitScreenConstants.PersistentSnapPosition;
@@ -683,11 +684,11 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
      * should be responsible for cleaning up the overlay.
      */
     public void stopSwipePipToHome(int taskId, ComponentName componentName, Rect destinationBounds,
-            SurfaceControl overlay, Rect appBounds) {
+            SurfaceControl overlay, Rect appBounds, Rect sourceRectHint) {
         if (mPip != null) {
             try {
                 mPip.stopSwipePipToHome(taskId, componentName, destinationBounds, overlay,
-                        appBounds);
+                        appBounds, sourceRectHint);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call stopSwipePipToHome");
             }
@@ -1494,10 +1495,10 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     }
 
     /** Call shell to move a task with given `taskId` to desktop  */
-    public void moveToDesktop(int taskId) {
+    public void moveToDesktop(int taskId, DesktopModeTransitionSource transitionSource) {
         if (mDesktopMode != null) {
             try {
-                mDesktopMode.moveToDesktop(taskId);
+                mDesktopMode.moveToDesktop(taskId, transitionSource);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call moveToDesktop", e);
             }
