@@ -36,6 +36,7 @@ import androidx.annotation.UiThread;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAnimUtils;
 import com.android.launcher3.LauncherInitListener;
 import com.android.launcher3.LauncherState;
@@ -242,7 +243,8 @@ public final class LauncherActivityInterface extends
 
     @Override
     public void onExitOverview(RotationTouchHelper deviceState, Runnable exitRunnable) {
-        final StateManager<LauncherState> stateManager = getCreatedContainer().getStateManager();
+        final StateManager<LauncherState, Launcher> stateManager =
+                getCreatedContainer().getStateManager();
         stateManager.addStateListener(
                 new StateManager.StateListener<LauncherState>() {
                     @Override
@@ -308,7 +310,8 @@ public final class LauncherActivityInterface extends
             return;
         }
         LauncherOverlayManager om = launcher.getOverlayManager();
-        if (!launcher.isStarted() || launcher.isForceInvisible()) {
+        if (!SystemUiProxy.INSTANCE.get(launcher).getHomeVisibilityState().isHomeVisible()
+                || launcher.isForceInvisible()) {
             om.hideOverlay(false /* animate */);
         } else {
             om.hideOverlay(150);

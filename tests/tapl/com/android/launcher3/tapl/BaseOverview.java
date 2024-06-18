@@ -23,6 +23,7 @@ import static com.android.launcher3.tapl.OverviewTask.TASK_START_EVENT;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
 
 import android.graphics.Rect;
+import android.util.Log;
 import android.view.KeyEvent;
 
 import androidx.annotation.NonNull;
@@ -359,21 +360,6 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     }
 
     /**
-     * Gets Overview Actions specific to grouped tasks.
-     *
-     * @return The Overview group actions bar
-     */
-    @NonNull
-    public OverviewActions getOverviewGroupActions() {
-        try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
-                "want to get overview group actions")) {
-            verifyActiveContainer();
-            UiObject2 groupActions = mLauncher.waitForOverviewObject("group_action_buttons");
-            return new OverviewActions(groupActions, mLauncher);
-        }
-    }
-
-    /**
      * Returns if clear all button is visible.
      */
     public boolean isClearAllVisible() {
@@ -398,26 +384,39 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     }
 
     protected boolean isActionsViewVisible() {
-        if (!hasTasks() || isClearAllVisible()) {
+        boolean hasTasks = hasTasks();
+        if (!hasTasks || isClearAllVisible()) {
+            LauncherInstrumentation.log("Not expecting an actions bar:"
+                    + (!hasTasks ? "no recent tasks" : "clear all button is visible"));
             return false;
         }
         boolean isTablet = mLauncher.isTablet();
         if (isTablet && mLauncher.isGridOnlyOverviewEnabled()) {
+            LauncherInstrumentation.log("Not expecting an actions bar: "
+                    + "device is tablet with grid-only Overview");
             return false;
         }
         OverviewTask task = isTablet ? getFocusedTaskForTablet() : getCurrentTask();
         if (task == null) {
+            LauncherInstrumentation.log("Not expecting an actions bar: no focused task");
             return false;
         }
+        float centerOffset = Math.abs(task.getExactCenterX() - mLauncher.getExactScreenCenterX());
         // In tablets, if focused task is not in center, overview actions aren't visible.
-        if (isTablet && Math.abs(task.getExactCenterX() - mLauncher.getExactScreenCenterX()) >= 1) {
+        if (isTablet && centerOffset >= 1) {
+            LauncherInstrumentation.log("Not expecting an actions bar: "
+                    + "device is tablet and task is not centered; center offset by "
+                    + centerOffset + "px");
             return false;
         }
         if (task.isTaskSplit() && (!mLauncher.isAppPairsEnabled() || !isTablet)) {
+            LauncherInstrumentation.log("Not expecting an actions bar: "
+                    + "device is phone and task is split");
             // Overview actions aren't visible for split screen tasks, except for save app pair
             // button on tablets.
             return false;
         }
+        LauncherInstrumentation.log("Expecting an actions bar");
         return true;
     }
 
@@ -462,20 +461,30 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
     }
 
     private void verifyActionsViewVisibility() {
+        // If no running tasks, no need to verify actions view visibility.
+        if (getTasks().isEmpty()) {
+            return;
+        }
+
+        boolean isTablet = mLauncher.isTablet();
+        OverviewTask task = isTablet ? getFocusedTaskForTablet() : getCurrentTask();
+
         try (LauncherInstrumentation.Closable c = mLauncher.addContextLayer(
-                "want to assert overview actions view visibility")) {
-            boolean isTablet = mLauncher.isTablet();
-            OverviewTask task = isTablet ? getFocusedTaskForTablet() : getCurrentTask();
+                "want to assert overview actions view visibility="
+                        + isActionsViewVisible()
+                        + ", focused task is "
+                        + (task == null ? "null" : (task.isTaskSplit() ? "split" : "not split"))
+                )) {
 
             if (isActionsViewVisible()) {
                 if (task.isTaskSplit()) {
-                    mLauncher.waitForOverviewObject("group_action_buttons");
+                    mLauncher.waitForOverviewObject("action_save_app_pair");
                 } else {
                     mLauncher.waitForOverviewObject("action_buttons");
                 }
             } else {
                 mLauncher.waitUntilOverviewObjectGone("action_buttons");
-                mLauncher.waitUntilOverviewObjectGone("group_action_buttons");
+                mLauncher.waitUntilOverviewObjectGone("action_save_app_pair");
             }
         }
     }
@@ -490,13 +499,18 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             throw new IllegalStateException("Must be run on tablet device.");
         }
         final List<UiObject2> taskViews = getTasks();
-        if (taskViews.size() == 0) {
+        if (!hasTasks()) {
+            LauncherInstrumentation.log("no recent tasks");
             return null;
         }
         int focusedTaskHeight = mLauncher.getFocusedTaskHeightForTablet();
         for (UiObject2 task : taskViews) {
             OverviewTask overviewTask = new OverviewTask(mLauncher, task, this);
 
+            LauncherInstrumentation.log("checking task height ("
+                    + overviewTask.getVisibleHeight()
+                    + ") against defined focused task height ("
+                    + focusedTaskHeight + ")");
             if (overviewTask.getVisibleHeight() == focusedTaskHeight) {
                 return overviewTask;
             }

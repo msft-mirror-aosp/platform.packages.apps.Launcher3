@@ -27,8 +27,11 @@
     <string name="safemode_widget_error" msgid="4863470563535682004">"Widgetit poistettu käytöstä vikasietotilassa"</string>
     <string name="shortcut_not_available" msgid="2536503539825726397">"Pikakuvake ei ole käytettävissä."</string>
     <string name="home_screen" msgid="5629429142036709174">"Etusivu"</string>
+    <!-- no translation found for set_default_home_app (5808906607627586381) -->
+    <skip />
     <string name="recent_task_option_split_screen" msgid="6690461455618725183">"Jaettu näyttö"</string>
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"Sovellustiedot: %1$s"</string>
+    <string name="split_app_usage_settings" msgid="7214375263347964093">"Käyttöasetus tälle: %1$s"</string>
     <string name="save_app_pair" msgid="5647523853662686243">"Tallenna sovelluspari"</string>
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"Sovellusparia ei tueta tällä laitteella"</string>
@@ -47,7 +50,7 @@
     <string name="productivity_widget_recommendation_category_label" msgid="3811812719618323750">"Kaikki tarvittava"</string>
     <string name="news_widget_recommendation_category_label" msgid="6756167867113741310">"Uutiset ja aikakauslehdet"</string>
     <string name="entertainment_widget_recommendation_category_label" msgid="3973107268630717874">"Viihde"</string>
-    <string name="social_widget_recommendation_category_label" msgid="689147679536384717">"Sosiaalinen"</string>
+    <string name="social_widget_recommendation_category_label" msgid="689147679536384717">"Some"</string>
     <string name="others_widget_recommendation_category_label" msgid="5555987036267226245">"Sinulle ehdotetut"</string>
     <string name="widget_picker_right_pane_accessibility_title" msgid="1673313931455067502">"<xliff:g id="SELECTED_HEADER">%1$s</xliff:g> widgetit oikealla, haku ja vaihtoehdot vasemmalla"</string>
     <string name="widgets_count" msgid="6467746476364652096">"{count,plural, =1{# widget}other{# widgetiä}}"</string>
@@ -84,7 +87,7 @@
     <string name="uninstall_drop_target_label" msgid="4722034217958379417">"Poista asennus"</string>
     <string name="app_info_drop_target_label" msgid="692894985365717661">"Sovelluksen tiedot"</string>
     <string name="install_private_system_shortcut_label" msgid="1616889277073184841">"Asenna yksityisesti"</string>
-    <string name="uninstall_private_system_shortcut_label" msgid="8423460530441627982">"Sovelluksen poistaminen"</string>
+    <string name="uninstall_private_system_shortcut_label" msgid="8423460530441627982">"Poista sovellus"</string>
     <string name="install_drop_target_label" msgid="2539096853673231757">"Asenna"</string>
     <string name="dismiss_prediction_label" msgid="3357562989568808658">"Älä ehdota sovellusta"</string>
     <string name="pin_prediction" msgid="4196423321649756498">"Kiinnitä sovellus"</string>
@@ -193,5 +196,4 @@
     <string name="ps_container_transition" msgid="8667331812048014412">"Yksityisen tilan siirtäminen"</string>
     <string name="ps_add_button_label" msgid="8127988716897128773">"Asenna"</string>
     <string name="ps_add_button_content_description" msgid="3254274107740952556">"Asenna sovelluksia yksityiseen tilaan"</string>
-    <string name="bubble_bar_overflow_description" msgid="7410995531938041192">"Ylivuoto"</string>
 </resources>
