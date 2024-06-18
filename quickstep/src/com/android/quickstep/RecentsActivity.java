@@ -115,7 +115,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
     private TISBindHelper mTISBindHelper;
     private @Nullable FallbackTaskbarUIController mTaskbarUIController;
 
-    private StateManager<RecentsState> mStateManager;
+    private StateManager<RecentsState, RecentsActivity> mStateManager;
 
     // Strong refs to runners which are cleared when the activity is destroyed
     private RemoteAnimationFactory mActivityLaunchAnimationRunner;
@@ -371,6 +371,9 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
         getSystemUiController().updateUiState(SystemUiController.UI_STATE_BASE_WINDOW,
                 Themes.getAttrBoolean(this, R.attr.isWorkspaceDarkText));
         ACTIVITY_TRACKER.handleCreate(this);
+
+        // Set screen title for Talkback
+        setTitle(R.string.accessibility_recent_apps);
     }
 
     @Override
@@ -381,6 +384,11 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
             AccessibilityManagerCompat.sendStateEventToTest(getBaseContext(),
                     OVERVIEW_STATE_ORDINAL);
         }
+    }
+
+    @Override
+    public boolean shouldAnimateStateChange() {
+        return false;
     }
 
     /**
@@ -459,12 +467,12 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
             };
 
     @Override
-    protected void collectStateHandlers(List<StateHandler> out) {
+    public void collectStateHandlers(List<StateHandler<RecentsState>> out) {
         out.add(new FallbackRecentsStateController(this));
     }
 
     @Override
-    public StateManager<RecentsState> getStateManager() {
+    public StateManager<RecentsState, RecentsActivity> getStateManager() {
         return mStateManager;
     }
 

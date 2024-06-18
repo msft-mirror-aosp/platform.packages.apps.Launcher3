@@ -134,6 +134,7 @@ public class RecyclerViewFastScroller extends View {
 
     protected FastScrollRecyclerView mRv;
     private RecyclerView.OnScrollListener mOnScrollListener;
+    private final ActivityContext mActivityContext;
 
     private int mDownX;
     private int mDownY;
@@ -170,7 +171,7 @@ public class RecyclerViewFastScroller extends View {
         mDeltaThreshold = res.getDisplayMetrics().density * SCROLL_DELTA_THRESHOLD_DP;
         mScrollbarLeftOffsetTouchDelegate = res.getDisplayMetrics().density
                 * SCROLLBAR_LEFT_OFFSET_TOUCH_DELEGATE_DP;
-
+        mActivityContext = ActivityContext.lookupContext(context);
         TypedArray ta =
                 context.obtainStyledAttributes(attrs, R.styleable.RecyclerViewFastScroller, defStyleAttr, 0);
         mCanThumbDetach = ta.getBoolean(R.styleable.RecyclerViewFastScroller_canThumbDetach, false);
@@ -248,7 +249,6 @@ public class RecyclerViewFastScroller extends View {
     public boolean handleTouchEvent(MotionEvent ev, Point offset) {
         int x = (int) ev.getX() - offset.x;
         int y = (int) ev.getY() - offset.y;
-        ActivityContext activityContext = ActivityContext.lookupContext(getContext());
 
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
@@ -269,15 +269,7 @@ public class RecyclerViewFastScroller extends View {
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
-                if (y > mLastY) {
-                    if (!mRequestedHideKeyboard) {
-                        activityContext.hideKeyboard();
-                    }
-                    mRequestedHideKeyboard = true;
-                } else {
-                    mRequestedHideKeyboard = false;
-                }
-
+                boolean isScrollingDown = y > mLastY;
                 mLastY = y;
                 int absDeltaY = Math.abs(y - mDownY);
                 int absDeltaX = Math.abs(x - mDownX);
@@ -293,6 +285,14 @@ public class RecyclerViewFastScroller extends View {
                     }
                 }
                 if (mIsDragging) {
+                    if (isScrollingDown) {
+                        if (!mRequestedHideKeyboard) {
+                            mActivityContext.hideKeyboard();
+                        }
+                        mRequestedHideKeyboard = true;
+                    } else {
+                        mRequestedHideKeyboard = false;
+                    }
                     updateFastScrollSectionNameAndThumbOffset(y);
                 }
                 break;

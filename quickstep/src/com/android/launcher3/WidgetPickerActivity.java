@@ -43,17 +43,18 @@ import com.android.launcher3.model.WidgetPredictionsRequester;
 import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
-import com.android.launcher3.util.PackageUserKey;
+import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.widget.BaseWidgetSheet;
 import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
-import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
+import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -194,6 +195,11 @@ public class WidgetPickerActivity extends BaseActivity {
                 return false;
             }
 
+            View dragView = widgetCell.getDragAndDropView();
+            if (dragView == null) {
+                return false;
+            }
+
             ClipData clipData = new ClipData(
                     new ClipDescription(
                             /* label= */ "", // not displayed anywhere; so, set to empty.
@@ -209,9 +215,9 @@ public class WidgetPickerActivity extends BaseActivity {
                     .putExtra(EXTRA_IS_PENDING_WIDGET_DRAG, true));
 
             // DRAG_FLAG_GLOBAL permits dragging data beyond app window.
-            return view.startDragAndDrop(
+            return dragView.startDragAndDrop(
                     clipData,
-                    new View.DragShadowBuilder(view),
+                    new View.DragShadowBuilder(dragView),
                     /* myLocalState= */ null,
                     View.DRAG_FLAG_GLOBAL
             );
@@ -235,14 +241,16 @@ public class WidgetPickerActivity extends BaseActivity {
                     );
             bindWidgets(allWidgets);
             if (mUiSurface != null) {
-                Map<PackageUserKey, List<WidgetItem>> allWidgetsMap = allWidgets.stream()
-                        .filter(WidgetsListHeaderEntry.class::isInstance)
+                Map<ComponentKey, WidgetItem> allWidgetItems = allWidgets.stream()
+                        .filter(entry -> entry instanceof WidgetsListContentEntry)
+                        .flatMap(entry -> entry.mWidgets.stream())
+                        .distinct()
                         .collect(Collectors.toMap(
-                                entry -> PackageUserKey.fromPackageItemInfo(entry.mPkgItem),
-                                entry -> entry.mWidgets)
-                        );
+                                widget -> new ComponentKey(widget.componentName, widget.user),
+                                Function.identity()
+                        ));
                 mWidgetPredictionsRequester = new WidgetPredictionsRequester(app.getContext(),
-                        mUiSurface, allWidgetsMap);
+                        mUiSurface, allWidgetItems);
                 mWidgetPredictionsRequester.request(mAddedWidgets, this::bindRecommendedWidgets);
             }
         });

@@ -38,6 +38,7 @@ import android.view.View;
 import android.view.animation.Interpolator;
 
 import androidx.annotation.FloatRange;
+import androidx.annotation.StringRes;
 
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StateManager;
@@ -369,6 +370,10 @@ public abstract class LauncherState implements BaseState<LauncherState> {
         return launcher.getWorkspace().getCurrentPageDescription();
     }
 
+    public @StringRes int getTitle() {
+        return R.string.home_screen;
+    }
+
     public PageAlphaProvider getWorkspacePageAlphaProvider(Launcher launcher) {
         if ((this != NORMAL && this != HINT_STATE)
                 || !launcher.getDeviceProfile().shouldFadeAdjacentWorkspaceScreens()) {
@@ -435,7 +440,7 @@ public abstract class LauncherState implements BaseState<LauncherState> {
      */
     public void onBackInvoked(Launcher launcher) {
         if (this != NORMAL) {
-            StateManager<LauncherState> lsm = launcher.getStateManager();
+            StateManager<LauncherState, Launcher> lsm = launcher.getStateManager();
             LauncherState lastState = lsm.getLastState();
             lsm.goToState(lastState, forEndCallback(this::onBackAnimationCompleted));
         }
@@ -456,7 +461,7 @@ public abstract class LauncherState implements BaseState<LauncherState> {
      */
     public void onBackProgressed(
             Launcher launcher, @FloatRange(from = 0.0, to = 1.0) float backProgress) {
-        StateManager<LauncherState> lsm = launcher.getStateManager();
+        StateManager<LauncherState, Launcher> lsm = launcher.getStateManager();
         LauncherState toState = lsm.getLastState();
         lsm.onBackProgressed(toState, backProgress);
     }
@@ -466,7 +471,7 @@ public abstract class LauncherState implements BaseState<LauncherState> {
      * predictive back gesture.
      */
     public void onBackCancelled(Launcher launcher) {
-        StateManager<LauncherState> lsm = launcher.getStateManager();
+        StateManager<LauncherState, Launcher> lsm = launcher.getStateManager();
         LauncherState toState = lsm.getLastState();
         lsm.onBackCancelled(toState);
     }
