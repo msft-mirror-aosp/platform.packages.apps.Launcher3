@@ -35,19 +35,10 @@ class TaskbarSpecsEvaluatorTest {
     private val taskbarSpecsEvaluator = spy(TaskbarSpecsEvaluator(taskbarFeatureEvaluator))
 
     @Test
-    fun testGetIconSizeByGrid_whenTaskbarIsTransient_withValidRowAndColumnInLandscape() {
+    fun testGetIconSizeByGrid_whenTaskbarIsTransient_withValidRowAndColumn() {
         doReturn(true).whenever(taskbarFeatureEvaluator).isTransient
-        doReturn(true).whenever(taskbarFeatureEvaluator).isLandscape
-        assertThat(taskbarSpecsEvaluator.getIconSizeByGrid(4, 4))
+        assertThat(taskbarSpecsEvaluator.getIconSizeByGrid(6, 5))
             .isEqualTo(TaskbarIconSpecs.iconSize52dp)
-    }
-
-    @Test
-    fun testGetIconSizeByGrid_whenTaskbarIsTransient_withValidRowAndColumnInPortrait() {
-        doReturn(true).whenever(taskbarFeatureEvaluator).isTransient
-        doReturn(false).whenever(taskbarFeatureEvaluator).isLandscape
-        assertThat(taskbarSpecsEvaluator.getIconSizeByGrid(4, 4))
-            .isEqualTo(TaskbarIconSpecs.iconSize48dp)
     }
 
     @Test

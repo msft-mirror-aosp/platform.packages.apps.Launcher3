@@ -435,11 +435,6 @@ public class BubbleBarViewController {
             return;
         }
 
-        if (mBubbleStashController.isBubblesShowingOnHome() && !isExpanding && !isExpanded()) {
-            mBubbleBarViewAnimator.animateBubbleBarForCollapsed(bubble);
-            return;
-        }
-
         // only animate the new bubble if we're in an app and not auto expanding
         if (isInApp && !isExpanding && !isExpanded()) {
             mBubbleBarViewAnimator.animateBubbleInForStashed(bubble);
