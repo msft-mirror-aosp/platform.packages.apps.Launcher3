@@ -388,7 +388,7 @@ public class BubbleBarViewController {
      */
     public void removeBubble(BubbleBarItem b) {
         if (b != null) {
-            mBarView.removeView(b.getView());
+            mBarView.removeBubble(b.getView());
         } else {
             Log.w(TAG, "removeBubble, bubble was null!");
         }
@@ -432,6 +432,11 @@ public class BubbleBarViewController {
         // so check for at most 2 children.
         if (mBarView.getChildCount() <= 2) {
             mBubbleBarViewAnimator.animateToInitialState(bubble, isInApp, isExpanding);
+            return;
+        }
+
+        if (mBubbleStashController.isBubblesShowingOnHome() && !isExpanding && !isExpanded()) {
+            mBubbleBarViewAnimator.animateBubbleBarForCollapsed(bubble);
             return;
         }
 
