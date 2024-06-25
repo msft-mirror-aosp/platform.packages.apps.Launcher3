@@ -1796,6 +1796,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 && (windowRotation == ROTATION_90 || windowRotation == ROTATION_270)) {
             builder.setFromRotation(mRemoteTargetHandles[0].getTaskViewSimulator(), windowRotation,
                     taskInfo.displayCutoutInsets);
+        } else if (taskInfo.displayCutoutInsets != null) {
+            builder.setDisplayCutoutInsets(taskInfo.displayCutoutInsets);
         }
         final SwipePipToHomeAnimator swipePipToHomeAnimator = builder.build();
         AnimatorPlaybackController activityAnimationToHome =
