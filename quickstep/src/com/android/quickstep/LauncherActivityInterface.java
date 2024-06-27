@@ -35,7 +35,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Flags;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAnimUtils;
 import com.android.launcher3.LauncherInitListener;
 import com.android.launcher3.LauncherState;
@@ -212,10 +212,7 @@ public final class LauncherActivityInterface extends
         if (launcher.isStarted() && (isInLiveTileMode() || launcher.hasBeenResumed())) {
             return launcher;
         }
-        if (Flags.useActivityOverlay()
-                && SystemUiProxy.INSTANCE.get(launcher).getHomeVisibilityState().isHomeVisible()) {
-            return launcher;
-        }
+
         return null;
     }
 
@@ -242,7 +239,8 @@ public final class LauncherActivityInterface extends
 
     @Override
     public void onExitOverview(RotationTouchHelper deviceState, Runnable exitRunnable) {
-        final StateManager<LauncherState> stateManager = getCreatedContainer().getStateManager();
+        final StateManager<LauncherState, Launcher> stateManager =
+                getCreatedContainer().getStateManager();
         stateManager.addStateListener(
                 new StateManager.StateListener<LauncherState>() {
                     @Override

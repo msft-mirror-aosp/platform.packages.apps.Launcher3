@@ -53,6 +53,7 @@ import com.android.launcher3.config.FeatureFlags.enableTaskbarNoRecreate
 import com.android.launcher3.taskbar.TaskbarControllers.LoggableTaskbarController
 import com.android.launcher3.testing.shared.ResourceUtils
 import com.android.launcher3.util.DisplayController
+import com.android.launcher3.util.Executors
 import java.io.PrintWriter
 import kotlin.jvm.optionals.getOrNull
 import kotlin.math.max
@@ -76,6 +77,7 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
     private val gestureNavSettingsObserver =
         GestureNavigationSettingsObserver(
             context.mainThreadHandler,
+            Executors.UI_HELPER_EXECUTOR.handler,
             context,
             this::onTaskbarOrBubblebarWindowHeightOrInsetsChanged
         )
@@ -236,7 +238,8 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
             provider.insetsSize = getInsetsForGravityWithCutout(contentHeight, gravity, endRotation)
         } else if (provider.type == mandatorySystemGestures()) {
             if (context.isThreeButtonNav) {
-                provider.insetsSize = Insets.of(0, 0, 0, 0)
+                provider.insetsSize = getInsetsForGravityWithCutout(contentHeight, gravity,
+                    endRotation)
             } else {
                 val gestureHeight =
                         ResourceUtils.getNavbarSize(
