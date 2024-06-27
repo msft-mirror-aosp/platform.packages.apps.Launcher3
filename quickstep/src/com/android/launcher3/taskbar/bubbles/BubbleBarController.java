@@ -135,7 +135,6 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
     private static final Executor BUBBLE_STATE_EXECUTOR = Executors.newSingleThreadExecutor(
             new SimpleThreadFactory("BubbleStateUpdates-", THREAD_PRIORITY_BACKGROUND));
-    private final Executor mMainExecutor;
     private final LauncherApps mLauncherApps;
     private final BubbleIconFactory mIconFactory;
     private final SystemUiProxy mSystemUiProxy;
@@ -198,7 +197,6 @@ public class BubbleBarController extends IBubblesListener.Stub {
         if (sBubbleBarEnabled) {
             mSystemUiProxy.setBubblesListener(this);
         }
-        mMainExecutor = MAIN_EXECUTOR;
         mLauncherApps = context.getSystemService(LauncherApps.class);
         mIconFactory = new BubbleIconFactory(context,
                 context.getResources().getDimensionPixelSize(R.dimen.bubblebar_icon_size),
@@ -241,7 +239,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
     private void createAndAddOverflowIfNeeded() {
         if (mOverflowBubble == null) {
             BubbleBarOverflow overflow = createOverflow(mContext);
-            mMainExecutor.execute(() -> {
+            MAIN_EXECUTOR.execute(() -> {
                 // we're on the main executor now, so check that the overflow hasn't been created
                 // again to avoid races.
                 if (mOverflowBubble == null) {
@@ -303,12 +301,12 @@ public class BubbleBarController extends IBubblesListener.Stub {
                     }
                     viewUpdate.currentBubbles = currentBubbles;
                 }
-                mMainExecutor.execute(() -> applyViewChanges(viewUpdate));
+                MAIN_EXECUTOR.execute(() -> applyViewChanges(viewUpdate));
             });
         } else {
             // No bubbles to load, immediately apply the changes.
             BUBBLE_STATE_EXECUTOR.execute(
-                    () -> mMainExecutor.execute(() -> applyViewChanges(viewUpdate)));
+                    () -> MAIN_EXECUTOR.execute(() -> applyViewChanges(viewUpdate)));
         }
     }
 
@@ -496,7 +494,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
     @Override
     public void animateBubbleBarLocation(BubbleBarLocation bubbleBarLocation) {
-        mMainExecutor.execute(
+        MAIN_EXECUTOR.execute(
                 () -> mBubbleBarViewController.animateBubbleBarLocation(bubbleBarLocation));
     }
 
@@ -602,7 +600,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
         Bitmap bitmap = createOverflowBitmap(context);
         LayoutInflater inflater = LayoutInflater.from(context);
         BubbleView bubbleView = (BubbleView) inflater.inflate(
-                R.layout.bubblebar_item_view, mBarView, false /* attachToRoot */);
+                R.layout.bubble_bar_overflow_button, mBarView, false /* attachToRoot */);
         BubbleBarOverflow overflow = new BubbleBarOverflow(bubbleView);
         bubbleView.setOverflow(overflow, bitmap);
         return overflow;

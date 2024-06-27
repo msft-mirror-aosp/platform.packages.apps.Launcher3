@@ -23,7 +23,9 @@ import android.annotation.IdRes
 import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Insets
 import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
@@ -63,6 +65,7 @@ import com.android.launcher3.pm.UserCache
 import com.android.launcher3.testing.TestLogging
 import com.android.launcher3.testing.shared.TestProtocol
 import com.android.launcher3.util.CancellableTask
+import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.MultiPropertyFactory
 import com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE
@@ -76,6 +79,7 @@ import com.android.launcher3.util.TraceHelper
 import com.android.launcher3.util.TransformingTouchDelegate
 import com.android.launcher3.util.ViewPool
 import com.android.launcher3.util.rects.set
+import com.android.launcher3.views.ActivityContext
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.RemoteAnimationTargets
 import com.android.quickstep.TaskAnimationManager
@@ -86,6 +90,7 @@ import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler
 import com.android.quickstep.task.thumbnail.TaskThumbnail
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
+import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.quickstep.util.ActiveGestureErrorDetector
 import com.android.quickstep.util.ActiveGestureLog
@@ -135,8 +140,8 @@ constructor(
         /** Returns a copy of integer array containing taskIds of all tasks in the TaskView. */
         get() = taskContainers.map { it.task.key.id }.toIntArray()
 
-    val thumbnailViews: Array<TaskThumbnailViewDeprecated>
-        get() = taskContainers.map { it.thumbnailViewDeprecated }.toTypedArray()
+    val snapshotViews: Array<View>
+        get() = taskContainers.map { it.snapshotView }.toTypedArray()
 
     val isGridTask: Boolean
         /** Returns whether the task is part of overview grid and not being focused. */
@@ -166,6 +171,11 @@ constructor(
     val firstThumbnailViewDeprecated: TaskThumbnailViewDeprecated
         /** Returns the first thumbnailView of the TaskView. */
         get() = taskContainers[0].thumbnailViewDeprecated
+
+    @get:Deprecated("Use [taskContainers] instead.")
+    val firstSnapshotView: View
+        /** Returns the first snapshotView of the TaskView. */
+        get() = taskContainers[0].snapshotView
 
     @get:Deprecated("Use [taskContainers] instead.")
     val firstItemInfo: ItemInfo
@@ -665,6 +675,7 @@ constructor(
                     taskOverlayFactory
                 )
             )
+        taskContainers.forEach { it.bind() }
         setOrientationState(orientedState)
     }
 
@@ -691,24 +702,16 @@ constructor(
         }
         val iconView = getOrInflateIconView(iconViewId)
         return TaskContainer(
-                task,
-                thumbnailView,
-                thumbnailViewDeprecated,
-                iconView,
-                TransformingTouchDelegate(iconView.asView()),
-                stagePosition,
-                DigitalWellBeingToast(container, this),
-                findViewById(showWindowViewId)!!,
-                taskOverlayFactory
-            )
-            .apply {
-                if (enableRefactorTaskThumbnail()) {
-                    thumbnailViewDeprecated.setTaskOverlay(overlay)
-                    bindThumbnailView()
-                } else {
-                    thumbnailViewDeprecated.bind(task, overlay)
-                }
-            }
+            task,
+            thumbnailView,
+            thumbnailViewDeprecated,
+            iconView,
+            TransformingTouchDelegate(iconView.asView()),
+            stagePosition,
+            DigitalWellBeingToast(container, this),
+            findViewById(showWindowViewId)!!,
+            taskOverlayFactory
+        )
     }
 
     protected fun getOrInflateIconView(@IdRes iconViewId: Int): TaskViewIcon {
@@ -825,7 +828,10 @@ constructor(
         taskContainers.forEach {
             val thumbnailBounds = Rect()
             if (relativeToDragLayer) {
-                container.dragLayer.getDescendantRectRelativeToSelf(it.snapshotView, bounds)
+                container.dragLayer.getDescendantRectRelativeToSelf(
+                    it.snapshotView,
+                    thumbnailBounds
+                )
             } else {
                 thumbnailBounds.set(it.snapshotView)
             }
@@ -1198,10 +1204,10 @@ constructor(
             this,
             container.task,
             container.iconView.drawable,
-            container.thumbnailViewDeprecated,
-            container.thumbnailViewDeprecated.thumbnail, /* intent */
-            null, /* user */
-            null,
+            container.snapshotView,
+            container.thumbnail,
+            /* intent */ null,
+            /* user */ null,
             container.itemInfo
         )
     }
@@ -1374,7 +1380,6 @@ constructor(
     open fun setColorTint(amount: Float, tintColor: Int) {
         taskContainers.forEach {
             if (!enableRefactorTaskThumbnail()) {
-                // TODO(b/334832108) Add scrim to new TTV
                 it.thumbnailViewDeprecated.dimAlpha = amount
             }
             it.iconView.setIconColorTint(tintColor, amount)
@@ -1514,8 +1519,15 @@ constructor(
         gridTranslationY = 0f
         boxTranslationY = 0f
         nonGridPivotTranslationX = 0f
+        taskContainers.forEach {
+            it.snapshotView.translationX = 0f
+            it.snapshotView.translationY = 0f
+        }
         resetViewTransforms()
     }
+
+    fun getTaskContainerForTaskThumbnailView(taskThumbnailView: TaskThumbnailView): TaskContainer? =
+        taskContainers.firstOrNull { it.thumbnailView == taskThumbnailView }
 
     open fun resetViewTransforms() {
         // fullscreenTranslation and accumulatedTranslation should not be reset, as
@@ -1536,10 +1548,6 @@ constructor(
         alpha = stableAlpha
         setIconScaleAndDim(1f)
         setColorTint(0f, 0)
-        if (!enableRefactorTaskThumbnail()) {
-            // TODO(b/335399428) add split select functionality to new TTV
-            taskContainers.forEach { it.thumbnailViewDeprecated.resetViewTransforms() }
-        }
     }
 
     private fun getGridTrans(endTranslation: Float) =
@@ -1571,7 +1579,20 @@ constructor(
 
         @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
         open fun computeWindowCornerRadius(context: Context): Float {
-            return QuickStepContract.getWindowCornerRadius(context)
+            val activityContext: ActivityContext? = ActivityContext.lookupContextNoThrow(context)
+
+            // The corner radius is fixed to match when Taskbar is persistent mode
+            return if (
+                activityContext != null &&
+                    activityContext.deviceProfile?.isTaskbarPresent == true &&
+                    DisplayController.isTransientTaskbar(context)
+            ) {
+                context.resources
+                    .getDimensionPixelSize(R.dimen.persistent_taskbar_corner_radius)
+                    .toFloat()
+            } else {
+                QuickStepContract.getWindowCornerRadius(context)
+            }
         }
 
         /** Sets the progress in range [0, 1] */
@@ -1605,9 +1626,22 @@ constructor(
         taskOverlayFactory: TaskOverlayFactory
     ) {
         val overlay: TaskOverlay<*> = taskOverlayFactory.createOverlay(this)
+        val taskContainerData = TaskContainerData()
 
         val snapshotView: View
             get() = thumbnailView ?: thumbnailViewDeprecated
+
+        // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
+        val thumbnail: Bitmap?
+            get() = thumbnailViewDeprecated.thumbnail
+
+        // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
+        val isRealSnapshot: Boolean
+            get() = thumbnailViewDeprecated.isRealSnapshot()
+
+        // TODO(b/349120849): Extract ThumbnailData from TaskContainerData/TaskThumbnailViewModel
+        val scaledInsets: Insets
+            get() = thumbnailViewDeprecated.scaledInsets
 
         /** Builds proto for logging */
         val itemInfo: WorkspaceItemInfo
@@ -1636,6 +1670,15 @@ constructor(
         fun destroy() {
             digitalWellBeingToast?.destroy()
             thumbnailView?.let { taskView.removeView(it) }
+        }
+
+        fun bind() {
+            if (enableRefactorTaskThumbnail() && thumbnailView != null) {
+                thumbnailViewDeprecated.setTaskOverlay(overlay)
+                bindThumbnailView()
+            } else {
+                thumbnailViewDeprecated.bind(task, overlay)
+            }
         }
 
         // TODO(b/335649589): TaskView's VM will already have access to TaskThumbnailView's VM
