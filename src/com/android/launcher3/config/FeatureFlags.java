@@ -19,6 +19,7 @@ package com.android.launcher3.config;
 import static com.android.launcher3.config.FeatureFlags.BooleanFlag.DISABLED;
 import static com.android.launcher3.config.FeatureFlags.BooleanFlag.ENABLED;
 import static com.android.wm.shell.Flags.enableTaskbarNavbarUnification;
+import static com.android.wm.shell.Flags.enableTaskbarOnPhones;
 
 import android.content.res.Resources;
 
@@ -84,11 +85,6 @@ public final class FeatureFlags {
                     + "data preparation for loading the home screen");
 
     // TODO(Block 4): Cleanup flags
-    public static final BooleanFlag ENABLE_FLOATING_SEARCH_BAR =
-            getReleaseFlag(268388460, "ENABLE_FLOATING_SEARCH_BAR", DISABLED,
-                    "Allow search bar to persist and animate across states, and attach to"
-                            + " the keyboard from the bottom of the screen");
-
     public static final BooleanFlag ENABLE_ALL_APPS_FROM_OVERVIEW =
             getDebugFlag(275132633, "ENABLE_ALL_APPS_FROM_OVERVIEW", DISABLED,
                     "Allow entering All Apps from Overview (e.g. long swipe up from app)");
@@ -148,7 +144,7 @@ public final class FeatureFlags {
             DISABLED, "Sends a notification whenever launcher encounters an uncaught exception.");
 
     public static final boolean ENABLE_TASKBAR_NAVBAR_UNIFICATION =
-            enableTaskbarNavbarUnification() && !isPhone();
+            enableTaskbarNavbarUnification() && (!isPhone() || enableTaskbarOnPhones());
 
     private static boolean isPhone() {
         final boolean isPhone;

@@ -32,6 +32,7 @@ import com.android.launcher3.icons.ComponentWithLabelAndIcon;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.pm.ShortcutConfigActivityInfo;
+import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.Preconditions;
@@ -41,6 +42,7 @@ import com.android.launcher3.widget.WidgetSections;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
+import com.android.wm.shell.Flags;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -130,6 +132,22 @@ public class WidgetsModel {
     }
 
     /**
+     * Returns a map of widget component keys to corresponding widget items. Excludes the
+     * shortcuts.
+     */
+    public synchronized Map<ComponentKey, WidgetItem> getAllWidgetComponentsWithoutShortcuts() {
+        if (!WIDGETS_ENABLED) {
+            return Collections.emptyMap();
+        }
+        Map<ComponentKey, WidgetItem> widgetsMap = new HashMap<>();
+        mWidgetsList.forEach((packageItemInfo, widgetsAndShortcuts) ->
+                widgetsAndShortcuts.stream().filter(item -> item.widgetInfo != null).forEach(
+                        item -> widgetsMap.put(new ComponentKey(item.componentName, item.user),
+                                item)));
+        return widgetsMap;
+    }
+
+    /**
      * @param packageUser If null, all widgets and shortcuts are updated and returned, otherwise
      *                    only widgets and shortcuts associated with the package/user are.
      */
@@ -201,6 +219,7 @@ public class WidgetsModel {
         // add and update.
         mWidgetsList.putAll(rawWidgetsShortcuts.stream()
                 .filter(new WidgetValidityCheck(app))
+                .filter(new WidgetFlagCheck())
                 .flatMap(widgetItem -> getPackageUserKeys(app.getContext(), widgetItem).stream()
                         .map(key -> new Pair<>(packageItemInfoCache.getOrCreate(key), widgetItem)))
                 .collect(groupingBy(pair -> pair.first, mapping(pair -> pair.second, toList()))));
@@ -356,6 +375,21 @@ public class WidgetsModel {
                 return false;
             }
 
+            return true;
+        }
+    }
+
+    private static class WidgetFlagCheck implements Predicate<WidgetItem> {
+
+        private static final String BUBBLES_SHORTCUT_WIDGET =
+                "com.android.systemui/com.android.wm.shell.bubbles.shortcut"
+                        + ".CreateBubbleShortcutActivity";
+
+        @Override
+        public boolean test(WidgetItem widgetItem) {
+            if (BUBBLES_SHORTCUT_WIDGET.equals(widgetItem.componentName.flattenToString())) {
+                return Flags.enableRetrievableBubbles();
+            }
             return true;
         }
     }
