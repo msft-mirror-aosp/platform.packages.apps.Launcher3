@@ -269,8 +269,8 @@ public class TaskbarUIController {
                                     foundTaskView,
                                     foundTask,
                                     taskContainer.getIconView().getDrawable(),
-                                    taskContainer.getThumbnailViewDeprecated(),
-                                    taskContainer.getThumbnailViewDeprecated().getThumbnail(),
+                                    taskContainer.getSnapshotView(),
+                                    taskContainer.getThumbnail(),
                                     null /* intent */,
                                     null /* user */,
                                     info);
@@ -415,7 +415,7 @@ public class TaskbarUIController {
     /**
      * Sets whether the user is going home based on the current gesture.
      */
-    public void setUserIsGoingHome(boolean isGoingHome) {
-        mControllers.taskbarStashController.setUserIsGoingHome(isGoingHome);
+    public void setUserIsNotGoingHome(boolean isNotGoingHome) {
+        mControllers.taskbarStashController.setUserIsNotGoingHome(isNotGoingHome);
     }
 }
