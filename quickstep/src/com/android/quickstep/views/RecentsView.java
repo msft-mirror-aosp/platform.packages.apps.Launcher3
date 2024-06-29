@@ -212,7 +212,6 @@ import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.TaskVisualsChangeListener;
 import com.android.quickstep.util.TransformParams;
 import com.android.quickstep.util.VibrationConstants;
-import com.android.quickstep.views.TaskView.TaskContainer;
 import com.android.systemui.plugins.ResourceProvider;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -1826,8 +1825,13 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 ((GroupedTaskView) taskView).bind(leftTopTask, rightBottomTask, mOrientationState,
                         mTaskOverlayFactory, groupTask.mSplitBounds);
             } else if (taskView instanceof DesktopTaskView) {
-                ((DesktopTaskView) taskView).bind(((DesktopTask) groupTask).tasks,
-                        mOrientationState, mTaskOverlayFactory);
+                // Minimized tasks should not be shown in Overview
+                List<Task> nonMinimizedTasks =
+                        ((DesktopTask) groupTask).tasks.stream()
+                                .filter(task -> !task.isMinimized)
+                                .toList();
+                ((DesktopTaskView) taskView).bind(nonMinimizedTasks, mOrientationState,
+                        mTaskOverlayFactory);
                 mDesktopTaskView = (DesktopTaskView) taskView;
             } else {
                 Task task = groupTask.task1.key.id == stagedTaskIdToBeRemoved ? groupTask.task2
