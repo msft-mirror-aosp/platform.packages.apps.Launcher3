@@ -128,7 +128,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                     }
             val thumbWidth = (taskSize.width() * scaleWidth).toInt()
             val thumbHeight = (taskSize.height() * scaleHeight).toInt()
-            it.thumbnailViewDeprecated.measure(
+            it.snapshotView.measure(
                 MeasureSpec.makeMeasureSpec(thumbWidth, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(thumbHeight, MeasureSpec.EXACTLY)
             )
@@ -139,8 +139,8 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             var taskY = (positionInParent.y * scaleHeight).toInt()
             // move task down by margin size
             taskY += thumbnailTopMarginPx
-            it.thumbnailViewDeprecated.x = taskX.toFloat()
-            it.thumbnailViewDeprecated.y = taskY.toFloat()
+            it.snapshotView.x = taskX.toFloat()
+            it.snapshotView.y = taskY.toFloat()
             if (DEBUG) {
                 Log.d(
                     TAG,
@@ -193,6 +193,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             }
             val taskContainer =
                 TaskContainer(
+                    this,
                     task,
                     // TODO(b/338360089): Support new TTV for DesktopTaskView
                     thumbnailView = null,
