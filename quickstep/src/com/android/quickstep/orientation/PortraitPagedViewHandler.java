@@ -130,6 +130,11 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
     }
 
     @Override
+    public void rotateInsets(@NonNull Rect insets, @NonNull Rect outInsets) {
+        outInsets.set(insets);
+    }
+
+    @Override
     public int getClearAllSidePadding(View view, boolean isRtl) {
         return (isRtl ? view.getPaddingRight() : - view.getPaddingLeft()) / 2;
     }
@@ -254,7 +259,8 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
             return new Pair<>(translationX, translationY);
         }
 
-        bannerParams.gravity = BOTTOM | ((deviceProfile.isLandscape) ? START : CENTER_HORIZONTAL);
+        bannerParams.gravity =
+                BOTTOM | (deviceProfile.isLeftRightSplit ? START : CENTER_HORIZONTAL);
 
         // Set correct width
         if (desiredTaskId == splitBounds.leftTopTaskId) {

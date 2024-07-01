@@ -22,7 +22,6 @@ import android.animation.ObjectAnimator
 import android.annotation.IdRes
 import android.app.ActivityOptions
 import android.content.Context
-import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.PointF
 import android.graphics.Rect
@@ -50,21 +49,18 @@ import com.android.launcher3.Flags.enableFocusOutline
 import com.android.launcher3.Flags.enableGridOnlyOverview
 import com.android.launcher3.Flags.enableOverviewIconMenu
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
-import com.android.launcher3.Flags.privateSpaceRestrictAccessibilityDrag
-import com.android.launcher3.LauncherSettings
-import com.android.launcher3.LauncherState
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.config.FeatureFlags.ENABLE_KEYBOARD_QUICK_SWITCH
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent
 import com.android.launcher3.model.data.ItemInfo
-import com.android.launcher3.model.data.ItemInfoWithIcon
-import com.android.launcher3.model.data.WorkspaceItemInfo
-import com.android.launcher3.pm.UserCache
 import com.android.launcher3.testing.TestLogging
 import com.android.launcher3.testing.shared.TestProtocol
 import com.android.launcher3.util.CancellableTask
+import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.Executors
+import com.android.launcher3.util.MultiPropertyFactory
+import com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE
 import com.android.launcher3.util.RunnableList
 import com.android.launcher3.util.SafeCloseable
 import com.android.launcher3.util.SplitConfigurationOptions
@@ -75,15 +71,13 @@ import com.android.launcher3.util.TraceHelper
 import com.android.launcher3.util.TransformingTouchDelegate
 import com.android.launcher3.util.ViewPool
 import com.android.launcher3.util.rects.set
+import com.android.launcher3.views.ActivityContext
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.RemoteAnimationTargets
 import com.android.quickstep.TaskAnimationManager
 import com.android.quickstep.TaskOverlayFactory
-import com.android.quickstep.TaskOverlayFactory.TaskOverlay
-import com.android.quickstep.TaskUtils
 import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler
-import com.android.quickstep.task.thumbnail.TaskThumbnail
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.quickstep.util.ActiveGestureErrorDetector
@@ -134,8 +128,8 @@ constructor(
         /** Returns a copy of integer array containing taskIds of all tasks in the TaskView. */
         get() = taskContainers.map { it.task.key.id }.toIntArray()
 
-    val thumbnailViews: Array<TaskThumbnailViewDeprecated>
-        get() = taskContainers.map { it.thumbnailViewDeprecated }.toTypedArray()
+    val snapshotViews: Array<View>
+        get() = taskContainers.map { it.snapshotView }.toTypedArray()
 
     val isGridTask: Boolean
         /** Returns whether the task is part of overview grid and not being focused. */
@@ -165,6 +159,11 @@ constructor(
     val firstThumbnailViewDeprecated: TaskThumbnailViewDeprecated
         /** Returns the first thumbnailView of the TaskView. */
         get() = taskContainers[0].thumbnailViewDeprecated
+
+    @get:Deprecated("Use [taskContainers] instead.")
+    val firstSnapshotView: View
+        /** Returns the first snapshotView of the TaskView. */
+        get() = taskContainers[0].snapshotView
 
     @get:Deprecated("Use [taskContainers] instead.")
     val firstItemInfo: ItemInfo
@@ -265,12 +264,14 @@ constructor(
             field = Utilities.boundToRange(value, 0f, 1f)
             onFullscreenProgressChanged(field)
         }
+
     // gridProgress 0 = carousel; 1 = 2 row grid.
     protected var gridProgress = 0f
         set(value) {
             field = value
             onGridProgressChanged()
         }
+
     /**
      * The modalness of this view is how it should be displayed when it is shown on its own in the
      * modal state of overview. 0 being in context with other tasks, 1 being shown on its own.
@@ -337,12 +338,14 @@ constructor(
             field = value
             applyTranslationY()
         }
+
     // The following translation variables should only be used in the same orientation as Launcher.
     private var boxTranslationY = 0f
         set(value) {
             field = value
             applyTranslationY()
         }
+
     // The following grid translations scales with mGridProgress.
     protected var gridTranslationX = 0f
         set(value) {
@@ -355,12 +358,14 @@ constructor(
             field = value
             applyTranslationY()
         }
+
     // The following grid translation is used to animate closing the gap between grid and clear all.
     private var gridEndTranslationX = 0f
         set(value) {
             field = value
             applyTranslationX()
         }
+
     // Applied as a complement to gridTranslation, for adjusting the carousel overview and quick
     // switch.
     protected var nonGridTranslationX = 0f
@@ -374,6 +379,7 @@ constructor(
             field = value
             applyTranslationX()
         }
+
     // Used when in SplitScreenSelectState
     private var splitSelectTranslationY = 0f
         set(value) {
@@ -395,6 +401,7 @@ constructor(
 
     protected var shouldShowScreenshot = false
         get() = !isRunningTask || field
+
     /** Enable or disable showing border on hover and focus change */
     @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
     var borderEnabled = false
@@ -409,8 +416,35 @@ constructor(
             focusBorderAnimator?.setBorderVisibility(visible = field && isFocused, animated = true)
         }
 
-    protected var iconScaleAnimStartProgress = 0f
     private var focusTransitionProgress = 1f
+        set(value) {
+            field = value
+            onFocusTransitionProgressUpdated(field)
+        }
+
+    private val focusTransitionPropertyFactory =
+        MultiPropertyFactory(
+            this,
+            FOCUS_TRANSITION,
+            FOCUS_TRANSITION_INDEX_COUNT,
+            { x: Float, y: Float -> x * y },
+            1f
+        )
+    private val focusTransitionFullscreen =
+        focusTransitionPropertyFactory.get(FOCUS_TRANSITION_INDEX_FULLSCREEN)
+    private val focusTransitionScaleAndDim =
+        focusTransitionPropertyFactory.get(FOCUS_TRANSITION_INDEX_SCALE_AND_DIM)
+    /**
+     * Variant of [focusTransitionScaleAndDim] that has a built-in interpolator, to be used with
+     * [com.android.launcher3.anim.PendingAnimation] via [SCALE_AND_DIM_OUT] only. PendingAnimation
+     * doesn't support interpolator per animation, so we'll have to interpolate inside the property.
+     */
+    private var focusTransitionScaleAndDimOut = focusTransitionScaleAndDim.value
+        set(value) {
+            field = value
+            focusTransitionScaleAndDim.value =
+                FOCUS_TRANSITION_FAST_OUT_INTERPOLATOR.getInterpolation(field)
+        }
 
     private var iconAndDimAnimator: ObjectAnimator? = null
     // The current background requests to load the task thumbnail and icon
@@ -629,6 +663,7 @@ constructor(
                     taskOverlayFactory
                 )
             )
+        taskContainers.forEach { it.bind() }
         setOrientationState(orientedState)
     }
 
@@ -655,24 +690,17 @@ constructor(
         }
         val iconView = getOrInflateIconView(iconViewId)
         return TaskContainer(
-                task,
-                thumbnailView,
-                thumbnailViewDeprecated,
-                iconView,
-                TransformingTouchDelegate(iconView.asView()),
-                stagePosition,
-                DigitalWellBeingToast(container, this),
-                findViewById(showWindowViewId)!!,
-                taskOverlayFactory
-            )
-            .apply {
-                if (enableRefactorTaskThumbnail()) {
-                    thumbnailViewDeprecated.setTaskOverlay(overlay)
-                    bindThumbnailView()
-                } else {
-                    thumbnailViewDeprecated.bind(task, overlay)
-                }
-            }
+            this,
+            task,
+            thumbnailView,
+            thumbnailViewDeprecated,
+            iconView,
+            TransformingTouchDelegate(iconView.asView()),
+            stagePosition,
+            DigitalWellBeingToast(container, this),
+            findViewById(showWindowViewId)!!,
+            taskOverlayFactory
+        )
     }
 
     protected fun getOrInflateIconView(@IdRes iconViewId: Int): TaskViewIcon {
@@ -789,7 +817,10 @@ constructor(
         taskContainers.forEach {
             val thumbnailBounds = Rect()
             if (relativeToDragLayer) {
-                container.dragLayer.getDescendantRectRelativeToSelf(it.snapshotView, bounds)
+                container.dragLayer.getDescendantRectRelativeToSelf(
+                    it.snapshotView,
+                    thumbnailBounds
+                )
             } else {
                 thumbnailBounds.set(it.snapshotView)
             }
@@ -1162,10 +1193,10 @@ constructor(
             this,
             container.task,
             container.iconView.drawable,
-            container.thumbnailViewDeprecated,
-            container.thumbnailViewDeprecated.thumbnail, /* intent */
-            null, /* user */
-            null,
+            container.snapshotView,
+            container.thumbnail,
+            /* intent */ null,
+            /* user */ null,
             container.itemInfo
         )
     }
@@ -1301,43 +1332,23 @@ constructor(
         }
     }
 
-    protected open fun setIconsAndBannersFullscreenProgress(progress: Float) {
-        // Animate icons and DWB banners in/out, except in QuickSwitch state, when tiles are
-        // oversized and banner would look disproportionately large.
-        if (recentsView?.stateManager?.state == LauncherState.BACKGROUND_APP) {
-            return
-        }
-        setIconsAndBannersTransitionProgress(progress, invert = true)
-    }
-
     /**
      * Called to animate a smooth transition when going directly from an app into Overview (and vice
      * versa). Icons fade in, and DWB banners slide in with a "shift up" animation.
      */
-    protected open fun setIconsAndBannersTransitionProgress(progress: Float, invert: Boolean) {
-        focusTransitionProgress = if (invert) 1 - progress else progress
-        getIconContentScale(invert).let { iconContentScale ->
-            taskContainers.forEach {
-                it.iconView.setContentAlpha(iconContentScale)
-                it.digitalWellBeingToast?.updateBannerOffset(1f - iconContentScale)
-            }
+    private fun onFocusTransitionProgressUpdated(focusTransitionProgress: Float) {
+        taskContainers.forEach {
+            it.iconView.setContentAlpha(focusTransitionProgress)
+            it.digitalWellBeingToast?.updateBannerOffset(1f - focusTransitionProgress)
         }
-    }
-
-    private fun getIconContentScale(invert: Boolean): Float {
-        val iconScalePercentage = SCALE_ICON_DURATION.toFloat() / DIM_ANIM_DURATION
-        val lowerClamp = if (invert) 1f - iconScalePercentage else 0f
-        val upperClamp = if (invert) 1f else iconScalePercentage
-        return Interpolators.clampToProgress(Interpolators.FAST_OUT_SLOW_IN, lowerClamp, upperClamp)
-            .getInterpolation(focusTransitionProgress)
     }
 
     fun animateIconScaleAndDimIntoView() {
         iconAndDimAnimator?.cancel()
         iconAndDimAnimator =
-            ObjectAnimator.ofFloat(this, FOCUS_TRANSITION, 1f).apply {
-                setCurrentFraction(iconScaleAnimStartProgress)
-                setDuration(DIM_ANIM_DURATION).interpolator = Interpolators.LINEAR
+            ObjectAnimator.ofFloat(focusTransitionScaleAndDim, MULTI_PROPERTY_VALUE, 0f, 1f).apply {
+                duration = SCALE_ICON_DURATION
+                interpolator = Interpolators.LINEAR
                 addListener(
                     object : AnimatorListenerAdapter() {
                         override fun onAnimationEnd(animation: Animator) {
@@ -1351,14 +1362,13 @@ constructor(
 
     fun setIconScaleAndDim(iconScale: Float) {
         iconAndDimAnimator?.cancel()
-        setIconsAndBannersTransitionProgress(iconScale, invert = false)
+        focusTransitionScaleAndDim.value = iconScale
     }
 
     /** Set a color tint on the snapshot and supporting views. */
     open fun setColorTint(amount: Float, tintColor: Int) {
         taskContainers.forEach {
             if (!enableRefactorTaskThumbnail()) {
-                // TODO(b/334832108) Add scrim to new TTV
                 it.thumbnailViewDeprecated.dimAlpha = amount
             }
             it.iconView.setIconColorTint(tintColor, amount)
@@ -1454,7 +1464,8 @@ constructor(
             it.iconView.setVisibility(if (fullscreenProgress < 1) VISIBLE else INVISIBLE)
             it.overlay.setFullscreenProgress(fullscreenProgress)
         }
-        setIconsAndBannersFullscreenProgress(fullscreenProgress)
+        focusTransitionFullscreen.value =
+            FOCUS_TRANSITION_FAST_OUT_INTERPOLATOR.getInterpolation(1 - fullscreenProgress)
         updateSnapshotRadius()
     }
 
@@ -1497,8 +1508,15 @@ constructor(
         gridTranslationY = 0f
         boxTranslationY = 0f
         nonGridPivotTranslationX = 0f
+        taskContainers.forEach {
+            it.snapshotView.translationX = 0f
+            it.snapshotView.translationY = 0f
+        }
         resetViewTransforms()
     }
+
+    fun getTaskContainerForTaskThumbnailView(taskThumbnailView: TaskThumbnailView): TaskContainer? =
+        taskContainers.firstOrNull { it.thumbnailView == taskThumbnailView }
 
     open fun resetViewTransforms() {
         // fullscreenTranslation and accumulatedTranslation should not be reset, as
@@ -1519,10 +1537,6 @@ constructor(
         alpha = stableAlpha
         setIconScaleAndDim(1f)
         setColorTint(0f, 0)
-        if (!enableRefactorTaskThumbnail()) {
-            // TODO(b/335399428) add split select functionality to new TTV
-            taskContainers.forEach { it.thumbnailViewDeprecated.resetViewTransforms() }
-        }
     }
 
     private fun getGridTrans(endTranslation: Float) =
@@ -1554,7 +1568,20 @@ constructor(
 
         @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
         open fun computeWindowCornerRadius(context: Context): Float {
-            return QuickStepContract.getWindowCornerRadius(context)
+            val activityContext: ActivityContext? = ActivityContext.lookupContextNoThrow(context)
+
+            // The corner radius is fixed to match when Taskbar is persistent mode
+            return if (
+                activityContext != null &&
+                    activityContext.deviceProfile?.isTaskbarPresent == true &&
+                    DisplayController.isTransientTaskbar(context)
+            ) {
+                context.resources
+                    .getDimensionPixelSize(R.dimen.persistent_taskbar_corner_radius)
+                    .toFloat()
+            } else {
+                QuickStepContract.getWindowCornerRadius(context)
+            }
         }
 
         /** Sets the progress in range [0, 1] */
@@ -1568,68 +1595,6 @@ constructor(
         override fun close() {}
     }
 
-    /** Holder for all Task dependent information. */
-    inner class TaskContainer(
-        val task: Task,
-        val thumbnailView: TaskThumbnailView?,
-        val thumbnailViewDeprecated: TaskThumbnailViewDeprecated,
-        val iconView: TaskViewIcon,
-        /**
-         * This technically can be a vanilla [android.view.TouchDelegate] class, however that class
-         * requires setting the touch bounds at construction, so we'd repeatedly be created many
-         * instances unnecessarily as scrolling occurs, whereas [TransformingTouchDelegate] allows
-         * touch delegated bounds only to be updated.
-         */
-        val iconTouchDelegate: TransformingTouchDelegate,
-        /** Defaults to STAGE_POSITION_UNDEFINED if in not a split screen task view */
-        @StagePosition val stagePosition: Int,
-        val digitalWellBeingToast: DigitalWellBeingToast?,
-        val showWindowsView: View?,
-        taskOverlayFactory: TaskOverlayFactory
-    ) {
-        val overlay: TaskOverlay<*> = taskOverlayFactory.createOverlay(this)
-
-        val snapshotView: View
-            get() = thumbnailView ?: thumbnailViewDeprecated
-
-        /** Builds proto for logging */
-        val itemInfo: WorkspaceItemInfo
-            get() =
-                WorkspaceItemInfo().apply {
-                    itemType = LauncherSettings.Favorites.ITEM_TYPE_TASK
-                    container = LauncherSettings.Favorites.CONTAINER_TASKSWITCHER
-                    val componentKey = TaskUtils.getLaunchComponentKeyForTask(task.key)
-                    user = componentKey.user
-                    intent = Intent().setComponent(componentKey.componentName)
-                    title = task.title
-                    recentsView?.let { screenId = it.indexOfChild(this@TaskView) }
-                    if (privateSpaceRestrictAccessibilityDrag()) {
-                        if (
-                            UserCache.getInstance(context).getUserInfo(componentKey.user).isPrivate
-                        ) {
-                            runtimeStatusFlags =
-                                runtimeStatusFlags or ItemInfoWithIcon.FLAG_NOT_PINNABLE
-                        }
-                    }
-                }
-
-        val taskView: TaskView
-            get() = this@TaskView
-
-        fun destroy() {
-            digitalWellBeingToast?.destroy()
-            thumbnailView?.let { taskView.removeView(it) }
-        }
-
-        // TODO(b/335649589): TaskView's VM will already have access to TaskThumbnailView's VM
-        //  so there will be no need to access TaskThumbnailView's VM through the TaskThumbnailView
-        fun bindThumbnailView() {
-            // TODO(b/343364498): Existing view has shouldShowScreenshot as an override as well but
-            //  this should be decided inside TaskThumbnailViewModel.
-            thumbnailView?.viewModel?.bind(TaskThumbnail(task.key.id, isRunningTask))
-        }
-    }
-
     companion object {
         private const val TAG = "TaskView"
         const val FLAG_UPDATE_ICON = 1
@@ -1638,21 +1603,43 @@ constructor(
         const val FLAG_UPDATE_ALL =
             (FLAG_UPDATE_ICON or FLAG_UPDATE_THUMBNAIL or FLAG_UPDATE_CORNER_RADIUS)
 
+        const val FOCUS_TRANSITION_INDEX_FULLSCREEN = 0
+        const val FOCUS_TRANSITION_INDEX_SCALE_AND_DIM = 1
+        const val FOCUS_TRANSITION_INDEX_COUNT = 2
+
         /** The maximum amount that a task view can be scrimmed, dimmed or tinted. */
         const val MAX_PAGE_SCRIM_ALPHA = 0.4f
         const val SCALE_ICON_DURATION: Long = 120
         private const val DIM_ANIM_DURATION: Long = 700
+        private const val FOCUS_TRANSITION_THRESHOLD =
+            SCALE_ICON_DURATION.toFloat() / DIM_ANIM_DURATION
+        val FOCUS_TRANSITION_FAST_OUT_INTERPOLATOR =
+            Interpolators.clampToProgress(
+                Interpolators.FAST_OUT_SLOW_IN,
+                1f - FOCUS_TRANSITION_THRESHOLD,
+                1f
+            )!!
         private val SYSTEM_GESTURE_EXCLUSION_RECT = listOf(Rect())
 
-        @JvmField
-        val FOCUS_TRANSITION: FloatProperty<TaskView> =
+        private val FOCUS_TRANSITION: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("focusTransition") {
                 override fun setValue(taskView: TaskView, v: Float) {
-                    taskView.setIconsAndBannersTransitionProgress(v, false /* invert */)
+                    taskView.focusTransitionProgress = v
                 }
 
                 override fun get(taskView: TaskView) = taskView.focusTransitionProgress
             }
+
+        @JvmField
+        val SCALE_AND_DIM_OUT: FloatProperty<TaskView> =
+            object : FloatProperty<TaskView>("scaleAndDimFastOut") {
+                override fun setValue(taskView: TaskView, v: Float) {
+                    taskView.focusTransitionScaleAndDimOut = v
+                }
+
+                override fun get(taskView: TaskView) = taskView.focusTransitionScaleAndDimOut
+            }
+
         private val SPLIT_SELECT_TRANSLATION_X: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("splitSelectTranslationX") {
                 override fun setValue(taskView: TaskView, v: Float) {
@@ -1661,6 +1648,7 @@ constructor(
 
                 override fun get(taskView: TaskView) = taskView.splitSelectTranslationX
             }
+
         private val SPLIT_SELECT_TRANSLATION_Y: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("splitSelectTranslationY") {
                 override fun setValue(taskView: TaskView, v: Float) {
@@ -1669,6 +1657,7 @@ constructor(
 
                 override fun get(taskView: TaskView) = taskView.splitSelectTranslationY
             }
+
         private val DISMISS_TRANSLATION_X: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("dismissTranslationX") {
                 override fun setValue(taskView: TaskView, v: Float) {
@@ -1677,6 +1666,7 @@ constructor(
 
                 override fun get(taskView: TaskView) = taskView.dismissTranslationX
             }
+
         private val DISMISS_TRANSLATION_Y: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("dismissTranslationY") {
                 override fun setValue(taskView: TaskView, v: Float) {
@@ -1685,6 +1675,7 @@ constructor(
 
                 override fun get(taskView: TaskView) = taskView.dismissTranslationY
             }
+
         private val TASK_OFFSET_TRANSLATION_X: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("taskOffsetTranslationX") {
                 override fun setValue(taskView: TaskView, v: Float) {
@@ -1693,6 +1684,7 @@ constructor(
 
                 override fun get(taskView: TaskView) = taskView.taskOffsetTranslationX
             }
+
         private val TASK_OFFSET_TRANSLATION_Y: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("taskOffsetTranslationY") {
                 override fun setValue(taskView: TaskView, v: Float) {
@@ -1701,6 +1693,7 @@ constructor(
 
                 override fun get(taskView: TaskView) = taskView.taskOffsetTranslationY
             }
+
         private val TASK_RESISTANCE_TRANSLATION_X: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("taskResistanceTranslationX") {
                 override fun setValue(taskView: TaskView, v: Float) {
@@ -1709,6 +1702,7 @@ constructor(
 
                 override fun get(taskView: TaskView) = taskView.taskResistanceTranslationX
             }
+
         private val TASK_RESISTANCE_TRANSLATION_Y: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("taskResistanceTranslationY") {
                 override fun setValue(taskView: TaskView, v: Float) {
@@ -1717,6 +1711,7 @@ constructor(
 
                 override fun get(taskView: TaskView) = taskView.taskResistanceTranslationY
             }
+
         @JvmField
         val GRID_END_TRANSLATION_X: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("gridEndTranslationX") {
@@ -1726,6 +1721,7 @@ constructor(
 
                 override fun get(taskView: TaskView) = taskView.gridEndTranslationX
             }
+
         @JvmField
         val DISMISS_SCALE: FloatProperty<TaskView> =
             object : FloatProperty<TaskView>("dismissScale") {

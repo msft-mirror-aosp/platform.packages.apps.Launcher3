@@ -47,8 +47,6 @@ import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SY
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNFOLD_ANIMATION_FORWARDER;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
 import static com.android.wm.shell.Flags.enableBubblesLongPressNavHandle;
 import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_BACK_ANIMATION;
 import static com.android.wm.shell.sysui.ShellSharedConstants.KEY_EXTRA_SHELL_BUBBLES;
@@ -72,6 +70,7 @@ import android.hardware.input.InputManager;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.RemoteException;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.util.ArraySet;
@@ -128,6 +127,7 @@ import com.android.quickstep.util.AssistUtils;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.systemui.shared.recents.IOverviewProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
+import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.InputChannelCompat.InputEventReceiver;
 import com.android.systemui.shared.system.InputConsumerController;
@@ -332,6 +332,49 @@ public class TouchInteractionService extends Service {
             });
         }
 
+        @BinderThread
+        @Override
+        public void updateWallpaperVisibility(int displayId, boolean visible) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.setWallpaperVisible(visible))
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void checkNavBarModes() {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(TaskbarManager::checkNavBarModes)
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void finishBarAnimations() {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(TaskbarManager::finishBarAnimations)
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void touchAutoDim(boolean reset) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(taskbarManager -> taskbarManager.touchAutoDim(reset))
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void transitionTo(@BarTransitions.TransitionMode int barMode,
+                boolean animate) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.transitionTo(barMode, animate))
+            ));
+        }
+
         /**
          * Preloads the Overview activity.
          * <p>
@@ -358,6 +401,12 @@ public class TouchInteractionService extends Service {
         public void onSystemBarAttributesChanged(int displayId, int behavior) {
             executeForTaskbarManager(taskbarManager ->
                     taskbarManager.onSystemBarAttributesChanged(displayId, behavior));
+        }
+
+        @Override
+        public void onTransitionModeUpdated(int barMode, boolean checkBarModes) {
+            executeForTaskbarManager(taskbarManager ->
+                    taskbarManager.onTransitionModeUpdated(barMode, checkBarModes));
         }
 
         @Override
@@ -512,6 +561,9 @@ public class TouchInteractionService extends Service {
 
                 private boolean isTrackpadDevice(int deviceId) {
                     InputDevice inputDevice = mInputManager.getInputDevice(deviceId);
+                    if (inputDevice == null) {
+                        return false;
+                    }
                     return inputDevice.getSources() == (InputDevice.SOURCE_MOUSE
                             | InputDevice.SOURCE_TOUCHPAD);
                 }
@@ -578,6 +630,7 @@ public class TouchInteractionService extends Service {
         mMainChoreographer = Choreographer.getInstance();
         mAM = ActivityManagerWrapper.getInstance();
         mDeviceState = new RecentsAnimationDeviceState(this, true);
+        mRotationTouchHelper = mDeviceState.getRotationTouchHelper();
         mAllAppsActionManager = new AllAppsActionManager(
                 this, UI_HELPER_EXECUTOR, this::createAllAppsPendingIntent);
         mInputManager = getSystemService(InputManager.class);
@@ -590,7 +643,6 @@ public class TouchInteractionService extends Service {
             }
         }
         mTaskbarManager = new TaskbarManager(this, mAllAppsActionManager, mNavCallbacks);
-        mRotationTouchHelper = mDeviceState.getRotationTouchHelper();
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
 
         // Call runOnUserUnlocked() before any other callbacks to ensure everything is initialized.
@@ -719,16 +771,7 @@ public class TouchInteractionService extends Service {
             SystemUiProxy.INSTANCE.get(this).setLastSystemUiStateFlags(systemUiStateFlags);
             mOverviewComponentObserver.onSystemUiStateChanged();
             mTaskbarManager.onSystemUiFlagsChanged(systemUiStateFlags);
-
-            long isShadeExpandedFlag =
-                    SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED | SYSUI_STATE_QUICK_SETTINGS_EXPANDED;
-            boolean wasExpanded = (lastSysUIFlags & isShadeExpandedFlag) != 0;
-            boolean isExpanded = (systemUiStateFlags & isShadeExpandedFlag) != 0;
-            if (wasExpanded != isExpanded && isExpanded) {
-                // End live tile when expanding the notification panel for the first time from
-                // overview.
-                mTaskAnimationManager.endLiveTile();
-            }
+            mTaskAnimationManager.onSystemUiFlagsChanged(lastSysUIFlags, systemUiStateFlags);
         }
     }
 
@@ -1253,7 +1296,7 @@ public class TouchInteractionService extends Service {
         // running activity as the task behind the overlay.
         TopTaskTracker.CachedTaskInfo otherVisibleTask = runningTask == null
                 ? null
-                : runningTask.otherVisibleTaskThisIsExcludedOver();
+                : runningTask.getVisibleNonExcludedTask();
         if (otherVisibleTask != null) {
             ActiveGestureLog.INSTANCE.addLog(new CompoundString("Changing active task to ")
                     .append(otherVisibleTask.getPackageName())
@@ -1546,6 +1589,7 @@ public class TouchInteractionService extends Service {
         pw.println("\tmConsumer=" + mConsumer.getName());
         ActiveGestureLog.INSTANCE.dump("", pw);
         RecentsModel.INSTANCE.get(this).dump("", pw);
+        TopTaskTracker.INSTANCE.get(this).dump("", pw);
         if (mTaskAnimationManager != null) {
             mTaskAnimationManager.dump("", pw);
         }

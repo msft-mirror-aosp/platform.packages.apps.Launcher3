@@ -132,11 +132,11 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             mWindowContext.registerComponentCallbacks(this);
         } else {
             mWindowContext = null;
-            mReceiver.register(mContext, ACTION_CONFIGURATION_CHANGED);
+            mReceiver.registerAsync(mContext, ACTION_CONFIGURATION_CHANGED);
         }
 
         // Initialize navigation mode change listener
-        mReceiver.registerPkgActions(mContext, TARGET_OVERLAY_PACKAGE, ACTION_OVERLAY_CHANGED);
+        mReceiver.registerPkgActionsAsync(mContext, TARGET_OVERLAY_PACKAGE, ACTION_OVERLAY_CHANGED);
 
         WindowManagerProxy wmProxy = WindowManagerProxy.INSTANCE.get(context);
         Context displayInfoContext = getDisplayInfoContext(display);
@@ -174,10 +174,17 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     }
 
     /**
-     * Returns whether taskbar is transient.
+     * Returns whether taskbar is transient or persistent.
+     *
+     * @return {@code true} if transient, {@code false} if persistent.
      */
     public static boolean isTransientTaskbar(Context context) {
         return INSTANCE.get(context).getInfo().isTransientTaskbar();
+    }
+
+    /** Returns whether we are currently in Desktop mode. */
+    public static boolean isInDesktopMode(Context context) {
+        return INSTANCE.get(context).getInfo().isInDesktopMode();
     }
 
     /**
@@ -216,6 +223,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         } else {
             // TODO: unregister broadcast receiver
         }
+        mReceiver.unregisterReceiverSafelyAsync(mContext);
     }
 
     /**
@@ -405,7 +413,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             navigationMode = wmProxy.getNavigationMode(displayInfoContext);
 
             mPerDisplayBounds.putAll(perDisplayBoundsCache);
-            List<WindowBounds> cachedValue = mPerDisplayBounds.get(normalizedDisplayInfo);
+            List<WindowBounds> cachedValue = getCurrentBounds();
 
             realBounds = wmProxy.getRealBounds(displayInfoContext, displayInfo);
             if (cachedValue == null) {
@@ -415,7 +423,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
                 FileLog.e(TAG, "(Invalid Cache) perDisplayBounds : " + mPerDisplayBounds);
                 mPerDisplayBounds.clear();
                 mPerDisplayBounds.putAll(wmProxy.estimateInternalDisplayBounds(displayInfoContext));
-                cachedValue = mPerDisplayBounds.get(normalizedDisplayInfo);
+                cachedValue = getCurrentBounds();
                 if (cachedValue == null) {
                     FileLog.e(TAG, "normalizedDisplayInfo not found in estimation: "
                             + normalizedDisplayInfo);
@@ -503,6 +511,13 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
          */
         public Set<CachedDisplayInfo> getAllDisplays() {
             return Collections.unmodifiableSet(mPerDisplayBounds.keySet());
+        }
+
+        /**
+         * Returns all {@link WindowBounds}s for the current display.
+         */
+        public List<WindowBounds> getCurrentBounds() {
+            return mPerDisplayBounds.get(normalizedDisplayInfo);
         }
 
         public int getDensityDpi() {

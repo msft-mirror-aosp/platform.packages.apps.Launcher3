@@ -90,6 +90,8 @@ public final class DigitalWellBeingToast {
     private final TaskView mTaskView;
     private final LauncherApps mLauncherApps;
 
+    private final int mBannerHeight;
+
     private Task mTask;
     private boolean mHasLimit;
 
@@ -109,6 +111,8 @@ public final class DigitalWellBeingToast {
         mContainer = container;
         mTaskView = taskView;
         mLauncherApps = container.asContext().getSystemService(LauncherApps.class);
+        mBannerHeight = container.asContext().getResources().getDimensionPixelSize(
+                R.dimen.digital_wellbeing_toast_height);
     }
 
     private void setNoLimit() {
@@ -328,12 +332,12 @@ public final class DigitalWellBeingToast {
                 (FrameLayout.LayoutParams) mBanner.getLayoutParams();
         DeviceProfile deviceProfile = mContainer.getDeviceProfile();
         layoutParams.bottomMargin = ((ViewGroup.MarginLayoutParams)
-                mTaskView.getFirstThumbnailViewDeprecated().getLayoutParams()).bottomMargin;
+                mTaskView.getFirstSnapshotView().getLayoutParams()).bottomMargin;
         RecentsPagedOrientationHandler orientationHandler = mTaskView.getPagedOrientationHandler();
         Pair<Float, Float> translations = orientationHandler
                 .getDwbLayoutTranslations(mTaskView.getMeasuredWidth(),
                         mTaskView.getMeasuredHeight(), mSplitBounds, deviceProfile,
-                        mTaskView.getThumbnailViews(), mTask.key.id, mBanner);
+                        mTaskView.getSnapshotViews(), mTask.key.id, mBanner);
         mSplitOffsetTranslationX = translations.first;
         mSplitOffsetTranslationY = translations.second;
         updateTranslationY();
@@ -359,10 +363,12 @@ public final class DigitalWellBeingToast {
     }
 
     void updateBannerOffset(float offsetPercentage) {
-        if (mBanner != null && mBannerOffsetPercentage != offsetPercentage) {
+        if (mBannerOffsetPercentage != offsetPercentage) {
             mBannerOffsetPercentage = offsetPercentage;
-            updateTranslationY();
-            mBanner.invalidateOutline();
+            if (mBanner != null) {
+                updateTranslationY();
+                mBanner.invalidateOutline();
+            }
         }
     }
 
@@ -372,7 +378,7 @@ public final class DigitalWellBeingToast {
         }
 
         mBanner.setTranslationY(
-                (mBannerOffsetPercentage * mBanner.getHeight()) + mSplitOffsetTranslationY);
+                (mBannerOffsetPercentage * mBannerHeight) + mSplitOffsetTranslationY);
     }
 
     private void updateTranslationX() {
