@@ -43,17 +43,18 @@ import com.android.launcher3.model.WidgetPredictionsRequester;
 import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
-import com.android.launcher3.util.PackageUserKey;
+import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.widget.BaseWidgetSheet;
 import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
-import com.android.launcher3.widget.model.WidgetsListHeaderEntry;
+import com.android.launcher3.widget.model.WidgetsListContentEntry;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -118,10 +119,6 @@ public class WidgetPickerActivity extends BaseActivity {
 
         WindowInsetsController wc = mDragLayer.getWindowInsetsController();
         wc.hide(navigationBars() + statusBars());
-
-        BaseWidgetSheet widgetSheet = WidgetsFullSheet.show(this, true);
-        widgetSheet.disableNavBarScrim(true);
-        widgetSheet.addOnCloseListener(this::finish);
 
         parseIntentExtras();
         refreshAndBindWidgets();
@@ -223,9 +220,10 @@ public class WidgetPickerActivity extends BaseActivity {
         };
     }
 
-    /** Updates the model with widgets and provides them after applying the provided filter. */
+    /** Updates the model with widgets, applies filters and launches the widgets sheet once
+     * widgets are available */
     private void refreshAndBindWidgets() {
-        MODEL_EXECUTOR.execute(() -> {
+        MODEL_EXECUTOR.getHandler().postDelayed(() -> {
             LauncherAppState app = LauncherAppState.getInstance(this);
             mModel.update(app, null);
             final List<WidgetsListBaseEntry> allWidgets =
@@ -239,26 +237,42 @@ public class WidgetPickerActivity extends BaseActivity {
                             }
                     );
             bindWidgets(allWidgets);
+            // Open sheet once widgets are available, so that it doesn't interrupt the open
+            // animation.
+            openWidgetsSheet();
             if (mUiSurface != null) {
-                Map<PackageUserKey, List<WidgetItem>> allWidgetsMap = allWidgets.stream()
-                        .filter(WidgetsListHeaderEntry.class::isInstance)
+                Map<ComponentKey, WidgetItem> allWidgetItems = allWidgets.stream()
+                        .filter(entry -> entry instanceof WidgetsListContentEntry)
+                        .flatMap(entry -> entry.mWidgets.stream())
+                        .distinct()
                         .collect(Collectors.toMap(
-                                entry -> PackageUserKey.fromPackageItemInfo(entry.mPkgItem),
-                                entry -> entry.mWidgets)
-                        );
+                                widget -> new ComponentKey(widget.componentName, widget.user),
+                                Function.identity()
+                        ));
                 mWidgetPredictionsRequester = new WidgetPredictionsRequester(app.getContext(),
-                        mUiSurface, allWidgetsMap);
+                        mUiSurface, allWidgetItems);
                 mWidgetPredictionsRequester.request(mAddedWidgets, this::bindRecommendedWidgets);
             }
-        });
+        }, mDeviceProfile.bottomSheetOpenDuration);
     }
 
     private void bindWidgets(List<WidgetsListBaseEntry> widgets) {
         MAIN_EXECUTOR.execute(() -> mPopupDataProvider.setAllWidgets(widgets));
     }
 
+    private void openWidgetsSheet() {
+        MAIN_EXECUTOR.execute(() -> {
+            BaseWidgetSheet widgetSheet = WidgetsFullSheet.show(this, true);
+            widgetSheet.disableNavBarScrim(true);
+            widgetSheet.addOnCloseListener(this::finish);
+        });
+    }
+
     private void bindRecommendedWidgets(List<ItemInfo> recommendedWidgets) {
-        MAIN_EXECUTOR.execute(() -> mPopupDataProvider.setRecommendedWidgets(recommendedWidgets));
+        // Bind recommendations once picker has finished open animation.
+        MAIN_EXECUTOR.getHandler().postDelayed(
+                () -> mPopupDataProvider.setRecommendedWidgets(recommendedWidgets),
+                mDeviceProfile.bottomSheetOpenDuration);
     }
 
     @Override

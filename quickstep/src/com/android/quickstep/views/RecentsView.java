@@ -31,9 +31,11 @@ import static com.android.app.animation.Interpolators.FINAL_FRAME;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.app.animation.Interpolators.OVERSHOOT_0_75;
 import static com.android.app.animation.Interpolators.clampToProgress;
+import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASK_MENU;
 import static com.android.launcher3.AbstractFloatingView.getTopOpenViewWithType;
 import static com.android.launcher3.BaseActivity.STATE_HANDLER_INVISIBILITY_FLAGS;
+import static com.android.launcher3.Flags.enableAdditionalHomeAnimations;
 import static com.android.launcher3.Flags.enableGridOnlyOverview;
 import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
 import static com.android.launcher3.LauncherAnimUtils.SUCCESS_TRANSITION_PROGRESS;
@@ -130,6 +132,7 @@ import androidx.annotation.UiThread;
 import androidx.core.graphics.ColorUtils;
 
 import com.android.internal.jank.Cuj;
+import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseActivity.MultiWindowModeChangedListener;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
@@ -152,6 +155,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StateManager;
+import com.android.launcher3.statemanager.StatefulContainer;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.OverScroll;
@@ -208,7 +212,6 @@ import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.util.TaskVisualsChangeListener;
 import com.android.quickstep.util.TransformParams;
 import com.android.quickstep.util.VibrationConstants;
-import com.android.quickstep.views.TaskView.TaskContainer;
 import com.android.systemui.plugins.ResourceProvider;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -312,7 +315,6 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     /**
      * Can be used to tint the color of the RecentsView to simulate a scrim that can views
      * excluded from. Really should be a proper scrim.
-     * TODO(b/187528071): Remove this and replace with a real scrim.
      */
     private static final FloatProperty<RecentsView> COLOR_TINT =
             new FloatProperty<RecentsView>("colorTint") {
@@ -553,7 +555,6 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     @Nullable
     protected GestureState.GestureEndTarget mCurrentGestureEndTarget;
 
-    // TODO(b/187528071): Remove these and replace with a real scrim.
     private float mColorTint;
     private final int mTintingColor;
     @Nullable
@@ -738,7 +739,11 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     private int mSplitHiddenTaskViewIndex = -1;
     @Nullable
     private FloatingTaskView mSecondFloatingTaskView;
-    private View mSplitDividerPlaceholderView;
+    /**
+     * A fullscreen scrim that goes behind the splitscreen animation to hide color conflicts and
+     * possible flickers. Removed after tasks + divider finish animating in.
+     */
+    private View mSplitScrim;
 
     /**
      * The task to be removed and immediately re-added. Should not be added to task pool.
@@ -1820,8 +1825,13 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 ((GroupedTaskView) taskView).bind(leftTopTask, rightBottomTask, mOrientationState,
                         mTaskOverlayFactory, groupTask.mSplitBounds);
             } else if (taskView instanceof DesktopTaskView) {
-                ((DesktopTaskView) taskView).bind(((DesktopTask) groupTask).tasks,
-                        mOrientationState, mTaskOverlayFactory);
+                // Minimized tasks should not be shown in Overview
+                List<Task> nonMinimizedTasks =
+                        ((DesktopTask) groupTask).tasks.stream()
+                                .filter(task -> !task.isMinimized)
+                                .toList();
+                ((DesktopTaskView) taskView).bind(nonMinimizedTasks, mOrientationState,
+                        mTaskOverlayFactory);
                 mDesktopTaskView = (DesktopTaskView) taskView;
             } else {
                 Task task = groupTask.task1.key.id == stagedTaskIdToBeRemoved ? groupTask.task2
@@ -2487,7 +2497,9 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     /** Returns whether user can start home based on state in {@link OverviewCommandHelper}. */
     protected abstract boolean canStartHomeSafely();
 
-    public abstract StateManager<STATE_TYPE> getStateManager();
+    /** Returns the state manager used in RecentsView **/
+    public abstract StateManager<STATE_TYPE,
+            ? extends StatefulContainer<STATE_TYPE>> getStateManager();
 
     public void reset() {
         setCurrentTask(-1);
@@ -2681,6 +2693,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     }
 
     private void animateRotation(int newRotation) {
+        AbstractFloatingView.closeAllOpenViewsExcept(mContainer, false, TYPE_REBIND_SAFE);
         AnimatorSet pa = setRecentsChangedOrientation(true);
         pa.addListener(AnimatorListeners.forSuccessCallback(() -> {
             setLayoutRotation(newRotation, mOrientationState.getDisplayRotation());
@@ -4513,6 +4526,9 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      * than the running task, when updating page offsets.
      */
     public void setOffsetMidpointIndexOverride(int offsetMidpointIndexOverride) {
+        if (!enableAdditionalHomeAnimations()) {
+            return;
+        }
         mOffsetMidpointIndexOverride = offsetMidpointIndexOverride;
         updatePageOffsets();
     }
@@ -4926,9 +4942,8 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 mSplitSelectStateController.getActiveSplitStagePosition(), firstTaskEndingBounds,
                 secondTaskEndingBounds);
 
-        mSplitDividerPlaceholderView = mSplitSelectStateController
-                .getSplitAnimationController().addDividerPlaceholderViewToAnim(pendingAnimation,
-                        mContainer, secondTaskEndingBounds, getContext());
+        mSplitScrim = mSplitSelectStateController.getSplitAnimationController()
+                .addScrimBehindAnim(pendingAnimation, mContainer, getContext());
         FloatingTaskView firstFloatingTaskView =
                 mSplitSelectStateController.getFirstFloatingTaskView();
         firstFloatingTaskView.getBoundsOnScreen(firstTaskStartingBounds);
@@ -4983,7 +4998,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
             safeRemoveDragLayerView(mSplitSelectStateController.getFirstFloatingTaskView());
             safeRemoveDragLayerView(mSecondFloatingTaskView);
             safeRemoveDragLayerView(mSplitSelectStateController.getSplitInstructionsView());
-            safeRemoveDragLayerView(mSplitDividerPlaceholderView);
+            safeRemoveDragLayerView(mSplitScrim);
             mSecondFloatingTaskView = null;
             mSplitSelectSource = null;
             mSplitSelectStateController.getSplitAnimationController()
@@ -6019,6 +6034,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      * tasks to be dimmed while other elements in the recents view are left alone.
      */
     public void showForegroundScrim(boolean show) {
+        // TODO(b/335606129) Add scrim response into new TTV - this is called from overlay
         if (!show && mColorTint == 0) {
             if (mTintingAnimator != null) {
                 mTintingAnimator.cancel();
@@ -6034,7 +6050,6 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     }
 
     /** Tint the RecentsView and TaskViews in to simulate a scrim. */
-    // TODO(b/187528071): Replace this tinting with a scrim on top of RecentsView
     private void setColorTint(float tintAmount) {
         mColorTint = tintAmount;
 
