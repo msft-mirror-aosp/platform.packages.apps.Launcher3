@@ -22,7 +22,6 @@ import android.animation.ObjectAnimator
 import android.annotation.IdRes
 import android.app.ActivityOptions
 import android.content.Context
-import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.PointF
 import android.graphics.Rect
@@ -50,19 +49,15 @@ import com.android.launcher3.Flags.enableFocusOutline
 import com.android.launcher3.Flags.enableGridOnlyOverview
 import com.android.launcher3.Flags.enableOverviewIconMenu
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
-import com.android.launcher3.Flags.privateSpaceRestrictAccessibilityDrag
-import com.android.launcher3.LauncherSettings
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.config.FeatureFlags.ENABLE_KEYBOARD_QUICK_SWITCH
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent
 import com.android.launcher3.model.data.ItemInfo
-import com.android.launcher3.model.data.ItemInfoWithIcon
-import com.android.launcher3.model.data.WorkspaceItemInfo
-import com.android.launcher3.pm.UserCache
 import com.android.launcher3.testing.TestLogging
 import com.android.launcher3.testing.shared.TestProtocol
 import com.android.launcher3.util.CancellableTask
+import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.MultiPropertyFactory
 import com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VALUE
@@ -76,15 +71,13 @@ import com.android.launcher3.util.TraceHelper
 import com.android.launcher3.util.TransformingTouchDelegate
 import com.android.launcher3.util.ViewPool
 import com.android.launcher3.util.rects.set
+import com.android.launcher3.views.ActivityContext
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.RemoteAnimationTargets
 import com.android.quickstep.TaskAnimationManager
 import com.android.quickstep.TaskOverlayFactory
-import com.android.quickstep.TaskOverlayFactory.TaskOverlay
-import com.android.quickstep.TaskUtils
 import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler
-import com.android.quickstep.task.thumbnail.TaskThumbnail
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.quickstep.util.ActiveGestureErrorDetector
@@ -135,8 +128,8 @@ constructor(
         /** Returns a copy of integer array containing taskIds of all tasks in the TaskView. */
         get() = taskContainers.map { it.task.key.id }.toIntArray()
 
-    val thumbnailViews: Array<TaskThumbnailViewDeprecated>
-        get() = taskContainers.map { it.thumbnailViewDeprecated }.toTypedArray()
+    val snapshotViews: Array<View>
+        get() = taskContainers.map { it.snapshotView }.toTypedArray()
 
     val isGridTask: Boolean
         /** Returns whether the task is part of overview grid and not being focused. */
@@ -166,6 +159,11 @@ constructor(
     val firstThumbnailViewDeprecated: TaskThumbnailViewDeprecated
         /** Returns the first thumbnailView of the TaskView. */
         get() = taskContainers[0].thumbnailViewDeprecated
+
+    @get:Deprecated("Use [taskContainers] instead.")
+    val firstSnapshotView: View
+        /** Returns the first snapshotView of the TaskView. */
+        get() = taskContainers[0].snapshotView
 
     @get:Deprecated("Use [taskContainers] instead.")
     val firstItemInfo: ItemInfo
@@ -665,6 +663,7 @@ constructor(
                     taskOverlayFactory
                 )
             )
+        taskContainers.forEach { it.bind() }
         setOrientationState(orientedState)
     }
 
@@ -691,24 +690,17 @@ constructor(
         }
         val iconView = getOrInflateIconView(iconViewId)
         return TaskContainer(
-                task,
-                thumbnailView,
-                thumbnailViewDeprecated,
-                iconView,
-                TransformingTouchDelegate(iconView.asView()),
-                stagePosition,
-                DigitalWellBeingToast(container, this),
-                findViewById(showWindowViewId)!!,
-                taskOverlayFactory
-            )
-            .apply {
-                if (enableRefactorTaskThumbnail()) {
-                    thumbnailViewDeprecated.setTaskOverlay(overlay)
-                    bindThumbnailView()
-                } else {
-                    thumbnailViewDeprecated.bind(task, overlay)
-                }
-            }
+            this,
+            task,
+            thumbnailView,
+            thumbnailViewDeprecated,
+            iconView,
+            TransformingTouchDelegate(iconView.asView()),
+            stagePosition,
+            DigitalWellBeingToast(container, this),
+            findViewById(showWindowViewId)!!,
+            taskOverlayFactory
+        )
     }
 
     protected fun getOrInflateIconView(@IdRes iconViewId: Int): TaskViewIcon {
@@ -825,7 +817,10 @@ constructor(
         taskContainers.forEach {
             val thumbnailBounds = Rect()
             if (relativeToDragLayer) {
-                container.dragLayer.getDescendantRectRelativeToSelf(it.snapshotView, bounds)
+                container.dragLayer.getDescendantRectRelativeToSelf(
+                    it.snapshotView,
+                    thumbnailBounds
+                )
             } else {
                 thumbnailBounds.set(it.snapshotView)
             }
@@ -1198,10 +1193,10 @@ constructor(
             this,
             container.task,
             container.iconView.drawable,
-            container.thumbnailViewDeprecated,
-            container.thumbnailViewDeprecated.thumbnail, /* intent */
-            null, /* user */
-            null,
+            container.snapshotView,
+            container.thumbnail,
+            /* intent */ null,
+            /* user */ null,
             container.itemInfo
         )
     }
@@ -1374,7 +1369,6 @@ constructor(
     open fun setColorTint(amount: Float, tintColor: Int) {
         taskContainers.forEach {
             if (!enableRefactorTaskThumbnail()) {
-                // TODO(b/334832108) Add scrim to new TTV
                 it.thumbnailViewDeprecated.dimAlpha = amount
             }
             it.iconView.setIconColorTint(tintColor, amount)
@@ -1514,8 +1508,15 @@ constructor(
         gridTranslationY = 0f
         boxTranslationY = 0f
         nonGridPivotTranslationX = 0f
+        taskContainers.forEach {
+            it.snapshotView.translationX = 0f
+            it.snapshotView.translationY = 0f
+        }
         resetViewTransforms()
     }
+
+    fun getTaskContainerForTaskThumbnailView(taskThumbnailView: TaskThumbnailView): TaskContainer? =
+        taskContainers.firstOrNull { it.thumbnailView == taskThumbnailView }
 
     open fun resetViewTransforms() {
         // fullscreenTranslation and accumulatedTranslation should not be reset, as
@@ -1536,10 +1537,6 @@ constructor(
         alpha = stableAlpha
         setIconScaleAndDim(1f)
         setColorTint(0f, 0)
-        if (!enableRefactorTaskThumbnail()) {
-            // TODO(b/335399428) add split select functionality to new TTV
-            taskContainers.forEach { it.thumbnailViewDeprecated.resetViewTransforms() }
-        }
     }
 
     private fun getGridTrans(endTranslation: Float) =
@@ -1571,7 +1568,20 @@ constructor(
 
         @VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
         open fun computeWindowCornerRadius(context: Context): Float {
-            return QuickStepContract.getWindowCornerRadius(context)
+            val activityContext: ActivityContext? = ActivityContext.lookupContextNoThrow(context)
+
+            // The corner radius is fixed to match when Taskbar is persistent mode
+            return if (
+                activityContext != null &&
+                    activityContext.deviceProfile?.isTaskbarPresent == true &&
+                    DisplayController.isTransientTaskbar(context)
+            ) {
+                context.resources
+                    .getDimensionPixelSize(R.dimen.persistent_taskbar_corner_radius)
+                    .toFloat()
+            } else {
+                QuickStepContract.getWindowCornerRadius(context)
+            }
         }
 
         /** Sets the progress in range [0, 1] */
@@ -1583,68 +1593,6 @@ constructor(
         }
 
         override fun close() {}
-    }
-
-    /** Holder for all Task dependent information. */
-    inner class TaskContainer(
-        val task: Task,
-        val thumbnailView: TaskThumbnailView?,
-        val thumbnailViewDeprecated: TaskThumbnailViewDeprecated,
-        val iconView: TaskViewIcon,
-        /**
-         * This technically can be a vanilla [android.view.TouchDelegate] class, however that class
-         * requires setting the touch bounds at construction, so we'd repeatedly be created many
-         * instances unnecessarily as scrolling occurs, whereas [TransformingTouchDelegate] allows
-         * touch delegated bounds only to be updated.
-         */
-        val iconTouchDelegate: TransformingTouchDelegate,
-        /** Defaults to STAGE_POSITION_UNDEFINED if in not a split screen task view */
-        @StagePosition val stagePosition: Int,
-        val digitalWellBeingToast: DigitalWellBeingToast?,
-        val showWindowsView: View?,
-        taskOverlayFactory: TaskOverlayFactory
-    ) {
-        val overlay: TaskOverlay<*> = taskOverlayFactory.createOverlay(this)
-
-        val snapshotView: View
-            get() = thumbnailView ?: thumbnailViewDeprecated
-
-        /** Builds proto for logging */
-        val itemInfo: WorkspaceItemInfo
-            get() =
-                WorkspaceItemInfo().apply {
-                    itemType = LauncherSettings.Favorites.ITEM_TYPE_TASK
-                    container = LauncherSettings.Favorites.CONTAINER_TASKSWITCHER
-                    val componentKey = TaskUtils.getLaunchComponentKeyForTask(task.key)
-                    user = componentKey.user
-                    intent = Intent().setComponent(componentKey.componentName)
-                    title = task.title
-                    recentsView?.let { screenId = it.indexOfChild(this@TaskView) }
-                    if (privateSpaceRestrictAccessibilityDrag()) {
-                        if (
-                            UserCache.getInstance(context).getUserInfo(componentKey.user).isPrivate
-                        ) {
-                            runtimeStatusFlags =
-                                runtimeStatusFlags or ItemInfoWithIcon.FLAG_NOT_PINNABLE
-                        }
-                    }
-                }
-
-        val taskView: TaskView
-            get() = this@TaskView
-
-        fun destroy() {
-            digitalWellBeingToast?.destroy()
-            thumbnailView?.let { taskView.removeView(it) }
-        }
-
-        // TODO(b/335649589): TaskView's VM will already have access to TaskThumbnailView's VM
-        //  so there will be no need to access TaskThumbnailView's VM through the TaskThumbnailView
-        fun bindThumbnailView() {
-            // TODO(b/343364498): Existing view has shouldShowScreenshot as an override as well but
-            //  this should be decided inside TaskThumbnailViewModel.
-            thumbnailView?.viewModel?.bind(TaskThumbnail(task.key.id, isRunningTask))
-        }
     }
 
     companion object {
