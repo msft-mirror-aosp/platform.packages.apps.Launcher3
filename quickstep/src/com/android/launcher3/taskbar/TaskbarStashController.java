@@ -22,10 +22,10 @@ import static com.android.app.animation.Interpolators.FINAL_FRAME;
 import static com.android.app.animation.Interpolators.INSTANT;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.internal.jank.InteractionJankMonitor.Configuration;
+import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TRANSIENT_TASKBAR_HIDE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TRANSIENT_TASKBAR_SHOW;
-import static com.android.launcher3.taskbar.TaskbarKeyguardController.MASK_ANY_SYSUI_LOCKED;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
@@ -35,11 +35,11 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_I
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_GOING_AWAY;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
+import android.animation.ValueAnimator;
 import android.app.RemoteAction;
 import android.graphics.drawable.Icon;
 import android.os.SystemClock;
@@ -66,6 +66,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.SystemUiProxy;
+import com.android.quickstep.util.SystemUiFlagUtils;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -242,6 +243,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     private final Alarm mTimeoutAlarm = new Alarm();
     private boolean mEnableBlockingTimeoutDuringTests = false;
 
+    private Animator mTaskbarBackgroundAlphaAnimator;
+    private long mTaskbarBackgroundDuration;
+    private boolean mIsGoingHome;
+
     // Evaluate whether the handle should be stashed
     private final LongPredicate mIsStashedPredicate = flags -> {
         boolean inApp = hasAnyFlag(flags, FLAGS_IN_APP);
@@ -266,6 +271,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         mSystemUiProxy = SystemUiProxy.INSTANCE.get(activity);
         mAccessibilityManager = mActivity.getSystemService(AccessibilityManager.class);
 
+        mTaskbarBackgroundDuration =
+                activity.getResources().getInteger(R.integer.taskbar_background_duration);
         if (mActivity.isPhoneMode()) {
             mUnstashedHeight = mActivity.getResources().getDimensionPixelSize(
                     R.dimen.taskbar_phone_size);
@@ -760,9 +767,16 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 backgroundAndHandleAlphaStartDelay,
                 backgroundAndHandleAlphaDuration, LINEAR);
 
-        play(as, mTaskbarBackgroundAlphaForStash.animateToValue(backgroundAlphaTarget),
-                backgroundAndHandleAlphaStartDelay,
-                backgroundAndHandleAlphaDuration, LINEAR);
+        if (enableScalingRevealHomeAnimation() && !isStashed) {
+            play(as, getTaskbarBackgroundAnimatorWhenNotGoingHome(duration),
+                    0, 0, LINEAR);
+            as.addListener(AnimatorListeners.forEndCallback(
+                    () -> mTaskbarBackgroundAlphaForStash.setValue(backgroundAlphaTarget)));
+        } else {
+            play(as, mTaskbarBackgroundAlphaForStash.animateToValue(backgroundAlphaTarget),
+                    backgroundAndHandleAlphaStartDelay,
+                    backgroundAndHandleAlphaDuration, LINEAR);
+        }
 
         // The rest of the animations might be "skipped" in TRANSITION_HANDLE_FADE transitions.
         AnimatorSet skippable = as;
@@ -803,6 +817,62 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         // feedforward hint. Note that the reveal animation above also visually scales it.
         skippable.play(mTaskbarStashedHandleHintScale.animateToValue(1f)
                 .setDuration(isStashed ? duration / 2 : duration));
+    }
+
+    private Animator getTaskbarBackgroundAnimatorWhenNotGoingHome(long duration) {
+        ValueAnimator a = ValueAnimator.ofFloat(0, 1);
+        a.setDuration(duration);
+        a.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            // This value is arbitrary.
+            private static final float ANIMATED_FRACTION_THRESHOLD = 0.25f;
+            private boolean mTaskbarBgAlphaAnimationStarted = false;
+            @Override
+            public void onAnimationUpdate(ValueAnimator valueAnimator) {
+                if (mIsGoingHome) {
+                    mTaskbarBgAlphaAnimationStarted = true;
+                }
+                if (mTaskbarBgAlphaAnimationStarted) {
+                    return;
+                }
+
+                if (valueAnimator.getAnimatedFraction() >= ANIMATED_FRACTION_THRESHOLD) {
+                    if (!mIsGoingHome) {
+                        playTaskbarBackgroundAlphaAnimation();
+                        setUserIsGoingHome(false);
+                        mTaskbarBgAlphaAnimationStarted = true;
+                    }
+                }
+            }
+        });
+        return a;
+    }
+
+    /**
+     * Sets whether the user is going home based on the current gesture.
+     */
+    public void setUserIsGoingHome(boolean isGoingHome) {
+        mIsGoingHome = isGoingHome;
+    }
+
+    /**
+     * Plays the taskbar background alpha animation if one is not currently playing.
+     */
+    public void playTaskbarBackgroundAlphaAnimation() {
+        if (mTaskbarBackgroundAlphaAnimator != null
+                && mTaskbarBackgroundAlphaAnimator.isRunning()) {
+            return;
+        }
+        mTaskbarBackgroundAlphaAnimator = mTaskbarBackgroundAlphaForStash
+                .animateToValue(1f)
+                .setDuration(mTaskbarBackgroundDuration);
+        mTaskbarBackgroundAlphaAnimator.setInterpolator(LINEAR);
+        mTaskbarBackgroundAlphaAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                mTaskbarBackgroundAlphaAnimator = null;
+            }
+        });
+        mTaskbarBackgroundAlphaAnimator.start();
     }
 
     private static void play(AnimatorSet as, @Nullable Animator a, long startDelay, long duration,
@@ -950,9 +1020,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
                 && DisplayController.isTransientTaskbar(mActivity);
         updateStateForFlag(FLAG_STASHED_SYSUI,
                 hasAnyFlag(systemUiStateFlags, SYSUI_STATE_SCREEN_PINNING) || stashForBubbles);
-        boolean isLocked = hasAnyFlag(systemUiStateFlags, MASK_ANY_SYSUI_LOCKED)
-                && !hasAnyFlag(systemUiStateFlags, SYSUI_STATE_STATUS_BAR_KEYGUARD_GOING_AWAY);
-        updateStateForFlag(FLAG_STASHED_DEVICE_LOCKED, isLocked);
+        updateStateForFlag(FLAG_STASHED_DEVICE_LOCKED,
+                SystemUiFlagUtils.isLocked(systemUiStateFlags));
 
         mIsImeShowing = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_IME_SHOWING);
         mIsImeSwitcherShowing = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_IME_SWITCHER_SHOWING);
