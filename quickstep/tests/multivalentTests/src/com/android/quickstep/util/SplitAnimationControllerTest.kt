@@ -33,8 +33,8 @@ import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.quickstep.views.GroupedTaskView
 import com.android.quickstep.views.IconView
+import com.android.quickstep.views.TaskContainer
 import com.android.quickstep.views.TaskView
-import com.android.quickstep.views.TaskView.TaskContainer
 import com.android.systemui.shared.recents.model.Task
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -225,7 +225,8 @@ class SplitAnimationControllerTest {
             depthController,
             null /* info */,
             null /* t */,
-            {} /* finishCallback */
+            {} /* finishCallback */,
+            1f /* cornerRadius */
         )
 
         verify(spySplitAnimationController)
@@ -261,7 +262,8 @@ class SplitAnimationControllerTest {
             depthController,
             transitionInfo,
             transaction,
-            {} /* finishCallback */
+            {} /* finishCallback */,
+            1f /* cornerRadius */
         )
 
         verify(spySplitAnimationController)
@@ -289,7 +291,8 @@ class SplitAnimationControllerTest {
             depthController,
             transitionInfo,
             transaction,
-            {} /* finishCallback */
+            {} /* finishCallback */,
+            1f /* cornerRadius */
         )
 
         verify(spySplitAnimationController)
@@ -317,7 +320,8 @@ class SplitAnimationControllerTest {
             depthController,
             transitionInfo,
             transaction,
-            {} /* finishCallback */
+            {} /* finishCallback */,
+            1f /* cornerRadius */
         )
 
         verify(spySplitAnimationController)
@@ -344,7 +348,8 @@ class SplitAnimationControllerTest {
             depthController,
             transitionInfo,
             transaction,
-            {} /* finishCallback */
+            {} /* finishCallback */,
+            1f /* cornerRadius */
         )
 
         verify(spySplitAnimationController)
@@ -371,7 +376,8 @@ class SplitAnimationControllerTest {
             depthController,
             transitionInfo,
             transaction,
-            {} /* finishCallback */
+            {} /* finishCallback */,
+            1f /* cornerRadius */
         )
 
         verify(spySplitAnimationController)
@@ -383,7 +389,7 @@ class SplitAnimationControllerTest {
         val spySplitAnimationController = spy(splitAnimationController)
         doNothing()
             .whenever(spySplitAnimationController)
-            .composeFadeInSplitLaunchAnimator(any(), any(), any(), any(), any())
+            .composeFadeInSplitLaunchAnimator(any(), any(), any(), any(), any(), any())
 
         spySplitAnimationController.playSplitLaunchAnimation(
             null /* launchingTaskView */,
@@ -397,10 +403,11 @@ class SplitAnimationControllerTest {
             depthController,
             transitionInfo,
             transaction,
-            {} /* finishCallback */
+            {} /* finishCallback */,
+            1f /* cornerRadius */
         )
 
         verify(spySplitAnimationController)
-            .composeFadeInSplitLaunchAnimator(any(), any(), any(), any(), any())
+            .composeFadeInSplitLaunchAnimator(any(), any(), any(), any(), any(), any())
     }
 }
