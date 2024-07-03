@@ -33,6 +33,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DREAMING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DIALOG_SHOWING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DISABLE_GESTURE_PIP_ANIMATING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DISABLE_GESTURE_SPLIT_INVOCATION;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_HOME_DISABLED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
@@ -45,6 +46,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_Q
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING_OCCLUDED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_TOUCHPAD_GESTURES_DISABLED;
 
 import android.app.ActivityTaskManager;
 import android.content.Context;
@@ -386,7 +388,7 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
         boolean canStartWithNavHidden = (mSystemUiStateFlags & SYSUI_STATE_NAV_BAR_HIDDEN) == 0
                 || (mSystemUiStateFlags & SYSUI_STATE_ALLOW_GESTURE_IGNORING_BAR_VISIBILITY) != 0
                 || mRotationTouchHelper.isTaskListFrozen();
-        return canStartWithNavHidden && canStartTrackpadGesture();
+        return canStartWithNavHidden && canStartAnyGesture();
     }
 
     /**
@@ -395,14 +397,25 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
      * mode.
      */
     public boolean canStartTrackpadGesture() {
-        return (mSystemUiStateFlags & SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED) == 0
-                && (mSystemUiStateFlags & SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING) == 0
-                && (mSystemUiStateFlags & SYSUI_STATE_QUICK_SETTINGS_EXPANDED) == 0
-                && (mSystemUiStateFlags & SYSUI_STATE_MAGNIFICATION_OVERLAP) == 0
-                && ((mSystemUiStateFlags & SYSUI_STATE_HOME_DISABLED) == 0
-                        || (mSystemUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) == 0)
-                && (mSystemUiStateFlags & SYSUI_STATE_DEVICE_DREAMING) == 0
-                && (mSystemUiStateFlags & SYSUI_STATE_DISABLE_GESTURE_SPLIT_INVOCATION) == 0;
+        boolean trackpadGesturesEnabled =
+                (mSystemUiStateFlags & SYSUI_STATE_TOUCHPAD_GESTURES_DISABLED) == 0;
+        return trackpadGesturesEnabled && canStartAnyGesture();
+    }
+
+    /**
+     * Common logic to determine if either trackpad or finger gesture can be started
+     */
+    private boolean canStartAnyGesture() {
+        boolean homeOrOverviewEnabled = (mSystemUiStateFlags & SYSUI_STATE_HOME_DISABLED) == 0
+                || (mSystemUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) == 0;
+        long gestureDisablingStates = SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED
+                        | SYSUI_STATE_STATUS_BAR_KEYGUARD_SHOWING
+                        | SYSUI_STATE_QUICK_SETTINGS_EXPANDED
+                        | SYSUI_STATE_MAGNIFICATION_OVERLAP
+                        | SYSUI_STATE_DEVICE_DREAMING
+                        | SYSUI_STATE_DISABLE_GESTURE_SPLIT_INVOCATION
+                        | SYSUI_STATE_DISABLE_GESTURE_PIP_ANIMATING;
+        return (gestureDisablingStates & mSystemUiStateFlags) == 0 && homeOrOverviewEnabled;
     }
 
     /**

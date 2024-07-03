@@ -72,6 +72,7 @@ import com.android.quickstep.AllAppsActionManager;
 import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.AssistUtils;
+import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
@@ -304,7 +305,7 @@ public class TaskbarManager {
                 .register(NAV_BAR_KIDS_MODE, mOnSettingsChangeListener);
         Log.d(TASKBAR_NOT_DESTROYED_TAG, "registering component callbacks from constructor.");
         mContext.registerComponentCallbacks(mComponentCallbacks);
-        mShutdownReceiver.register(mContext, Intent.ACTION_SHUTDOWN);
+        mShutdownReceiver.registerAsync(mContext, Intent.ACTION_SHUTDOWN);
         UI_HELPER_EXECUTOR.execute(() -> {
             mSharedState.taskbarSystemActionPendingIntent = PendingIntent.getBroadcast(
                     mContext,
@@ -519,6 +520,36 @@ public class TaskbarManager {
         }
     }
 
+    public void setWallpaperVisible(boolean isVisible) {
+        mSharedState.wallpaperVisible = isVisible;
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.setWallpaperVisible(isVisible);
+        }
+    }
+
+    public void checkNavBarModes() {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.checkNavBarModes();
+        }
+    }
+
+    public void finishBarAnimations() {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.finishBarAnimations();
+        }
+    }
+
+    public void touchAutoDim(boolean reset) {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.touchAutoDim(reset);
+        }
+    }
+
+    public void transitionTo(@BarTransitions.TransitionMode int barMode,
+            boolean animate) {
+        mTaskbarActivityContext.transitionTo(barMode, animate);
+    }
+
     private boolean isTaskbarEnabled(DeviceProfile deviceProfile) {
         return ENABLE_TASKBAR_NAVBAR_UNIFICATION || deviceProfile.isTaskbarPresent;
     }
@@ -543,6 +574,13 @@ public class TaskbarManager {
         mSharedState.systemBarAttrsBehavior = behavior;
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.onSystemBarAttributesChanged(displayId, behavior);
+        }
+    }
+
+    public void onTransitionModeUpdated(int barMode, boolean checkBarModes) {
+        mSharedState.barMode = barMode;
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.onTransitionModeUpdated(barMode, checkBarModes);
         }
     }
 
@@ -582,8 +620,7 @@ public class TaskbarManager {
     public void destroy() {
         debugWhyTaskbarNotDestroyed("TaskbarManager#destroy()");
         removeActivityCallbacksAndListeners();
-        UI_HELPER_EXECUTOR.execute(
-                () -> mTaskbarBroadcastReceiver.unregisterReceiverSafely(mContext));
+        mTaskbarBroadcastReceiver.unregisterReceiverSafelyAsync(mContext);
         destroyExistingTaskbar();
         removeTaskbarRootViewFromWindow();
         if (mUserUnlocked) {
@@ -595,7 +632,7 @@ public class TaskbarManager {
                 .unregister(NAV_BAR_KIDS_MODE, mOnSettingsChangeListener);
         Log.d(TASKBAR_NOT_DESTROYED_TAG, "unregistering component callbacks from destroy().");
         mContext.unregisterComponentCallbacks(mComponentCallbacks);
-        mContext.unregisterReceiver(mShutdownReceiver);
+        mShutdownReceiver.unregisterReceiverSafelyAsync(mContext);
     }
 
     public @Nullable TaskbarActivityContext getCurrentActivityContext() {
@@ -611,7 +648,8 @@ public class TaskbarManager {
         }
     }
 
-    private void addTaskbarRootViewToWindow() {
+    @VisibleForTesting
+    public void addTaskbarRootViewToWindow() {
         if (enableTaskbarNoRecreate() && !mAddedWindow && mTaskbarActivityContext != null) {
             mWindowManager.addView(mTaskbarRootLayout,
                     mTaskbarActivityContext.getWindowLayoutParams());
@@ -619,7 +657,8 @@ public class TaskbarManager {
         }
     }
 
-    private void removeTaskbarRootViewFromWindow() {
+    @VisibleForTesting
+    public void removeTaskbarRootViewFromWindow() {
         if (enableTaskbarNoRecreate() && mAddedWindow) {
             mWindowManager.removeViewImmediate(mTaskbarRootLayout);
             mAddedWindow = false;
