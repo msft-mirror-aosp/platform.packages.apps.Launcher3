@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-package com.android.quickstep.task.thumbnail.data
+package com.android.quickstep.task.thumbnail
 
-import com.android.launcher3.util.CancellableTask
-import com.android.systemui.shared.recents.model.Task
-import com.android.systemui.shared.recents.model.ThumbnailData
-import java.util.function.Consumer
+import android.graphics.Bitmap
+import android.graphics.Matrix
 
-interface TaskThumbnailDataSource {
-    fun getThumbnailInBackground(
-        task: Task,
-        callback: Consumer<ThumbnailData>
-    ): CancellableTask<ThumbnailData>?
+/** Ui state for [com.android.quickstep.TaskOverlayFactory.TaskOverlay] */
+sealed class TaskOverlayUiState {
+    data object Disabled : TaskOverlayUiState()
+
+    data class Enabled(
+        val isRealSnapshot: Boolean,
+        val thumbnail: Bitmap?,
+        val thumbnailMatrix: Matrix
+    ) : TaskOverlayUiState()
 }
