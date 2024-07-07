@@ -156,11 +156,6 @@ constructor(
         get() = taskContainers[0].task
 
     @get:Deprecated("Use [taskContainers] instead.")
-    val firstThumbnailViewDeprecated: TaskThumbnailViewDeprecated
-        /** Returns the first thumbnailView of the TaskView. */
-        get() = taskContainers[0].thumbnailViewDeprecated
-
-    @get:Deprecated("Use [taskContainers] instead.")
     val firstSnapshotView: View
         /** Returns the first snapshotView of the TaskView. */
         get() = taskContainers[0].snapshotView
@@ -851,7 +846,8 @@ constructor(
             taskContainers.forEach {
                 if (visible) {
                     recentsModel.thumbnailCache
-                        .updateThumbnailInBackground(it.task) { thumbnailData ->
+                        .getThumbnailInBackground(it.task) { thumbnailData ->
+                            it.task.thumbnail = thumbnailData
                             it.thumbnailViewDeprecated.setThumbnail(it.task, thumbnailData)
                         }
                         ?.also { request -> pendingThumbnailLoadRequests.add(request) }
@@ -867,12 +863,15 @@ constructor(
             taskContainers.forEach {
                 if (visible) {
                     recentsModel.iconCache
-                        .updateIconInBackground(it.task) { task ->
-                            setIcon(it.iconView, task.icon)
+                        .getIconInBackground(it.task) { icon, contentDescription, title ->
+                            it.task.icon = icon
+                            it.task.titleDescription = contentDescription
+                            it.task.title = title
+                            setIcon(it.iconView, icon)
                             if (enableOverviewIconMenu()) {
-                                setText(it.iconView, task.title)
+                                setText(it.iconView, title)
                             }
-                            it.digitalWellBeingToast?.initialize(task)
+                            it.digitalWellBeingToast?.initialize(it.task)
                         }
                         ?.also { request -> pendingIconLoadRequests.add(request) }
                 } else {
@@ -1394,10 +1393,8 @@ constructor(
     }
 
     open fun setOverlayEnabled(overlayEnabled: Boolean) {
-        // TODO(b/335606129) Investigate the usage of [TaskOverlay] in the new TaskThumbnailView.
-        //  and if it's still necessary we should support that in the new TTV class.
         if (!enableRefactorTaskThumbnail()) {
-            taskContainers.forEach { it.thumbnailViewDeprecated.setOverlayEnabled(overlayEnabled) }
+            taskContainers.forEach { it.setOverlayEnabled(overlayEnabled) }
         }
     }
 
@@ -1472,7 +1469,9 @@ constructor(
     protected open fun updateSnapshotRadius() {
         updateCurrentFullscreenParams()
         taskContainers.forEach {
-            it.thumbnailViewDeprecated.setFullscreenParams(getThumbnailFullscreenParams())
+            if (!enableRefactorTaskThumbnail()) {
+                it.thumbnailViewDeprecated.setFullscreenParams(getThumbnailFullscreenParams())
+            }
             it.overlay.setFullscreenParams(getThumbnailFullscreenParams())
         }
     }
