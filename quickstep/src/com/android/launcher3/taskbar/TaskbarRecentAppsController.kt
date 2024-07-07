@@ -24,11 +24,9 @@ import com.android.launcher3.util.CancellableTask
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
-import com.android.systemui.shared.recents.model.Task
 import com.android.window.flags.Flags.enableDesktopWindowingMode
 import com.android.window.flags.Flags.enableDesktopWindowingTaskbarRunningApps
 import java.io.PrintWriter
-import java.util.function.Consumer
 
 /**
  * Provides recent apps functionality, when the Taskbar Recent Apps section is enabled. Behavior:
@@ -149,31 +147,58 @@ class TaskbarRecentAppsController(
             taskListChangeId =
                 recentsModel.getTasks { tasks ->
                     allRecentTasks = tasks
+                    val oldRunningPackages = runningAppPackages
+                    val oldMinimizedPackages = minimizedAppPackages
                     desktopTask = allRecentTasks.filterIsInstance<DesktopTask>().firstOrNull()
-                    onRecentsOrHotseatChanged()
-                    controllers.taskbarViewController.commitRunningAppsToUI()
+                    val runningPackagesChanged = oldRunningPackages != runningAppPackages
+                    val minimizedPackagessChanged = oldMinimizedPackages != minimizedAppPackages
+                    if (
+                        onRecentsOrHotseatChanged() ||
+                            runningPackagesChanged ||
+                            minimizedPackagessChanged
+                    ) {
+                        controllers.taskbarViewController.commitRunningAppsToUI()
+                    }
                 }
         }
     }
 
-    private fun onRecentsOrHotseatChanged() {
+    /**
+     * Updates [shownTasks] when Recents or Hotseat changes.
+     *
+     * @return Whether [shownTasks] changed.
+     */
+    private fun onRecentsOrHotseatChanged(): Boolean {
+        val oldShownTasks = shownTasks
         shownTasks =
             if (isInDesktopMode) {
                 computeShownRunningTasks()
             } else {
                 computeShownRecentTasks()
             }
+        val shownTasksChanged = oldShownTasks != shownTasks
+        if (!shownTasksChanged) {
+            return shownTasksChanged
+        }
 
         for (groupTask in shownTasks) {
             for (task in groupTask.tasks) {
-                val callback =
-                    Consumer<Task> { controllers.taskbarViewController.onTaskUpdated(it) }
-                val cancellableTask = recentsModel.iconCache.updateIconInBackground(task, callback)
+                val cancellableTask =
+                    recentsModel.iconCache.getIconInBackground(task) {
+                        icon,
+                        contentDescription,
+                        title ->
+                        task.icon = icon
+                        task.titleDescription = contentDescription
+                        task.title = title
+                        controllers.taskbarViewController.onTaskUpdated(task)
+                    }
                 if (cancellableTask != null) {
                     iconLoadRequests.add(cancellableTask)
                 }
             }
         }
+        return shownTasksChanged
     }
 
     private fun computeShownRunningTasks(): List<GroupTask> {
