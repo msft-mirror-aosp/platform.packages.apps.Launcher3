@@ -44,6 +44,7 @@ import com.android.wm.shell.util.GroupedRecentTaskInfo;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
@@ -70,7 +71,8 @@ public class RecentTasksList {
     private TaskLoadResult mResultsBg = INVALID_RESULT;
     private TaskLoadResult mResultsUi = INVALID_RESULT;
 
-    private RecentsModel.RunningTasksListener mRunningTasksListener;
+    private @Nullable RecentsModel.RunningTasksListener mRunningTasksListener;
+    private @Nullable RecentsModel.RecentTasksChangedListener mRecentTasksChangedListener;
     // Tasks are stored in order of least recently launched to most recently launched.
     private ArrayList<ActivityManager.RunningTaskInfo> mRunningTasks;
 
@@ -199,6 +201,9 @@ public class RecentTasksList {
 
     public void onRecentTasksChanged() {
         invalidateLoadedTasks();
+        if (mRecentTasksChangedListener != null) {
+            mRecentTasksChangedListener.onRecentTasksChanged();
+        }
     }
 
     private synchronized void invalidateLoadedTasks() {
@@ -219,6 +224,21 @@ public class RecentTasksList {
      */
     public void unregisterRunningTasksListener() {
         mRunningTasksListener = null;
+    }
+
+    /**
+     * Registers a listener for running tasks
+     */
+    public void registerRecentTasksChangedListener(
+            RecentsModel.RecentTasksChangedListener listener) {
+        mRecentTasksChangedListener = listener;
+    }
+
+    /**
+     * Removes the previously registered running tasks listener
+     */
+    public void unregisterRecentTasksChangedListener() {
+        mRecentTasksChangedListener = null;
     }
 
     private void initRunningTasks(ArrayList<ActivityManager.RunningTaskInfo> runningTasks) {
@@ -305,7 +325,9 @@ public class RecentTasksList {
                 // leftover TYPE_FREEFORM tasks created when flag was on should be ignored.
                 if (enableDesktopWindowingMode()) {
                     GroupTask desktopTask = createDesktopTask(rawTask);
-                    allTasks.add(desktopTask);
+                    if (desktopTask != null) {
+                        allTasks.add(desktopTask);
+                    }
                 }
                 continue;
             }
@@ -349,14 +371,22 @@ public class RecentTasksList {
         return allTasks;
     }
 
-    private DesktopTask createDesktopTask(GroupedRecentTaskInfo recentTaskInfo) {
+    private @Nullable DesktopTask createDesktopTask(GroupedRecentTaskInfo recentTaskInfo) {
         ArrayList<Task> tasks = new ArrayList<>(recentTaskInfo.getTaskInfoList().size());
+        int[] minimizedTaskIds = recentTaskInfo.getMinimizedTaskIds();
+        if (minimizedTaskIds.length == recentTaskInfo.getTaskInfoList().size()) {
+            // All Tasks are minimized -> don't create a DesktopTask
+            return null;
+        }
         for (ActivityManager.RecentTaskInfo taskInfo : recentTaskInfo.getTaskInfoList()) {
             Task.TaskKey key = new Task.TaskKey(taskInfo);
             Task task = Task.from(key, taskInfo, false);
             task.setLastSnapshotData(taskInfo);
             task.positionInParent = taskInfo.positionInParent;
             task.appBounds = taskInfo.configuration.windowConfiguration.getAppBounds();
+            task.isVisible = taskInfo.isVisible;
+            task.isMinimized =
+                    Arrays.stream(minimizedTaskIds).anyMatch(taskId -> taskId == taskInfo.taskId);
             tasks.add(task);
         }
         return new DesktopTask(tasks);

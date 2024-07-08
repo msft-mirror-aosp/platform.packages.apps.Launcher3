@@ -31,6 +31,7 @@ import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
 import static com.android.quickstep.util.SystemActionConstants.SYSTEM_ACTION_ID_TASKBAR;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DIALOG_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE;
@@ -245,7 +246,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     private Animator mTaskbarBackgroundAlphaAnimator;
     private long mTaskbarBackgroundDuration;
-    private boolean mIsGoingHome;
+    private boolean mUserIsNotGoingHome = false;
 
     // Evaluate whether the handle should be stashed
     private final LongPredicate mIsStashedPredicate = flags -> {
@@ -338,7 +339,16 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         // For now, assume we're in an app, since LauncherTaskbarUIController won't be able to tell
         // us that we're paused until a bit later. This avoids flickering upon recreating taskbar.
         updateStateForFlag(FLAG_IN_APP, true);
+
         applyState(/* duration = */ 0);
+
+        // Hide the background while stashed so it doesn't show on fast swipes home
+        boolean shouldHideTaskbarBackground = enableScalingRevealHomeAnimation()
+                && DisplayController.isTransientTaskbar(mActivity)
+                && isStashed();
+
+        mTaskbarBackgroundAlphaForStash.setValue(shouldHideTaskbarBackground ? 0 : 1);
+
         if (mTaskbarSharedState.getTaskbarWasPinned()
                 || !mTaskbarSharedState.taskbarWasStashedAuto) {
             tryStartTaskbarTimeout();
@@ -828,17 +838,13 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             private boolean mTaskbarBgAlphaAnimationStarted = false;
             @Override
             public void onAnimationUpdate(ValueAnimator valueAnimator) {
-                if (mIsGoingHome) {
-                    mTaskbarBgAlphaAnimationStarted = true;
-                }
                 if (mTaskbarBgAlphaAnimationStarted) {
                     return;
                 }
 
                 if (valueAnimator.getAnimatedFraction() >= ANIMATED_FRACTION_THRESHOLD) {
-                    if (!mIsGoingHome) {
+                    if (mUserIsNotGoingHome) {
                         playTaskbarBackgroundAlphaAnimation();
-                        setUserIsGoingHome(false);
                         mTaskbarBgAlphaAnimationStarted = true;
                     }
                 }
@@ -850,8 +856,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * Sets whether the user is going home based on the current gesture.
      */
-    public void setUserIsGoingHome(boolean isGoingHome) {
-        mIsGoingHome = isGoingHome;
+    public void setUserIsNotGoingHome(boolean userIsNotGoingHome) {
+        mUserIsNotGoingHome = userIsNotGoingHome;
     }
 
     /**
@@ -1013,7 +1019,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         long startDelay = 0;
 
         updateStateForFlag(FLAG_STASHED_IN_APP_SYSUI, hasAnyFlag(systemUiStateFlags,
-                SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE));
+                SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE | SYSUI_STATE_DIALOG_SHOWING));
 
         boolean stashForBubbles = hasAnyFlag(FLAG_IN_OVERVIEW)
                 && hasAnyFlag(systemUiStateFlags, SYSUI_STATE_BUBBLES_EXPANDED)
