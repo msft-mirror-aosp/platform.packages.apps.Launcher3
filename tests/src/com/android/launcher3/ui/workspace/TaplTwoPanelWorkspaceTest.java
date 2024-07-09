@@ -247,7 +247,6 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
     }
 
     @ScreenRecordRule.ScreenRecord // b/329935119
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/329935119
     @Test
     @PortraitLandscape
     public void testEmptyPageDoesNotGetRemovedIfPagePairIsNotEmpty() {
@@ -353,8 +352,11 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
     }
 
     private void assertPagesExist(Launcher launcher, int... pageIds) {
+        waitForLauncherCondition("Existing page count does NOT match. "
+                + "Expected: " + pageIds.length
+                + ". Actual: " + launcher.getWorkspace().getPageCount(),
+                l -> pageIds.length == l.getWorkspace().getPageCount());
         int pageCount = launcher.getWorkspace().getPageCount();
-        assertEquals("Existing page count does NOT match.", pageIds.length, pageCount);
         for (int i = 0; i < pageCount; i++) {
             CellLayout page = (CellLayout) launcher.getWorkspace().getPageAt(i);
             int pageId = launcher.getWorkspace().getCellLayoutId(page);

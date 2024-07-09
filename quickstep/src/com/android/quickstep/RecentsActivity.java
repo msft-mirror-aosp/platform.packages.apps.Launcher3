@@ -115,7 +115,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
     private TISBindHelper mTISBindHelper;
     private @Nullable FallbackTaskbarUIController mTaskbarUIController;
 
-    private StateManager<RecentsState> mStateManager;
+    private StateManager<RecentsState, RecentsActivity> mStateManager;
 
     // Strong refs to runners which are cleared when the activity is destroyed
     private RemoteAnimationFactory mActivityLaunchAnimationRunner;
@@ -132,6 +132,13 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
      * Init drag layer and overview panel views.
      */
     protected void setupViews() {
+        SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(this);
+        // SplitSelectStateController needs to be created before setContentView()
+        mSplitSelectStateController =
+                new SplitSelectStateController(this, mHandler, getStateManager(),
+                        null /* depthController */, getStatsLogManager(),
+                        systemUiProxy, RecentsModel.INSTANCE.get(this),
+                        null /*activityBackCallback*/);
         inflateRootView(R.layout.fallback_recents_activity);
         setContentView(getRootView());
         mDragLayer = findViewById(R.id.drag_layer);
@@ -139,12 +146,6 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
         mFallbackRecentsView = findViewById(R.id.overview_panel);
         mActionsView = findViewById(R.id.overview_actions_view);
         getRootView().getSysUiScrim().getSysUIProgress().updateValue(0);
-        SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(this);
-        mSplitSelectStateController =
-                new SplitSelectStateController(this, mHandler, getStateManager(),
-                        null /* depthController */, getStatsLogManager(),
-                        systemUiProxy, RecentsModel.INSTANCE.get(this),
-                        null /*activityBackCallback*/);
         mDragLayer.recreateControllers();
         if (enableDesktopWindowingMode()) {
             mDesktopRecentsTransitionController = new DesktopRecentsTransitionController(
@@ -386,6 +387,11 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
         }
     }
 
+    @Override
+    public boolean shouldAnimateStateChange() {
+        return false;
+    }
+
     /**
      * Initialize/update the device profile.
      */
@@ -462,12 +468,12 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
             };
 
     @Override
-    protected void collectStateHandlers(List<StateHandler> out) {
+    public void collectStateHandlers(List<StateHandler<RecentsState>> out) {
         out.add(new FallbackRecentsStateController(this));
     }
 
     @Override
-    public StateManager<RecentsState> getStateManager() {
+    public StateManager<RecentsState, RecentsActivity> getStateManager() {
         return mStateManager;
     }
 

@@ -30,6 +30,7 @@ import android.view.View
 import android.view.ViewOutlineProvider
 import androidx.annotation.ColorInt
 import com.android.launcher3.Utilities
+import com.android.launcher3.util.ViewPool
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
@@ -42,7 +43,7 @@ import com.android.systemui.shared.system.QuickStepContract
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
-class TaskThumbnailView : View {
+class TaskThumbnailView : View, ViewPool.Reusable {
     // TODO(b/335649589): Ideally create and obtain this from DI. This ViewModel should be scoped
     //  to [TaskView], and also shared between [TaskView] and [TaskThumbnailView]
     //  This is using a lazy for now because the dependencies cannot be obtained without DI.
@@ -53,25 +54,31 @@ class TaskThumbnailView : View {
         TaskThumbnailViewModel(
             recentsView.mRecentsViewData,
             (parent as TaskView).taskViewData,
+            (parent as TaskView).getTaskContainerForTaskThumbnailView(this)!!.taskContainerData,
             recentsView.mTasksRepository,
         )
     }
 
     private var uiState: TaskThumbnailUiState = Uninitialized
     private var inheritedScale: Float = 1f
+    private var dimProgress: Float = 0f
 
     private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val scrimPaint = Paint().apply { color = Color.BLACK }
     private val _measuredBounds = Rect()
     private val measuredBounds: Rect
         get() {
             _measuredBounds.set(0, 0, measuredWidth, measuredHeight)
             return _measuredBounds
         }
-    private var cornerRadius: Float = TaskCornerRadius.get(context)
+
+    private var overviewCornerRadius: Float = TaskCornerRadius.get(context)
     private var fullscreenCornerRadius: Float = QuickStepContract.getWindowCornerRadius(context)
 
     constructor(context: Context?) : super(context)
+
     constructor(context: Context?, attrs: AttributeSet?) : super(context, attrs)
+
     constructor(
         context: Context?,
         attrs: AttributeSet?,
@@ -87,7 +94,14 @@ class TaskThumbnailView : View {
                 invalidate()
             }
         }
-        MainScope().launch { viewModel.recentsFullscreenProgress.collect { invalidateOutline() } }
+        MainScope().launch {
+            viewModel.dimProgress.collect { dimProgress ->
+                // TODO(b/348195366) Add fade in/out for scrim
+                this@TaskThumbnailView.dimProgress = dimProgress
+                invalidate()
+            }
+        }
+        MainScope().launch { viewModel.cornerRadiusProgress.collect { invalidateOutline() } }
         MainScope().launch {
             viewModel.inheritedScale.collect { viewModelInheritedScale ->
                 inheritedScale = viewModelInheritedScale
@@ -104,12 +118,21 @@ class TaskThumbnailView : View {
             }
     }
 
+    override fun onRecycle() {
+        // Do nothing
+        uiState = Uninitialized
+    }
+
     override fun onDraw(canvas: Canvas) {
         when (val uiStateVal = uiState) {
             is Uninitialized -> drawBackgroundOnly(canvas, Color.BLACK)
             is LiveTile -> drawTransparentUiState(canvas)
             is Snapshot -> drawSnapshotState(canvas, uiStateVal)
             is BackgroundOnly -> drawBackgroundOnly(canvas, uiStateVal.backgroundColor)
+        }
+
+        if (dimProgress > 0) {
+            drawScrim(canvas)
         }
     }
 
@@ -121,7 +144,7 @@ class TaskThumbnailView : View {
     override fun onConfigurationChanged(newConfig: Configuration?) {
         super.onConfigurationChanged(newConfig)
 
-        cornerRadius = TaskCornerRadius.get(context)
+        overviewCornerRadius = TaskCornerRadius.get(context)
         fullscreenCornerRadius = QuickStepContract.getWindowCornerRadius(context)
         invalidateOutline()
     }
@@ -135,15 +158,21 @@ class TaskThumbnailView : View {
         canvas.drawBitmap(snapshot.bitmap, snapshot.drawnRect, measuredBounds, null)
     }
 
+    private fun drawScrim(canvas: Canvas) {
+        scrimPaint.alpha = (dimProgress * MAX_SCRIM_ALPHA).toInt()
+        canvas.drawRect(measuredBounds, scrimPaint)
+    }
+
     private fun getCurrentCornerRadius() =
         Utilities.mapRange(
-            viewModel.recentsFullscreenProgress.value,
-            cornerRadius,
+            viewModel.cornerRadiusProgress.value,
+            overviewCornerRadius,
             fullscreenCornerRadius
         ) / inheritedScale
 
     companion object {
         private val CLEAR_PAINT =
             Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
+        private const val MAX_SCRIM_ALPHA = (0.4f * 255).toInt()
     }
 }

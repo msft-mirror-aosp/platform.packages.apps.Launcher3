@@ -32,6 +32,8 @@ import androidx.test.filters.SmallTest;
 
 import com.android.launcher3.util.LooperExecutor;
 import com.android.quickstep.util.GroupTask;
+import com.android.quickstep.views.TaskViewType;
+import com.android.systemui.shared.recents.model.Task;
 import com.android.wm.shell.util.GroupedRecentTaskInfo;
 
 import org.junit.Before;
@@ -40,14 +42,19 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @SmallTest
 public class RecentTasksListTest {
 
     @Mock
     private SystemUiProxy mockSystemUiProxy;
+    @Mock
+    private TopTaskTracker mTopTaskTracker;
 
     // Class under test
     private RecentTasksList mRecentTasksList;
@@ -58,7 +65,7 @@ public class RecentTasksListTest {
         LooperExecutor mockMainThreadExecutor = mock(LooperExecutor.class);
         KeyguardManager mockKeyguardManager = mock(KeyguardManager.class);
         mRecentTasksList = new RecentTasksList(mockMainThreadExecutor, mockKeyguardManager,
-                mockSystemUiProxy);
+                mockSystemUiProxy, mTopTaskTracker);
     }
 
     @Test
@@ -101,5 +108,53 @@ public class RecentTasksListTest {
         assertEquals(1, taskList.size());
         assertEquals(taskDescription, taskList.get(0).task1.taskDescription.getLabel());
         assertNull(taskList.get(0).task2.taskDescription.getLabel());
+    }
+
+    @Test
+    public void loadTasksInBackground_freeformTask_createsDesktopTask() {
+        ActivityManager.RecentTaskInfo[] tasks = {
+                createRecentTaskInfo(1 /* taskId */),
+                createRecentTaskInfo(4 /* taskId */),
+                createRecentTaskInfo(5 /* taskId */)};
+        GroupedRecentTaskInfo recentTaskInfos = GroupedRecentTaskInfo.forFreeformTasks(
+                tasks, Collections.emptySet() /* minimizedTaskIds */);
+        when(mockSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
+                .thenReturn(new ArrayList<>(Collections.singletonList(recentTaskInfos)));
+
+        List<GroupTask> taskList = mRecentTasksList.loadTasksInBackground(
+                Integer.MAX_VALUE /* numTasks */, -1 /* requestId */, false /* loadKeysOnly */);
+
+        assertEquals(1, taskList.size());
+        assertEquals(TaskViewType.DESKTOP, taskList.get(0).taskViewType);
+        List<Task> actualFreeformTasks = taskList.get(0).getTasks();
+        assertEquals(3, actualFreeformTasks.size());
+        assertEquals(1, actualFreeformTasks.get(0).key.id);
+        assertEquals(4, actualFreeformTasks.get(1).key.id);
+        assertEquals(5, actualFreeformTasks.get(2).key.id);
+    }
+
+    @Test
+    public void loadTasksInBackground_freeformTask_onlyMinimizedTasks_doesNotCreateDesktopTask() {
+        ActivityManager.RecentTaskInfo[] tasks = {
+                createRecentTaskInfo(1 /* taskId */),
+                createRecentTaskInfo(4 /* taskId */),
+                createRecentTaskInfo(5 /* taskId */)};
+        Set<Integer> minimizedTaskIds =
+                Arrays.stream(new Integer[]{1, 4, 5}).collect(Collectors.toSet());
+        GroupedRecentTaskInfo recentTaskInfos =
+                GroupedRecentTaskInfo.forFreeformTasks(tasks, minimizedTaskIds);
+        when(mockSystemUiProxy.getRecentTasks(anyInt(), anyInt()))
+                .thenReturn(new ArrayList<>(Collections.singletonList(recentTaskInfos)));
+
+        List<GroupTask> taskList = mRecentTasksList.loadTasksInBackground(
+                Integer.MAX_VALUE /* numTasks */, -1 /* requestId */, false /* loadKeysOnly */);
+
+        assertEquals(0, taskList.size());
+    }
+
+    private ActivityManager.RecentTaskInfo createRecentTaskInfo(int taskId) {
+        ActivityManager.RecentTaskInfo recentTaskInfo = new ActivityManager.RecentTaskInfo();
+        recentTaskInfo.taskId = taskId;
+        return recentTaskInfo;
     }
 }
