@@ -43,6 +43,7 @@ import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.SystemUiProxy;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 
+import java.io.PrintWriter;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -597,5 +598,20 @@ public class BubbleBarViewController {
     public interface BubbleBarBoundsChangeListener {
         /** Called when bounds have changed */
         void onBoundsChanged();
+    }
+
+    /** Dumps the state of BubbleBarViewController. */
+    public void dump(PrintWriter pw) {
+        pw.println("Bubble bar view controller state:");
+        pw.println("  mHiddenForSysui: " + mHiddenForSysui);
+        pw.println("  mHiddenForNoBubbles: " + mHiddenForNoBubbles);
+        pw.println("  mShouldShowEducation: " + mShouldShowEducation);
+        pw.println("  mBubbleBarTranslationY.value: " + mBubbleBarTranslationY.value);
+        pw.println("  mBubbleBarSwipeUpTranslationY: " + mBubbleBarSwipeUpTranslationY);
+        if (mBarView != null) {
+            mBarView.dump(pw);
+        } else {
+            pw.println("  Bubble bar view is null!");
+        }
     }
 }
