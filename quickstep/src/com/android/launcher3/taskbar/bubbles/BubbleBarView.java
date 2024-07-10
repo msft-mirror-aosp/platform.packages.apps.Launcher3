@@ -49,6 +49,8 @@ import com.android.launcher3.util.DisplayController;
 import com.android.wm.shell.Flags;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 
+import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -979,8 +981,7 @@ public class BubbleBarView extends FrameLayout {
         return translationX - getScaleIconShift();
     }
 
-    private float getCollapsedBubbleTranslationX(int bubbleIndex, int bubbleCount,
-            boolean onLeft) {
+    private float getCollapsedBubbleTranslationX(int bubbleIndex, int bubbleCount, boolean onLeft) {
         if (bubbleIndex < 0 || bubbleIndex >= bubbleCount) {
             return 0;
         }
@@ -991,7 +992,9 @@ public class BubbleBarView extends FrameLayout {
                     bubbleIndex == 0 && bubbleCount > MAX_VISIBLE_BUBBLES_COLLAPSED
                             ? mIconOverlapAmount : 0);
         } else {
-            translationX = mBubbleBarPadding + (bubbleIndex == 0 ? 0 : mIconOverlapAmount);
+            translationX = mBubbleBarPadding + (
+                    bubbleIndex == 0 || bubbleCount <= MAX_VISIBLE_BUBBLES_COLLAPSED
+                            ? 0 : mIconOverlapAmount);
         }
         return translationX - getScaleIconShift();
     }
@@ -1307,6 +1310,37 @@ public class BubbleBarView extends FrameLayout {
 
             }
         });
+    }
+
+    /** Dumps the current state of BubbleBarView. */
+    public void dump(PrintWriter pw) {
+        pw.println("BubbleBarView state:");
+        pw.println("  visibility: " + getVisibility());
+        pw.println("  translation Y: " + getTranslationY());
+        pw.println("  bubbles in bar (childCount = " + getChildCount() + ")");
+        for (BubbleView bubbleView: getBubbles()) {
+            BubbleBarItem bubble = bubbleView.getBubble();
+            String key = bubble == null ? "null" : bubble.getKey();
+            pw.println("    bubble key: " + key);
+        }
+        pw.println("  isExpanded: " + isExpanded());
+        pw.println("  mIsAnimatingNewBubble: " + mIsAnimatingNewBubble);
+        if (mBubbleAnimator != null) {
+            pw.println("  mBubbleAnimator.isRunning(): " + mBubbleAnimator.isRunning());
+            pw.println("  mBubbleAnimator is null");
+        }
+        pw.println("  mDragging: " + mDragging);
+    }
+
+    private List<BubbleView> getBubbles() {
+        List<BubbleView> bubbles = new ArrayList<>();
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (child instanceof BubbleView bubble) {
+                bubbles.add(bubble);
+            }
+        }
+        return bubbles;
     }
 
     /** Interface for BubbleBarView to communicate with its controller. */
