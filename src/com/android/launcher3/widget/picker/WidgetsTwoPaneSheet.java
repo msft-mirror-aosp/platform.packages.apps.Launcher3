@@ -119,6 +119,9 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
         mWidgetRecommendationsView.initParentViews(mWidgetRecommendationsContainer);
         mWidgetRecommendationsView.setWidgetCellLongClickListener(this);
         mWidgetRecommendationsView.setWidgetCellOnClickListener(this);
+        if (!mDeviceProfile.isTwoPanels) {
+            mWidgetRecommendationsView.enableFullPageViewIfLowDensity();
+        }
         // To save the currently displayed page, so that, it can be requested when rebinding
         // recommendations with different size constraints.
         mWidgetRecommendationsView.addPageSwitchListener(

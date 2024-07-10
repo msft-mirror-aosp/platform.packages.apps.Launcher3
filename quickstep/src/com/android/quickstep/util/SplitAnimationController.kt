@@ -27,8 +27,10 @@ import android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN
 import android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.view.RemoteAnimationTarget
 import android.view.SurfaceControl
@@ -121,7 +123,7 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                     return SplitAnimInitProps(
                         container.snapshotView,
                         container.thumbnail,
-                        drawable!!,
+                        drawable,
                         fadeWithThumbnail = true,
                         isStagedTask = true,
                         iconView = container.iconView.asView()
@@ -140,7 +142,7 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                 return SplitAnimInitProps(
                     it.snapshotView,
                     it.thumbnail,
-                    drawable!!,
+                    drawable,
                     fadeWithThumbnail = true,
                     isStagedTask = true,
                     iconView = it.iconView.asView()
@@ -152,15 +154,15 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
     /**
      * Returns the drawable that's provided in iconView, however if that is null it falls back to
      * the drawable that's in splitSelectSource. TaskView's icon drawable can be null if the
-     * TaskView is scrolled far enough off screen
+     * TaskView is scrolled far enough off screen.
      *
-     * @return [Drawable]
+     * @return the [Drawable] icon, or a translucent drawable if none was found
      */
-    fun getDrawable(iconView: TaskViewIcon, splitSelectSource: SplitSelectSource?): Drawable? {
-        if (iconView.drawable == null && splitSelectSource != null) {
-            return splitSelectSource.drawable
-        }
-        return iconView.drawable
+    fun getDrawable(iconView: TaskViewIcon, splitSelectSource: SplitSelectSource?): Drawable {
+        val drawable =
+            if (iconView.drawable == null && splitSelectSource != null) splitSelectSource.drawable
+            else iconView.drawable
+        return drawable ?: ColorDrawable(Color.TRANSPARENT)
     }
 
     /**
