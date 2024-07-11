@@ -46,7 +46,6 @@ import com.android.launcher3.R;
 import com.android.launcher3.anim.SpringAnimationBuilder;
 import com.android.launcher3.taskbar.bubbles.animation.BubbleAnimator;
 import com.android.launcher3.util.DisplayController;
-import com.android.wm.shell.Flags;
 import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 
 import java.io.PrintWriter;
@@ -258,10 +257,6 @@ public class BubbleBarView extends FrameLayout {
      */
     public void animateBubbleBarIconSize(float newIconSize, float newBubbleBarPadding) {
         if (!isIconSizeOrPaddingUpdated(newIconSize, newBubbleBarPadding)) {
-            return;
-        }
-        if (!Flags.animateBubbleSizeChange()) {
-            setIconSizeAndPadding(newIconSize, newBubbleBarPadding);
             return;
         }
         if (mScalePaddingAnimator != null && mScalePaddingAnimator.isRunning()) {
@@ -901,6 +896,13 @@ public class BubbleBarView extends FrameLayout {
             float fullElevationForChild = (MAX_BUBBLES * mBubbleElevation) - i;
             bv.setZ(fullElevationForChild * elevationState);
 
+            // only update the dot scale if we're expanding or collapsing
+            // TODO b/351904597: update the dot for the first bubble after removal and reorder
+            // since those might happen when the bar is collapsed and will need their dot back
+            if (mWidthAnimator.isRunning()) {
+                bv.setDotScale(widthState);
+            }
+
             if (mIsBarExpanded) {
                 // If bar is on the right, account for bubble bar expanding and shifting left
                 final float expandedBarShift = onLeft ? 0 : currentWidth - expandedWidth;
@@ -909,7 +911,6 @@ public class BubbleBarView extends FrameLayout {
                 bv.setTranslationX(widthState * (targetX - collapsedX) + collapsedX);
                 // When we're expanded, the badge is visible for all bubbles
                 bv.updateBadgeVisibility(/* show= */ true);
-                bv.setDotScale(widthState);
                 bv.setAlpha(1);
             } else {
                 // If bar is on the right, account for bubble bar expanding and shifting left
@@ -918,7 +919,6 @@ public class BubbleBarView extends FrameLayout {
                 bv.setTranslationX(widthState * (expandedX - targetX) + targetX);
                 // The badge is always visible for the first bubble
                 bv.updateBadgeVisibility(/* show= */ i == 0);
-                bv.setDotScale(widthState);
                 // If we're fully collapsed, hide all bubbles except for the first 2. If there are
                 // only 2 bubbles, hide the second bubble as well because it's the overflow.
                 if (widthState == 0) {
