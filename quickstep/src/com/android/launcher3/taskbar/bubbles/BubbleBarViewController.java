@@ -400,7 +400,7 @@ public class BubbleBarViewController {
         addedBubble.getView().setOnClickListener(mBubbleClickListener);
         mBubbleDragController.setupBubbleView(addedBubble.getView());
         if (!suppressAnimation) {
-            animateBubbleNotification(addedBubble, isExpanding);
+            animateBubbleNotification(addedBubble, isExpanding, /* isUpdate= */ true);
         }
     }
 
@@ -428,18 +428,19 @@ public class BubbleBarViewController {
                 }
                 return;
             }
-            animateBubbleNotification(bubble, isExpanding);
+            animateBubbleNotification(bubble, isExpanding, /* isUpdate= */ true);
         } else {
             Log.w(TAG, "addBubble, bubble was null!");
         }
     }
 
     /** Animates the bubble bar to notify the user about a bubble change. */
-    public void animateBubbleNotification(BubbleBarBubble bubble, boolean isExpanding) {
+    public void animateBubbleNotification(BubbleBarBubble bubble, boolean isExpanding,
+            boolean isUpdate) {
         boolean isInApp = mTaskbarStashController.isInApp();
         // if this is the first bubble, animate to the initial state. one bubble is the overflow
         // so check for at most 2 children.
-        if (mBarView.getChildCount() <= 2) {
+        if (mBarView.getChildCount() <= 2 && !isUpdate) {
             mBubbleBarViewAnimator.animateToInitialState(bubble, isInApp, isExpanding);
             return;
         }
