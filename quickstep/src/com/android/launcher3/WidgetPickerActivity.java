@@ -20,6 +20,7 @@ import static android.content.ClipDescription.MIMETYPE_TEXT_INTENT;
 import static android.view.WindowInsets.Type.navigationBars;
 import static android.view.WindowInsets.Type.statusBars;
 
+import static com.android.launcher3.Flags.enablePredictiveBackGesture;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
@@ -33,6 +34,9 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.window.BackEvent;
+import android.window.OnBackAnimationCallback;
+import android.window.OnBackInvokedDispatcher;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -44,7 +48,6 @@ import com.android.launcher3.model.WidgetsModel;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.popup.PopupDataProvider;
 import com.android.launcher3.util.ComponentKey;
-import com.android.launcher3.widget.BaseWidgetSheet;
 import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.model.WidgetsListContentEntry;
@@ -81,6 +84,15 @@ public class WidgetPickerActivity extends BaseActivity {
      */
     private static final String EXTRA_ADDED_APP_WIDGETS = "added_app_widgets";
     /**
+     * Intent extra for the string representing the title displayed within the picker header.
+     */
+    private static final String EXTRA_PICKER_TITLE = "picker_title";
+    /**
+     * Intent extra for the string representing the description displayed within the picker header.
+     */
+    private static final String EXTRA_PICKER_DESCRIPTION = "picker_description";
+
+    /**
      * A unique identifier of the surface hosting the widgets;
      * <p>"widgets" is reserved for home screen surface.</p>
      * <p>"widgets_hub" is reserved for glanceable hub surface.</p>
@@ -108,10 +120,16 @@ public class WidgetPickerActivity extends BaseActivity {
     // Widgets existing on the host surface.
     @NonNull
     private List<AppWidgetProviderInfo> mAddedWidgets = new ArrayList<>();
+    @Nullable
+    private String mTitle;
+    @Nullable
+    private String mDescription;
 
     /** A set of user ids that should be filtered out from the selected widgets. */
     @NonNull
     Set<Integer> mFilteredUserIds = new HashSet<>();
+    @Nullable
+    private WidgetsFullSheet mWidgetSheet;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -136,7 +154,22 @@ public class WidgetPickerActivity extends BaseActivity {
         refreshAndBindWidgets();
     }
 
+    @Override
+    protected void registerBackDispatcher() {
+        if (!enablePredictiveBackGesture()) {
+            super.registerBackDispatcher();
+            return;
+        }
+
+        getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                new BackAnimationCallback());
+    }
+
     private void parseIntentExtras() {
+        mTitle = getIntent().getStringExtra(EXTRA_PICKER_TITLE);
+        mDescription = getIntent().getStringExtra(EXTRA_PICKER_DESCRIPTION);
+
         // A value of 0 for either size means that no filtering will occur in that dimension. If
         // both values are 0, then no size filtering will occur.
         mDesiredWidgetWidth =
@@ -241,7 +274,7 @@ public class WidgetPickerActivity extends BaseActivity {
     /** Updates the model with widgets, applies filters and launches the widgets sheet once
      * widgets are available */
     private void refreshAndBindWidgets() {
-        MODEL_EXECUTOR.getHandler().postDelayed(() -> {
+        MODEL_EXECUTOR.execute(() -> {
             LauncherAppState app = LauncherAppState.getInstance(this);
             mModel.update(app, null);
             final List<WidgetsListBaseEntry> allWidgets =
@@ -271,18 +304,19 @@ public class WidgetPickerActivity extends BaseActivity {
                         mUiSurface, allWidgetItems);
                 mWidgetPredictionsRequester.request(mAddedWidgets, this::bindRecommendedWidgets);
             }
-        }, mDeviceProfile.bottomSheetOpenDuration);
+        });
     }
 
     private void bindWidgets(List<WidgetsListBaseEntry> widgets) {
         MAIN_EXECUTOR.execute(() -> mPopupDataProvider.setAllWidgets(widgets));
     }
 
-    private void openWidgetsSheet() {
+   private void openWidgetsSheet() {
         MAIN_EXECUTOR.execute(() -> {
-            BaseWidgetSheet widgetSheet = WidgetsFullSheet.show(this, true);
-            widgetSheet.disableNavBarScrim(true);
-            widgetSheet.addOnCloseListener(this::finish);
+            mWidgetSheet = WidgetsFullSheet.show(this, true);
+            mWidgetSheet.mayUpdateTitleAndDescription(mTitle, mDescription);
+            mWidgetSheet.disableNavBarScrim(true);
+            mWidgetSheet.addOnCloseListener(this::finish);
         });
     }
 
@@ -300,6 +334,51 @@ public class WidgetPickerActivity extends BaseActivity {
             mWidgetPredictionsRequester.clear();
         }
     }
+
+    /**
+     * Animation callback for different predictive back animation states for the widget picker.
+     */
+    private class BackAnimationCallback implements OnBackAnimationCallback {
+        @Nullable
+        OnBackAnimationCallback mActiveOnBackAnimationCallback;
+
+        @Override
+        public void onBackStarted(@NonNull BackEvent backEvent) {
+            if (mActiveOnBackAnimationCallback != null) {
+                mActiveOnBackAnimationCallback.onBackCancelled();
+            }
+            if (mWidgetSheet != null) {
+                mActiveOnBackAnimationCallback = mWidgetSheet;
+                mActiveOnBackAnimationCallback.onBackStarted(backEvent);
+            }
+        }
+
+        @Override
+        public void onBackInvoked() {
+            if (mActiveOnBackAnimationCallback == null) {
+                return;
+            }
+            mActiveOnBackAnimationCallback.onBackInvoked();
+            mActiveOnBackAnimationCallback = null;
+        }
+
+        @Override
+        public void onBackProgressed(@NonNull BackEvent backEvent) {
+            if (mActiveOnBackAnimationCallback == null) {
+                return;
+            }
+            mActiveOnBackAnimationCallback.onBackProgressed(backEvent);
+        }
+
+        @Override
+        public void onBackCancelled() {
+            if (mActiveOnBackAnimationCallback == null) {
+                return;
+            }
+            mActiveOnBackAnimationCallback.onBackCancelled();
+            mActiveOnBackAnimationCallback = null;
+        }
+    };
 
     private WidgetAcceptabilityVerdict isWidgetAcceptable(WidgetItem widget) {
         final AppWidgetProviderInfo info = widget.widgetInfo;

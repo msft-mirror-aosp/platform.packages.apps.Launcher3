@@ -113,8 +113,6 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
 
     @Test
     @PortraitLandscape
-    @ScreenRecordRule.ScreenRecord // b/329935119
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/329935119
     public void testSinglePageDragIconWhenMultiplePageScrollingIsPossible() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -169,6 +167,7 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
 
     @Test
     @PortraitLandscape
+    @ScreenRecordRule.ScreenRecord // b/352130094
     public void testDragIconToPage2() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -352,11 +351,8 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
     }
 
     private void assertPagesExist(Launcher launcher, int... pageIds) {
-        waitForLauncherCondition("Existing page count does NOT match. "
-                + "Expected: " + pageIds.length
-                + ". Actual: " + launcher.getWorkspace().getPageCount(),
-                l -> pageIds.length == l.getWorkspace().getPageCount());
         int pageCount = launcher.getWorkspace().getPageCount();
+        assertEquals("Existing page count does NOT match.", pageIds.length, pageCount);
         for (int i = 0; i < pageCount; i++) {
             CellLayout page = (CellLayout) launcher.getWorkspace().getPageAt(i);
             int pageId = launcher.getWorkspace().getCellLayoutId(page);
