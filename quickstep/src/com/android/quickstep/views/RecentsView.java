@@ -461,7 +461,9 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     private static final float FOREGROUND_SCRIM_TINT = 0.32f;
 
+    @Nullable
     public final RecentsViewData mRecentsViewData = new RecentsViewData();
+    @Nullable
     public final TasksRepository mTasksRepository;
 
     protected final RecentsOrientedState mOrientationState;
@@ -1824,7 +1826,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
             // If we need to remove half of a pair of tasks, force a TaskView with Type.SINGLE
             // to be a temporary container for the remaining task.
             TaskView taskView = getTaskViewFromPool(
-                    isRemovalNeeded ? TaskView.Type.SINGLE : groupTask.taskViewType);
+                    isRemovalNeeded ? TaskViewType.SINGLE : groupTask.taskViewType);
             if (taskView instanceof GroupedTaskView) {
                 boolean firstTaskIsLeftTopTask =
                         groupTask.mSplitBounds.leftTopTaskId == groupTask.task1.key.id;
@@ -2600,16 +2602,16 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      * Handle the edge case where Recents could increment task count very high over long
      * period of device usage. Probably will never happen, but meh.
      */
-    private TaskView getTaskViewFromPool(@TaskView.Type int type) {
+    private TaskView getTaskViewFromPool(TaskViewType type) {
         TaskView taskView;
         switch (type) {
-            case TaskView.Type.GROUPED:
+            case GROUPED:
                 taskView = mGroupedTaskViewPool.getView();
                 break;
-            case TaskView.Type.DESKTOP:
+            case DESKTOP:
                 taskView = mDesktopTaskViewPool.getView();
                 break;
-            case TaskView.Type.SINGLE:
+            case SINGLE:
             default:
                 taskView = mTaskViewPool.getView();
         }
@@ -2840,12 +2842,12 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
             // Add an empty view for now until the task plan is loaded and applied
             final TaskView taskView;
             if (needDesktopTask) {
-                taskView = getTaskViewFromPool(TaskView.Type.DESKTOP);
+                taskView = getTaskViewFromPool(TaskViewType.DESKTOP);
                 mTmpRunningTasks = Arrays.copyOf(runningTasks, runningTasks.length);
                 ((DesktopTaskView) taskView).bind(Arrays.asList(mTmpRunningTasks),
                         mOrientationState, mTaskOverlayFactory);
             } else if (needGroupTaskView) {
-                taskView = getTaskViewFromPool(TaskView.Type.GROUPED);
+                taskView = getTaskViewFromPool(TaskViewType.GROUPED);
                 mTmpRunningTasks = new Task[]{runningTasks[0], runningTasks[1]};
                 // When we create a placeholder task view mSplitBoundsConfig will be null, but with
                 // the actual app running we won't need to show the thumbnail until all the tasks
@@ -2853,7 +2855,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 ((GroupedTaskView)taskView).bind(mTmpRunningTasks[0], mTmpRunningTasks[1],
                         mOrientationState, mTaskOverlayFactory, mSplitBoundsConfig);
             } else {
-                taskView = getTaskViewFromPool(TaskView.Type.SINGLE);
+                taskView = getTaskViewFromPool(TaskViewType.SINGLE);
                 // The temporary running task is only used for the duration between the start of the
                 // gesture and the task list is loaded and applied
                 mTmpRunningTasks = new Task[]{runningTasks[0]};
@@ -3814,7 +3816,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                     anim.setFloat(taskView, taskView.getSecondaryDismissTranslationProperty(),
                             secondaryTranslation, clampToProgress(LINEAR, animationStartProgress,
                                     dismissTranslationInterpolationEnd));
-                    anim.setFloat(taskView, TaskView.SCALE_AND_DIM_OUT, 0f,
+                    anim.add(taskView.getFocusTransitionScaleAndDimOutAnimator(),
                             clampToProgress(LINEAR, 0f, ANIMATION_DISMISS_PROGRESS_MIDPOINT));
                 } else {
                     float primaryTranslation =

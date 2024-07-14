@@ -191,7 +191,6 @@ class DesktopSystemShortcutTest {
         return TaskContainer(
             taskView,
             task,
-            thumbnailView = null,
             thumbnailViewDeprecated,
             iconView,
             transformingTouchDelegate,
