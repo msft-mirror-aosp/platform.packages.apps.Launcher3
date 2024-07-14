@@ -87,7 +87,7 @@ class SplitAnimationControllerTest {
     @Before
     fun setup() {
         whenever(mockTaskContainer.snapshotView).thenReturn(mockSnapshotView)
-        whenever(mockTaskContainer.thumbnail).thenReturn(mockBitmap)
+        whenever(mockTaskContainer.splitAnimationThumbnail).thenReturn(mockBitmap)
         whenever(mockTaskContainer.iconView).thenReturn(mockIconView)
         whenever(mockIconView.drawable).thenReturn(mockTaskViewDrawable)
         whenever(mockTaskView.taskContainers).thenReturn(List(1) { mockTaskContainer })
@@ -276,7 +276,7 @@ class SplitAnimationControllerTest {
         whenever(mockAppPairIcon.context).thenReturn(mockContextThemeWrapper)
         doNothing()
             .whenever(spySplitAnimationController)
-            .composeIconSplitLaunchAnimator(any(), any(), any(), any())
+            .composeIconSplitLaunchAnimator(any(), any(), any(), any(), any())
         doReturn(-1).whenever(spySplitAnimationController).hasChangesForBothAppPairs(any(), any())
 
         spySplitAnimationController.playSplitLaunchAnimation(
@@ -296,7 +296,7 @@ class SplitAnimationControllerTest {
         )
 
         verify(spySplitAnimationController)
-            .composeIconSplitLaunchAnimator(any(), any(), any(), any())
+            .composeIconSplitLaunchAnimator(any(), any(), any(), any(), any())
     }
 
     @Test
