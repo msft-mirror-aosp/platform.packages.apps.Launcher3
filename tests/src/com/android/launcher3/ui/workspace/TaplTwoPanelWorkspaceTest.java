@@ -113,8 +113,6 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
 
     @Test
     @PortraitLandscape
-    @ScreenRecordRule.ScreenRecord // b/329935119
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/329935119
     public void testSinglePageDragIconWhenMultiplePageScrollingIsPossible() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -169,6 +167,7 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
 
     @Test
     @PortraitLandscape
+    @ScreenRecordRule.ScreenRecord // b/352130094
     public void testDragIconToPage2() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -247,7 +246,6 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
     }
 
     @ScreenRecordRule.ScreenRecord // b/329935119
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/329935119
     @Test
     @PortraitLandscape
     public void testEmptyPageDoesNotGetRemovedIfPagePairIsNotEmpty() {

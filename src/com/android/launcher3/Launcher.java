@@ -38,6 +38,7 @@ import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_BIND
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_BIND_PENDING_APPWIDGET;
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_CREATE_APPWIDGET;
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_CREATE_SHORTCUT;
+import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_HOME_ROLE;
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_PICK_APPWIDGET;
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_RECONFIGURE_APPWIDGET;
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE;
@@ -151,6 +152,7 @@ import android.view.WindowInsetsAnimation;
 import android.view.WindowManager.LayoutParams;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.animation.OvershootInterpolator;
+import android.widget.Toast;
 import android.window.BackEvent;
 import android.window.OnBackAnimationCallback;
 
@@ -178,6 +180,8 @@ import com.android.launcher3.celllayout.CellPosMapper.CellPos;
 import com.android.launcher3.celllayout.CellPosMapper.TwoPanelCellPosMapper;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.debug.TestEvent;
+import com.android.launcher3.debug.TestEventEmitter;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.dragndrop.DragController;
 import com.android.launcher3.dragndrop.DragLayer;
@@ -309,7 +313,7 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     private static boolean sIsNewProcess = true;
 
-    private StateManager<LauncherState> mStateManager;
+    private StateManager<LauncherState, Launcher> mStateManager;
 
     private static final int ON_ACTIVITY_RESULT_ANIMATION_DELAY = 500;
 
@@ -592,6 +596,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             RuleController.getInstance(this).setRules(
                     RuleController.parseRules(this, R.xml.split_configuration));
         }
+        TestEventEmitter.INSTANCE.get(this).sendEvent(TestEvent.LAUNCHER_ON_CREATE);
     }
 
     protected ModelCallbacks createModelCallbacks() {
@@ -768,6 +773,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             // initialized properly.
             onSaveInstanceState(new Bundle());
             mModel.rebindCallbacks();
+            updateDisallowBack();
         } finally {
             Trace.endSection();
         }
@@ -890,6 +896,17 @@ public class Launcher extends StatefulActivity<LauncherState>
             return;
         }
         mPendingActivityResult = null;
+
+        if (requestCode == REQUEST_HOME_ROLE) {
+            if (resultCode != RESULT_OK) {
+                Toast.makeText(
+                        this,
+                        this.getString(R.string.set_default_home_app,
+                                this.getString(R.string.derived_app_name)),
+                        Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
 
         // Reset the startActivity waiting flag
         final PendingRequestArgs requestArgs = mPendingRequestArgs;
@@ -2761,7 +2778,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
-    protected void collectStateHandlers(List<StateHandler> out) {
+     public void collectStateHandlers(List<StateHandler<LauncherState>> out) {
         out.add(getAllAppsController());
         out.add(getWorkspace());
     }
@@ -2783,8 +2800,11 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     private void updateDisallowBack() {
-        if (BuildCompat.isAtLeastV() && Flags.enableDesktopWindowingMode()) {
-            // TODO(b/330183377) disable back in launcher when when we productionize
+        if (BuildCompat.isAtLeastV()
+                && Flags.enableDesktopWindowingMode()
+                && !Flags.enableDesktopWindowingWallpaperActivity()
+                && mDeviceProfile.isTablet) {
+            // TODO(b/333533253): Clean up after desktop wallpaper activity flag is rolled out
             return;
         }
         LauncherRootView rv = getRootView();
@@ -2981,7 +3001,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
-    public StateManager<LauncherState> getStateManager() {
+    public StateManager<LauncherState, Launcher> getStateManager() {
         return mStateManager;
     }
 

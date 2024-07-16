@@ -75,7 +75,7 @@ public class UserCache implements SafeCloseable {
 
     private final List<BiConsumer<UserHandle, String>> mUserEventListeners = new ArrayList<>();
     private final SimpleBroadcastReceiver mUserChangeReceiver =
-            new SimpleBroadcastReceiver(this::onUsersChanged);
+            new SimpleBroadcastReceiver(MODEL_EXECUTOR, this::onUsersChanged);
 
     private final Context mContext;
 
