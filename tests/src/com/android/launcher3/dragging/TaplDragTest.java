@@ -174,13 +174,13 @@ public class TaplDragTest extends AbstractLauncherUiTest<Launcher> {
     public void testDragAndCancelAppIcon() {
         final HomeAppIcon homeAppIcon = createShortcutInCenterIfNotExist(GMAIL_APP_NAME);
         Point positionBeforeDrag =
-                mLauncher.getWorkspace().getWorkspaceIconsPositions().get(GMAIL_APP_NAME);
+                mLauncher.getWorkspace().getWorkspaceIconPosition(GMAIL_APP_NAME);
         assertNotNull("App not found in Workspace before dragging.", positionBeforeDrag);
 
         mLauncher.getWorkspace().dragAndCancelAppIcon(homeAppIcon);
 
         Point positionAfterDrag =
-                mLauncher.getWorkspace().getWorkspaceIconsPositions().get(GMAIL_APP_NAME);
+                mLauncher.getWorkspace().getWorkspaceIconPosition(GMAIL_APP_NAME);
         assertNotNull("App not found in Workspace after dragging.", positionAfterDrag);
         assertEquals("App not returned to same position in Workspace after drag & cancel",
                 positionBeforeDrag, positionAfterDrag);

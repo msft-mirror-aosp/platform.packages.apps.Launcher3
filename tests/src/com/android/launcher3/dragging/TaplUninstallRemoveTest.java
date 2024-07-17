@@ -46,7 +46,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Map;
 
 /**
  * Test runs in Out of process (Oop) and In process (Ipc)
@@ -155,18 +154,14 @@ public class TaplUninstallRemoveTest extends AbstractLauncherUiTest<Launcher> {
                 createShortcutIfNotExist(appNames[i], gridPositions[i]);
             }
 
-            Map<String, Point> initialPositions =
-                    mLauncher.getWorkspace().getWorkspaceIconsPositions();
-            assertThat(initialPositions.keySet()).containsAtLeastElementsIn(appNames);
+            Point initialPosition =
+                    mLauncher.getWorkspace().getWorkspaceIconPosition(DUMMY_APP_NAME);
+            assertThat(initialPosition).isNotNull();
 
             final Workspace workspace = mLauncher.getWorkspace().getWorkspaceAppIcon(
                     DUMMY_APP_NAME).uninstall();
             workspace.verifyWorkspaceAppIconIsGone(
                     DUMMY_APP_NAME + " was expected to disappear after uninstall.", DUMMY_APP_NAME);
-
-            Log.d(UIOBJECT_STALE_ELEMENT, "second getWorkspaceIconsPositions()");
-            Map<String, Point> finalPositions = workspace.getWorkspaceIconsPositions();
-            assertThat(finalPositions).doesNotContainKey(DUMMY_APP_NAME);
         } finally {
             TestUtil.uninstallDummyApp();
         }

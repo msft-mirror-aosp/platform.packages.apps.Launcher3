@@ -229,6 +229,17 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     }
 
     @Override
+    public void onImeSwitcherLongPress() {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.onImeSwitcherLongPress();
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call onImeSwitcherLongPress");
+            }
+        }
+    }
+
+    @Override
     public void setHomeRotationEnabled(boolean enabled) {
         if (mSystemUiProxy != null) {
             try {
@@ -831,12 +842,14 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
 
     /**
      * Tells SysUI to dismiss the bubble with the provided key.
+     *
      * @param key the key of the bubble to dismiss.
+     * @param timestamp the timestamp when the removal happened.
      */
-    public void dragBubbleToDismiss(String key) {
+    public void dragBubbleToDismiss(String key, long timestamp) {
         if (mBubbles == null) return;
         try {
-            mBubbles.dragBubbleToDismiss(key);
+            mBubbles.dragBubbleToDismiss(key, timestamp);
         } catch (RemoteException e) {
             Log.w(TAG, "Failed call dragBubbleToDismiss");
         }
