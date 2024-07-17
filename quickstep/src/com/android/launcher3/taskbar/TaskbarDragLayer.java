@@ -104,7 +104,6 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
         mTaskbarBackgroundAlpha = new MultiPropertyFactory<>(this, BG_ALPHA, INDEX_COUNT,
                 (a, b) -> a * b, 1f);
         mTaskbarBackgroundAlpha.get(INDEX_ALL_OTHER_STATES).setValue(0);
-        mTaskbarBackgroundAlpha.get(INDEX_STASH_ANIM).setValue(1);
     }
 
     public void init(TaskbarDragLayerController.TaskbarDragLayerCallbacks callbacks) {

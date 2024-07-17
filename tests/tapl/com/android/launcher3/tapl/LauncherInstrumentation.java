@@ -2459,7 +2459,8 @@ public final class LauncherInstrumentation {
     }
 
     float getWindowCornerRadius() {
-        // TODO(b/197326121): Check if the touch is overlapping with the corners by offsetting
+        // Return a larger corner radius to ensure gesture calculated from the radius are offset to
+        // prevent overlapping
         final float tmpBuffer = 100f;
         final Resources resources = getResources();
         if (!supportsRoundedCornersOnWindows(resources)) {

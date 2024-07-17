@@ -46,6 +46,7 @@ import android.view.View;
 import android.view.animation.Interpolator;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.view.OneShotPreDrawListener;
 
 import com.android.app.animation.Interpolators;
@@ -63,6 +64,7 @@ import com.android.launcher3.anim.RevealOutlineAnimation;
 import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.TaskItemInfo;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
@@ -70,6 +72,8 @@ import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiTranslateDelegate;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.launcher3.views.IconButtonView;
+import com.android.quickstep.util.GroupTask;
+import com.android.systemui.shared.recents.model.Task;
 
 import java.io.PrintWriter;
 import java.util.Set;
@@ -92,6 +96,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     public static final int ALPHA_INDEX_ASSISTANT_INVOKED = 5;
     public static final int ALPHA_INDEX_SMALL_SCREEN = 6;
     private static final int NUM_ALPHA_CHANNELS = 7;
+
+    private static boolean sEnableModelLoadingForTests = true;
 
     private final TaskbarActivityContext mActivity;
     private final TaskbarView mTaskbarView;
@@ -189,7 +195,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mTaskbarIconTranslationXForPinning.updateValue(pinningValue);
 
         mModelCallbacks.init(controllers);
-        if (mActivity.isUserSetupComplete()) {
+        if (mActivity.isUserSetupComplete() && sEnableModelLoadingForTests) {
             // Only load the callbacks if user setup is completed
             LauncherAppState.getInstance(mActivity).getModel().addCallbacksAndLoad(mModelCallbacks);
         }
@@ -224,7 +230,6 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         }
         LauncherAppState.getInstance(mActivity).getModel().removeCallbacks(mModelCallbacks);
         mActivity.removeOnDeviceProfileChangeListener(mDeviceProfileChangeListener);
-        mModelCallbacks.unregisterListeners();
     }
 
     public boolean areIconsVisible() {
@@ -347,6 +352,11 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         float allAppIconTranslateRange = mapRange(scale, transientTaskbarAllAppsOffset,
                 persistentTaskbarAllAppsOffset);
 
+        // no x translation required when all apps button is the only icon in taskbar.
+        if (iconViews.length <= 1) {
+            allAppIconTranslateRange = 0f;
+        }
+
         if (mIsRtl) {
             allAppIconTranslateRange *= -1;
         }
@@ -377,7 +387,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                         -finalMarginScale * (iconIndex - halfIconCount));
             }
 
-            if (iconView.equals(mTaskbarView.getAllAppsButtonView()) && iconViews.length > 1) {
+            if (iconView.equals(mTaskbarView.getAllAppsButtonView())) {
                 ((IconButtonView) iconView).setTranslationXForTaskbarAllAppsIcon(
                         allAppIconTranslateRange);
             }
@@ -509,27 +519,40 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         return mTaskbarView.getTaskbarDividerView();
     }
 
-    /** Updates which icons are marked as running given the Set of currently running packages. */
-    public void updateIconViewsRunningStates(Set<String> runningPackages,
-            Set<String> minimizedPackages) {
+    /**
+     * Updates which icons are marked as running or minimized given the Sets of currently running
+     * and minimized tasks.
+     */
+    public void updateIconViewsRunningStates(Set<Integer> runningTaskIds,
+            Set<Integer> minimizedTaskIds) {
         for (View iconView : getIconViews()) {
             if (iconView instanceof BubbleTextView btv) {
                 btv.updateRunningState(
-                        getRunningAppState(btv.getTargetPackageName(), runningPackages,
-                                minimizedPackages));
+                        getRunningAppState(btv, runningTaskIds, minimizedTaskIds));
             }
         }
     }
 
     private BubbleTextView.RunningAppState getRunningAppState(
-            String packageName,
-            Set<String> runningPackages,
-            Set<String> minimizedPackages) {
-        if (minimizedPackages.contains(packageName)) {
-            return BubbleTextView.RunningAppState.MINIMIZED;
+            BubbleTextView btv,
+            Set<Integer> runningTaskIds,
+            Set<Integer> minimizedTaskIds) {
+        Object tag = btv.getTag();
+        if (tag instanceof TaskItemInfo itemInfo) {
+            if (minimizedTaskIds.contains(itemInfo.getTaskId())) {
+                return BubbleTextView.RunningAppState.MINIMIZED;
+            }
+            if (runningTaskIds.contains(itemInfo.getTaskId())) {
+                return BubbleTextView.RunningAppState.RUNNING;
+            }
         }
-        if (runningPackages.contains(packageName)) {
-            return BubbleTextView.RunningAppState.RUNNING;
+        if (tag instanceof GroupTask groupTask && !groupTask.hasMultipleTasks()) {
+            if (minimizedTaskIds.contains(groupTask.task1.key.id)) {
+                return BubbleTextView.RunningAppState.MINIMIZED;
+            }
+            if (runningTaskIds.contains(groupTask.task1.key.id)) {
+                return BubbleTextView.RunningAppState.RUNNING;
+            }
         }
         return BubbleTextView.RunningAppState.NOT_RUNNING;
     }
@@ -864,6 +887,27 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         return mTaskbarView.isEventOverAnyItem(ev);
     }
 
+    /** Called when there's a change in running apps to update the UI. */
+    public void commitRunningAppsToUI() {
+        mModelCallbacks.commitRunningAppsToUI();
+    }
+
+    /**
+     * To be called when the given Task is updated, so that we can tell TaskbarView to also update.
+     * @param task The Task whose e.g. icon changed.
+     */
+    public void onTaskUpdated(Task task) {
+        // Find the icon view(s) that changed.
+        for (View view : mTaskbarView.getIconViews()) {
+            if (view instanceof BubbleTextView btv
+                    && view.getTag() instanceof GroupTask groupTask) {
+                if (groupTask.containsTask(task.key.id)) {
+                    mTaskbarView.applyGroupTaskToBubbleTextView(btv, groupTask);
+                }
+            }
+        }
+    }
+
     @Override
     public void dumpLogs(String prefix, PrintWriter pw) {
         pw.println(prefix + "TaskbarViewController:");
@@ -884,14 +928,9 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mModelCallbacks.dumpLogs(prefix + "\t", pw);
     }
 
-    /** Called when there's a change in running apps to update the UI. */
-    public void commitRunningAppsToUI() {
-        mModelCallbacks.commitRunningAppsToUI();
+    /** Enables model loading for tests. */
+    @VisibleForTesting
+    public static void enableModelLoadingForTests(boolean enable) {
+        sEnableModelLoadingForTests = enable;
     }
-
-    /** Call TaskbarModelCallbacks to update running apps. */
-    public void updateRunningApps() {
-        mModelCallbacks.updateRunningApps();
-    }
-
 }
