@@ -54,6 +54,7 @@ import android.window.TransitionFilter;
 
 import androidx.annotation.MainThread;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.annotation.WorkerThread;
 
 import com.android.internal.logging.InstanceId;
@@ -187,7 +188,8 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     @Nullable
     private final ProxyUnfoldTransitionProvider mUnfoldTransitionProvider;
 
-    private SystemUiProxy(Context context) {
+    @VisibleForTesting
+    protected SystemUiProxy(Context context) {
         mContext = context;
         mAsyncHandler = new Handler(UI_HELPER_EXECUTOR.getLooper(), this::handleMessageAsync);
         final Intent baseIntent = new Intent().setPackage(mContext.getPackageName());
