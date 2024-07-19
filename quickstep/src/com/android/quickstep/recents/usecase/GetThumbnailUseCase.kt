@@ -14,20 +14,17 @@
  * limitations under the License.
  */
 
-package com.android.quickstep.task.thumbnail
+package com.android.quickstep.recents.usecase
 
 import android.graphics.Bitmap
-import androidx.annotation.ColorInt
+import com.android.quickstep.recents.data.RecentTasksRepository
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.runBlocking
 
-sealed class TaskThumbnailUiState {
-    data object Uninitialized : TaskThumbnailUiState()
-
-    data object LiveTile : TaskThumbnailUiState()
-
-    data class BackgroundOnly(@ColorInt val backgroundColor: Int) : TaskThumbnailUiState()
-
-    data class Snapshot(val bitmap: Bitmap, @ColorInt val backgroundColor: Int) :
-        TaskThumbnailUiState()
+/** Use case for retrieving thumbnail. */
+class GetThumbnailUseCase(private val taskRepository: RecentTasksRepository) {
+    /** Returns the latest thumbnail associated with [taskId] if loaded, or null otherwise */
+    fun run(taskId: Int): Bitmap? = runBlocking {
+        taskRepository.getThumbnailById(taskId).firstOrNull()?.thumbnail
+    }
 }
-
-data class TaskThumbnail(val taskId: Int, val isRunning: Boolean)
