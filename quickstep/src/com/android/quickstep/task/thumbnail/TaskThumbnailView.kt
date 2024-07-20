@@ -31,14 +31,14 @@ import androidx.core.view.isVisible
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.util.ViewPool
+import com.android.quickstep.recents.di.RecentsDependencies
+import com.android.quickstep.recents.di.inject
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
+import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
 import com.android.quickstep.util.TaskCornerRadius
-import com.android.quickstep.views.RecentsView
-import com.android.quickstep.views.RecentsViewContainer
-import com.android.quickstep.views.TaskView
 import com.android.systemui.shared.system.QuickStepContract
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -49,26 +49,16 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
 class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
-    // TODO(b/335649589): Ideally create and obtain this from DI. This ViewModel should be scoped
-    //  to [TaskView], and also shared between [TaskView] and [TaskThumbnailView]
-    //  This is using a lazy for now because the dependencies cannot be obtained without DI.
-    val viewModel by lazy {
-        val recentsView =
-            RecentsViewContainer.containerFromContext<RecentsViewContainer>(context)
-                .getOverviewPanel<RecentsView<*, *>>()
-        TaskThumbnailViewModel(
-            recentsView.mRecentsViewData!!,
-            (parent as TaskView).taskViewData,
-            (parent as TaskView).getTaskContainerForTaskThumbnailView(this)!!.taskContainerData,
-            recentsView.mTasksRepository!!,
-        )
-    }
+
+    private val viewModel: TaskThumbnailViewModel by RecentsDependencies.inject(this)
+
     private lateinit var viewAttachedScope: CoroutineScope
 
     private val scrimView: View by lazy { findViewById(R.id.task_thumbnail_scrim) }
     private val liveTileView: LiveTileView by lazy { findViewById(R.id.task_thumbnail_live_tile) }
-    private val thumbnail: ImageView by lazy { findViewById(R.id.task_thumbnail) }
+    private val thumbnailView: ImageView by lazy { findViewById(R.id.task_thumbnail) }
 
+    private var uiState: TaskThumbnailUiState = Uninitialized
     private var inheritedScale: Float = 1f
 
     private val _measuredBounds = Rect()
@@ -97,6 +87,7 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
             CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("TaskThumbnailView"))
         viewModel.uiState
             .onEach { viewModelUiState ->
+                uiState = viewModelUiState
                 resetViews()
                 when (viewModelUiState) {
                     is Uninitialized -> {}
@@ -135,7 +126,14 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
     }
 
     override fun onRecycle() {
-        // Do nothing
+        uiState = Uninitialized
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (uiState is Snapshot) {
+            setImageMatrix()
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -148,7 +146,7 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
 
     private fun resetViews() {
         liveTileView.isVisible = false
-        thumbnail.isVisible = false
+        thumbnailView.isVisible = false
         scrimView.alpha = 0f
         setBackgroundColor(Color.BLACK)
     }
@@ -163,8 +161,13 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
 
     private fun drawSnapshot(snapshot: Snapshot) {
         drawBackground(snapshot.backgroundColor)
-        thumbnail.setImageBitmap(snapshot.bitmap)
-        thumbnail.isVisible = true
+        thumbnailView.setImageBitmap(snapshot.bitmap)
+        thumbnailView.isVisible = true
+        setImageMatrix()
+    }
+
+    private fun setImageMatrix() {
+        thumbnailView.imageMatrix = viewModel.getThumbnailPositionState(width, height, isLayoutRtl)
     }
 
     private fun getCurrentCornerRadius() =
