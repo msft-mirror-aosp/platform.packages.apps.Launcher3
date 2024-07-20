@@ -229,6 +229,17 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     }
 
     @Override
+    public void onImeSwitcherLongPress() {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.onImeSwitcherLongPress();
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call onImeSwitcherLongPress");
+            }
+        }
+    }
+
+    @Override
     public void setHomeRotationEnabled(boolean enabled) {
         if (mSystemUiProxy != null) {
             try {
@@ -831,12 +842,14 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
 
     /**
      * Tells SysUI to dismiss the bubble with the provided key.
+     *
      * @param key the key of the bubble to dismiss.
+     * @param timestamp the timestamp when the removal happened.
      */
-    public void dragBubbleToDismiss(String key) {
+    public void dragBubbleToDismiss(String key, long timestamp) {
         if (mBubbles == null) return;
         try {
-            mBubbles.dragBubbleToDismiss(key);
+            mBubbles.dragBubbleToDismiss(key, timestamp);
         } catch (RemoteException e) {
             Log.w(TAG, "Failed call dragBubbleToDismiss");
         }
@@ -1381,10 +1394,26 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         }
     }
 
-    public ArrayList<GroupedRecentTaskInfo> getRecentTasks(int numTasks, int userId) {
+    public static class GetRecentTasksException extends Exception {
+        public GetRecentTasksException(String message) {
+            super(message);
+        }
+
+        public GetRecentTasksException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    /**
+     * Retrieves a list of Recent tasks from ActivityManager.
+     * @throws GetRecentTasksException if IRecentTasks is not initialized, or when we get
+     * RemoteException from server side
+     */
+    public ArrayList<GroupedRecentTaskInfo> getRecentTasks(int numTasks, int userId)
+            throws GetRecentTasksException {
         if (mRecentTasks == null) {
-            Log.w(TAG, "getRecentTasks() failed due to null mRecentTasks");
-            return new ArrayList<>();
+            Log.e(TAG, "getRecentTasks() failed due to null mRecentTasks");
+            throw new GetRecentTasksException("null mRecentTasks");
         }
         try {
             final GroupedRecentTaskInfo[] rawTasks = mRecentTasks.getRecentTasks(numTasks,
@@ -1394,8 +1423,8 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
             }
             return new ArrayList<>(Arrays.asList(rawTasks));
         } catch (RemoteException e) {
-            Log.w(TAG, "Failed call getRecentTasks", e);
-            return new ArrayList<>();
+            Log.e(TAG, "Failed call getRecentTasks", e);
+            throw new GetRecentTasksException("Failed call getRecentTasks", e);
         }
     }
 
