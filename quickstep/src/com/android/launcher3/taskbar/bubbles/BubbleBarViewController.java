@@ -31,6 +31,7 @@ import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
@@ -62,6 +63,7 @@ public class BubbleBarViewController {
     private final TaskbarActivityContext mActivity;
     private final BubbleBarView mBarView;
     private int mIconSize;
+    private int mBubbleBarPadding;
 
     // Initialized in init.
     private BubbleStashController mBubbleStashController;
@@ -110,13 +112,12 @@ public class BubbleBarViewController {
         mTaskbarStashController = controllers.taskbarStashController;
         mTaskbarInsetsController = controllers.taskbarInsetsController;
         mBubbleBarViewAnimator = new BubbleBarViewAnimator(mBarView, mBubbleStashController);
-
+        onBubbleBarConfigurationChanged(/* animate= */ false);
         mActivity.addOnDeviceProfileChangeListener(
-                dp -> updateBubbleBarIconSize(dp.taskbarIconSize, /* animate= */ true));
-        updateBubbleBarIconSize(mActivity.getDeviceProfile().taskbarIconSize, /* animate= */ false);
+                dp -> onBubbleBarConfigurationChanged(/* animate= */ true));
         mBubbleBarScale.updateValue(1f);
-        mBubbleClickListener = v -> onBubbleClicked(v);
-        mBubbleBarClickListener = v -> onBubbleBarClicked();
+        mBubbleClickListener = v -> onBubbleClicked((BubbleView) v);
+        mBubbleBarClickListener = v -> expandBubbleBar();
         mBubbleDragController.setupBubbleBarView(mBarView);
         mBarView.setOnClickListener(mBubbleBarClickListener);
         mBarView.addOnLayoutChangeListener(
@@ -136,11 +137,27 @@ public class BubbleBarViewController {
             public void onBubbleBarTouchedWhileAnimating() {
                 BubbleBarViewController.this.onBubbleBarTouchedWhileAnimating();
             }
+
+            @Override
+            public void expandBubbleBar() {
+                BubbleBarViewController.this.expandBubbleBar();
+            }
+
+            @Override
+            public void dismissBubbleBar() {
+                onDismissAllBubbles();
+            }
+
+            @Override
+            public void updateBubbleBarLocation(BubbleBarLocation location) {
+                mBubbleBarController.updateBubbleBarLocation(location);
+            }
         });
     }
 
-    private void onBubbleClicked(View v) {
-        BubbleBarItem bubble = ((BubbleView) v).getBubble();
+    private void onBubbleClicked(BubbleView bubbleView) {
+        bubbleView.markSeen();
+        BubbleBarItem bubble = bubbleView.getBubble();
         if (bubble == null) {
             Log.e(TAG, "bubble click listener, bubble was null");
         }
@@ -160,7 +177,7 @@ public class BubbleBarViewController {
         mBubbleStashController.onNewBubbleAnimationInterrupted(false, mBarView.getTranslationY());
     }
 
-    private void onBubbleBarClicked() {
+    private void expandBubbleBar() {
         if (mShouldShowEducation) {
             mShouldShowEducation = false;
             // Get the bubble bar bounds on screen
@@ -334,27 +351,60 @@ public class BubbleBarViewController {
     // Modifying view related properties.
     //
 
-    private void updateBubbleBarIconSize(int newIconSize, boolean animate) {
+    /** Notifies controller of configuration change, so bubble bar can be adjusted */
+    public void onBubbleBarConfigurationChanged(boolean animate) {
+        int newIconSize;
+        int newPadding;
         Resources res = mActivity.getResources();
+        if (mBubbleStashController.isBubblesShowingOnHome()) {
+            newIconSize = getBubbleBarIconSizeFromDeviceProfile(res);
+            newPadding = getBubbleBarPaddingFromDeviceProfile(res);
+        } else {
+            // the bubble bar is shown inside the persistent task bar, use preset sizes
+            newIconSize = res.getDimensionPixelSize(R.dimen.bubblebar_icon_size_persistent_taskbar);
+            newPadding = res.getDimensionPixelSize(
+                    R.dimen.bubblebar_icon_spacing_persistent_taskbar);
+        }
+        updateBubbleBarIconSizeAndPadding(newIconSize, newPadding, animate);
+    }
+
+
+    private int getBubbleBarIconSizeFromDeviceProfile(Resources res) {
+        DeviceProfile deviceProfile = mActivity.getDeviceProfile();
         DisplayMetrics dm = res.getDisplayMetrics();
         float smallIconSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
                 APP_ICON_SMALL_DP, dm);
         float mediumIconSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
                 APP_ICON_MEDIUM_DP, dm);
-        float largeIconSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
-                APP_ICON_LARGE_DP, dm);
         float smallMediumThreshold = (smallIconSize + mediumIconSize) / 2f;
-        float mediumLargeThreshold = (mediumIconSize + largeIconSize) / 2f;
-        mIconSize = newIconSize <= smallMediumThreshold
+        int taskbarIconSize = deviceProfile.taskbarIconSize;
+        return taskbarIconSize <= smallMediumThreshold
                 ? res.getDimensionPixelSize(R.dimen.bubblebar_icon_size_small) :
                 res.getDimensionPixelSize(R.dimen.bubblebar_icon_size);
-        float bubbleBarPadding = newIconSize >= mediumLargeThreshold
+
+    }
+
+    private int getBubbleBarPaddingFromDeviceProfile(Resources res) {
+        DeviceProfile deviceProfile = mActivity.getDeviceProfile();
+        DisplayMetrics dm = res.getDisplayMetrics();
+        float mediumIconSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+                APP_ICON_MEDIUM_DP, dm);
+        float largeIconSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+                APP_ICON_LARGE_DP, dm);
+        float mediumLargeThreshold = (mediumIconSize + largeIconSize) / 2f;
+        return deviceProfile.taskbarIconSize >= mediumLargeThreshold
                 ? res.getDimensionPixelSize(R.dimen.bubblebar_icon_spacing_large) :
                 res.getDimensionPixelSize(R.dimen.bubblebar_icon_spacing);
+    }
+
+    private void updateBubbleBarIconSizeAndPadding(int iconSize, int padding, boolean animate) {
+        if (mIconSize == iconSize && mBubbleBarPadding == padding) return;
+        mIconSize = iconSize;
+        mBubbleBarPadding = padding;
         if (animate) {
-            mBarView.animateBubbleBarIconSize(mIconSize, bubbleBarPadding);
+            mBarView.animateBubbleBarIconSize(iconSize, padding);
         } else {
-            mBarView.setIconSizeAndPadding(mIconSize, bubbleBarPadding);
+            mBarView.setIconSizeAndPadding(iconSize, padding);
         }
     }
 
@@ -574,17 +624,17 @@ public class BubbleBarViewController {
     }
 
     /**
-     * Called when bubble was dragged into the dismiss target. Notifies System
+     * Called when given bubble was dismissed. Notifies SystemUI
      * @param bubble dismissed bubble item
      */
-    public void onDismissBubbleWhileDragging(@NonNull BubbleBarItem bubble) {
+    public void onDismissBubble(@NonNull BubbleBarItem bubble) {
         mSystemUiProxy.dragBubbleToDismiss(bubble.getKey(), mTimeSource.currentTimeMillis());
     }
 
     /**
-     * Called when bubble stack was dragged into the dismiss target
+     * Called when bubble stack was dismissed
      */
-    public void onDismissAllBubblesWhileDragging() {
+    public void onDismissAllBubbles() {
         mSystemUiProxy.removeAllBubbles();
     }
 
