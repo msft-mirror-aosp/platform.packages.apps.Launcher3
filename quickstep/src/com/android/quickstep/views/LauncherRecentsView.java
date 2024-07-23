@@ -54,6 +54,7 @@ import com.android.quickstep.GestureState;
 import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.RotationTouchHelper;
 import com.android.quickstep.SystemUiProxy;
+import com.android.quickstep.util.AnimUtils;
 import com.android.quickstep.util.SplitSelectStateController;
 import com.android.systemui.shared.recents.model.Task;
 
@@ -91,10 +92,12 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
     protected void handleStartHome(boolean animated) {
         StateManager stateManager = getStateManager();
         animated &= stateManager.shouldAnimateStateChange();
-        stateManager.goToState(NORMAL, animated);
-        if (FeatureFlags.enableSplitContextually()) {
-            mSplitSelectStateController.getSplitAnimationController()
-                    .playPlaceholderDismissAnim(mContainer, LAUNCHER_SPLIT_SELECTION_EXIT_HOME);
+        if (mSplitSelectStateController.isSplitSelectActive()) {
+            AnimUtils.goToNormalStateWithSplitDismissal(stateManager, mContainer,
+                    LAUNCHER_SPLIT_SELECTION_EXIT_HOME,
+                    mSplitSelectStateController.getSplitAnimationController());
+        } else {
+            stateManager.goToState(NORMAL, animated);
         }
         AbstractFloatingView.closeAllOpenViews(mContainer, animated);
     }
