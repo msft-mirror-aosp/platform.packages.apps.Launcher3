@@ -24,4 +24,16 @@ class RecentsViewData {
 
     // This is typically a View concern but it is used to invalidate rendering in other Views
     val scale = MutableStateFlow(1f)
+
+    // Whether the current RecentsView state supports task overlays.
+    // TODO(b/331753115): Derive from RecentsView state flow once migrated to MVVM.
+    val overlayEnabled = MutableStateFlow(false)
+
+    // The settled set of visible taskIds that is updated after RecentsView scroll settles.
+    val settledFullyVisibleTaskIds = MutableStateFlow(emptySet<Int>())
+
+    // Color tint on foreground scrim
+    val tintAmount = MutableStateFlow(0f)
+
+    val thumbnailSplashProgress = MutableStateFlow(0f)
 }

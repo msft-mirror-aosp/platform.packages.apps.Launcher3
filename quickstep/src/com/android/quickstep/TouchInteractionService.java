@@ -42,6 +42,7 @@ import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_DOWN;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_MOVE;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_UP;
+import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.NAVIGATION_MODE_SWITCHED;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.RECENTS_ANIMATION_START_PENDING;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
@@ -101,6 +102,7 @@ import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.LockedUserState;
+import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ScreenOnTracker;
@@ -126,6 +128,7 @@ import com.android.quickstep.util.AssistUtils;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.systemui.shared.recents.IOverviewProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
+import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.InputChannelCompat.InputEventReceiver;
 import com.android.systemui.shared.system.InputConsumerController;
@@ -330,6 +333,49 @@ public class TouchInteractionService extends Service {
             });
         }
 
+        @BinderThread
+        @Override
+        public void updateWallpaperVisibility(int displayId, boolean visible) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.setWallpaperVisible(visible))
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void checkNavBarModes() {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(TaskbarManager::checkNavBarModes)
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void finishBarAnimations() {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(TaskbarManager::finishBarAnimations)
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void touchAutoDim(boolean reset) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(taskbarManager -> taskbarManager.touchAutoDim(reset))
+            ));
+        }
+
+        @BinderThread
+        @Override
+        public void transitionTo(@BarTransitions.TransitionMode int barMode,
+                boolean animate) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
+                    executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.transitionTo(barMode, animate))
+            ));
+        }
+
         /**
          * Preloads the Overview activity.
          * <p>
@@ -356,6 +402,12 @@ public class TouchInteractionService extends Service {
         public void onSystemBarAttributesChanged(int displayId, int behavior) {
             executeForTaskbarManager(taskbarManager ->
                     taskbarManager.onSystemBarAttributesChanged(displayId, behavior));
+        }
+
+        @Override
+        public void onTransitionModeUpdated(int barMode, boolean checkBarModes) {
+            executeForTaskbarManager(taskbarManager ->
+                    taskbarManager.onTransitionModeUpdated(barMode, checkBarModes));
         }
 
         @Override
@@ -571,6 +623,8 @@ public class TouchInteractionService extends Service {
     private InputManager mInputManager;
     private final Set<Integer> mTrackpadsConnected = new ArraySet<>();
 
+    private NavigationMode mGestureStartNavMode = null;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -785,14 +839,26 @@ public class TouchInteractionService extends Service {
         TestLogging.recordMotionEvent(
                 TestProtocol.SEQUENCE_TIS, "TouchInteractionService.onInputEvent", event);
 
-        boolean isUserUnlocked = LockedUserState.get(this).isUserUnlocked();
-        if (!isUserUnlocked || (mDeviceState.isButtonNavMode()
-                && !isTrackpadMotionEvent(event))) {
+        if (!LockedUserState.get(this).isUserUnlocked()) {
+            ActiveGestureLog.INSTANCE.addLog(new CompoundString("TIS.onInputEvent: ")
+                    .append("Cannot process input event: user is locked"));
+            return;
+        }
+
+        NavigationMode currentNavMode = mDeviceState.getMode();
+        if (mGestureStartNavMode != null && mGestureStartNavMode != currentNavMode) {
+            ActiveGestureLog.INSTANCE.addLog(new CompoundString("TIS.onInputEvent: ")
+                            .append("Navigation mode switched mid-gesture (")
+                            .append(mGestureStartNavMode.name())
+                            .append(" -> ")
+                            .append(currentNavMode.name())
+                            .append("); cancelling gesture."),
+                    NAVIGATION_MODE_SWITCHED);
+            event.setAction(ACTION_CANCEL);
+        } else if (mDeviceState.isButtonNavMode() && !isTrackpadMotionEvent(event)) {
             ActiveGestureLog.INSTANCE.addLog(new CompoundString("TIS.onInputEvent: ")
                     .append("Cannot process input event: ")
-                    .append(!isUserUnlocked
-                            ? "user is locked"
-                            : "using 3-button nav and event is not a trackpad event"));
+                    .append("using 3-button nav and event is not a trackpad event"));
             return;
         }
 
@@ -817,6 +883,12 @@ public class TouchInteractionService extends Service {
                 }
                 return;
             }
+        }
+
+        if (action == ACTION_DOWN || isHoverActionWithoutConsumer) {
+            mGestureStartNavMode = currentNavMode;
+        } else if (action == ACTION_UP || action == ACTION_CANCEL) {
+            mGestureStartNavMode = null;
         }
 
         SafeCloseable traceToken = TraceHelper.INSTANCE.allowIpcs("TIS.onInputEvent");

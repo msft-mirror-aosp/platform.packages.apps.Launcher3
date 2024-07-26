@@ -46,6 +46,7 @@ import android.view.View;
 import android.view.animation.Interpolator;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.view.OneShotPreDrawListener;
 
 import com.android.app.animation.Interpolators;
@@ -63,6 +64,7 @@ import com.android.launcher3.anim.RevealOutlineAnimation;
 import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.TaskItemInfo;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
@@ -94,6 +96,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     public static final int ALPHA_INDEX_ASSISTANT_INVOKED = 5;
     public static final int ALPHA_INDEX_SMALL_SCREEN = 6;
     private static final int NUM_ALPHA_CHANNELS = 7;
+
+    private static boolean sEnableModelLoadingForTests = true;
 
     private final TaskbarActivityContext mActivity;
     private final TaskbarView mTaskbarView;
@@ -191,7 +195,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mTaskbarIconTranslationXForPinning.updateValue(pinningValue);
 
         mModelCallbacks.init(controllers);
-        if (mActivity.isUserSetupComplete()) {
+        if (mActivity.isUserSetupComplete() && sEnableModelLoadingForTests) {
             // Only load the callbacks if user setup is completed
             LauncherAppState.getInstance(mActivity).getModel().addCallbacksAndLoad(mModelCallbacks);
         }
@@ -515,35 +519,38 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         return mTaskbarView.getTaskbarDividerView();
     }
 
-    /** Updates which icons are marked as running given the Set of currently running packages. */
-    public void updateIconViewsRunningStates(Set<String> runningPackages,
-            Set<String> minimizedPackages) {
+    /**
+     * Updates which icons are marked as running or minimized given the Sets of currently running
+     * and minimized tasks.
+     */
+    public void updateIconViewsRunningStates(Set<Integer> runningTaskIds,
+            Set<Integer> minimizedTaskIds) {
         for (View iconView : getIconViews()) {
             if (iconView instanceof BubbleTextView btv) {
                 btv.updateRunningState(
-                        getRunningAppState(btv, runningPackages, minimizedPackages));
+                        getRunningAppState(btv, runningTaskIds, minimizedTaskIds));
             }
         }
     }
 
     private BubbleTextView.RunningAppState getRunningAppState(
             BubbleTextView btv,
-            Set<String> runningPackages,
-            Set<String> minimizedPackages) {
+            Set<Integer> runningTaskIds,
+            Set<Integer> minimizedTaskIds) {
         Object tag = btv.getTag();
-        if (tag instanceof ItemInfo itemInfo) {
-            if (minimizedPackages.contains(itemInfo.getTargetPackage())) {
+        if (tag instanceof TaskItemInfo itemInfo) {
+            if (minimizedTaskIds.contains(itemInfo.getTaskId())) {
                 return BubbleTextView.RunningAppState.MINIMIZED;
             }
-            if (runningPackages.contains(itemInfo.getTargetPackage())) {
+            if (runningTaskIds.contains(itemInfo.getTaskId())) {
                 return BubbleTextView.RunningAppState.RUNNING;
             }
         }
         if (tag instanceof GroupTask groupTask && !groupTask.hasMultipleTasks()) {
-            if (minimizedPackages.contains(groupTask.task1.key.getPackageName())) {
+            if (minimizedTaskIds.contains(groupTask.task1.key.id)) {
                 return BubbleTextView.RunningAppState.MINIMIZED;
             }
-            if (runningPackages.contains(groupTask.task1.key.getPackageName())) {
+            if (runningTaskIds.contains(groupTask.task1.key.id)) {
                 return BubbleTextView.RunningAppState.RUNNING;
             }
         }
@@ -919,5 +926,11 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 "ALPHA_INDEX_SMALL_SCREEN");
 
         mModelCallbacks.dumpLogs(prefix + "\t", pw);
+    }
+
+    /** Enables model loading for tests. */
+    @VisibleForTesting
+    public static void enableModelLoadingForTests(boolean enable) {
+        sEnableModelLoadingForTests = enable;
     }
 }

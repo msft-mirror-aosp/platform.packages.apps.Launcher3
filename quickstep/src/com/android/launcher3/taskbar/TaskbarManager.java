@@ -39,7 +39,6 @@ import android.app.PendingIntent;
 import android.content.ComponentCallbacks;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.hardware.display.DisplayManager;
@@ -72,6 +71,7 @@ import com.android.quickstep.AllAppsActionManager;
 import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.AssistUtils;
+import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 import com.android.systemui.unfold.UnfoldTransitionProgressProvider;
@@ -114,11 +114,12 @@ public class TaskbarManager {
     private WindowManager mWindowManager;
     private FrameLayout mTaskbarRootLayout;
     private boolean mAddedWindow;
+    private boolean mIsSuspended;
     private final TaskbarNavButtonController mNavButtonController;
     private final ComponentCallbacks mComponentCallbacks;
 
     private final SimpleBroadcastReceiver mShutdownReceiver =
-            new SimpleBroadcastReceiver(i -> destroyExistingTaskbar());
+            new SimpleBroadcastReceiver(UI_HELPER_EXECUTOR, i -> destroyExistingTaskbar());
 
     // The source for this provider is set when Launcher is available
     // We use 'non-destroyable' version here so the original provider won't be destroyed
@@ -155,7 +156,7 @@ public class TaskbarManager {
     private boolean mUserUnlocked = false;
 
     private final SimpleBroadcastReceiver mTaskbarBroadcastReceiver =
-            new SimpleBroadcastReceiver(this::showTaskbarFromBroadcast);
+            new SimpleBroadcastReceiver(UI_HELPER_EXECUTOR, this::showTaskbarFromBroadcast);
 
     private final AllAppsActionManager mAllAppsActionManager;
 
@@ -304,17 +305,15 @@ public class TaskbarManager {
                 .register(NAV_BAR_KIDS_MODE, mOnSettingsChangeListener);
         Log.d(TASKBAR_NOT_DESTROYED_TAG, "registering component callbacks from constructor.");
         mContext.registerComponentCallbacks(mComponentCallbacks);
-        mShutdownReceiver.registerAsync(mContext, Intent.ACTION_SHUTDOWN);
+        mShutdownReceiver.register(mContext, Intent.ACTION_SHUTDOWN);
         UI_HELPER_EXECUTOR.execute(() -> {
             mSharedState.taskbarSystemActionPendingIntent = PendingIntent.getBroadcast(
                     mContext,
                     SYSTEM_ACTION_ID_TASKBAR,
                     new Intent(ACTION_SHOW_TASKBAR).setPackage(mContext.getPackageName()),
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            mContext.registerReceiver(
-                    mTaskbarBroadcastReceiver,
-                    new IntentFilter(ACTION_SHOW_TASKBAR),
-                    RECEIVER_NOT_EXPORTED);
+            mTaskbarBroadcastReceiver.register(
+                    mContext, RECEIVER_NOT_EXPORTED, ACTION_SHOW_TASKBAR);
         });
 
         debugWhyTaskbarNotDestroyed("TaskbarManager created");
@@ -442,6 +441,8 @@ public class TaskbarManager {
      */
     @VisibleForTesting
     public synchronized void recreateTaskbar() {
+        if (mIsSuspended) return;
+
         Trace.beginSection("recreateTaskbar");
         try {
             DeviceProfile dp = mUserUnlocked ?
@@ -519,6 +520,36 @@ public class TaskbarManager {
         }
     }
 
+    public void setWallpaperVisible(boolean isVisible) {
+        mSharedState.wallpaperVisible = isVisible;
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.setWallpaperVisible(isVisible);
+        }
+    }
+
+    public void checkNavBarModes() {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.checkNavBarModes();
+        }
+    }
+
+    public void finishBarAnimations() {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.finishBarAnimations();
+        }
+    }
+
+    public void touchAutoDim(boolean reset) {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.touchAutoDim(reset);
+        }
+    }
+
+    public void transitionTo(@BarTransitions.TransitionMode int barMode,
+            boolean animate) {
+        mTaskbarActivityContext.transitionTo(barMode, animate);
+    }
+
     private boolean isTaskbarEnabled(DeviceProfile deviceProfile) {
         return ENABLE_TASKBAR_NAVBAR_UNIFICATION || deviceProfile.isTaskbarPresent;
     }
@@ -543,6 +574,13 @@ public class TaskbarManager {
         mSharedState.systemBarAttrsBehavior = behavior;
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.onSystemBarAttributesChanged(displayId, behavior);
+        }
+    }
+
+    public void onTransitionModeUpdated(int barMode, boolean checkBarModes) {
+        mSharedState.barMode = barMode;
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.onTransitionModeUpdated(barMode, checkBarModes);
         }
     }
 
@@ -582,7 +620,7 @@ public class TaskbarManager {
     public void destroy() {
         debugWhyTaskbarNotDestroyed("TaskbarManager#destroy()");
         removeActivityCallbacksAndListeners();
-        mTaskbarBroadcastReceiver.unregisterReceiverSafelyAsync(mContext);
+        mTaskbarBroadcastReceiver.unregisterReceiverSafely(mContext);
         destroyExistingTaskbar();
         removeTaskbarRootViewFromWindow();
         if (mUserUnlocked) {
@@ -594,7 +632,7 @@ public class TaskbarManager {
                 .unregister(NAV_BAR_KIDS_MODE, mOnSettingsChangeListener);
         Log.d(TASKBAR_NOT_DESTROYED_TAG, "unregistering component callbacks from destroy().");
         mContext.unregisterComponentCallbacks(mComponentCallbacks);
-        mShutdownReceiver.unregisterReceiverSafelyAsync(mContext);
+        mShutdownReceiver.unregisterReceiverSafely(mContext);
     }
 
     public @Nullable TaskbarActivityContext getCurrentActivityContext() {
@@ -610,8 +648,22 @@ public class TaskbarManager {
         }
     }
 
+    /**
+     * Removes Taskbar from the window manager and prevents recreation if {@code true}.
+     * <p>
+     * Suspending is for testing purposes only; avoid calling this method in production.
+     */
     @VisibleForTesting
-    void addTaskbarRootViewToWindow() {
+    public void setSuspended(boolean isSuspended) {
+        mIsSuspended = isSuspended;
+        if (mIsSuspended) {
+            removeTaskbarRootViewFromWindow();
+        } else {
+            addTaskbarRootViewToWindow();
+        }
+    }
+
+    private void addTaskbarRootViewToWindow() {
         if (enableTaskbarNoRecreate() && !mAddedWindow && mTaskbarActivityContext != null) {
             mWindowManager.addView(mTaskbarRootLayout,
                     mTaskbarActivityContext.getWindowLayoutParams());
@@ -619,8 +671,7 @@ public class TaskbarManager {
         }
     }
 
-    @VisibleForTesting
-    void removeTaskbarRootViewFromWindow() {
+    private void removeTaskbarRootViewFromWindow() {
         if (enableTaskbarNoRecreate() && mAddedWindow) {
             mWindowManager.removeViewImmediate(mTaskbarRootLayout);
             mAddedWindow = false;

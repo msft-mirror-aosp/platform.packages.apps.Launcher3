@@ -24,9 +24,11 @@ import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RoundRectShape
 import android.util.AttributeSet
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.updateLayoutParams
+import com.android.launcher3.Flags.enableRefactorTaskThumbnail
 import com.android.launcher3.R
 import com.android.launcher3.util.RunnableList
 import com.android.launcher3.util.SplitConfigurationOptions
@@ -40,7 +42,7 @@ import com.android.systemui.shared.recents.model.Task
 
 /** TaskView that contains all tasks that are part of the desktop. */
 class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
-    TaskView(context, attrs) {
+    TaskView(context, attrs, type = TaskViewType.DESKTOP) {
 
     private val snapshotDrawParams =
         object : FullscreenDrawParams(context) {
@@ -48,11 +50,11 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             override fun computeTaskCornerRadius(context: Context) =
                 computeWindowCornerRadius(context)
         }
-    private val taskThumbnailViewPool =
+    private val taskThumbnailViewDeprecatedPool =
         ViewPool<TaskThumbnailViewDeprecated>(
             context,
             this,
-            R.layout.task_thumbnail,
+            R.layout.task_thumbnail_deprecated,
             VIEW_POOL_MAX_SIZE,
             VIEW_POOL_INITIAL_SIZE
         )
@@ -87,6 +89,65 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 setIcon(this, LayerDrawable(arrayOf(iconBackground, icon)))
             }
         childCountAtInflation = childCount
+    }
+
+    /** Updates this desktop task to the gives task list defined in `tasks` */
+    fun bind(
+        tasks: List<Task>,
+        orientedState: RecentsOrientedState,
+        taskOverlayFactory: TaskOverlayFactory
+    ) {
+        if (DEBUG) {
+            val sb = StringBuilder()
+            sb.append("bind tasks=").append(tasks.size).append("\n")
+            tasks.forEach { sb.append(" key=${it.key}\n") }
+            Log.d(TAG, sb.toString())
+        }
+        cancelPendingLoadTasks()
+        taskContainers =
+            tasks.map { task ->
+                val snapshotView =
+                    if (enableRefactorTaskThumbnail()) {
+                        LayoutInflater.from(context).inflate(R.layout.task_thumbnail, this, false)
+                    } else {
+                        taskThumbnailViewDeprecatedPool.view
+                    }
+
+                addView(
+                    snapshotView,
+                    // Add snapshotView to the front after initial views e.g. icon and
+                    // background.
+                    childCountAtInflation,
+                    LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                )
+                TaskContainer(
+                    this,
+                    task,
+                    snapshotView,
+                    iconView,
+                    TransformingTouchDelegate(iconView.asView()),
+                    SplitConfigurationOptions.STAGE_POSITION_UNDEFINED,
+                    digitalWellBeingToast = null,
+                    showWindowsView = null,
+                    taskOverlayFactory
+                )
+            }
+        taskContainers.forEach { it.bind() }
+        setOrientationState(orientedState)
+    }
+
+    override fun onRecycle() {
+        super.onRecycle()
+        visibility = VISIBLE
+        taskContainers.forEach {
+            if (!enableRefactorTaskThumbnail()) {
+                removeView(it.thumbnailViewDeprecated)
+                taskThumbnailViewDeprecatedPool.recycle(it.thumbnailViewDeprecated)
+            }
+        }
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -149,76 +210,6 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 )
             }
         }
-    }
-
-    override fun onRecycle() {
-        super.onRecycle()
-        visibility = VISIBLE
-    }
-
-    /** Updates this desktop task to the gives task list defined in `tasks` */
-    fun bind(
-        tasks: List<Task>,
-        orientedState: RecentsOrientedState,
-        taskOverlayFactory: TaskOverlayFactory
-    ) {
-        if (DEBUG) {
-            val sb = StringBuilder()
-            sb.append("bind tasks=").append(tasks.size).append("\n")
-            tasks.forEach { sb.append(" key=${it.key}\n") }
-            Log.d(TAG, sb.toString())
-        }
-        cancelPendingLoadTasks()
-
-        if (!isTaskContainersInitialized()) {
-            taskContainers = arrayListOf()
-        }
-        val taskContainers = taskContainers as ArrayList
-        taskContainers.ensureCapacity(tasks.size)
-        tasks.forEachIndexed { index, task ->
-            val thumbnailViewDeprecated: TaskThumbnailViewDeprecated
-            if (index >= taskContainers.size) {
-                thumbnailViewDeprecated = taskThumbnailViewPool.view
-                // Add thumbnailView from to position after the initial child views.
-                addView(
-                    thumbnailViewDeprecated,
-                    childCountAtInflation,
-                    LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    )
-                )
-            } else {
-                thumbnailViewDeprecated = taskContainers[index].thumbnailViewDeprecated
-            }
-            val taskContainer =
-                TaskContainer(
-                    task,
-                    // TODO(b/338360089): Support new TTV for DesktopTaskView
-                    thumbnailView = null,
-                    thumbnailViewDeprecated,
-                    iconView,
-                    TransformingTouchDelegate(iconView.asView()),
-                    SplitConfigurationOptions.STAGE_POSITION_UNDEFINED,
-                    digitalWellBeingToast = null,
-                    showWindowsView = null,
-                    taskOverlayFactory
-                )
-            if (index >= taskContainers.size) {
-                taskContainers.add(taskContainer)
-            } else {
-                taskContainers[index] = taskContainer
-            }
-            taskContainer.bind()
-        }
-        repeat(taskContainers.size - tasks.size) {
-            with(taskContainers.removeLast()) {
-                removeView(thumbnailViewDeprecated)
-                taskThumbnailViewPool.recycle(thumbnailViewDeprecated)
-            }
-        }
-
-        setOrientationState(orientedState)
     }
 
     override fun needsUpdate(dataChange: Int, flag: Int) =

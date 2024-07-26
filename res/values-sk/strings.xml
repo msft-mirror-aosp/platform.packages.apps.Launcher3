@@ -27,8 +27,7 @@
     <string name="safemode_widget_error" msgid="4863470563535682004">"Miniaplikácie sú v núdzovom režime zakázané"</string>
     <string name="shortcut_not_available" msgid="2536503539825726397">"Skratky nie sú k dispozícii"</string>
     <string name="home_screen" msgid="5629429142036709174">"Domov"</string>
-    <!-- no translation found for set_default_home_app (5808906607627586381) -->
-    <skip />
+    <string name="set_default_home_app" msgid="5808906607627586381">"Nastaviť aplikáciu <xliff:g id="LAUNCHER_NAME">%1$s</xliff:g> ako predvolenú vstupnú aplikáciu v Nastaveniach"</string>
     <string name="recent_task_option_split_screen" msgid="6690461455618725183">"Rozdeliť obrazovku"</string>
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"Informácie o aplikácii pre %1$s"</string>
     <string name="split_app_usage_settings" msgid="7214375263347964093">"Nastavenia používania pre %1$s"</string>
@@ -39,6 +38,10 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"Pár aplikácií nie je k dispozícii"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Pridržaním presuňte miniaplikáciu."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Dvojitým klepnutím a pridržaním presuňte miniaplikáciu alebo použite vlastné akcie."</string>
+    <!-- no translation found for widget_picker_widget_options_button_description (4770099264476852363) -->
+    <skip />
+    <!-- no translation found for widget_picker_show_all_widgets_menu_item_title (9023638224586908119) -->
+    <skip />
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"šírka %1$d, výška %2$d"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"Miniaplikácia <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>

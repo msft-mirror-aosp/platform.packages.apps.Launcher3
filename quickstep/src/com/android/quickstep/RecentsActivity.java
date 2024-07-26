@@ -27,7 +27,7 @@ import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_O
 import static com.android.quickstep.OverviewComponentObserver.startHomeIntentSafely;
 import static com.android.quickstep.TaskUtils.taskIsATargetWithMode;
 import static com.android.quickstep.TaskViewUtils.createRecentsWindowAnimator;
-import static com.android.window.flags.Flags.enableDesktopWindowingMode;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -132,6 +132,13 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
      * Init drag layer and overview panel views.
      */
     protected void setupViews() {
+        SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(this);
+        // SplitSelectStateController needs to be created before setContentView()
+        mSplitSelectStateController =
+                new SplitSelectStateController(this, mHandler, getStateManager(),
+                        null /* depthController */, getStatsLogManager(),
+                        systemUiProxy, RecentsModel.INSTANCE.get(this),
+                        null /*activityBackCallback*/);
         inflateRootView(R.layout.fallback_recents_activity);
         setContentView(getRootView());
         mDragLayer = findViewById(R.id.drag_layer);
@@ -139,14 +146,8 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
         mFallbackRecentsView = findViewById(R.id.overview_panel);
         mActionsView = findViewById(R.id.overview_actions_view);
         getRootView().getSysUiScrim().getSysUIProgress().updateValue(0);
-        SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(this);
-        mSplitSelectStateController =
-                new SplitSelectStateController(this, mHandler, getStateManager(),
-                        null /* depthController */, getStatsLogManager(),
-                        systemUiProxy, RecentsModel.INSTANCE.get(this),
-                        null /*activityBackCallback*/);
         mDragLayer.recreateControllers();
-        if (enableDesktopWindowingMode()) {
+        if (DESKTOP_WINDOWING_MODE.isEnabled(this)) {
             mDesktopRecentsTransitionController = new DesktopRecentsTransitionController(
                     getStateManager(), systemUiProxy, getIApplicationThread(),
                     null /* depthController */
