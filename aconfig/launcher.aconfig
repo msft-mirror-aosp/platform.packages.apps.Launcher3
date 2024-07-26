@@ -323,3 +323,9 @@ flag {
     description: "Menu in Taskbar with options to launch and manage multiple instances of the same app"
     bug: "355237285"
 }
+flag {
+    name: "navigate_to_child_preference"
+    namespace: "launcher"
+    description: "Settings screen supports navigating to child preference if the key is not on the screen"
+    bug: "293390881"
+}

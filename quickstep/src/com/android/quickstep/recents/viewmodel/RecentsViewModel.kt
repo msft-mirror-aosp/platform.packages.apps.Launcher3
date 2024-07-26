@@ -45,4 +45,12 @@ class RecentsViewModel(
     fun setOverlayEnabled(isOverlayEnabled: Boolean) {
         recentsViewData.overlayEnabled.value = isOverlayEnabled
     }
+
+    fun setTintAmount(tintAmount: Float) {
+        recentsViewData.tintAmount.value = tintAmount
+    }
+
+    fun updateThumbnailSplashProgress(taskThumbnailSplashAlpha: Float) {
+        recentsViewData.thumbnailSplashProgress.value = taskThumbnailSplashAlpha
+    }
 }
