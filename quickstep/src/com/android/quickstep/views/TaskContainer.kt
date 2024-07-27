@@ -117,7 +117,6 @@ class TaskContainer(
                 taskContainerViewModel.shouldShowThumbnailSplash(task.key.id)
             else thumbnailViewDeprecated.shouldShowSplashView()
 
-    // TODO(b/350743460) Support sysUiStatusNavFlags for new TTV.
     val sysUiStatusNavFlags: Int
         get() =
             if (enableRefactorTaskThumbnail())
