@@ -33,8 +33,7 @@ import com.android.quickstep.recents.di.RecentsDependencies
 import com.android.quickstep.recents.di.get
 import com.android.quickstep.recents.di.getScope
 import com.android.quickstep.recents.di.inject
-import com.android.quickstep.recents.usecase.GetThumbnailUseCase
-import com.android.quickstep.task.thumbnail.TaskThumbnail
+import com.android.quickstep.recents.viewmodel.TaskContainerViewModel
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
@@ -61,9 +60,18 @@ class TaskContainer(
 ) {
     val overlay: TaskOverlayFactory.TaskOverlay<*> = taskOverlayFactory.createOverlay(this)
     lateinit var taskContainerData: TaskContainerData
-    private val getThumbnailUseCase: GetThumbnailUseCase by RecentsDependencies.inject()
+
     private val taskThumbnailViewModel: TaskThumbnailViewModel by
         RecentsDependencies.inject(snapshotView)
+
+    // TODO(b/335649589): Ideally create and obtain this from DI.
+    private val taskContainerViewModel: TaskContainerViewModel by lazy {
+        TaskContainerViewModel(
+            sysUiStatusNavFlagsUseCase = RecentsDependencies.get(),
+            getThumbnailUseCase = RecentsDependencies.get(),
+            splashAlphaUseCase = RecentsDependencies.get(),
+        )
+    }
 
     init {
         if (enableRefactorTaskThumbnail()) {
@@ -73,7 +81,7 @@ class TaskContainer(
                 val taskViewScope = RecentsDependencies.getScope(taskView)
                 linkTo(taskViewScope)
 
-                val taskContainerScope = RecentsDependencies.getScope(this)
+                val taskContainerScope = RecentsDependencies.getScope(this@TaskContainer)
                 linkTo(taskContainerScope)
             }
         } else {
@@ -84,7 +92,7 @@ class TaskContainer(
     val splitAnimationThumbnail: Bitmap?
         get() =
             if (enableRefactorTaskThumbnail()) {
-                getThumbnailUseCase.run(task.key.id)
+                taskContainerViewModel.getThumbnail(task.key.id)
             } else {
                 thumbnailViewDeprecated.thumbnail
             }
@@ -104,13 +112,15 @@ class TaskContainer(
     // TODO(b/334826842): Support shouldShowSplashView for new TTV.
     val shouldShowSplashView: Boolean
         get() =
-            if (enableRefactorTaskThumbnail()) false
+            if (enableRefactorTaskThumbnail())
+                taskContainerViewModel.shouldShowThumbnailSplash(task.key.id)
             else thumbnailViewDeprecated.shouldShowSplashView()
 
-    // TODO(b/350743460) Support sysUiStatusNavFlags for new TTV.
     val sysUiStatusNavFlags: Int
         get() =
-            if (enableRefactorTaskThumbnail()) 0 else thumbnailViewDeprecated.sysUiStatusNavFlags
+            if (enableRefactorTaskThumbnail())
+                taskContainerViewModel.getSysUiStatusNavFlags(task.key.id)
+            else thumbnailViewDeprecated.sysUiStatusNavFlags
 
     /** Builds proto for logging */
     val itemInfo: WorkspaceItemInfo
@@ -153,9 +163,7 @@ class TaskContainer(
     }
 
     fun bindThumbnailView() {
-        // TODO(b/343364498): Existing view has shouldShowScreenshot as an override as well but
-        //  this should be decided inside TaskThumbnailViewModel.
-        taskThumbnailViewModel.bind(TaskThumbnail(task.key.id, taskView.isRunningTask))
+        taskThumbnailViewModel.bind(task.key.id)
     }
 
     fun setOverlayEnabled(enabled: Boolean) {
