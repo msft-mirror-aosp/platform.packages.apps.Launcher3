@@ -45,15 +45,18 @@ class TasksRepository(
     private val _taskData =
         groupedTaskData.map { groupTaskList -> groupTaskList.flatMap { it.tasks } }
     private val visibleTaskIds = MutableStateFlow(emptySet<Int>())
+    private val thumbnailOverride = MutableStateFlow(mapOf<Int, ThumbnailData>())
 
     private val taskData: Flow<List<Task>> =
-        combine(_taskData, getThumbnailQueryResults(), getIconQueryResults()) {
+        combine(_taskData, getThumbnailQueryResults(), getIconQueryResults(), thumbnailOverride) {
             tasks,
             thumbnailQueryResults,
-            iconQueryResults ->
+            iconQueryResults,
+            thumbnailOverride ->
             tasks.forEach { task ->
-                // Add retrieved thumbnails + remove unnecessary thumbnails
-                task.thumbnail = thumbnailQueryResults[task.key.id]
+                // Add retrieved thumbnails + remove unnecessary thumbnails (e.g. invisible)
+                task.thumbnail =
+                    thumbnailOverride[task.key.id] ?: thumbnailQueryResults[task.key.id]
 
                 // TODO(b/352331675) don't load icons for DesktopTaskView
                 // Add retrieved icons + remove unnecessary icons
@@ -79,6 +82,12 @@ class TasksRepository(
 
     override fun setVisibleTasks(visibleTaskIdList: List<Int>) {
         this.visibleTaskIds.value = visibleTaskIdList.toSet()
+        setThumbnailOverride(thumbnailOverride.value)
+    }
+
+    override fun setThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
+        this.thumbnailOverride.value =
+            thumbnailOverride.filterKeys(this.visibleTaskIds.value::contains).toMap()
     }
 
     /** Flow wrapper for [TaskThumbnailDataSource.getThumbnailInBackground] api */
@@ -130,9 +139,15 @@ class TasksRepository(
                                 icon,
                                 contentDescription,
                                 title ->
-                                continuation.resume(
-                                    TaskIconQueryResponse(icon, contentDescription, title)
-                                )
+                                icon.constantState?.let {
+                                    continuation.resume(
+                                        TaskIconQueryResponse(
+                                            it.newDrawable().mutate(),
+                                            contentDescription,
+                                            title
+                                        )
+                                    )
+                                }
                             }
                         continuation.invokeOnCancellation { cancellableTask?.cancel() }
                     }
@@ -157,7 +172,7 @@ class TasksRepository(
     }
 }
 
-private data class TaskIconQueryResponse(
+data class TaskIconQueryResponse(
     val icon: Drawable,
     val contentDescription: String,
     val title: String
