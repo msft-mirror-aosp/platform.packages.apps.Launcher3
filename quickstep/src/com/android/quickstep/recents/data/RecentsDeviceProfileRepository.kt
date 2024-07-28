@@ -16,21 +16,6 @@
 
 package com.android.quickstep.recents.data
 
-import com.android.quickstep.views.RecentsViewContainer
-
-/**
- * Repository for shrink down version of [com.android.launcher3.DeviceProfile] that only contains
- * data related to Recents.
- */
-class RecentsDeviceProfileRepository(private val container: RecentsViewContainer) {
-
-    fun getRecentsDeviceProfile() =
-        with(container.deviceProfile) { RecentsDeviceProfile(isLargeScreen = isTablet) }
-
-    /**
-     * Container to hold [com.android.launcher3.DeviceProfile] related to Recents.
-     *
-     * @property isLargeScreen whether the current device posture has a large screen
-     */
-    data class RecentsDeviceProfile(val isLargeScreen: Boolean)
+interface RecentsDeviceProfileRepository {
+    fun getRecentsDeviceProfile(): RecentsDeviceProfile
 }

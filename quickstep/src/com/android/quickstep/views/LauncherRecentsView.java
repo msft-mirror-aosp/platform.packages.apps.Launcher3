@@ -26,7 +26,7 @@ import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SPLIT_SELECTION_EXIT_HOME;
-import static com.android.window.flags.Flags.enableDesktopWindowingWallpaperActivity;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -268,7 +268,7 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
         super.onGestureAnimationStart(runningTasks, rotationTouchHelper);
         DesktopVisibilityController desktopVisibilityController =
                 mContainer.getDesktopVisibilityController();
-        if (!enableDesktopWindowingWallpaperActivity() && desktopVisibilityController != null) {
+        if (!WALLPAPER_ACTIVITY.isEnabled(mContext) && desktopVisibilityController != null) {
             // TODO: b/333533253 - Remove after flag rollout
             desktopVisibilityController.setRecentsGestureStart();
         }
@@ -291,7 +291,7 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
             }
         }
         super.onGestureAnimationEnd();
-        if (!enableDesktopWindowingWallpaperActivity() && desktopVisibilityController != null) {
+        if (!WALLPAPER_ACTIVITY.isEnabled(mContext) && desktopVisibilityController != null) {
             // TODO: b/333533253 - Remove after flag rollout
             desktopVisibilityController.setRecentsGestureEnd(endTarget);
         }

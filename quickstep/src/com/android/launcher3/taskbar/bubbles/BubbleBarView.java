@@ -307,6 +307,17 @@ public class BubbleBarView extends FrameLayout {
         }
     }
 
+    @Override
+    public void setAlpha(float alpha) {
+        super.setAlpha(alpha);
+        int childCount = getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            View childView = getChildAt(i);
+            if (!(childView instanceof BubbleView)) continue;
+            ((BubbleView) childView).setProvideShadowOutline(alpha == 1f);
+        }
+    }
+
     /**
      * Sets new icon sizes and newBubbleBarPadding between icons and bubble bar borders.
      *
@@ -1228,6 +1239,7 @@ public class BubbleBarView extends FrameLayout {
                 mWidthAnimator.reverse();
             }
             updateBubbleAccessibilityStates();
+            announceExpandedStateChange();
         }
     }
 
@@ -1342,6 +1354,26 @@ public class BubbleBarView extends FrameLayout {
                     contentDesc, bubbleCount - 1);
         }
         setContentDescription(contentDesc);
+    }
+
+    private void announceExpandedStateChange() {
+        final CharSequence selectedBubbleContentDesc;
+        if (mSelectedBubbleView != null) {
+            selectedBubbleContentDesc = mSelectedBubbleView.getContentDescription();
+        } else {
+            selectedBubbleContentDesc = getResources().getString(
+                    R.string.bubble_bar_bubble_fallback_description);
+        }
+
+        final String msg;
+        if (mIsBarExpanded) {
+            msg = getResources().getString(R.string.bubble_bar_accessibility_announce_expand,
+                    selectedBubbleContentDesc);
+        } else {
+            msg = getResources().getString(R.string.bubble_bar_accessibility_announce_collapse,
+                    selectedBubbleContentDesc);
+        }
+        announceForAccessibility(msg);
     }
 
     private boolean isIconSizeOrPaddingUpdated(float newIconSize, float newBubbleBarPadding) {
