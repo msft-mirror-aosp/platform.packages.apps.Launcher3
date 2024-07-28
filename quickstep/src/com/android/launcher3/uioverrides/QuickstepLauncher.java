@@ -64,10 +64,10 @@ import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.QUICK_SWITCH_FROM_HOME_FALLBACK;
 import static com.android.quickstep.util.AnimUtils.completeRunnableListCallback;
 import static com.android.quickstep.util.SplitAnimationTimings.TABLET_HOME_TO_SPLIT;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
-import static com.android.window.flags.Flags.enableDesktopWindowingMode;
-import static com.android.window.flags.Flags.enableDesktopWindowingWallpaperActivity;
 import static com.android.wm.shell.common.split.SplitScreenConstants.SNAP_TO_50_50;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -201,6 +201,8 @@ import com.android.systemui.unfold.dagger.UnfoldMain;
 import com.android.systemui.unfold.progress.RemoteUnfoldTransitionReceiver;
 import com.android.systemui.unfold.updates.RotationChangeProvider;
 
+import kotlin.Unit;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -212,8 +214,6 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-
-import kotlin.Unit;
 
 public class QuickstepLauncher extends Launcher implements RecentsViewContainer {
     private static final boolean TRACE_LAYOUTS =
@@ -256,6 +256,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
 
     private boolean mIsPredictiveBackToHomeInProgress;
 
+    private boolean mCanShowAllAppsEducationView;
+
+    private boolean mIsOverlayVisible;
+
     public static QuickstepLauncher getLauncher(Context context) {
         return fromContext(context);
     }
@@ -276,7 +280,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
         // TODO(b/337863494): Explore use of the same OverviewComponentObserver across launcher
         OverviewComponentObserver overviewComponentObserver = new OverviewComponentObserver(
                 asContext(), deviceState);
-        if (enableDesktopWindowingMode()) {
+        if (DESKTOP_WINDOWING_MODE.isEnabled(this)) {
             mDesktopRecentsTransitionController = new DesktopRecentsTransitionController(
                     getStateManager(), systemUiProxy, getIApplicationThread(),
                     getDepthController());
@@ -296,7 +300,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
 
         mTISBindHelper = new TISBindHelper(this, this::onTISConnected);
         mDepthController = new DepthController(this);
-        if (enableDesktopWindowingMode()) {
+        if (DESKTOP_WINDOWING_MODE.isEnabled(this)) {
             mDesktopVisibilityController = new DesktopVisibilityController(this);
             mDesktopVisibilityController.registerSystemUiListener();
             mSplitSelectStateController.initSplitFromDesktopController(this,
@@ -493,13 +497,20 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
                     (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
             boolean visible = (state == NORMAL || state == OVERVIEW)
                     && (willUserBeActive || isUserActive())
-                    && !profile.isVerticalBarLayout();
+                    && !profile.isVerticalBarLayout()
+                    && !mIsOverlayVisible;
             SystemUiProxy.INSTANCE.get(this)
                     .setLauncherKeepClearAreaHeight(visible, profile.hotseatBarSizePx);
         }
         if (state == NORMAL && !inTransition) {
             ((RecentsView) getOverviewPanel()).setSwipeDownShouldLaunchApp(false);
         }
+    }
+
+    @Override
+    public void onOverlayVisibilityChanged(boolean visible) {
+        super.onOverlayVisibilityChanged(visible);
+        mIsOverlayVisible = visible;
     }
 
     @Override
@@ -513,7 +524,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
         } else if (item.containerId == Favorites.CONTAINER_HOTSEAT_PREDICTION) {
             mHotseatPredictionController.setPredictedItems(item);
         } else if (item.containerId == Favorites.CONTAINER_WIDGETS_PREDICTION) {
-            getPopupDataProvider().setRecommendedWidgets(item.items);
+            getWidgetPickerDataProvider().setWidgetRecommendations(item.items);
         }
     }
 
@@ -1004,7 +1015,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
 
     @Override
     public void setResumed() {
-        if (!enableDesktopWindowingWallpaperActivity()
+        if (!WALLPAPER_ACTIVITY.isEnabled(this)
                 && mDesktopVisibilityController != null
                 && mDesktopVisibilityController.areDesktopTasksVisible()
                 && !mDesktopVisibilityController.isRecentsGestureInProgress()) {
@@ -1493,5 +1504,13 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer 
     @Override
     public boolean isRecentsViewVisible() {
         return getStateManager().getState().isRecentsViewVisible;
+    }
+
+    public boolean isCanShowAllAppsEducationView() {
+        return mCanShowAllAppsEducationView;
+    }
+
+    public void setCanShowAllAppsEducationView(boolean canShowAllAppsEducationView) {
+        mCanShowAllAppsEducationView = canShowAllAppsEducationView;
     }
 }
