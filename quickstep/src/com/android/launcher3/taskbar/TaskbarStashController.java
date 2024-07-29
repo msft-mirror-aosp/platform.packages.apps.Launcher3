@@ -31,6 +31,7 @@ import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
 import static com.android.quickstep.util.SystemActionConstants.SYSTEM_ACTION_ID_TASKBAR;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DIALOG_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE;
@@ -94,6 +95,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     public static final int FLAG_STASHED_SYSUI = 1 << 9; //  app pinning,...
     public static final int FLAG_STASHED_DEVICE_LOCKED = 1 << 10; // device is locked: keyguard, ...
     public static final int FLAG_IN_OVERVIEW = 1 << 11; // launcher is in overview
+    public static final int FLAG_IGNORE_IN_APP = 1 << 12; // used to sync with app launch animation
 
     // If any of these flags are enabled, isInApp should return true.
     private static final int FLAGS_IN_APP = FLAG_IN_APP | FLAG_IN_SETUP;
@@ -285,18 +287,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     }
 
     /**
-     * Show Taskbar upon receiving broadcast
-     */
-    public void showTaskbarFromBroadcast() {
-        // If user is in middle of taskbar education handle go to next step of education
-        if (mControllers.taskbarEduTooltipController.isBeforeTooltipFeaturesStep()) {
-            mControllers.taskbarEduTooltipController.hide();
-            mControllers.taskbarEduTooltipController.maybeShowFeaturesEdu();
-        }
-        updateAndAnimateTransientTaskbar(false);
-    }
-
-    /**
      * Initializes the controller
      */
     public void init(
@@ -342,9 +332,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         applyState(/* duration = */ 0);
 
         // Hide the background while stashed so it doesn't show on fast swipes home
-        boolean shouldHideTaskbarBackground = enableScalingRevealHomeAnimation()
-                && DisplayController.isTransientTaskbar(mActivity)
-                && isStashed();
+        boolean shouldHideTaskbarBackground = mActivity.isPhoneMode() ||
+                (enableScalingRevealHomeAnimation()
+                        && DisplayController.isTransientTaskbar(mActivity)
+                        && isStashed());
 
         mTaskbarBackgroundAlphaForStash.setValue(shouldHideTaskbarBackground ? 0 : 1);
 
@@ -1018,7 +1009,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         long startDelay = 0;
 
         updateStateForFlag(FLAG_STASHED_IN_APP_SYSUI, hasAnyFlag(systemUiStateFlags,
-                SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE));
+                SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE | SYSUI_STATE_DIALOG_SHOWING));
 
         boolean stashForBubbles = hasAnyFlag(FLAG_IN_OVERVIEW)
                 && hasAnyFlag(systemUiStateFlags, SYSUI_STATE_BUBBLES_EXPANDED)
@@ -1273,6 +1264,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
          */
         @Nullable
         public Animator createSetStateAnimator(long flags, long duration) {
+            // We do this when we want to synchronize the app launch and taskbar stash animations.
+            if (hasAnyFlag(FLAG_IGNORE_IN_APP) && hasAnyFlag(flags, FLAG_IN_APP)) {
+                flags = flags & ~FLAG_IN_APP;
+            }
+
             boolean isStashed = mStashCondition.test(flags);
 
             if (DEBUG) {

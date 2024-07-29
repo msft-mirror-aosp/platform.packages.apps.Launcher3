@@ -20,8 +20,6 @@ import static com.android.launcher3.util.TestConstants.AppNames.CHROME_APP_NAME;
 import static com.android.launcher3.util.TestConstants.AppNames.MAPS_APP_NAME;
 import static com.android.launcher3.util.TestConstants.AppNames.MESSAGES_APP_NAME;
 import static com.android.launcher3.util.TestConstants.AppNames.STORE_APP_NAME;
-import static com.android.launcher3.util.rule.TestStabilityRule.LOCAL;
-import static com.android.launcher3.util.rule.TestStabilityRule.PLATFORM_POSTSUBMIT;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -40,7 +38,6 @@ import com.android.launcher3.ui.PortraitLandscapeRunner.PortraitLandscape;
 import com.android.launcher3.util.LauncherLayoutBuilder;
 import com.android.launcher3.util.TestUtil;
 import com.android.launcher3.util.rule.ScreenRecordRule;
-import com.android.launcher3.util.rule.TestStabilityRule;
 
 import org.junit.After;
 import org.junit.Before;
@@ -113,8 +110,6 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
 
     @Test
     @PortraitLandscape
-    @ScreenRecordRule.ScreenRecord // b/329935119
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/329935119
     public void testSinglePageDragIconWhenMultiplePageScrollingIsPossible() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -169,6 +164,7 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
 
     @Test
     @PortraitLandscape
+    @ScreenRecordRule.ScreenRecord // b/352130094
     public void testDragIconToPage2() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -289,6 +285,7 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
 
     @Test
     @PortraitLandscape
+    @ScreenRecordRule.ScreenRecord // b/330232490
     public void testEmptyPagesGetRemovedIfBothPagesAreEmpty() {
         Workspace workspace = mLauncher.getWorkspace();
 
@@ -352,11 +349,8 @@ public class TaplTwoPanelWorkspaceTest extends AbstractLauncherUiTest<Launcher> 
     }
 
     private void assertPagesExist(Launcher launcher, int... pageIds) {
-        waitForLauncherCondition("Existing page count does NOT match. "
-                + "Expected: " + pageIds.length
-                + ". Actual: " + launcher.getWorkspace().getPageCount(),
-                l -> pageIds.length == l.getWorkspace().getPageCount());
         int pageCount = launcher.getWorkspace().getPageCount();
+        assertEquals("Existing page count does NOT match.", pageIds.length, pageCount);
         for (int i = 0; i < pageCount; i++) {
             CellLayout page = (CellLayout) launcher.getWorkspace().getPageAt(i);
             int pageId = launcher.getWorkspace().getCellLayoutId(page);

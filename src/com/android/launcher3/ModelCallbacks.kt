@@ -11,6 +11,8 @@ import com.android.launcher3.Utilities.SHOULD_SHOW_FIRST_PAGE_WIDGET
 import com.android.launcher3.WorkspaceLayoutManager.FIRST_SCREEN_ID
 import com.android.launcher3.allapps.AllAppsStore
 import com.android.launcher3.config.FeatureFlags
+import com.android.launcher3.debug.TestEvent
+import com.android.launcher3.debug.TestEventEmitter
 import com.android.launcher3.model.BgDataModel
 import com.android.launcher3.model.StringCache
 import com.android.launcher3.model.data.AppInfo
@@ -156,6 +158,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
             /*pause=*/ false,
             deviceProfile.isTwoPanels
         )
+        TestEventEmitter.INSTANCE.get(launcher).sendEvent(TestEvent.WORKSPACE_FINISH_LOADING)
     }
 
     /**
@@ -251,8 +254,8 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         PopupContainerWithArrow.dismissInvalidPopup(launcher)
     }
 
-    override fun bindAllWidgets(allWidgets: List<WidgetsListBaseEntry?>?) {
-        launcher.popupDataProvider.allWidgets = allWidgets
+    override fun bindAllWidgets(allWidgets: List<WidgetsListBaseEntry>) {
+        launcher.widgetPickerDataProvider.setWidgets(allWidgets, /* defaultWidgets= */ listOf())
     }
 
     /** Returns the ids of the workspaces to bind. */
@@ -301,7 +304,8 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         }
 
         val widgetsListBaseEntry: WidgetsListBaseEntry =
-            launcher.popupDataProvider.allWidgets.firstOrNull { item: WidgetsListBaseEntry ->
+            launcher.widgetPickerDataProvider.get().allWidgets.firstOrNull {
+                item: WidgetsListBaseEntry ->
                 item.mPkgItem.packageName == BuildConfig.APPLICATION_ID
             } ?: return
 

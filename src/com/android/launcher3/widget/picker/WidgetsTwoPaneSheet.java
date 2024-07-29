@@ -22,12 +22,15 @@ import static com.android.launcher3.UtilitiesKt.CLIP_TO_PADDING_FALSE_MODIFIER;
 import static com.android.launcher3.UtilitiesKt.modifyAttributesOnViewTree;
 import static com.android.launcher3.UtilitiesKt.restoreAttributesOnViewTree;
 import static com.android.launcher3.widget.picker.WidgetsListItemAnimator.WIDGET_LIST_ITEM_APPEARANCE_DELAY;
+import static com.android.launcher3.widget.picker.model.data.WidgetPickerDataUtils.findContentEntryForPackageUser;
 
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.Process;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -35,7 +38,9 @@ import android.view.ViewParent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.ScrollView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -60,9 +65,6 @@ import java.util.List;
  * Popup for showing the full list of available widgets with a two-pane layout.
  */
 public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
-
-    private static final int PERSONAL_TAB = 0;
-    private static final int WORK_TAB = 1;
     private static final int MINIMUM_WIDTH_LEFT_PANE_FOLDABLE_DP = 268;
     private static final int MAXIMUM_WIDTH_LEFT_PANE_FOLDABLE_DP = 395;
     private static final String SUGGESTIONS_PACKAGE_NAME = "widgets_list_suggestions_entry";
@@ -83,6 +85,18 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     private int mActivePage = -1;
     @Nullable
     private PackageUserKey mSelectedHeader;
+    private TextView mHeaderDescription;
+
+    /**
+     * A menu displayed for options (e.g. "show all widgets" filter) around widget lists in the
+     * picker.
+     */
+    protected View mWidgetOptionsMenu;
+    /**
+     * State of the options in the menu (if displayed to the user).
+     */
+    @Nullable
+    protected WidgetOptionsMenuState mWidgetOptionsMenuState = null;
 
     public WidgetsTwoPaneSheet(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
@@ -120,12 +134,20 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
         mWidgetRecommendationsView.initParentViews(mWidgetRecommendationsContainer);
         mWidgetRecommendationsView.setWidgetCellLongClickListener(this);
         mWidgetRecommendationsView.setWidgetCellOnClickListener(this);
+        if (!mDeviceProfile.isTwoPanels) {
+            mWidgetRecommendationsView.enableFullPageViewIfLowDensity();
+        }
         // To save the currently displayed page, so that, it can be requested when rebinding
         // recommendations with different size constraints.
         mWidgetRecommendationsView.addPageSwitchListener(
                 newPage -> mRecommendationsCurrentPage = newPage);
 
         mHeaderTitle = mContent.findViewById(R.id.title);
+        mHeaderDescription = mContent.findViewById(R.id.widget_picker_description);
+
+        mWidgetOptionsMenu = mContent.findViewById(R.id.widget_picker_widget_options_menu);
+        setupWidgetOptionsMenu();
+
         mRightPane = mContent.findViewById(R.id.right_pane);
         mRightPaneScrollView = mContent.findViewById(R.id.right_pane_scroll_view);
         mRightPaneScrollView.setOverScrollMode(View.OVER_SCROLL_NEVER);
@@ -138,6 +160,51 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
 
         // Set the fast scroller as not visible for two pane layout.
         mFastScroller.setVisibility(GONE);
+    }
+
+    @Override
+    public void mayUpdateTitleAndDescription(@Nullable String title, @Nullable String description) {
+        if (title != null) {
+            mHeaderTitle.setText(title);
+        }
+        if (description != null) {
+            mHeaderDescription.setText(description);
+            mHeaderDescription.setVisibility(VISIBLE);
+        }
+    }
+
+    protected void setupWidgetOptionsMenu() {
+        mWidgetOptionsMenu.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (mWidgetOptionsMenuState != null) {
+                    PopupMenu popupMenu = new PopupMenu(mActivityContext, /*anchor=*/ v,
+                            Gravity.END);
+                    MenuItem menuItem = popupMenu.getMenu().add(
+                            R.string.widget_picker_show_all_widgets_menu_item_title);
+                    menuItem.setCheckable(true);
+                    menuItem.setChecked(mWidgetOptionsMenuState.showAllWidgets);
+                    menuItem.setOnMenuItemClickListener(
+                            item -> onShowAllWidgetsMenuItemClick(item));
+                    popupMenu.show();
+                }
+            }
+        });
+    }
+
+    private boolean onShowAllWidgetsMenuItemClick(MenuItem menuItem) {
+        mWidgetOptionsMenuState.showAllWidgets = !mWidgetOptionsMenuState.showAllWidgets;
+        menuItem.setChecked(mWidgetOptionsMenuState.showAllWidgets);
+
+        // Refresh widgets
+        onWidgetsBound();
+        if (mIsInSearchMode) {
+            mSearchBar.reset();
+        } else if (!mSuggestedWidgetsPackageUserKey.equals(mSelectedHeader)) {
+            mAdapters.get(mActivePage).mWidgetsListAdapter.selectFirstHeaderEntry();
+            mAdapters.get(mActivePage).mWidgetsRecyclerView.scrollToTop();
+        }
+        return true;
     }
 
     @Override
@@ -219,6 +286,29 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     }
 
     @Override
+    protected List<WidgetsListBaseEntry> getWidgetsToDisplay() {
+        List<WidgetsListBaseEntry> allWidgets =
+                mActivityContext.getWidgetPickerDataProvider().get().getAllWidgets();
+        List<WidgetsListBaseEntry> defaultWidgets =
+                mActivityContext.getWidgetPickerDataProvider().get().getDefaultWidgets();
+
+        if (allWidgets.isEmpty() || defaultWidgets.isEmpty()) {
+            // no menu if there are no default widgets to show
+            mWidgetOptionsMenuState = null;
+            mWidgetOptionsMenu.setVisibility(GONE);
+        } else {
+            if (mWidgetOptionsMenuState == null) {
+                mWidgetOptionsMenuState = new WidgetOptionsMenuState();
+            }
+
+            mWidgetOptionsMenu.setVisibility(VISIBLE);
+            return mWidgetOptionsMenuState.showAllWidgets ? allWidgets : defaultWidgets;
+        }
+
+        return allWidgets;
+    }
+
+    @Override
     public void onWidgetsBound() {
         super.onWidgetsBound();
         if (mRecommendedWidgetsCount == 0 && mSelectedHeader == null) {
@@ -270,7 +360,7 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
         WidgetsListHeaderEntry widgetsListHeaderEntry = WidgetsListHeaderEntry.create(
                         packageItemInfo,
                         /*titleSectionName=*/ suggestionsHeaderTitle,
-                        /*items=*/ mActivityContext.getPopupDataProvider().getRecommendedWidgets(),
+                        /*items=*/ List.of(), // not necessary
                         /*visibleWidgetsCount=*/ 0)
                 .withWidgetListShown();
 
@@ -371,9 +461,10 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
     protected void updateRecyclerViewVisibility(AdapterHolder adapterHolder) {
         // The first item is always an empty space entry. Look for any more items.
         boolean isWidgetAvailable = adapterHolder.mWidgetsListAdapter.hasVisibleEntries();
-
-        mRightPane.setVisibility(isWidgetAvailable ? VISIBLE : GONE);
-
+        if (!isWidgetAvailable) {
+            mRightPane.removeAllViews();
+            mRightPane.addView(mNoWidgetsView);
+        }
         super.updateRecyclerViewVisibility(adapterHolder);
     }
 
@@ -419,8 +510,11 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                 final boolean isUserClick = mSelectedHeader != null
                         && !getAccessibilityInitialFocusView().isAccessibilityFocused();
                 mSelectedHeader = selectedHeader;
-                WidgetsListContentEntry contentEntry = mActivityContext.getPopupDataProvider()
-                        .getSelectedAppWidgets(selectedHeader);
+                final boolean showDefaultWidgets = mWidgetOptionsMenuState != null
+                        && !mWidgetOptionsMenuState.showAllWidgets;
+                WidgetsListContentEntry contentEntry = findContentEntryForPackageUser(
+                        mActivityContext.getWidgetPickerDataProvider().get(),
+                        selectedHeader, showDefaultWidgets);
 
                 if (contentEntry == null || mRightPane == null) {
                     return;
@@ -553,5 +647,16 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
          * the left pane.
          */
         void onHeaderChanged(@NonNull PackageUserKey selectedHeader);
+    }
+
+    /**
+     * Holds the selection state of the options menu (if presented to the user).
+     */
+    protected static class WidgetOptionsMenuState {
+        /**
+         * UI state indicating whether to show default or all widgets.
+         * <p>If true, shows all widgets; else shows the default widgets.</p>
+         */
+        public boolean showAllWidgets = false;
     }
 }
