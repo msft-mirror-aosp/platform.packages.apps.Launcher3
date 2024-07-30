@@ -73,7 +73,7 @@ public final class OverviewComponentObserver {
     private Consumer<Boolean> mOverviewChangeListener = b -> { };
 
     private String mUpdateRegisteredPackage;
-    private BaseActivityInterface mActivityInterface;
+    private BaseContainerInterface mContainerInterface;
     private Intent mOverviewIntent;
     private boolean mIsHomeAndOverviewSame;
     private boolean mIsDefaultHome;
@@ -150,8 +150,8 @@ public final class OverviewComponentObserver {
         // Set assistant visibility to 0 from launcher's perspective, ensures any elements that
         // launcher made invisible become visible again before the new activity control helper
         // becomes active.
-        if (mActivityInterface != null) {
-            mActivityInterface.onAssistantVisibilityChanged(0.f);
+        if (mContainerInterface != null) {
+            mContainerInterface.onAssistantVisibilityChanged(0.f);
         }
 
         if (SEPARATE_RECENTS_ACTIVITY.get()) {
@@ -168,7 +168,7 @@ public final class OverviewComponentObserver {
 
         if (!mIsHomeDisabled && (defaultHome == null || mIsDefaultHome)) {
             // User default home is same as out home app. Use Overview integrated in Launcher.
-            mActivityInterface = LauncherActivityInterface.INSTANCE;
+            mContainerInterface = LauncherActivityInterface.INSTANCE;
             mIsHomeAndOverviewSame = true;
             mOverviewIntent = mMyHomeIntent;
             mCurrentHomeIntent.setComponent(mMyHomeIntent.getComponent());
@@ -178,7 +178,7 @@ public final class OverviewComponentObserver {
         } else {
             // The default home app is a different launcher. Use the fallback Overview instead.
 
-            mActivityInterface = FallbackActivityInterface.INSTANCE;
+            mContainerInterface = FallbackActivityInterface.INSTANCE;
             mIsHomeAndOverviewSame = false;
             mOverviewIntent = mFallbackIntent;
             mCurrentHomeIntent.setComponent(defaultHome);
@@ -266,21 +266,12 @@ public final class OverviewComponentObserver {
     }
 
     /**
-     * Get the current activity control helper for managing interactions to the overview activity.
+     * Get the current control helper for managing interactions to the overview container.
      *
-     * @return the current activity control helper
+     * @return the current control helper
      */
-    public BaseActivityInterface getActivityInterface() {
-        return mActivityInterface;
-    }
-
-    /**
-     * Get the current container control helper for managing interactions to the overview activity.
-     *
-     * @return the current container control helper
-     */
-    public BaseContainerInterface<?, ?> getContainerInterface() {
-        return mActivityInterface;
+    public BaseContainerInterface<?,?> getContainerInterface() {
+        return mContainerInterface;
     }
 
     public void dump(PrintWriter pw) {

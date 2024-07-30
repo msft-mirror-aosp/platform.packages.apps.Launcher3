@@ -82,7 +82,7 @@ import java.util.function.Consumer;
  * Handles the navigation gestures when a 3rd party launcher is the default home activity.
  */
 public class FallbackSwipeHandler extends
-        AbsSwipeUpHandler<RecentsActivity, FallbackRecentsView, RecentsState> {
+        AbsSwipeUpHandler<RecentsActivity, FallbackRecentsView<RecentsActivity>, RecentsState> {
 
     private static final String TAG = "FallbackSwipeHandler";
 

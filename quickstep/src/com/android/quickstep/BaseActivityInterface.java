@@ -36,7 +36,6 @@ import android.animation.AnimatorSet;
 import android.view.MotionEvent;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.UiThread;
 
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
@@ -123,13 +122,6 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         ACTIVITY_TYPE activity = getCreatedContainer();
         return activity != null && activity.isStarted();
     }
-
-    @UiThread
-    @Nullable
-    public abstract <T extends RecentsView> T getVisibleRecentsView();
-
-    @UiThread
-    public abstract boolean switchToRecentsIfVisible(Animator.AnimatorListener animatorListener);
 
     public boolean deferStartingActivity(RecentsAnimationDeviceState deviceState, MotionEvent ev) {
         TaskbarUIController controller = getTaskbarController();

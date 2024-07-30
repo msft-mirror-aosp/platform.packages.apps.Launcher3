@@ -83,7 +83,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.ConstantItem;
 import com.android.launcher3.EncryptionType;
 import com.android.launcher3.Flags;
@@ -324,10 +323,10 @@ public class TouchInteractionService extends Service {
         @Override
         public void enterStageSplitFromRunningApp(boolean leftOrTop) {
             executeForTouchInteractionService(tis -> {
-                StatefulActivity activity =
-                        tis.mOverviewComponentObserver.getActivityInterface().getCreatedContainer();
-                if (activity != null) {
-                    activity.enterStageSplitFromRunningApp(leftOrTop);
+                RecentsViewContainer container = tis.mOverviewComponentObserver
+                        .getContainerInterface().getCreatedContainer();
+                if (container != null) {
+                    container.enterStageSplitFromRunningApp(leftOrTop);
                 }
             });
         }
@@ -761,11 +760,12 @@ public class TouchInteractionService extends Service {
 
     private void onOverviewTargetChange(boolean isHomeAndOverviewSame) {
         mAllAppsActionManager.setHomeAndOverviewSame(isHomeAndOverviewSame);
-
-        StatefulActivity<?> newOverviewActivity =
-                mOverviewComponentObserver.getActivityInterface().getCreatedContainer();
-        if (newOverviewActivity != null) {
-            mTaskbarManager.setActivity(newOverviewActivity);
+        RecentsViewContainer newOverviewContainer =
+                mOverviewComponentObserver.getContainerInterface().getCreatedContainer();
+        if (newOverviewContainer != null
+                && newOverviewContainer instanceof StatefulActivity activity) {
+            //TODO(b/368030750) refactor taskbarManager to accept RecentsViewContainer
+            mTaskbarManager.setActivity(activity);
         }
         mTISBinder.onOverviewTargetChange();
     }
@@ -795,7 +795,7 @@ public class TouchInteractionService extends Service {
     @UiThread
     private void onAssistantVisibilityChanged() {
         if (LockedUserState.get(this).isUserUnlocked()) {
-            mOverviewComponentObserver.getActivityInterface().onAssistantVisibilityChanged(
+            mOverviewComponentObserver.getContainerInterface().onAssistantVisibilityChanged(
                     mDeviceState.getAssistantVisibility());
         }
     }
@@ -1575,11 +1575,11 @@ public class TouchInteractionService extends Service {
             return;
         }
 
-        final BaseActivityInterface activityInterface =
-                mOverviewComponentObserver.getActivityInterface();
+        final BaseContainerInterface containerInterface =
+                mOverviewComponentObserver.getContainerInterface();
         final Intent overviewIntent = new Intent(
                 mOverviewComponentObserver.getOverviewIntentIgnoreSysUiState());
-        if (activityInterface.getCreatedContainer() != null && fromInit) {
+        if (containerInterface.getCreatedContainer() != null && fromInit) {
             // The activity has been created before the initialization of overview service. It is
             // usually happens when booting or launcher is the top activity, so we should already
             // have the latest state.
@@ -1599,18 +1599,18 @@ public class TouchInteractionService extends Service {
         if (!LockedUserState.get(this).isUserUnlocked()) {
             return;
         }
-        final BaseActivityInterface activityInterface =
-                mOverviewComponentObserver.getActivityInterface();
-        final BaseDraggingActivity activity = activityInterface.getCreatedContainer();
-        if (activity == null || activity.isStarted()) {
+        final BaseContainerInterface containerInterface =
+                mOverviewComponentObserver.getContainerInterface();
+        final RecentsViewContainer container = containerInterface.getCreatedContainer();
+        if (container == null || container.isStarted()) {
             // We only care about the existing background activity.
             return;
         }
-        Configuration oldConfig = activity.getResources().getConfiguration();
+        Configuration oldConfig = container.asContext().getResources().getConfiguration();
         boolean isFoldUnfold = isTablet(oldConfig) != isTablet(newConfig);
         if (!isFoldUnfold && mOverviewComponentObserver.canHandleConfigChanges(
-                activity.getComponentName(),
-                activity.getResources().getConfiguration().diff(newConfig))) {
+                container.getComponentName(),
+                container.asContext().getResources().getConfiguration().diff(newConfig))) {
             // Since navBar gestural height are different between portrait and landscape,
             // can handle orientation changes and refresh navigation gestural region through
             // onOneHandedModeChanged()
@@ -1649,11 +1649,11 @@ public class TouchInteractionService extends Service {
         pw.println("\tmInputEventReceiver=" + mInputEventReceiver);
         DisplayController.INSTANCE.get(this).dump(pw);
         pw.println("TouchState:");
-        BaseDraggingActivity createdOverviewActivity = mOverviewComponentObserver == null ? null
-                : mOverviewComponentObserver.getActivityInterface().getCreatedContainer();
+        RecentsViewContainer createdOverviewContainer = mOverviewComponentObserver == null ? null
+                : mOverviewComponentObserver.getContainerInterface().getCreatedContainer();
         boolean resumed = mOverviewComponentObserver != null
-                && mOverviewComponentObserver.getActivityInterface().isResumed();
-        pw.println("\tcreatedOverviewActivity=" + createdOverviewActivity);
+                && mOverviewComponentObserver.getContainerInterface().isResumed();
+        pw.println("\tcreatedOverviewActivity=" + createdOverviewContainer);
         pw.println("\tresumed=" + resumed);
         pw.println("\tmConsumer=" + mConsumer.getName());
         ActiveGestureLog.INSTANCE.dump("", pw);
@@ -1661,8 +1661,8 @@ public class TouchInteractionService extends Service {
         if (mTaskAnimationManager != null) {
             mTaskAnimationManager.dump("", pw);
         }
-        if (createdOverviewActivity != null) {
-            createdOverviewActivity.getDeviceProfile().dump(this, "", pw);
+        if (createdOverviewContainer != null) {
+            createdOverviewContainer.getDeviceProfile().dump(this, "", pw);
         }
         mTaskbarManager.dumpLogs("", pw);
         mDesktopVisibilityController.dumpLogs("", pw);

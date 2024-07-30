@@ -34,6 +34,7 @@ import android.view.RemoteAnimationTarget;
 import android.view.View;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
@@ -59,7 +60,15 @@ import java.util.function.Predicate;
 public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_TYPE>,
         CONTAINER_TYPE extends RecentsViewContainer> {
 
+
     public boolean rotationSupportedByActivity = false;
+
+    @UiThread
+    @Nullable
+    public abstract <T extends RecentsView<?,?>> T getVisibleRecentsView();
+
+    @UiThread
+    public abstract boolean switchToRecentsIfVisible(Animator.AnimatorListener animatorListener);
 
     @Nullable
     public abstract CONTAINER_TYPE getCreatedContainer();
@@ -125,6 +134,8 @@ public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_
     public boolean shouldCancelCurrentGesture() {
         return false;
     }
+
+    abstract void runOnInitBackgroundStateUI(Runnable callback);
 
     @Nullable
     public DesktopVisibilityController getDesktopVisibilityController() {

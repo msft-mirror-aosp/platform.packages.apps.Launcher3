@@ -100,7 +100,7 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
     public TaskbarDragLayer(@NonNull Context context, @Nullable AttributeSet attrs,
             int defStyleAttr, int defStyleRes) {
         super(context, attrs, 1 /* alphaChannelCount */);
-        mBackgroundRenderer = new TaskbarBackgroundRenderer(mActivity);
+        mBackgroundRenderer = new TaskbarBackgroundRenderer(mContainer);
 
         mTaskbarBackgroundAlpha = new MultiPropertyFactory<>(this, BG_ALPHA, INDEX_COUNT,
                 (a, b) -> a * b, 1f);
@@ -109,7 +109,7 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
 
     public void init(TaskbarDragLayerController.TaskbarDragLayerCallbacks callbacks) {
         mControllerCallbacks = callbacks;
-        mBackgroundRenderer.updateStashedHandleWidth(mActivity, getResources());
+        mBackgroundRenderer.updateStashedHandleWidth(mContainer, getResources());
         recreateControllers();
     }
 
@@ -275,7 +275,7 @@ public class TaskbarDragLayer extends BaseDragLayer<TaskbarActivityContext> {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getAction() == ACTION_UP && event.getKeyCode() == KEYCODE_BACK) {
-            AbstractFloatingView topView = AbstractFloatingView.getTopOpenView(mActivity);
+            AbstractFloatingView topView = AbstractFloatingView.getTopOpenView(mContainer);
             if (topView != null && topView.canHandleBack()) {
                 topView.onBackInvoked();
                 // Handled by the floating view.

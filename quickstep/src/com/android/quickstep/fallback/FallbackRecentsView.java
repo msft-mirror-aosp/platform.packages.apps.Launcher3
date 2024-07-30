@@ -38,6 +38,7 @@ import com.android.launcher3.desktop.DesktopRecentsTransitionController;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StateManager.StateListener;
+import com.android.launcher3.statemanager.StatefulContainer;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitSelectSource;
 import com.android.quickstep.FallbackActivityInterface;
@@ -49,6 +50,7 @@ import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.util.TaskViewSimulator;
 import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
 
@@ -56,7 +58,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsState>
+public class FallbackRecentsView<CONTAINER_TYPE extends Context & RecentsViewContainer
+        & StatefulContainer<RecentsState>> extends RecentsView<CONTAINER_TYPE, RecentsState>
         implements StateListener<RecentsState> {
 
     private static final int TASK_DISMISS_DURATION = 150;
@@ -93,7 +96,7 @@ public class FallbackRecentsView extends RecentsView<RecentsActivity, RecentsSta
     }
 
     @Override
-    public StateManager<RecentsState, RecentsActivity> getStateManager() {
+    public StateManager<RecentsState, ?> getStateManager() {
         return mContainer.getStateManager();
     }
 

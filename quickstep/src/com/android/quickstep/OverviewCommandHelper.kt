@@ -50,15 +50,15 @@ import com.android.quickstep.views.RecentsViewContainer
 import com.android.quickstep.views.TaskView
 import com.android.systemui.shared.recents.model.ThumbnailData
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper
-import java.io.PrintWriter
-import java.util.concurrent.ConcurrentLinkedDeque
-import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
+import java.io.PrintWriter
+import java.util.concurrent.ConcurrentLinkedDeque
+import kotlin.coroutines.resume
 
 /** Helper class to handle various atomic commands for switching between Overview. */
 class OverviewCommandHelper
@@ -80,11 +80,11 @@ constructor(
      */
     private var keyboardTaskFocusIndex = -1
 
-    private val activityInterface: BaseActivityInterface<*, *>
-        get() = overviewComponentObserver.activityInterface
+    private val containerInterface: BaseContainerInterface<*, *>
+        get() = overviewComponentObserver.containerInterface
 
     private val visibleRecentsView: RecentsView<*, *>?
-        get() = activityInterface.getVisibleRecentsView<RecentsView<*, *>>()
+        get() = containerInterface.getVisibleRecentsView<RecentsView<*, *>>()
 
     /**
      * Adds a command to be executed next, after all pending tasks are completed. Max commands that
@@ -258,10 +258,10 @@ constructor(
         command: CommandInfo,
         onCallbackResult: () -> Unit,
     ): Boolean {
-        val recentsViewContainer = activityInterface.getCreatedContainer() as? RecentsViewContainer
+        val recentsViewContainer = containerInterface.getCreatedContainer()
         val recentsView: RecentsView<*, *>? = recentsViewContainer?.getOverviewPanel()
         val deviceProfile = recentsViewContainer?.getDeviceProfile()
-        val uiController = activityInterface.getTaskbarController()
+        val uiController = containerInterface.getTaskbarController()
         val allowQuickSwitch =
             uiController != null &&
                 deviceProfile != null &&
@@ -316,13 +316,13 @@ constructor(
                     onCallbackResult()
                 }
             }
-        if (activityInterface.switchToRecentsIfVisible(animatorListener)) {
+        if (containerInterface.switchToRecentsIfVisible(animatorListener)) {
             Log.d(TAG, "switching to Overview state - waiting: $command")
             // If successfully switched, wait until animation finishes
             return false
         }
 
-        val activity = activityInterface.getCreatedContainer()
+        val activity = containerInterface.getCreatedContainer()
         if (activity != null) {
             InteractionJankMonitorWrapper.begin(activity.rootView, Cuj.CUJ_LAUNCHER_QUICK_SWITCH)
         }
@@ -352,7 +352,7 @@ constructor(
                     Log.d(TAG, "recents animation started: $command")
                     updateRecentsViewFocus(command)
                     logShowOverviewFrom(command.type)
-                    activityInterface.runOnInitBackgroundStateUI {
+                    containerInterface.runOnInitBackgroundStateUI {
                         Log.d(TAG, "recents animation started - onInitBackgroundStateUI: $command")
                         interactionHandler.onGestureEnded(0f, PointF())
                     }
@@ -366,7 +366,7 @@ constructor(
                     interactionHandler.onGestureCancelled()
                     command.removeListener(this)
 
-                    activityInterface.getCreatedContainer() ?: return
+                    containerInterface.getCreatedContainer() ?: return
                     recentsView?.onRecentsAnimationComplete()
                 }
             }
@@ -473,7 +473,7 @@ constructor(
     }
 
     private fun logShowOverviewFrom(commandType: CommandType) {
-        val container = activityInterface.getCreatedContainer() as? RecentsViewContainer ?: return
+        val container = containerInterface.getCreatedContainer() ?: return
         val event =
             when (commandType) {
                 SHOW -> LAUNCHER_OVERVIEW_SHOW_OVERVIEW_FROM_KEYBOARD_SHORTCUT
