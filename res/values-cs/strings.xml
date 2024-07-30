@@ -27,6 +27,7 @@
     <string name="safemode_widget_error" msgid="4863470563535682004">"V nouzovém režimu jsou widgety zakázány."</string>
     <string name="shortcut_not_available" msgid="2536503539825726397">"Zkratka není k dispozici"</string>
     <string name="home_screen" msgid="5629429142036709174">"Domů"</string>
+    <string name="set_default_home_app" msgid="5808906607627586381">"Nastavit <xliff:g id="LAUNCHER_NAME">%1$s</xliff:g> jako výchozí vstupní aplikaci v Nastavení"</string>
     <string name="recent_task_option_split_screen" msgid="6690461455618725183">"Rozdělit obrazovku"</string>
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"Informace o aplikaci %1$s"</string>
     <string name="split_app_usage_settings" msgid="7214375263347964093">"Nastavení využití pro aplikaci %1$s"</string>
@@ -37,6 +38,8 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"Dvojice aplikací není k dispozici"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Widget přesunete klepnutím a podržením."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Dvojitým klepnutím a podržením přesunete widget, případně použijte vlastní akce."</string>
+    <string name="widget_picker_widget_options_button_description" msgid="4770099264476852363">"Další možnosti"</string>
+    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"Zobrazit všechny widgety"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"šířka %1$d, výška %2$d"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> widget"</string>
@@ -192,6 +195,6 @@
     <string name="ps_container_lock_button_content_description" msgid="5961993384382649530">"Soukromé, uzamčeno."</string>
     <string name="ps_container_lock_title" msgid="2640257399982364682">"Zamknout"</string>
     <string name="ps_container_transition" msgid="8667331812048014412">"Převádění soukromého prostoru"</string>
-    <string name="ps_add_button_label" msgid="8127988716897128773">"Instalovat"</string>
+    <string name="ps_add_button_label" msgid="8127988716897128773">"Nainstalovat"</string>
     <string name="ps_add_button_content_description" msgid="3254274107740952556">"Instalovat aplikace do soukromého prostoru"</string>
 </resources>

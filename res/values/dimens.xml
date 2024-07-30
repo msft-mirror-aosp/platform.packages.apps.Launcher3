@@ -172,8 +172,6 @@
     <dimen name="padded_rounded_button_height">48dp</dimen>
     <dimen name="rounded_button_height">48dp</dimen>
     <dimen name="rounded_button_radius">200dp</dimen>
-    <dimen name="rounded_button_padding">8dp</dimen>
-
 
     <!-- Widget tray -->
     <dimen name="widget_cell_vertical_padding">8dp</dimen>
@@ -447,6 +445,9 @@
 
     <!-- Size of the maximum radius for the enforced rounded rectangles. -->
     <dimen name="enforced_rounded_corner_max_radius">16dp</dimen>
+
+    <!-- Size of the radius for the rounded corners of Persistent Taskbar. -->
+    <dimen name="persistent_taskbar_corner_radius">16dp</dimen>
 
     <!-- Base Swipe Detector, speed in dp/s -->
     <dimen name="base_swift_detector_fling_release_velocity">1dp</dimen>

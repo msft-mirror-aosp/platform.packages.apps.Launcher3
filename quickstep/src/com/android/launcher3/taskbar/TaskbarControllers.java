@@ -180,8 +180,9 @@ public class TaskbarControllers {
                 taskbarUnfoldAnimationController, taskbarKeyguardController,
                 stashedHandleViewController, taskbarStashController,
                 taskbarAutohideSuspendController, taskbarPopupController, taskbarInsetsController,
-                voiceInteractionWindowController, taskbarTranslationController,
-                taskbarEduTooltipController, keyboardQuickSwitchController, taskbarPinningController
+                voiceInteractionWindowController, taskbarRecentAppsController,
+                taskbarTranslationController, taskbarEduTooltipController,
+                keyboardQuickSwitchController, taskbarPinningController,
         };
         mBackgroundRendererControllers = new BackgroundRendererController[] {
                 taskbarDragLayerController, taskbarScrimViewController,
@@ -281,6 +282,11 @@ public class TaskbarControllers {
         }
         uiController.dumpLogs(prefix + "\t", pw);
         rotationButtonController.dumpLogs(prefix + "\t", pw);
+        if (bubbleControllers.isPresent()) {
+            bubbleControllers.get().dump(pw);
+        } else {
+            pw.println(String.format("%s\t%s", prefix, "Bubble controllers are empty."));
+        }
     }
 
     /**

@@ -27,6 +27,7 @@
     <string name="safemode_widget_error" msgid="4863470563535682004">"Widgets desativados no modo de segurança"</string>
     <string name="shortcut_not_available" msgid="2536503539825726397">"O atalho não está disponível"</string>
     <string name="home_screen" msgid="5629429142036709174">"Início"</string>
+    <string name="set_default_home_app" msgid="5808906607627586381">"Definir <xliff:g id="LAUNCHER_NAME">%1$s</xliff:g> como app de início padrão nas Configurações"</string>
     <string name="recent_task_option_split_screen" msgid="6690461455618725183">"Tela dividida"</string>
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"Informações do app %1$s"</string>
     <string name="split_app_usage_settings" msgid="7214375263347964093">"Configurações de uso de %1$s"</string>
@@ -37,6 +38,8 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"O Par de apps não está disponível"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Toque e pressione para mover um widget."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Toque duas vezes e mantenha a tela pressionada para mover um widget ou usar ações personalizadas."</string>
+    <string name="widget_picker_widget_options_button_description" msgid="4770099264476852363">"Mais opções"</string>
+    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"Mostrar todos os widgets"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"%1$d de largura por %2$d de altura"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"Widget <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>
@@ -184,13 +187,13 @@
     <string name="work_apps_enable_btn_text" msgid="1736198302467317371">"Ativar"</string>
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"Filtrar"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"Falha: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
-    <string name="private_space_label" msgid="2359721649407947001">"Espaço particular"</string>
+    <string name="private_space_label" msgid="2359721649407947001">"Espaço privado"</string>
     <string name="private_space_secondary_label" msgid="9203933341714508907">"Toque para configurar ou abrir"</string>
     <string name="ps_container_title" msgid="4391796149519594205">"Particular"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"Configurações do Espaço particular"</string>
     <string name="ps_container_unlock_button_content_description" msgid="9181551784092204234">"Privada, desbloqueado."</string>
     <string name="ps_container_lock_button_content_description" msgid="5961993384382649530">"Privada, bloqueado."</string>
-    <string name="ps_container_lock_title" msgid="2640257399982364682">"Bloquear"</string>
+    <string name="ps_container_lock_title" msgid="2640257399982364682">"Bloqueio"</string>
     <string name="ps_container_transition" msgid="8667331812048014412">"Espaço particular em transição"</string>
     <string name="ps_add_button_label" msgid="8127988716897128773">"Instalar"</string>
     <string name="ps_add_button_content_description" msgid="3254274107740952556">"Instalar apps no espaço privado"</string>

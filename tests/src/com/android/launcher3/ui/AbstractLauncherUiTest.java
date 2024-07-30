@@ -22,6 +22,7 @@ import static androidx.test.InstrumentationRegistry.getInstrumentation;
 import static com.android.launcher3.testing.shared.TestProtocol.ICON_MISSING;
 import static com.android.launcher3.testing.shared.TestProtocol.WIDGET_CONFIG_NULL_EXTRA_INTENT;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -238,12 +239,13 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
     protected void clearPackageData(String pkg) throws IOException, InterruptedException {
         final CountDownLatch count = new CountDownLatch(2);
         final SimpleBroadcastReceiver broadcastReceiver =
-                new SimpleBroadcastReceiver(i -> count.countDown());
+                new SimpleBroadcastReceiver(UI_HELPER_EXECUTOR, i -> count.countDown());
+        // We OK to make binder calls on main thread in test.
         broadcastReceiver.registerPkgActions(mTargetContext, pkg,
                 Intent.ACTION_PACKAGE_RESTARTED, Intent.ACTION_PACKAGE_DATA_CLEARED);
 
         mDevice.executeShellCommand("pm clear " + pkg);
-        assertTrue(pkg + " didn't restart", count.await(10, TimeUnit.SECONDS));
+        assertTrue(pkg + " didn't restart", count.await(20, TimeUnit.SECONDS));
         mTargetContext.unregisterReceiver(broadcastReceiver);
     }
 
@@ -698,5 +700,12 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
         // Launch the home activity
         UiDevice.getInstance(getInstrumentation()).pressHome();
         mLauncher.waitForLauncherInitialized();
+    }
+
+    /** Clears all recent tasks */
+    protected void clearAllRecentTasks() {
+        if (!mLauncher.getRecentTasks().isEmpty()) {
+            mLauncher.goHome().switchToOverview().dismissAllTasks();
+        }
     }
 }
