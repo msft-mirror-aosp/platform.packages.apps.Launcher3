@@ -69,10 +69,12 @@ import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.picker.search.SearchModeListener;
 import com.android.launcher3.widget.picker.search.WidgetsSearchBar;
+import com.android.launcher3.widget.picker.search.WidgetsSearchBar.WidgetsSearchDataProvider;
 import com.android.launcher3.workprofile.PersonalWorkPagedView;
 import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip.OnActivePageChangedListener;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -135,7 +137,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     private WidgetsRecyclerView mCurrentTouchEventRecyclerView;
     @Nullable
     PersonalWorkPagedView mViewPager;
-    private boolean mIsInSearchMode;
+    protected boolean mIsInSearchMode;
     private boolean mIsNoWidgetsViewNeeded;
     @Px
     protected int mMaxSpanPerRow;
@@ -245,8 +247,12 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         mSearchBarContainer = mSearchScrollView.findViewById(R.id.search_bar_container);
         mSearchBar = mSearchScrollView.findViewById(R.id.widgets_search_bar);
 
-        mSearchBar.initialize(
-                mActivityContext.getPopupDataProvider(), /* searchModeListener= */ this);
+        mSearchBar.initialize(new WidgetsSearchDataProvider() {
+            @Override
+            public List<WidgetsListBaseEntry> getWidgets() {
+                return getWidgetsToDisplay();
+            }
+        }, /* searchModeListener= */ this);
     }
 
     private void setDeviceManagementResources() {
@@ -462,22 +468,28 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         setTranslationShift(mTranslationShift);
     }
 
+    /**
+     * Returns all displayable widgets.
+     */
+    protected List<WidgetsListBaseEntry> getWidgetsToDisplay() {
+        return mActivityContext.getWidgetPickerDataProvider().get().getAllWidgets();
+    }
+
     @Override
     public void onWidgetsBound() {
         if (mIsInSearchMode) {
             return;
         }
-        List<WidgetsListBaseEntry> allWidgets =
-                mActivityContext.getPopupDataProvider().getAllWidgets();
+        List<WidgetsListBaseEntry> widgets = getWidgetsToDisplay();
 
         AdapterHolder primaryUserAdapterHolder = mAdapters.get(AdapterHolder.PRIMARY);
-        primaryUserAdapterHolder.mWidgetsListAdapter.setWidgets(allWidgets);
+        primaryUserAdapterHolder.mWidgetsListAdapter.setWidgets(widgets);
 
         if (mHasWorkProfile) {
             mViewPager.setVisibility(VISIBLE);
             mTabBar.setVisibility(VISIBLE);
             AdapterHolder workUserAdapterHolder = mAdapters.get(AdapterHolder.WORK);
-            workUserAdapterHolder.mWidgetsListAdapter.setWidgets(allWidgets);
+            workUserAdapterHolder.mWidgetsListAdapter.setWidgets(widgets);
             onActivePageChanged(mViewPager.getCurrentPage());
         } else {
             onActivePageChanged(0);
@@ -561,12 +573,11 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         if (mIsInSearchMode) {
             return;
         }
-
         if (enableCategorizedWidgetSuggestions()) {
             // We avoid applying new recommendations when some are already displayed.
             if (mRecommendedWidgetsMap.isEmpty()) {
                 mRecommendedWidgetsMap =
-                        mActivityContext.getPopupDataProvider().getCategorizedRecommendedWidgets();
+                        mActivityContext.getWidgetPickerDataProvider().get().getRecommendations();
             }
             mRecommendedWidgetsCount = mWidgetRecommendationsView.setRecommendations(
                     mRecommendedWidgetsMap,
@@ -578,17 +589,20 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             );
         } else {
             if (mRecommendedWidgets.isEmpty()) {
-                mRecommendedWidgets =
-                        mActivityContext.getPopupDataProvider().getRecommendedWidgets();
+                mRecommendedWidgets = mActivityContext.getWidgetPickerDataProvider().get()
+                        .getRecommendations()
+                        .values().stream()
+                        .flatMap(Collection::stream).toList();
+                mRecommendedWidgetsCount = mWidgetRecommendationsView.setRecommendations(
+                        mRecommendedWidgets,
+                        mDeviceProfile,
+                        /* availableHeight= */ getMaxAvailableHeightForRecommendations(),
+                        /* availableWidth= */ mMaxSpanPerRow,
+                        /* cellPadding= */ mWidgetCellHorizontalPadding
+                );
             }
-            mRecommendedWidgetsCount = mWidgetRecommendationsView.setRecommendations(
-                    mRecommendedWidgets,
-                    mDeviceProfile,
-                    /* availableHeight= */ getMaxAvailableHeightForRecommendations(),
-                    /* availableWidth= */ mMaxSpanPerRow,
-                    /* cellPadding= */ mWidgetCellHorizontalPadding
-            );
         }
+
         mWidgetRecommendationsContainer.setVisibility(
                 mRecommendedWidgetsCount > 0 ? VISIBLE : GONE);
     }
@@ -677,6 +691,18 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         sheet.mIsOpen = true;
         sheet.open(animate);
         return sheet;
+    }
+
+    /**
+     * Updates the widget picker's title and description in the header to the provided values (if
+     * present).
+     */
+    public void mayUpdateTitleAndDescription(@Nullable String title,
+            @Nullable String descriptionRes) {
+        if (title != null) {
+            mHeaderTitle.setText(title);
+        }
+        // Full sheet doesn't support a description.
     }
 
     @Override
