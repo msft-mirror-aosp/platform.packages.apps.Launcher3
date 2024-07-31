@@ -33,7 +33,6 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_S
 
 import android.annotation.BinderThread;
 import android.annotation.Nullable;
-import android.app.Notification;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherApps;
@@ -356,6 +355,13 @@ public class BubbleBarController extends IBubblesListener.Stub {
             }
         }
 
+        // if a bubble was updated upstream, but removed before the update was received, add it back
+        if (update.updatedBubble != null && !mBubbles.containsKey(update.updatedBubble.getKey())) {
+            mBubbles.put(update.updatedBubble.getKey(), update.updatedBubble);
+            mBubbleBarViewController.addBubble(
+                    update.updatedBubble, isExpanding, suppressAnimation);
+        }
+
         if (update.addedBubble != null && isCollapsed) {
             // If we're collapsed, the most recently added bubble will be selected.
             bubbleToSelect = update.addedBubble;
@@ -394,7 +400,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
             BubbleBarBubble bb = mBubbles.get(update.updatedBubble.getKey());
             // If we're not stashed, we're visible so animate
             bb.getView().updateDotVisibility(!mBubbleStashController.isStashed() /* animate */);
-            mBubbleBarViewController.animateBubbleNotification(bb, /* isExpanding= */ false);
+            mBubbleBarViewController.animateBubbleNotification(
+                    bb, /* isExpanding= */ false, /* isUpdate= */ true);
         }
         if (update.bubbleKeysInOrder != null && !update.bubbleKeysInOrder.isEmpty()) {
             // Create the new list
@@ -445,18 +452,16 @@ public class BubbleBarController extends IBubblesListener.Stub {
         }
     }
 
+    /**
+     * Removes the given bubble from the backing list of bubbles after it was dismissed by the user.
+     */
+    public void onBubbleDismissed(BubbleView bubble) {
+        mBubbles.remove(bubble.getBubble().getKey());
+    }
+
     /** Tells WMShell to show the currently selected bubble. */
     public void showSelectedBubble() {
         if (getSelectedBubbleKey() != null) {
-            if (mSelectedBubble instanceof BubbleBarBubble) {
-                // Because we've visited this bubble, we should suppress the notification.
-                // This is updated on WMShell side when we show the bubble, but that update isn't
-                // passed to launcher, instead we apply it directly here.
-                BubbleInfo info = ((BubbleBarBubble) mSelectedBubble).getInfo();
-                info.setFlags(
-                        info.getFlags() | Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION);
-                mSelectedBubble.getView().updateDotVisibility(true /* animate */);
-            }
             mLastSentBubbleBarTop = mBarView.getRestingTopPositionOnScreen();
             mSystemUiProxy.showBubble(getSelectedBubbleKey(), mLastSentBubbleBarTop);
         } else {
@@ -630,8 +635,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
         final TypedArray ta = mContext.obtainStyledAttributes(
                 new int[]{
-                        com.android.internal.R.attr.materialColorOnPrimaryFixed,
-                        com.android.internal.R.attr.materialColorPrimaryFixed
+                        R.attr.materialColorOnPrimaryFixed,
+                        R.attr.materialColorPrimaryFixed
                 });
         int overflowIconColor = ta.getColor(0, Color.WHITE);
         int overflowBackgroundColor = ta.getColor(1, Color.BLACK);

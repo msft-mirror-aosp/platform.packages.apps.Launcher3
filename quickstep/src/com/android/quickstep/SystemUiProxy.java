@@ -23,8 +23,8 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.RECENT_TASKS_MISSING;
 import static com.android.quickstep.util.LogUtils.splitFailureMessage;
-import static com.android.window.flags.Flags.enableDesktopWindowingMode;
 import static com.android.window.flags.Flags.enableDesktopWindowingTaskbarRunningApps;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE;
 
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
@@ -224,6 +224,17 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
                 mSystemUiProxy.onImeSwitcherPressed();
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call onImeSwitcherPressed", e);
+            }
+        }
+    }
+
+    @Override
+    public void onImeSwitcherLongPress() {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.onImeSwitcherLongPress();
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call onImeSwitcherLongPress");
             }
         }
     }
@@ -831,12 +842,14 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
 
     /**
      * Tells SysUI to dismiss the bubble with the provided key.
+     *
      * @param key the key of the bubble to dismiss.
+     * @param timestamp the timestamp when the removal happened.
      */
-    public void dragBubbleToDismiss(String key) {
+    public void dragBubbleToDismiss(String key, long timestamp) {
         if (mBubbles == null) return;
         try {
-            mBubbles.dragBubbleToDismiss(key);
+            mBubbles.dragBubbleToDismiss(key, timestamp);
         } catch (RemoteException e) {
             Log.w(TAG, "Failed call dragBubbleToDismiss");
         }
@@ -1381,10 +1394,26 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         }
     }
 
-    public ArrayList<GroupedRecentTaskInfo> getRecentTasks(int numTasks, int userId) {
+    public static class GetRecentTasksException extends Exception {
+        public GetRecentTasksException(String message) {
+            super(message);
+        }
+
+        public GetRecentTasksException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    /**
+     * Retrieves a list of Recent tasks from ActivityManager.
+     * @throws GetRecentTasksException if IRecentTasks is not initialized, or when we get
+     * RemoteException from server side
+     */
+    public ArrayList<GroupedRecentTaskInfo> getRecentTasks(int numTasks, int userId)
+            throws GetRecentTasksException {
         if (mRecentTasks == null) {
-            Log.w(TAG, "getRecentTasks() failed due to null mRecentTasks");
-            return new ArrayList<>();
+            Log.e(TAG, "getRecentTasks() failed due to null mRecentTasks");
+            throw new GetRecentTasksException("null mRecentTasks");
         }
         try {
             final GroupedRecentTaskInfo[] rawTasks = mRecentTasks.getRecentTasks(numTasks,
@@ -1394,8 +1423,8 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
             }
             return new ArrayList<>(Arrays.asList(rawTasks));
         } catch (RemoteException e) {
-            Log.w(TAG, "Failed call getRecentTasks", e);
-            return new ArrayList<>();
+            Log.e(TAG, "Failed call getRecentTasks", e);
+            throw new GetRecentTasksException("Failed call getRecentTasks", e);
         }
     }
 
@@ -1415,7 +1444,8 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
 
     private boolean shouldEnableRunningTasksForDesktopMode() {
         // TODO(b/335401172): unify DesktopMode checks in Launcher
-        return enableDesktopWindowingMode() && enableDesktopWindowingTaskbarRunningApps();
+        return DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+                && enableDesktopWindowingTaskbarRunningApps();
     }
 
     private boolean handleMessageAsync(Message msg) {
