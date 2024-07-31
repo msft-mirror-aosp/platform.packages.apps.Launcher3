@@ -27,8 +27,7 @@
     <string name="safemode_widget_error" msgid="4863470563535682004">"Widgets är inaktiverade i felsäkert läge"</string>
     <string name="shortcut_not_available" msgid="2536503539825726397">"Genvägen är inte tillgänglig"</string>
     <string name="home_screen" msgid="5629429142036709174">"Startskärm"</string>
-    <!-- no translation found for set_default_home_app (5808906607627586381) -->
-    <skip />
+    <string name="set_default_home_app" msgid="5808906607627586381">"Ställ in <xliff:g id="LAUNCHER_NAME">%1$s</xliff:g> som standardstartskärmsapp i Inställningar"</string>
     <string name="recent_task_option_split_screen" msgid="6690461455618725183">"Delad skärm"</string>
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"Appinformation för %1$s"</string>
     <string name="split_app_usage_settings" msgid="7214375263347964093">"Användningsinställningar för %1$s"</string>
@@ -39,6 +38,8 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"App-paret är inte tillgängligt"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Tryck länge för att flytta en widget."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Tryck snabbt två gånger och håll kvar för att flytta en widget eller använda anpassade åtgärder."</string>
+    <string name="widget_picker_widget_options_button_description" msgid="4770099264476852363">"Fler alternativ"</string>
+    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"Visa alla widgetar"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"%1$d bred gånger %2$d hög"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"Widget för <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>

@@ -16,6 +16,8 @@
 
 package com.android.launcher3;
 
+import static android.graphics.fonts.FontStyle.FONT_WEIGHT_BOLD;
+import static android.graphics.fonts.FontStyle.FONT_WEIGHT_NORMAL;
 import static android.text.Layout.Alignment.ALIGN_NORMAL;
 
 import static com.android.launcher3.Flags.enableCursorHoverStates;
@@ -40,11 +42,15 @@ import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.icu.text.MessageFormat;
+import android.text.Spannable;
+import android.text.SpannableString;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.TextUtils.TruncateAt;
+import android.text.style.ImageSpan;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.Property;
 import android.util.Size;
 import android.util.TypedValue;
@@ -54,6 +60,7 @@ import android.view.View;
 import android.view.ViewDebug;
 import android.widget.TextView;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
@@ -96,6 +103,8 @@ import java.util.Locale;
 public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         IconLabelDotView, DraggableView, Reorderable {
 
+    public static final String TAG = "BubbleTextView";
+
     public static final int DISPLAY_WORKSPACE = 0;
     public static final int DISPLAY_ALL_APPS = 1;
     public static final int DISPLAY_FOLDER = 2;
@@ -111,6 +120,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private static final String EMPTY = "";
     private static final StringMatcherUtility.StringMatcher MATCHER =
             StringMatcherUtility.StringMatcher.getInstance();
+    private static final int BOLD_TEXT_ADJUSTMENT = FONT_WEIGHT_BOLD - FONT_WEIGHT_NORMAL;
 
     private static final int[] STATE_PRESSED = new int[]{android.R.attr.state_pressed};
 
@@ -494,7 +504,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             mLastOriginalText = label;
             mLastModifiedText = mLastOriginalText;
             mBreakPointsIntArray = StringMatcherUtility.getListOfBreakpoints(label, MATCHER);
-            setText(label);
+            if (Flags.enableNewArchivingIcon()
+                    && info instanceof ItemInfoWithIcon infoWithIcon
+                    && infoWithIcon.isInactiveArchive()) {
+                setTextWithArchivingIcon(label);
+            } else {
+                setText(label);
+            }
         }
         if (info.contentDescription != null) {
             setContentDescription(info.isDisabled()
@@ -804,7 +820,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     getLineSpacingExtra());
             if (!TextUtils.equals(modifiedString, mLastModifiedText)) {
                 mLastModifiedText = modifiedString;
-                setText(modifiedString);
+                if (Flags.enableNewArchivingIcon()
+                        && getTag() instanceof ItemInfoWithIcon infoWithIcon
+                        && infoWithIcon.isInactiveArchive()) {
+                    setTextWithArchivingIcon(modifiedString);
+                } else {
+                    setText(modifiedString);
+                }
                 // if text contains NEW_LINE, set max lines to 2
                 if (TextUtils.indexOf(modifiedString, NEW_LINE) != -1) {
                     setSingleLine(false);
@@ -823,6 +845,44 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mTextColor = color;
         mTextColorStateList = null;
         super.setTextColor(getModifiedColor());
+    }
+
+    /**
+     * Sets text with a start icon for App Archiving.
+     * Uses a bolded drawable if text is bolded.
+     * @param text
+     */
+    private void setTextWithArchivingIcon(CharSequence text) {
+        var drawableId = R.drawable.cloud_download_24px;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+                && getResources().getConfiguration().fontWeightAdjustment >= BOLD_TEXT_ADJUSTMENT) {
+            // If System bold text setting is on, then use a bolded icon
+            drawableId = R.drawable.cloud_download_semibold_24px;
+        }
+        setTextWithStartIcon(text, drawableId);
+    }
+
+    /**
+     * Uses a SpannableString to set text with a Drawable at the start of the TextView
+     * @param text text to use for TextView
+     * @param drawableId Drawable Resource to use for drawing image at start of text
+     */
+    @VisibleForTesting
+    public void setTextWithStartIcon(CharSequence text, @DrawableRes int drawableId) {
+        Drawable drawable = getContext().getDrawable(drawableId);
+        if (drawable == null) {
+            setText(text);
+            Log.w(TAG, "setTextWithStartIcon: start icon Drawable not found from resources"
+                    + ", will just set text instead. text=" + text);
+            return;
+        }
+        drawable.setTint(getCurrentTextColor());
+        drawable.setBounds(0, 0, Math.round(getTextSize()), Math.round(getTextSize()));
+        ImageSpan imageSpan = new ImageSpan(drawable, ImageSpan.ALIGN_CENTER);
+        // First space will be replaced with Drawable, second space is for space before text.
+        SpannableString spannable = new SpannableString("  " + text);
+        spannable.setSpan(imageSpan, 0, 1, Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+        setText(spannable);
     }
 
     @Override
