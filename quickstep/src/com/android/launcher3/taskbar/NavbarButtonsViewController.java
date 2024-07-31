@@ -48,7 +48,6 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_Q
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SHORTCUT_HELPER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING;
-import static com.android.wm.shell.Flags.enableTaskbarOnPhones;
 
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
@@ -80,6 +79,7 @@ import android.view.View.OnHoverListener;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.view.inputmethod.Flags;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -247,7 +247,9 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 ? context.getColor(R.color.taskbar_nav_icon_light_color)
                 : context.getColor(R.color.taskbar_nav_icon_dark_color);
 
-        mTaskbarTransitions = new TaskbarTransitions(mContext, mNavButtonsView);
+        if (mContext.isPhoneMode()) {
+            mTaskbarTransitions = new TaskbarTransitions(mContext, mNavButtonsView);
+        }
     }
 
     /**
@@ -272,7 +274,10 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 InputMethodService.canImeRenderGesturalNavButtons() && mContext.imeDrawsImeNavBar();
         if (!mIsImeRenderingNavButtons) {
             // IME switcher
-            mImeSwitcherButton = addButton(R.drawable.ic_ime_switcher, BUTTON_IME_SWITCH,
+            final int switcherResId = Flags.imeSwitcherRevamp()
+                    ? com.android.internal.R.drawable.ic_ime_switcher_new
+                    : R.drawable.ic_ime_switcher;
+            mImeSwitcherButton = addButton(switcherResId, BUTTON_IME_SWITCH,
                     isThreeButtonNav ? mStartContextualContainer : mEndContextualContainer,
                     mControllers.navButtonController, R.id.ime_switcher);
             mPropertyHolders.add(new StatePropertyHolder(mImeSwitcherButton,
@@ -359,13 +364,15 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 R.bool.floating_rotation_button_position_left);
         mControllers.rotationButtonController.setRotationButton(mFloatingRotationButton,
                 mRotationButtonListener);
-        mTaskbarTransitions.init();
+        if (mContext.isPhoneMode()) {
+            mTaskbarTransitions.init();
+        }
 
         applyState();
         mPropertyHolders.forEach(StatePropertyHolder::endAnimation);
 
         // Initialize things needed to move nav buttons to separate window.
-        mSeparateWindowParent = new BaseDragLayer<TaskbarActivityContext>(mContext, null, 0) {
+        mSeparateWindowParent = new BaseDragLayer<>(mContext, null, 0) {
             @Override
             public void recreateControllers() {
                 mControllers = new TouchController[0];
@@ -621,7 +628,9 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     }
 
     public void setWallpaperVisible(boolean isVisible) {
-        mTaskbarTransitions.setWallpaperVisibility(isVisible);
+        if (mContext.isPhoneMode()) {
+            mTaskbarTransitions.setWallpaperVisibility(isVisible);
+        }
     }
 
     public void onTransitionModeUpdated(int barMode, boolean checkBarModes) {
@@ -632,25 +641,32 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     }
 
     public void checkNavBarModes() {
-        boolean isBarHidden = (mSysuiStateFlags & SYSUI_STATE_NAV_BAR_HIDDEN) != 0;
-        mTaskbarTransitions.transitionTo(mTransitionMode, !isBarHidden);
-    }
-
-    public void finishBarAnimations() {
-        mTaskbarTransitions.finishAnimations();
-    }
-
-    public void touchAutoDim(boolean reset) {
-        mTaskbarTransitions.setAutoDim(false);
-        mHandler.removeCallbacks(mAutoDim);
-        if (reset) {
-            mHandler.postDelayed(mAutoDim, AUTODIM_TIMEOUT_MS);
+        if (mContext.isPhoneMode()) {
+            boolean isBarHidden = (mSysuiStateFlags & SYSUI_STATE_NAV_BAR_HIDDEN) != 0;
+            mTaskbarTransitions.transitionTo(mTransitionMode, !isBarHidden);
         }
     }
 
-    public void transitionTo(@BarTransitions.TransitionMode int barMode,
-            boolean animate) {
-        mTaskbarTransitions.transitionTo(barMode, animate);
+    public void finishBarAnimations() {
+        if (mContext.isPhoneMode()) {
+            mTaskbarTransitions.finishAnimations();
+        }
+    }
+
+    public void touchAutoDim(boolean reset) {
+        if (mContext.isPhoneMode()) {
+            mTaskbarTransitions.setAutoDim(false);
+            mHandler.removeCallbacks(mAutoDim);
+            if (reset) {
+                mHandler.postDelayed(mAutoDim, AUTODIM_TIMEOUT_MS);
+            }
+        }
+    }
+
+    public void transitionTo(@BarTransitions.TransitionMode int barMode, boolean animate) {
+        if (mContext.isPhoneMode()) {
+            mTaskbarTransitions.transitionTo(barMode, animate);
+        }
     }
 
     /** Use to set the translationY for the all nav+contextual buttons */
@@ -752,7 +768,9 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
 
     private void onDarkIntensityChanged() {
         updateNavButtonColor();
-        mTaskbarTransitions.onDarkIntensityChanged(mTaskbarNavButtonDarkIntensity.value);
+        if (mContext.isPhoneMode()) {
+            mTaskbarTransitions.onDarkIntensityChanged(mTaskbarNavButtonDarkIntensity.value);
+        }
     }
 
     protected ImageView addButton(@DrawableRes int drawableId, @TaskbarButton int buttonType,
@@ -1100,7 +1118,9 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 + mOnBackgroundNavButtonColorOverrideMultiplier.value);
 
         mNavButtonsView.dumpLogs(prefix + "\t", pw);
-        mTaskbarTransitions.dumpLogs(prefix + "\t", pw);
+        if (mContext.isPhoneMode()) {
+            mTaskbarTransitions.dumpLogs(prefix + "\t", pw);
+        }
     }
 
     private static String getStateString(int flags) {

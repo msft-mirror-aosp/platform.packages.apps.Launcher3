@@ -25,8 +25,8 @@
     android:clipChildren="true"
     android:defaultFocusHighlightEnabled="false"
     android:focusable="true"
-    launcher:focusBorderColor="?androidprv:attr/materialColorOutline"
-    launcher:hoverBorderColor="?androidprv:attr/materialColorPrimary"
+    launcher:focusBorderColor="?attr/materialColorOutline"
+    launcher:hoverBorderColor="?attr/materialColorPrimary"
     android:clipToPadding="true"
     android:padding="0.1dp">
     <!-- Setting a padding of 0.1 dp since android:clipToPadding needs a non-zero value for
@@ -35,15 +35,6 @@
         android:id="@+id/background"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
-
-    <!--
-         TODO(b249371338): DesktopTaskView extends from TaskView. TaskView expects TaskThumbnailView
-         and IconView with these ids to be present. Need to refactor RecentsView to accept child
-         views that do not inherint from TaskView only or create a generic TaskView that have
-         N number of tasks.
-     -->
-    <include layout="@layout/task_thumbnail"
-        android:visibility="gone" />
 
     <ViewStub
         android:id="@+id/icon"
