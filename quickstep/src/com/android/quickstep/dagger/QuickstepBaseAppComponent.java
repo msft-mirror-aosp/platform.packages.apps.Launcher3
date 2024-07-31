@@ -21,6 +21,7 @@ import com.android.launcher3.dagger.LauncherBaseAppComponent;
 import com.android.launcher3.model.WellbeingModel;
 import com.android.quickstep.logging.SettingsChangeLogger;
 import com.android.quickstep.util.AsyncClockEventDelegate;
+import com.android.quickstep.util.ContextualSearchHapticManager;
 
 /**
  * Launcher Quickstep base component for Dagger injection.
@@ -36,4 +37,6 @@ public interface QuickstepBaseAppComponent extends LauncherBaseAppComponent {
     WellbeingModel getWellbeingModel();
 
     AsyncClockEventDelegate getAsyncClockEventDelegate();
+
+    ContextualSearchHapticManager getContextualSearchHapticManager();
 }

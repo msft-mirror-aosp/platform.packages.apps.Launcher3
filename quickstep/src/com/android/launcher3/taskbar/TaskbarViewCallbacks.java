@@ -19,6 +19,7 @@ package com.android.launcher3.taskbar;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_LONG_PRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP;
 
+import android.content.Context;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
@@ -64,7 +65,8 @@ public class TaskbarViewCallbacks {
         mActivity.getStatsLogManager().logger().log(LAUNCHER_TASKBAR_ALLAPPS_BUTTON_LONG_PRESS);
     }
 
-    public boolean isAllAppsButtonHapticFeedbackEnabled() {
+    /** @return true if haptic feedback should occur when long pressing the all apps button. */
+    public boolean isAllAppsButtonHapticFeedbackEnabled(Context context) {
         return false;
     }
 
