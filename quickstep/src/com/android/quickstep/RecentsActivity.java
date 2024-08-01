@@ -352,7 +352,6 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
     @Override
     protected void onStop() {
         super.onStop();
-
         // Workaround for b/78520668, explicitly trim memory once UI is hidden
         onTrimMemory(TRIM_MEMORY_UI_HIDDEN);
         mFallbackRecentsView.updateLocusId();

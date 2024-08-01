@@ -30,6 +30,7 @@ import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
@@ -175,7 +176,7 @@ public interface ActivityContext {
     /**
      * The root view to support drag-and-drop and popup support.
      */
-    BaseDragLayer<?> getDragLayer();
+    BaseDragLayer getDragLayer();
 
     /**
      * @see Activity#getWindow()
@@ -183,6 +184,14 @@ public interface ActivityContext {
      */
     @Nullable
     default Window getWindow() {
+        return null;
+    }
+
+    /**
+     * @see Activity#getComponentName()
+     * @return ComponentName
+     */
+    default ComponentName getComponentName() {
         return null;
     }
 

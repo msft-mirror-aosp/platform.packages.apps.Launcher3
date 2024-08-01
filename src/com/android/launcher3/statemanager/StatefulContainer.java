@@ -20,11 +20,9 @@ package com.android.launcher3.statemanager;
 import static com.android.launcher3.LauncherState.FLAG_CLOSE_POPUPS;
 import static com.android.launcher3.statemanager.BaseState.FLAG_NON_INTERACTIVE;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.res.Configuration;
-import android.view.Window;
 
 import androidx.annotation.CallSuper;
 

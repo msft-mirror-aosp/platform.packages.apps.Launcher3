@@ -39,6 +39,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.R;
 import com.android.launcher3.util.SimpleBroadcastReceiver;
 import com.android.quickstep.util.ActiveGestureLog;
@@ -178,7 +179,11 @@ public final class OverviewComponentObserver {
         } else {
             // The default home app is a different launcher. Use the fallback Overview instead.
 
-            mContainerInterface = FallbackActivityInterface.INSTANCE;
+            if (Flags.enableFallbackOverviewInWindow()) {
+                mContainerInterface = FallbackWindowInterface.INSTANCE;
+            } else {
+                mContainerInterface = FallbackActivityInterface.INSTANCE;
+            }
             mIsHomeAndOverviewSame = false;
             mOverviewIntent = mFallbackIntent;
             mCurrentHomeIntent.setComponent(defaultHome);

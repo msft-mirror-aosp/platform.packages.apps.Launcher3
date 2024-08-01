@@ -45,7 +45,9 @@ import com.android.launcher3.LauncherRootView;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
+import com.android.launcher3.statemanager.StatefulContainer;
 import com.android.launcher3.util.SystemUiController;
+import com.android.quickstep.fallback.window.RecentsWindowManager;
 import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
@@ -62,16 +64,18 @@ import java.util.Collections;
 import java.util.HashMap;
 
 public abstract class AbsSwipeUpHandlerTestCase<
-        RECENTS_CONTAINER extends Context & RecentsViewContainer,
-        STATE extends BaseState<STATE>,
-        RECENTS_VIEW extends RecentsView<RECENTS_CONTAINER, STATE>,
+        RECENTS_CONTAINER extends Context & RecentsViewContainer & StatefulContainer<STATE>,
+        STATE extends BaseState<STATE>, RECENTS_VIEW extends RecentsView<RECENTS_CONTAINER, STATE>,
         ACTIVITY_TYPE extends  StatefulActivity<STATE> & RecentsViewContainer,
         ACTIVITY_INTERFACE extends BaseActivityInterface<STATE, ACTIVITY_TYPE>,
         SWIPE_HANDLER extends AbsSwipeUpHandler<RECENTS_CONTAINER, RECENTS_VIEW, STATE>> {
 
     protected final Context mContext =
             InstrumentationRegistry.getInstrumentation().getTargetContext();
-    protected final TaskAnimationManager mTaskAnimationManager = new TaskAnimationManager(mContext);
+    protected final RecentsWindowManager mRecentsWindowManager =
+            RecentsWindowManager.Companion.getOrCreateInstance(mContext);
+    protected final TaskAnimationManager mTaskAnimationManager =
+            new TaskAnimationManager(mContext, mRecentsWindowManager);
     protected final RecentsAnimationDeviceState mRecentsAnimationDeviceState =
             new RecentsAnimationDeviceState(mContext, true);
     protected final InputConsumerController mInputConsumerController =

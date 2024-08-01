@@ -45,35 +45,16 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
- * {@link BaseActivityInterface} for recents when the default launcher is different than the
- * currently running one and apps should interact with the {@link RecentsActivity} as opposed
+ * {@link BaseWindowInterface} for recents when the default launcher is different than the
+ * currently running one and apps should interact with the {@link RecentsWindowManager} as opposed
  * to the in-launcher one.
  */
 public final class FallbackWindowInterface extends BaseWindowInterface{
 
-    private static FallbackWindowInterface INSTANCE;
+    public static final FallbackWindowInterface INSTANCE = new FallbackWindowInterface();
 
-    private final RecentsWindowManager mRecentsWindowManager;
-
-    @Nullable
-    public static FallbackWindowInterface getInstance(){
-        return INSTANCE;
-    }
-
-    public static FallbackWindowInterface init(RecentsWindowManager recentsWindowManager) {
-       if (INSTANCE == null) {
-           INSTANCE = new FallbackWindowInterface(recentsWindowManager);
-       }
-       return INSTANCE;
-    }
-
-    private FallbackWindowInterface(RecentsWindowManager recentsWindowManager) {
-        super(DEFAULT, BACKGROUND_APP);
-        mRecentsWindowManager = recentsWindowManager;
-    }
-
-    public void destroy() {
-        INSTANCE = null;
+    private FallbackWindowInterface() {
+        super( DEFAULT, BACKGROUND_APP);
     }
 
     /** 2 */
@@ -119,7 +100,7 @@ public final class FallbackWindowInterface extends BaseWindowInterface{
     @Nullable
     @Override
     public RecentsWindowManager getCreatedContainer() {
-        return mRecentsWindowManager;
+        return RecentsWindowManager.Companion.getInstanceOrNull();
     }
 
     @Override

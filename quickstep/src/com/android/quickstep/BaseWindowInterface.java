@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,19 +20,17 @@ import static com.android.app.animation.Interpolators.INSTANT;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.MotionEventsUtils.isTrackpadMultiFingerSwipe;
 import static com.android.quickstep.AbsSwipeUpHandler.RECENTS_ATTACH_DURATION;
-import static com.android.quickstep.GestureState.GestureEndTarget.LAST_TASK;
-import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_ATTACHED_ALPHA_ANIM;
 import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_FADE_ANIM;
 import static com.android.quickstep.util.RecentsAtomicAnimationFactory.INDEX_RECENTS_TRANSLATE_X_ANIM;
 import static com.android.quickstep.views.RecentsView.ADJACENT_PAGE_HORIZONTAL_OFFSET;
 import static com.android.quickstep.views.RecentsView.FULLSCREEN_PROGRESS;
 import static com.android.quickstep.views.RecentsView.RECENTS_SCALE_PROPERTY;
-import static com.android.quickstep.views.RecentsView.RUNNING_TASK_ATTACH_ALPHA;
 import static com.android.quickstep.views.RecentsView.TASK_SECONDARY_TRANSLATION;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
+import android.util.Log;
 import android.view.MotionEvent;
 
 import androidx.annotation.Nullable;
@@ -40,15 +38,13 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statehandlers.DepthController;
-import com.android.launcher3.statehandlers.DesktopVisibilityController;
-import com.android.launcher3.statemanager.BaseState;
-import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
+import com.android.quickstep.fallback.RecentsState;
+import com.android.quickstep.fallback.window.RecentsWindowManager;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.views.RecentsView;
-import com.android.quickstep.views.RecentsViewContainer;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 
 import java.util.HashMap;
@@ -56,54 +52,23 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
- * Utility class which abstracts out the logical differences between Launcher and RecentsActivity.
+ * Temporary utility class in place for differences needed between
+ * Recents in Window in Launcher vs Fallback
  */
-public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_TYPE>,
-        ACTIVITY_TYPE extends StatefulActivity<STATE_TYPE> & RecentsViewContainer> extends
-        BaseContainerInterface<STATE_TYPE, ACTIVITY_TYPE> {
+public abstract class BaseWindowInterface extends
+        BaseContainerInterface<RecentsState, RecentsWindowManager> {
 
-    private STATE_TYPE mTargetState;
+    final String TAG = "BaseWindowInterface";
+    private RecentsState mTargetState;
 
-    protected BaseActivityInterface(boolean rotationSupportedByActivity,
-            STATE_TYPE overviewState, STATE_TYPE backgroundState) {
+
+    protected BaseWindowInterface(RecentsState overviewState, RecentsState backgroundState) {
         super(backgroundState);
-        this.rotationSupportedByActivity = rotationSupportedByActivity;
         mTargetState = overviewState;
     }
 
-    /**
-     * Called when the current gesture transition is cancelled.
-     * @param activityVisible Whether the user can see the changes we make here, so try to animate.
-     * @param endTarget If the gesture ended before we got cancelled, where we were headed.
-     */
-    public void onTransitionCancelled(boolean activityVisible,
-            @Nullable GestureState.GestureEndTarget endTarget) {
-        ACTIVITY_TYPE activity = getCreatedContainer();
-        if (activity == null) {
-            return;
-        }
-        STATE_TYPE startState = activity.getStateManager().getRestState();
-        if (endTarget != null) {
-            // We were on our way to this state when we got canceled, end there instead.
-            startState = stateFromGestureEndTarget(endTarget);
-            DesktopVisibilityController controller = getDesktopVisibilityController();
-            if (controller != null && controller.areDesktopTasksVisible()
-                    && endTarget == LAST_TASK) {
-                // When we are cancelling the transition and going back to last task, move to
-                // rest state instead when desktop tasks are visible.
-                // If a fullscreen task is visible, launcher goes to normal state when the
-                // activity is stopped. This does not happen when desktop tasks are visible
-                // on top of launcher. Force the launcher state to rest state here.
-                startState = activity.getStateManager().getRestState();
-                // Do not animate the transition
-                activityVisible = false;
-            }
-        }
-        activity.getStateManager().goToState(startState, activityVisible);
-    }
-
     @Nullable
-    public abstract ACTIVITY_TYPE getCreatedContainer();
+    public abstract RecentsWindowManager getCreatedContainer();
 
     @Nullable
     public DepthController getDepthController() {
@@ -111,13 +76,12 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
     }
 
     public final boolean isResumed() {
-        ACTIVITY_TYPE activity = getCreatedContainer();
-        return activity != null && activity.hasBeenResumed();
+        return isStarted();
     }
 
     public final boolean isStarted() {
-        ACTIVITY_TYPE activity = getCreatedContainer();
-        return activity != null && activity.isStarted();
+        RecentsWindowManager windowManager = getCreatedContainer();
+        return windowManager != null && windowManager.isStarted();
     }
 
     public boolean deferStartingActivity(RecentsAnimationDeviceState deviceState, MotionEvent ev) {
@@ -138,11 +102,11 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
 
     public void switchRunningTaskViewToScreenshot(HashMap<Integer, ThumbnailData> thumbnailDatas,
             Runnable runnable) {
-        ACTIVITY_TYPE activity = getCreatedContainer();
-        if (activity == null) {
+        RecentsWindowManager windowManager = getCreatedContainer();
+        if (windowManager == null) {
             return;
         }
-        RecentsView recentsView = activity.getOverviewPanel();
+        RecentsView recentsView = windowManager.getOverviewPanel();
         if (recentsView == null) {
             if (runnable != null) {
                 runnable.run();
@@ -152,10 +116,15 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         recentsView.switchToScreenshot(thumbnailDatas, runnable);
     }
 
+    /**
+     * todo: Create an abstract animation factory to handle both activity and window implementations
+     * todo: move new factory into BaseContainerInterface and cleanup.
+      */
+
     class DefaultAnimationFactory implements AnimationFactory {
 
-        protected final ACTIVITY_TYPE mActivity;
-        private final STATE_TYPE mStartState;
+        protected final RecentsWindowManager mRecentsWindowManager;
+        private final RecentsState mStartState;
         private final Consumer<AnimatorControllerWithResistance> mCallback;
 
         private boolean mIsAttachedToWindow;
@@ -164,64 +133,64 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
         DefaultAnimationFactory(Consumer<AnimatorControllerWithResistance> callback) {
             mCallback = callback;
 
-            mActivity = getCreatedContainer();
-            mStartState = mActivity.getStateManager().getState();
+            mRecentsWindowManager = getCreatedContainer();
+            mStartState = mRecentsWindowManager.getStateManager().getState();
         }
 
-        protected ACTIVITY_TYPE initBackgroundStateUI() {
-            STATE_TYPE resetState = mStartState;
+        protected RecentsWindowManager initBackgroundStateUI() {
+            RecentsState resetState = mStartState;
             if (mStartState.shouldDisableRestore()) {
-                resetState = mActivity.getStateManager().getRestState();
+                resetState = mRecentsWindowManager.getStateManager().getRestState();
             }
-            mActivity.getStateManager().setRestState(resetState);
-            mActivity.getStateManager().goToState(mBackgroundState, false);
+            mRecentsWindowManager.getStateManager().setRestState(resetState);
+            mRecentsWindowManager.getStateManager().goToState(mBackgroundState, false);
             onInitBackgroundStateUI();
-            return mActivity;
+            return mRecentsWindowManager;
         }
 
         @Override
         public void createContainerInterface(long transitionLength) {
             PendingAnimation pa = new PendingAnimation(transitionLength * 2);
-            createBackgroundToOverviewAnim(mActivity, pa);
+            createBackgroundToOverviewAnim(mRecentsWindowManager, pa);
             AnimatorPlaybackController controller = pa.createPlaybackController();
-            mActivity.getStateManager().setCurrentUserControlledAnimation(controller);
+            mRecentsWindowManager.getStateManager().setCurrentUserControlledAnimation(controller);
 
             // Since we are changing the start position of the UI, reapply the state, at the end
-            controller.setEndAction(() -> mActivity.getStateManager().goToState(
-                    controller.getInterpolatedProgress() > 0.5 ? mTargetState : mBackgroundState,
-                    /* animated= */ false));
+            controller.setEndAction(() -> {
+                mRecentsWindowManager.getStateManager().goToState(
+                        controller.getInterpolatedProgress() > 0.5 ? mTargetState
+                                : mBackgroundState,
+                        /* animated= */ false);
+            });
 
-            RecentsView recentsView = mActivity.getOverviewPanel();
+            RecentsView recentsView = mRecentsWindowManager.getOverviewPanel();
             AnimatorControllerWithResistance controllerWithResistance =
-                    AnimatorControllerWithResistance.createForRecents(controller, mActivity,
-                            recentsView.getPagedViewOrientedState(), mActivity.getDeviceProfile(),
-                            recentsView, RECENTS_SCALE_PROPERTY, recentsView,
-                            TASK_SECONDARY_TRANSLATION);
+                    AnimatorControllerWithResistance.createForRecents(controller,
+                            mRecentsWindowManager, recentsView.getPagedViewOrientedState(),
+                            mRecentsWindowManager.getDeviceProfile(), recentsView,
+                            RECENTS_SCALE_PROPERTY, recentsView, TASK_SECONDARY_TRANSLATION);
             mCallback.accept(controllerWithResistance);
 
             // Creating the activity controller animation sometimes reapplies the launcher state
             // (because we set the animation as the current state animation), so we reapply the
             // attached state here as well to ensure recents is shown/hidden appropriately.
-            if (DisplayController.getNavigationMode(mActivity) == NavigationMode.NO_BUTTON) {
-                setRecentsAttachedToAppWindow(
-                        mIsAttachedToWindow, false, recentsView.shouldUpdateRunningTaskAlpha());
+            if (DisplayController.getNavigationMode(mRecentsWindowManager)
+                    == NavigationMode.NO_BUTTON) {
+                setRecentsAttachedToAppWindow(mIsAttachedToWindow, false, false);
             }
         }
 
         @Override
-        public void setRecentsAttachedToAppWindow(
-                boolean attached, boolean animate, boolean updateRunningTaskAlpha) {
+        public void setRecentsAttachedToAppWindow(boolean attached, boolean animate,
+                boolean updateRunningTaskAlpha) {
+
             if (mIsAttachedToWindow == attached && animate) {
                 return;
             }
-            mActivity.getStateManager()
+            mRecentsWindowManager.getStateManager()
                     .cancelStateElementAnimation(INDEX_RECENTS_FADE_ANIM);
-            mActivity.getStateManager()
+            mRecentsWindowManager.getStateManager()
                     .cancelStateElementAnimation(INDEX_RECENTS_TRANSLATE_X_ANIM);
-            if (updateRunningTaskAlpha) {
-                mActivity.getStateManager()
-                        .cancelStateElementAnimation(INDEX_RECENTS_ATTACHED_ALPHA_ANIM);
-            }
 
             AnimatorSet animatorSet = new AnimatorSet();
             animatorSet.addListener(new AnimatorListenerAdapter() {
@@ -235,29 +204,21 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
                 }});
 
             long animationDuration = animate ? RECENTS_ATTACH_DURATION : 0;
-            Animator fadeAnim = mActivity.getStateManager()
-                    .createStateElementAnimation(INDEX_RECENTS_FADE_ANIM, attached ? 1f : 0f);
+            Animator fadeAnim = mRecentsWindowManager.getStateManager()
+                    .createStateElementAnimation(INDEX_RECENTS_FADE_ANIM, attached ? 1 : 0);
             fadeAnim.setInterpolator(attached ? INSTANT : ACCELERATE_2);
             fadeAnim.setDuration(animationDuration);
             animatorSet.play(fadeAnim);
 
             float fromTranslation = ADJACENT_PAGE_HORIZONTAL_OFFSET.get(
-                    mActivity.getOverviewPanel());
-            float toTranslation = attached ? 0f : 1f;
-            Animator translationAnimator = mActivity.getStateManager().createStateElementAnimation(
-                    INDEX_RECENTS_TRANSLATE_X_ANIM, fromTranslation, toTranslation);
+                    mRecentsWindowManager.getOverviewPanel());
+            float toTranslation = attached ? 0 : 1;
+
+            Animator translationAnimator =
+                    mRecentsWindowManager.getStateManager().createStateElementAnimation(
+                            INDEX_RECENTS_TRANSLATE_X_ANIM, fromTranslation, toTranslation);
             translationAnimator.setDuration(animationDuration);
             animatorSet.play(translationAnimator);
-
-            if (updateRunningTaskAlpha) {
-                float fromAlpha = RUNNING_TASK_ATTACH_ALPHA.get(mActivity.getOverviewPanel());
-                float toAlpha = attached ? 1f : 0f;
-                Animator runningTaskAttachAlphaAnimator = mActivity.getStateManager()
-                        .createStateElementAnimation(
-                                INDEX_RECENTS_ATTACHED_ALPHA_ANIM, fromAlpha, toAlpha);
-                runningTaskAttachAlphaAnimator.setDuration(animationDuration);
-                animatorSet.play(runningTaskAttachAlphaAnimator);
-            }
             animatorSet.start();
         }
 
@@ -276,9 +237,10 @@ public abstract class BaseActivityInterface<STATE_TYPE extends BaseState<STATE_T
             mTargetState = stateFromGestureEndTarget(endTarget);
         }
 
-        protected void createBackgroundToOverviewAnim(ACTIVITY_TYPE activity, PendingAnimation pa) {
+        protected void createBackgroundToOverviewAnim(RecentsWindowManager container,
+                PendingAnimation pa) {
             //  Scale down recents from being full screen to being in overview.
-            RecentsView recentsView = activity.getOverviewPanel();
+            RecentsView recentsView = container.getOverviewPanel();
             pa.addFloat(recentsView, RECENTS_SCALE_PROPERTY,
                     recentsView.getMaxScaleForFullScreen(), 1, LINEAR);
             pa.addFloat(recentsView, FULLSCREEN_PROGRESS, 1, 0, LINEAR);

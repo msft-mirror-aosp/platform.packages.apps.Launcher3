@@ -31,6 +31,7 @@ import android.view.MotionEvent;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
+import com.android.launcher3.Flags;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.config.FeatureFlags;
@@ -41,9 +42,10 @@ import com.android.launcher3.statemanager.StateManager.StateListener;
 import com.android.launcher3.statemanager.StatefulContainer;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitSelectSource;
+import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.FallbackActivityInterface;
+import com.android.quickstep.FallbackWindowInterface;
 import com.android.quickstep.GestureState;
-import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.RotationTouchHelper;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.SplitSelectStateController;
@@ -72,8 +74,14 @@ public class FallbackRecentsView<CONTAINER_TYPE extends Context & RecentsViewCon
     }
 
     public FallbackRecentsView(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr, FallbackActivityInterface.INSTANCE);
+        super(context, attrs, defStyleAttr, getContainerInterface());
         mContainer.getStateManager().addStateListener(this);
+    }
+
+    private static BaseContainerInterface<RecentsState, ?> getContainerInterface() {
+        return Flags.enableFallbackOverviewInWindow()
+                ? FallbackWindowInterface.INSTANCE
+                : FallbackActivityInterface.INSTANCE;
     }
 
     @Override
@@ -286,7 +294,8 @@ public class FallbackRecentsView<CONTAINER_TYPE extends Context & RecentsViewCon
             }
         }
 
-        if (isOverlayEnabled) {
+        // disabling this so app icons aren't drawn on top of recent tasks.
+        if (isOverlayEnabled && !Flags.enableFallbackOverviewInWindow()) {
             runActionOnRemoteHandles(remoteTargetHandle ->
                     remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(true));
         }

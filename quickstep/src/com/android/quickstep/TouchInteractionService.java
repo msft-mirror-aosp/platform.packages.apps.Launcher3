@@ -76,6 +76,7 @@ import android.view.Choreographer;
 import android.view.InputDevice;
 import android.view.InputEvent;
 import android.view.MotionEvent;
+import android.view.View;
 
 import androidx.annotation.BinderThread;
 import androidx.annotation.NonNull;
@@ -106,6 +107,8 @@ import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.TraceHelper;
 import com.android.quickstep.OverviewCommandHelper.CommandType;
+import com.android.quickstep.fallback.window.RecentsWindowManager;
+import com.android.quickstep.fallback.window.RecentsWindowSwipeHandler;
 import com.android.quickstep.inputconsumers.AccessibilityInputConsumer;
 import com.android.quickstep.inputconsumers.AssistantInputConsumer;
 import com.android.quickstep.inputconsumers.BubbleBarInputConsumer;
@@ -605,6 +608,8 @@ public class TouchInteractionService extends Service {
             this::createLauncherSwipeHandler;
     private final AbsSwipeUpHandler.Factory mFallbackSwipeHandlerFactory =
             this::createFallbackSwipeHandler;
+    private final AbsSwipeUpHandler.Factory mRecentsWindowSwipeHandlerFactory =
+            this::createRecentsWindowSwipeHandler;
 
     private final ScreenOnTracker.ScreenOnListener mScreenOnListener = this::onScreenOnChanged;
 
@@ -637,6 +642,7 @@ public class TouchInteractionService extends Service {
     private InputEventReceiver mInputEventReceiver;
 
     private TaskbarManager mTaskbarManager;
+    private RecentsWindowManager mRecentsWindowManager;
     private Function<GestureState, AnimatedFloat> mSwipeUpProxyProvider = i -> null;
     private AllAppsActionManager mAllAppsActionManager;
     private InputManager mInputManager;
@@ -667,6 +673,9 @@ public class TouchInteractionService extends Service {
         mDesktopVisibilityController = new DesktopVisibilityController(this);
         mTaskbarManager = new TaskbarManager(
                 this, mAllAppsActionManager, mNavCallbacks, mDesktopVisibilityController);
+        if (Flags.enableFallbackOverviewInWindow()) {
+            mRecentsWindowManager = RecentsWindowManager.Companion.getOrCreateInstance(this);
+        }
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
 
         // Call runOnUserUnlocked() before any other callbacks to ensure everything is initialized.
@@ -717,7 +726,7 @@ public class TouchInteractionService extends Service {
     @UiThread
     public void onUserUnlocked() {
         Log.d(TAG, "onUserUnlocked: userId=" + getUserId());
-        mTaskAnimationManager = new TaskAnimationManager(this);
+        mTaskAnimationManager = new TaskAnimationManager(this, mRecentsWindowManager);
         mOverviewComponentObserver = new OverviewComponentObserver(this, mDeviceState);
         mOverviewCommandHelper = new OverviewCommandHelper(this,
                 mOverviewComponentObserver, mTaskAnimationManager);
@@ -1430,8 +1439,9 @@ public class TouchInteractionService extends Service {
     }
 
     public AbsSwipeUpHandler.Factory getSwipeUpHandlerFactory() {
-        return !mOverviewComponentObserver.isHomeAndOverviewSame()
-                ? mFallbackSwipeHandlerFactory : mLauncherSwipeHandlerFactory;
+        return mOverviewComponentObserver.isHomeAndOverviewSame()
+                ? mLauncherSwipeHandlerFactory : (Flags.enableFallbackOverviewInWindow()
+                ? mRecentsWindowSwipeHandlerFactory : mFallbackSwipeHandlerFactory);
     }
 
     private InputConsumer createOtherActivityInputConsumer(GestureState gestureState,
@@ -1480,7 +1490,8 @@ public class TouchInteractionService extends Service {
                             .append("activity == null, trying to use default input consumer"));
         }
 
-        boolean hasWindowFocus = container.getRootView().hasWindowFocus();
+        View rootview = container.getRootView();
+        boolean hasWindowFocus = rootview != null && rootview.hasWindowFocus();
         boolean isPreviousGestureAnimatingToLauncher =
                 previousGestureState.isRunningAnimationToLauncher()
                         || mDeviceState.isPredictiveBackToHomeInProgress();
@@ -1682,6 +1693,13 @@ public class TouchInteractionService extends Service {
     private AbsSwipeUpHandler createFallbackSwipeHandler(
             GestureState gestureState, long touchTimeMs) {
         return new FallbackSwipeHandler(this, mDeviceState, mTaskAnimationManager,
+                gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
+                mInputConsumer);
+    }
+
+    private AbsSwipeUpHandler createRecentsWindowSwipeHandler(
+            GestureState gestureState, long touchTimeMs) {
+        return new RecentsWindowSwipeHandler(this, mDeviceState, mTaskAnimationManager,
                 gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
                 mInputConsumer);
     }

@@ -44,7 +44,7 @@ public interface RecentsViewContainer extends ActivityContext {
      * Returns an instance of an implementation of RecentsViewContainer
      * @param context will find instance of recentsViewContainer from given context.
      */
-    static <T extends RecentsViewContainer> T containerFromContext(Context context) {
+    static <T extends Context & RecentsViewContainer> T containerFromContext(Context context) {
         if (context instanceof RecentsViewContainer) {
             return (T) context;
         } else if (context instanceof ContextWrapper) {
@@ -136,12 +136,6 @@ public interface RecentsViewContainer extends ActivityContext {
      * @param r runnable to be executed upon event
      */
     void runOnBindToTouchInteractionService(Runnable r);
-
-    /**
-     * @see Activity#getComponentName()
-     * @return ComponentName
-     */
-    ComponentName getComponentName();
 
     /**
      * @see
