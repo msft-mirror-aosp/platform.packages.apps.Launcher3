@@ -47,7 +47,7 @@ constructor(
 
     override val spaceNeeded: Int
         get() {
-            return dpToPx(activityContext.taskbarSpecsEvaluator.taskbarIconSize.size.toFloat())
+            return dpToPx(activityContext.taskbarSpecsEvaluator!!.taskbarIconSize.size.toFloat())
         }
 
     init {
@@ -58,15 +58,15 @@ constructor(
     private fun setUpIcon() {
         val drawable =
             resources.getDrawable(
-                getAllAppsButton(activityContext.taskbarFeatureEvaluator.isTransient)
+                getAllAppsButton(activityContext.taskbarFeatureEvaluator!!.isTransient)
             )
-        val padding = activityContext.taskbarSpecsEvaluator.taskbarIconPadding
+        val padding = activityContext.taskbarSpecsEvaluator!!.taskbarIconPadding
 
         allAppsButton.setIconDrawable(drawable)
-        allAppsButton.setPadding(/* left= */ padding)
+        allAppsButton.setPadding(padding)
         allAppsButton.setForegroundTint(activityContext.getColor(R.color.all_apps_button_color))
 
-        // TODO(jagrutdesai) : add click listeners in future cl
+        // TODO(b/356465292) : add click listeners in future cl
         addView(allAppsButton)
     }
 
