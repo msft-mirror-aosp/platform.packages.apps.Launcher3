@@ -62,7 +62,6 @@ import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.ON_SETTLED_ON_END_TARGET;
 import static com.android.quickstep.views.RecentsView.UPDATE_SYSUI_FLAGS_THRESHOLD;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
-import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -151,6 +150,7 @@ import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
 import com.android.wm.shell.common.TransactionPool;
 import com.android.wm.shell.shared.desktopmode.DesktopModeFlags;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.startingsurface.SplashScreenExitAnimationUtils;
 
 import kotlin.Unit;
@@ -1273,7 +1273,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         TaskView currentPageTaskView = mRecentsView != null
                 ? mRecentsView.getCurrentPageTaskView() : null;
 
-        if (DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+        if (DesktopModeStatus.canEnterDesktopMode(mContext)
                 && !(DesktopModeFlags.WALLPAPER_ACTIVITY.isEnabled(mContext)
                 && DesktopModeFlags.QUICK_SWITCH.isEnabled(mContext))) {
             if ((nextPageTaskView instanceof DesktopTaskView
@@ -1446,7 +1446,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             setClampScrollOffset(false);
         };
 
-        if (DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+        if (DesktopModeStatus.canEnterDesktopMode(mContext)
                 && !(DesktopModeFlags.WALLPAPER_ACTIVITY.isEnabled(mContext)
                 && DesktopModeFlags.QUICK_SWITCH.isEnabled(mContext))) {
             if (mRecentsView != null && (mRecentsView.getCurrentPageTaskView() != null
@@ -2100,7 +2100,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             // If there are no targets, then we don't need to capture anything
             mStateCallback.setStateOnUiThread(STATE_SCREENSHOT_CAPTURED);
         } else {
-            boolean finishTransitionPosted = false;
             // If we already have cached screenshot(s) from running tasks, skip update
             boolean shouldUpdate = false;
             int[] runningTaskIds = mGestureState.getRunningTaskIds(mIsSwipeForSplit);
@@ -2124,45 +2123,32 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                         }
 
                         MAIN_EXECUTOR.execute(() -> {
-                            if (!updateThumbnail(false /* refreshView */)) {
-                                setScreenshotCapturedState();
-                            }
+                            updateThumbnail();
+                            setScreenshotCapturedState();
                         });
                     });
                     return;
                 }
 
-                finishTransitionPosted = updateThumbnail(false /* refreshView */);
+                updateThumbnail();
             }
 
-            if (!finishTransitionPosted) {
-                setScreenshotCapturedState();
-            }
+            setScreenshotCapturedState();
         }
     }
 
     // Returns whether finish transition was posted.
-    private boolean updateThumbnail(boolean refreshView) {
+    private void updateThumbnail() {
         if (mGestureState.getEndTarget() == HOME
                 || mGestureState.getEndTarget() == NEW_TASK
                 || mGestureState.getEndTarget() == ALL_APPS
                 || mRecentsView == null) {
             // Capture the screenshot before finishing the transition to home or quickswitching to
             // ensure it's taken in the correct orientation, but no need to update the thumbnail.
-            return false;
+            return;
         }
 
-        boolean finishTransitionPosted = false;
-        TaskView updatedTaskView = mRecentsView.updateThumbnail(mTaskSnapshotCache, refreshView);
-        if (updatedTaskView != null && refreshView && !mCanceled) {
-            // Defer finishing the animation until the next launcher frame with the
-            // new thumbnail
-            finishTransitionPosted = ViewUtils.postFrameDrawn(updatedTaskView,
-                    () -> mStateCallback.setStateOnUiThread(STATE_SCREENSHOT_CAPTURED),
-                    this::isCanceled);
-        }
-
-        return finishTransitionPosted;
+        mRecentsView.updateThumbnail(mTaskSnapshotCache);
     }
 
     private void setScreenshotCapturedState() {
@@ -2294,7 +2280,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                     mRecentsAnimationController, mRecentsAnimationTargets);
         });
 
-        if (DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+        if (DesktopModeStatus.canEnterDesktopMode(mContext)
                 && !(DesktopModeFlags.WALLPAPER_ACTIVITY.isEnabled(mContext)
                         && DesktopModeFlags.QUICK_SWITCH.isEnabled(mContext))) {
             if (mRecentsView.getNextPageTaskView() instanceof DesktopTaskView
