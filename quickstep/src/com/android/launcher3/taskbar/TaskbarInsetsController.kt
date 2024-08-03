@@ -131,44 +131,29 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
         val taskbarTouchableHeight = controllers.taskbarStashController.touchableHeight
         val bubblesTouchableHeight =
             if (controllers.bubbleControllers.isPresent) {
-                controllers.bubbleControllers.get().bubbleStashController.touchableHeight
+                controllers.bubbleControllers.get().bubbleStashController.getTouchableHeight()
             } else {
                 0
             }
         val touchableHeight = max(taskbarTouchableHeight, bubblesTouchableHeight)
 
-        if (
+        defaultTouchableRegion.set(
+            0,
+            windowLayoutParams.height - touchableHeight,
+            context.deviceProfile.widthPx,
+            windowLayoutParams.height
+        )
+        val isBubbleBarVisible =
             controllers.bubbleControllers.isPresent &&
-                controllers.bubbleControllers.get().bubbleStashController.isBubblesShowingOnHome
-        ) {
+                controllers.bubbleControllers.get().bubbleStashController.isBubbleBarVisible()
+        // if there's an animating bubble add it to the touch region so that it's clickable
+        val isAnimatingNewBubble =
+            controllers.bubbleControllers.getOrNull()?.bubbleBarViewController?.isAnimatingNewBubble
+                ?: false
+        if (isBubbleBarVisible || isAnimatingNewBubble) {
             val iconBounds =
                 controllers.bubbleControllers.get().bubbleBarViewController.bubbleBarBounds
-            defaultTouchableRegion.set(
-                iconBounds.left,
-                iconBounds.top,
-                iconBounds.right,
-                iconBounds.bottom
-            )
-        } else {
-            defaultTouchableRegion.set(
-                0,
-                windowLayoutParams.height - touchableHeight,
-                context.deviceProfile.widthPx,
-                windowLayoutParams.height
-            )
-
-            // if there's an animating bubble add it to the touch region so that it's clickable
-            val isAnimatingNewBubble =
-                controllers.bubbleControllers
-                    .getOrNull()
-                    ?.bubbleBarViewController
-                    ?.isAnimatingNewBubble
-                    ?: false
-            if (isAnimatingNewBubble) {
-                val iconBounds =
-                    controllers.bubbleControllers.get().bubbleBarViewController.bubbleBarBounds
-                defaultTouchableRegion.op(iconBounds, Region.Op.UNION)
-            }
+            defaultTouchableRegion.op(iconBounds, Region.Op.UNION)
         }
 
         // Pre-calculate insets for different providers across different rotations for this gravity
@@ -358,13 +343,6 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
      */
     fun updateInsetsTouchability(insetsInfo: ViewTreeObserver.InternalInsetsInfo) {
         insetsInfo.touchableRegion.setEmpty()
-        // Always have nav buttons be touchable
-        controllers.navbarButtonsViewController.addVisibleButtonsRegion(
-            context.dragLayer,
-            insetsInfo.touchableRegion
-        )
-        debugTouchableRegion.lastSetTouchableBounds.set(insetsInfo.touchableRegion.bounds)
-
         val bubbleBarVisible =
             controllers.bubbleControllers.isPresent &&
                 controllers.bubbleControllers.get().bubbleBarViewController.isBubbleBarVisible()
@@ -443,6 +421,12 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
             debugTouchableRegion.lastSetTouchableReason =
                 "Icons are not visible, but other components such as 3 buttons might be"
         }
+        // Always have nav buttons be touchable
+        controllers.navbarButtonsViewController.addVisibleButtonsRegion(
+            context.dragLayer,
+            insetsInfo.touchableRegion
+        )
+        debugTouchableRegion.lastSetTouchableBounds.set(insetsInfo.touchableRegion.bounds)
         context.excludeFromMagnificationRegion(insetsIsTouchableRegion)
     }
 
