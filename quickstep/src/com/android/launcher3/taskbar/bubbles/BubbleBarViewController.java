@@ -75,6 +75,7 @@ public class BubbleBarViewController {
     private View.OnClickListener mBubbleClickListener;
     private View.OnClickListener mBubbleBarClickListener;
     private BubbleView.Controller mBubbleViewController;
+    private BubbleBarOverflow mOverflowBubble;
 
     // These are exposed to {@link BubbleStashController} to animate for stashing/un-stashing
     private final MultiValueAlpha mBubbleBarAlpha;
@@ -90,6 +91,8 @@ public class BubbleBarViewController {
     // Whether the bar is hidden because there are no bubbles.
     private boolean mHiddenForNoBubbles = true;
     private boolean mShouldShowEducation;
+
+    public boolean mOverflowAdded;
 
     private BubbleBarViewAnimator mBubbleBarViewAnimator;
 
@@ -121,6 +124,7 @@ public class BubbleBarViewController {
         mBubbleClickListener = v -> onBubbleClicked((BubbleView) v);
         mBubbleBarClickListener = v -> expandBubbleBar();
         mBubbleDragController.setupBubbleBarView(mBarView);
+        mOverflowBubble = bubbleControllers.bubbleCreator.createOverflow(mBarView);
         mBarView.setOnClickListener(mBubbleBarClickListener);
         mBarView.addOnLayoutChangeListener(
                 (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -491,6 +495,46 @@ public class BubbleBarViewController {
         }
     }
 
+    /** Whether the overflow view is added to the bubble bar. */
+    public boolean isOverflowAdded() {
+        return mOverflowAdded;
+    }
+
+    /** Shows or hides the overflow view. */
+    public void showOverflow(boolean showOverflow) {
+        if (mOverflowAdded == showOverflow) return;
+        mOverflowAdded = showOverflow;
+        if (mOverflowAdded) {
+            mBarView.addBubble(mOverflowBubble.getView());
+            mOverflowBubble.getView().setOnClickListener(mBubbleClickListener);
+            mOverflowBubble.getView().setController(mBubbleViewController);
+        } else {
+            mBarView.removeBubble(mOverflowBubble.getView());
+            mOverflowBubble.getView().setOnClickListener(null);
+            mOverflowBubble.getView().setController(null);
+        }
+    }
+
+    /** Adds the overflow view to the bubble bar while animating a view away. */
+    public void addOverflowAndRemoveBubble(BubbleBarBubble removedBubble) {
+        if (mOverflowAdded) return;
+        mOverflowAdded = true;
+        mBarView.addBubbleAndRemoveBubble(mOverflowBubble.getView(), removedBubble.getView());
+        mOverflowBubble.getView().setOnClickListener(mBubbleClickListener);
+        mOverflowBubble.getView().setController(mBubbleViewController);
+        removedBubble.getView().setController(null);
+    }
+
+    /** Removes the overflow view to the bubble bar while animating a view in. */
+    public void removeOverflowAndAddBubble(BubbleBarBubble addedBubble) {
+        if (!mOverflowAdded) return;
+        mOverflowAdded = false;
+        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), mOverflowBubble.getView());
+        addedBubble.getView().setOnClickListener(mBubbleClickListener);
+        addedBubble.getView().setController(mBubbleViewController);
+        mOverflowBubble.getView().setController(null);
+    }
+
     /**
      * Adds the provided bubble to the bubble bar.
      */
@@ -500,10 +544,6 @@ public class BubbleBarViewController {
             b.getView().setOnClickListener(mBubbleClickListener);
             mBubbleDragController.setupBubbleView(b.getView());
             b.getView().setController(mBubbleViewController);
-
-            if (b instanceof BubbleBarOverflow) {
-                return;
-            }
 
             if (suppressAnimation || !(b instanceof BubbleBarBubble bubble)) {
                 // the bubble bar and handle are initialized as part of the first bubble animation.
