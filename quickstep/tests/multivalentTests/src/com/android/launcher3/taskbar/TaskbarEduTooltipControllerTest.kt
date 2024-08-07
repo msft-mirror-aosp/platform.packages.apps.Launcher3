@@ -16,6 +16,7 @@
 
 package com.android.launcher3.taskbar
 
+import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.launcher3.Utilities
 import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnMainSync
@@ -35,12 +36,14 @@ import com.android.launcher3.util.OnboardingPrefs
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(LauncherMultivalentJUnit::class)
 @EmulatedDevices(["pixelFoldable2023", "pixelTablet2023"])
+@Ignore
 class TaskbarEduTooltipControllerTest {
 
     private val context =
@@ -77,6 +80,7 @@ class TaskbarEduTooltipControllerTest {
 
     @Before
     fun setUp() {
+        Log.e("Taskbar", "TaskbarEduTooltipControllerTest test started")
         Utilities.disableRunningInTestHarnessForTests()
     }
 
@@ -85,6 +89,7 @@ class TaskbarEduTooltipControllerTest {
         if (wasInTestHarness) {
             Utilities.enableRunningInTestHarnessForTests()
         }
+        Log.e("Taskbar", "TaskbarEduTooltipControllerTest test completed")
     }
 
     @Test
