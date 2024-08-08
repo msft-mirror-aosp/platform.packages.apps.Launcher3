@@ -14,12 +14,18 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.taskbar
+package com.android.launcher3.taskbar.test
 
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.launcher3.Utilities
+import com.android.launcher3.taskbar.TOOLTIP_STEP_FEATURES
+import com.android.launcher3.taskbar.TOOLTIP_STEP_NONE
+import com.android.launcher3.taskbar.TOOLTIP_STEP_PINNING
+import com.android.launcher3.taskbar.TOOLTIP_STEP_SWIPE
+import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnMainSync
+import com.android.launcher3.taskbar.TaskbarEduTooltipController
 import com.android.launcher3.taskbar.rules.TaskbarModeRule
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.PINNED
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.THREE_BUTTONS
@@ -51,25 +57,25 @@ class TaskbarEduTooltipControllerTest {
             InstrumentationRegistry.getInstrumentation().targetContext
         )
 
-    @get:Rule
+    @get:Rule(order = 0)
     val tooltipStepPreferenceRule =
         TaskbarPreferenceRule(
             context,
             OnboardingPrefs.TASKBAR_EDU_TOOLTIP_STEP.prefItem,
         )
 
-    @get:Rule
+    @get:Rule(order = 1)
     val searchEduPreferenceRule =
         TaskbarPreferenceRule(
             context,
             OnboardingPrefs.TASKBAR_SEARCH_EDU_SEEN,
         )
 
-    @get:Rule val taskbarPinningPreferenceRule = TaskbarPinningPreferenceRule(context)
+    @get:Rule(order = 2) val taskbarPinningPreferenceRule = TaskbarPinningPreferenceRule(context)
 
-    @get:Rule val taskbarModeRule = TaskbarModeRule(context)
+    @get:Rule(order = 3) val taskbarModeRule = TaskbarModeRule(context)
 
-    @get:Rule val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
+    @get:Rule(order = 4) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
 
     @InjectController lateinit var taskbarEduTooltipController: TaskbarEduTooltipController
 
