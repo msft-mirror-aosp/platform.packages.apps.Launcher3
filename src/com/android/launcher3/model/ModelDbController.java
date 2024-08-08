@@ -291,6 +291,100 @@ public class ModelDbController {
 
 
     /**
+     * Resets the launcher DB if we should reset it.
+     */
+    public void resetLauncherDb(@Nullable LauncherRestoreEventLogger restoreEventLogger) {
+        if (restoreEventLogger != null) {
+            sendMetricsForFailedMigration(restoreEventLogger, getDb());
+        }
+        FileLog.d(TAG, "Migration failed: resetting launcher database");
+        createEmptyDB();
+        LauncherPrefs.get(mContext).putSync(
+                getEmptyDbCreatedKey(mOpenHelper.getDatabaseName()).to(true));
+
+        // Write the grid state to avoid another migration
+        new DeviceGridState(LauncherAppState.getIDP(mContext)).writeToPrefs(mContext);
+    }
+
+    /**
+     * Determines if we should reset the DB.
+     */
+    private boolean shouldResetDb() {
+        if (isThereExistingDb()) {
+            return true;
+        }
+        if (!isGridMigrationNecessary()) {
+            return false;
+        }
+        if (isCurrentDbSameAsTarget()) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isThereExistingDb() {
+        if (LauncherPrefs.get(mContext).get(getEmptyDbCreatedKey())) {
+            // If we already have a new DB, ignore migration
+            Log.d(TAG, "migrateGridIfNeeded: new DB already created, skipping migration");
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isGridMigrationNecessary() {
+        InvariantDeviceProfile idp = LauncherAppState.getIDP(mContext);
+        if (GridSizeMigrationDBController.needsToMigrate(mContext, idp)) {
+            return true;
+        }
+        Log.d(TAG, "migrateGridIfNeeded: no grid migration needed");
+        return false;
+    }
+
+    private boolean isCurrentDbSameAsTarget() {
+        InvariantDeviceProfile idp = LauncherAppState.getIDP(mContext);
+        String targetDbName = new DeviceGridState(idp).getDbFile();
+        if (TextUtils.equals(targetDbName, mOpenHelper.getDatabaseName())) {
+            Log.e(TAG, "migrateGridIfNeeded: target db is same as current: " + targetDbName);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Migrates the DB. If the migration failed, it clears the DB.
+     */
+    public void attemptMigrateDb(LauncherRestoreEventLogger restoreEventLogger) throws Exception {
+        createDbIfNotExists();
+
+        if (shouldResetDb()) {
+            resetLauncherDb(restoreEventLogger);
+            return;
+        }
+
+        InvariantDeviceProfile idp = LauncherAppState.getIDP(mContext);
+        DatabaseHelper oldHelper = mOpenHelper;
+        mOpenHelper = (mContext instanceof SandboxContext) ? oldHelper
+                : createDatabaseHelper(true /* forMigration */);
+        try {
+            // This is the current grid we have, given by the mContext
+            DeviceGridState srcDeviceState = new DeviceGridState(mContext);
+            // This is the state we want to migrate to that is given by the idp
+            DeviceGridState destDeviceState = new DeviceGridState(idp);
+
+            GridSizeMigrationLogic gridSizeMigrationLogic = new GridSizeMigrationLogic();
+            gridSizeMigrationLogic.migrateGrid(mContext, srcDeviceState, destDeviceState,
+                    mOpenHelper, oldHelper.getWritableDatabase());
+        } catch (Exception e) {
+            resetLauncherDb(restoreEventLogger);
+            throw new Exception("Failed to migrate grid", e);
+        } finally {
+            if (mOpenHelper != oldHelper) {
+                oldHelper.close();
+            }
+        }
+    }
+
+    /**
      * Migrates the DB if needed. If the migration failed, it clears the DB.
      */
     public void tryMigrateDB(@Nullable LauncherRestoreEventLogger restoreEventLogger) {
@@ -333,8 +427,8 @@ public class ModelDbController {
             return false;
         }
         InvariantDeviceProfile idp = LauncherAppState.getIDP(mContext);
-        if (!GridSizeMigrationUtil.needsToMigrate(mContext, idp)) {
-            FileLog.d(TAG, "migrateGridIfNeeded: no grid migration needed");
+        if (!GridSizeMigrationDBController.needsToMigrate(mContext, idp)) {
+            Log.d(TAG, "migrateGridIfNeeded: no grid migration needed");
             return true;
         }
         String targetDbName = new DeviceGridState(idp).getDbFile();
@@ -350,7 +444,7 @@ public class ModelDbController {
             DeviceGridState srcDeviceState = new DeviceGridState(mContext);
             // This is the state we want to migrate to that is given by the idp
             DeviceGridState destDeviceState = new DeviceGridState(idp);
-            return GridSizeMigrationUtil.migrateGridIfNeeded(mContext, srcDeviceState,
+            return GridSizeMigrationDBController.migrateGridIfNeeded(mContext, srcDeviceState,
                     destDeviceState, mOpenHelper, oldHelper.getWritableDatabase());
         } catch (Exception e) {
             FileLog.e(TAG, "Failed to migrate grid", e);
