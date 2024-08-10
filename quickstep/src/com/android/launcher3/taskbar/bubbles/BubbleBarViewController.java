@@ -72,9 +72,11 @@ public class BubbleBarViewController {
     private BubbleDragController mBubbleDragController;
     private TaskbarStashController mTaskbarStashController;
     private TaskbarInsetsController mTaskbarInsetsController;
+    private TaskbarViewPropertiesProvider mTaskbarViewPropertiesProvider;
     private View.OnClickListener mBubbleClickListener;
     private View.OnClickListener mBubbleBarClickListener;
     private BubbleView.Controller mBubbleViewController;
+    private BubbleBarOverflow mOverflowBubble;
 
     // These are exposed to {@link BubbleStashController} to animate for stashing/un-stashing
     private final MultiValueAlpha mBubbleBarAlpha;
@@ -90,6 +92,8 @@ public class BubbleBarViewController {
     // Whether the bar is hidden because there are no bubbles.
     private boolean mHiddenForNoBubbles = true;
     private boolean mShouldShowEducation;
+
+    public boolean mOverflowAdded;
 
     private BubbleBarViewAnimator mBubbleBarViewAnimator;
 
@@ -107,13 +111,16 @@ public class BubbleBarViewController {
                 R.dimen.bubblebar_icon_size);
     }
 
-    public void init(TaskbarControllers controllers, BubbleControllers bubbleControllers) {
+    /** Initializes controller. */
+    public void init(TaskbarControllers controllers, BubbleControllers bubbleControllers,
+            TaskbarViewPropertiesProvider taskbarViewPropertiesProvider) {
         mBubbleStashController = bubbleControllers.bubbleStashController;
         mBubbleBarController = bubbleControllers.bubbleBarController;
         mBubbleDragController = bubbleControllers.bubbleDragController;
         mTaskbarStashController = controllers.taskbarStashController;
         mTaskbarInsetsController = controllers.taskbarInsetsController;
         mBubbleBarViewAnimator = new BubbleBarViewAnimator(mBarView, mBubbleStashController);
+        mTaskbarViewPropertiesProvider = taskbarViewPropertiesProvider;
         onBubbleBarConfigurationChanged(/* animate= */ false);
         mActivity.addOnDeviceProfileChangeListener(
                 dp -> onBubbleBarConfigurationChanged(/* animate= */ true));
@@ -121,6 +128,7 @@ public class BubbleBarViewController {
         mBubbleClickListener = v -> onBubbleClicked((BubbleView) v);
         mBubbleBarClickListener = v -> expandBubbleBar();
         mBubbleDragController.setupBubbleBarView(mBarView);
+        mOverflowBubble = bubbleControllers.bubbleCreator.createOverflow(mBarView);
         mBarView.setOnClickListener(mBubbleBarClickListener);
         mBarView.addOnLayoutChangeListener(
                 (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -299,7 +307,8 @@ public class BubbleBarViewController {
 
     /** Whether a new bubble is animating. */
     public boolean isAnimatingNewBubble() {
-        return mBarView.isAnimatingNewBubble();
+        return mBarView.isAnimatingNewBubble()
+                || (mBubbleBarViewAnimator != null && mBubbleBarViewAnimator.hasAnimatingBubble());
     }
 
     /** The horizontal margin of the bubble bar from the edge of the screen. */
@@ -343,6 +352,7 @@ public class BubbleBarViewController {
             if (hidden) {
                 mBarView.setAlpha(0);
                 mBarView.setExpanded(false);
+                updatePersistentTaskbar(/* isBubbleBarExpanded = */ false);
             }
             mActivity.bubbleBarVisibilityChanged(!hidden);
         }
@@ -491,6 +501,46 @@ public class BubbleBarViewController {
         }
     }
 
+    /** Whether the overflow view is added to the bubble bar. */
+    public boolean isOverflowAdded() {
+        return mOverflowAdded;
+    }
+
+    /** Shows or hides the overflow view. */
+    public void showOverflow(boolean showOverflow) {
+        if (mOverflowAdded == showOverflow) return;
+        mOverflowAdded = showOverflow;
+        if (mOverflowAdded) {
+            mBarView.addBubble(mOverflowBubble.getView());
+            mOverflowBubble.getView().setOnClickListener(mBubbleClickListener);
+            mOverflowBubble.getView().setController(mBubbleViewController);
+        } else {
+            mBarView.removeBubble(mOverflowBubble.getView());
+            mOverflowBubble.getView().setOnClickListener(null);
+            mOverflowBubble.getView().setController(null);
+        }
+    }
+
+    /** Adds the overflow view to the bubble bar while animating a view away. */
+    public void addOverflowAndRemoveBubble(BubbleBarBubble removedBubble) {
+        if (mOverflowAdded) return;
+        mOverflowAdded = true;
+        mBarView.addBubbleAndRemoveBubble(mOverflowBubble.getView(), removedBubble.getView());
+        mOverflowBubble.getView().setOnClickListener(mBubbleClickListener);
+        mOverflowBubble.getView().setController(mBubbleViewController);
+        removedBubble.getView().setController(null);
+    }
+
+    /** Removes the overflow view to the bubble bar while animating a view in. */
+    public void removeOverflowAndAddBubble(BubbleBarBubble addedBubble) {
+        if (!mOverflowAdded) return;
+        mOverflowAdded = false;
+        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), mOverflowBubble.getView());
+        addedBubble.getView().setOnClickListener(mBubbleClickListener);
+        addedBubble.getView().setController(mBubbleViewController);
+        mOverflowBubble.getView().setController(null);
+    }
+
     /**
      * Adds the provided bubble to the bubble bar.
      */
@@ -500,10 +550,6 @@ public class BubbleBarViewController {
             b.getView().setOnClickListener(mBubbleClickListener);
             mBubbleDragController.setupBubbleView(b.getView());
             b.getView().setController(mBubbleViewController);
-
-            if (b instanceof BubbleBarOverflow) {
-                return;
-            }
 
             if (suppressAnimation || !(b instanceof BubbleBarBubble bubble)) {
                 // the bubble bar and handle are initialized as part of the first bubble animation.
@@ -535,14 +581,14 @@ public class BubbleBarViewController {
         }
         boolean persistentTaskbarOrOnHome = mBubbleStashController.isBubblesShowingOnHome()
                 || !mBubbleStashController.isTransientTaskBar();
-        if (persistentTaskbarOrOnHome && !isExpanding && !isExpanded()) {
-            mBubbleBarViewAnimator.animateBubbleBarForCollapsed(bubble);
+        if (persistentTaskbarOrOnHome && !isExpanded()) {
+            mBubbleBarViewAnimator.animateBubbleBarForCollapsed(bubble, isExpanding);
             return;
         }
 
         // only animate the new bubble if we're in an app, have handle view and not auto expanding
-        if (isInApp && !isExpanding && mBubbleStashController.getHasHandleView() && !isExpanded()) {
-            mBubbleBarViewAnimator.animateBubbleInForStashed(bubble);
+        if (isInApp && mBubbleStashController.getHasHandleView() && !isExpanded()) {
+            mBubbleBarViewAnimator.animateBubbleInForStashed(bubble, isExpanding);
         }
     }
 
@@ -571,6 +617,7 @@ public class BubbleBarViewController {
     public void setExpanded(boolean isExpanded) {
         if (isExpanded != mBarView.isExpanded()) {
             mBarView.setExpanded(isExpanded);
+            updatePersistentTaskbar(isExpanded);
             if (!isExpanded) {
                 mSystemUiProxy.collapseBubbles();
             } else {
@@ -581,11 +628,34 @@ public class BubbleBarViewController {
         }
     }
 
+    private void updatePersistentTaskbar(boolean isBubbleBarExpanded) {
+        if (mBubbleStashController.isTransientTaskBar()) return;
+        boolean hideTaskbar = isBubbleBarExpanded && isIntersectingTaskbar();
+        mTaskbarViewPropertiesProvider
+                .getIconsAlpha()
+                .animateToValue(hideTaskbar ? 0 : 1)
+                .start();
+    }
+
+    /** Return {@code true} if expanded bubble bar would intersect the taskbar. */
+    public boolean isIntersectingTaskbar() {
+        if (mBarView.isExpanding() || mBarView.isExpanded()) {
+            Rect taskbarViewBounds = mTaskbarViewPropertiesProvider.getTaskbarViewBounds();
+            return mBarView.getBubbleBarExpandedBounds().intersect(taskbarViewBounds);
+        } else {
+            return false;
+        }
+    }
+
     /**
      * Sets whether the bubble bar should be expanded. This method is used in response to UI events
      * from SystemUI.
      */
     public void setExpandedFromSysui(boolean isExpanded) {
+        if (isAnimatingNewBubble() && isExpanded) {
+            mBubbleBarViewAnimator.expandedWhileAnimating();
+            return;
+        }
         if (!isExpanded) {
             mBubbleStashController.stashBubbleBar();
         } else {
@@ -709,5 +779,15 @@ public class BubbleBarViewController {
         } else {
             pw.println("  Bubble bar view is null!");
         }
+    }
+
+    /** Interface for BubbleBarViewController to get the taskbar view properties. */
+    public interface TaskbarViewPropertiesProvider {
+
+        /** Returns the bounds of the taskbar. */
+        Rect getTaskbarViewBounds();
+
+        /** Returns taskbar icons alpha */
+        MultiPropertyFactory<View>.MultiProperty getIconsAlpha();
     }
 }
