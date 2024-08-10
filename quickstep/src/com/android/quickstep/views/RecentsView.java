@@ -135,6 +135,7 @@ import com.android.internal.jank.Cuj;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BaseActivity.MultiWindowModeChangedListener;
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Flags;
 import com.android.launcher3.Insettable;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.PagedView;
@@ -553,6 +554,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     // Progress from 0 to 1 where 0 is a carousel and 1 is a 2 row grid.
     private float mGridProgress = 0;
     private float mTaskThumbnailSplashAlpha = 0;
+    private boolean mBorderEnabled = false;
     private boolean mShowAsGridLastOnLayout = false;
     private final IntSet mTopRowIdSet = new IntSet();
     private int mClearAllShortTotalWidthTranslation = 0;
@@ -1048,7 +1050,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
     @Nullable
     public Task onTaskThumbnailChanged(int taskId, ThumbnailData thumbnailData) {
         if (enableRefactorTaskThumbnail()) {
-            // TODO(b/342560598): Listen in TaskRepository and reload
+            mHelper.onTaskThumbnailChanged(taskId, thumbnailData);
             return null;
         }
         if (mHandleTaskStackChanges) {
@@ -1097,9 +1099,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
 
     /** Updates the thumbnail(s) of the relevant TaskView. */
     public void updateThumbnail(Map<Integer, ThumbnailData> thumbnailData) {
-        if (enableRefactorTaskThumbnail()) {
-            mRecentsViewModel.addOrUpdateThumbnailOverride(thumbnailData);
-        } else {
+        if (!enableRefactorTaskThumbnail()) {
             for (Map.Entry<Integer, ThumbnailData> entry : thumbnailData.entrySet()) {
                 Integer id = entry.getKey();
                 ThumbnailData thumbnail = entry.getValue();
@@ -1527,6 +1527,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
      * Enable or disable showing border on hover and focus change on task views
      */
     public void setTaskBorderEnabled(boolean enabled) {
+        mBorderEnabled = enabled;
         int taskCount = getTaskViewCount();
         for (int i = 0; i < taskCount; i++) {
             TaskView taskView = requireTaskViewAt(i);
@@ -2046,6 +2047,7 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 taskView.setFullscreenProgress(mFullscreenProgress);
                 taskView.setModalness(mTaskModalness);
                 taskView.setTaskThumbnailSplashAlpha(mTaskThumbnailSplashAlpha);
+                taskView.setBorderEnabled(mBorderEnabled);
             }
         }
         // resetTaskVisuals is called at the end of dismiss animation which could update
@@ -4919,6 +4921,9 @@ public abstract class RecentsView<CONTAINER_TYPE extends Context & RecentsViewCo
                 mSplitHiddenTaskView.updateSnapshotRadius();
             });
         } else if (isInitiatingSplitFromTaskView) {
+            if (Flags.enableHoverOfChildElementsInTaskview()) {
+                mSplitHiddenTaskView.setBorderEnabled(false);
+            }
             // Splitting from Overview for fullscreen task
             createTaskDismissAnimation(builder, mSplitHiddenTaskView, true, false, duration,
                     true /* dismissingForSplitSelection*/);

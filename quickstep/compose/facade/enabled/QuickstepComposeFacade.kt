@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,32 +14,15 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.celllayout.board;
+package com.android.quickstep.compose
 
-import android.graphics.Point;
+import android.content.Context
+import com.android.launcher3.compose.ComposeFacade
+import com.android.launcher3.compose.core.BaseComposeFacade
+import com.android.quickstep.compose.core.QuickstepComposeFeatures
 
-public class IconPoint {
-    public Point coord;
-    public char mType;
+object QuickstepComposeFacade : BaseComposeFacade, QuickstepComposeFeatures {
+    override fun isComposeAvailable() = ComposeFacade.isComposeAvailable()
 
-    public IconPoint(Point coord, char type) {
-        this.coord = coord;
-        mType = type;
-    }
-
-    public char getType() {
-        return mType;
-    }
-
-    public void setType(char type) {
-        mType = type;
-    }
-
-    public Point getCoord() {
-        return coord;
-    }
-
-    public void setCoord(Point coord) {
-        this.coord = coord;
-    }
+    override fun initComposeView(appContext: Context) = ComposeFacade.initComposeView(appContext)
 }
