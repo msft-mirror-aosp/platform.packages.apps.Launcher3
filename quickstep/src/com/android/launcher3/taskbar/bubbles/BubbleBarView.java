@@ -124,8 +124,6 @@ public class BubbleBarView extends FrameLayout {
 
     private final BubbleBarBackground mBubbleBarBackground;
 
-    private boolean mIsAnimatingNewBubble = false;
-
     /**
      * The current bounds of all the bubble bar. Note that these bounds may not account for
      * translation. The bounds should be retrieved using {@link #getBubbleBarBounds()} which
@@ -661,13 +659,25 @@ public class BubbleBarView extends FrameLayout {
         return displayHeight - bubbleBarHeight + (int) mController.getBubbleBarTranslationY();
     }
 
-    /**
-     * Updates the bounds with translation that may have been applied and returns the result.
-     */
+    /** Returns the bounds with translation that may have been applied. */
     public Rect getBubbleBarBounds() {
-        mBubbleBarBounds.top = getTop() + (int) getTranslationY() + mPointerSize;
-        mBubbleBarBounds.bottom = getBottom() + (int) getTranslationY();
-        return mBubbleBarBounds;
+        Rect bounds = new Rect(mBubbleBarBounds);
+        bounds.top = getTop() + (int) getTranslationY() + mPointerSize;
+        bounds.bottom = getBottom() + (int) getTranslationY();
+        return bounds;
+    }
+
+    /** Returns the expanded bounds with translation that may have been applied. */
+    public Rect getBubbleBarExpandedBounds() {
+        Rect expandedBounds = getBubbleBarBounds();
+        if (!isExpanded() || isExpanding()) {
+            if (mBubbleBarLocation.isOnLeft(isLayoutRtl())) {
+                expandedBounds.right = expandedBounds.left + (int) expandedWidth();
+            } else {
+                expandedBounds.left = expandedBounds.right - (int) expandedWidth();
+            }
+        }
+        return expandedBounds;
     }
 
     /**
@@ -700,16 +710,6 @@ public class BubbleBarView extends FrameLayout {
      */
     public float getRelativePivotY() {
         return mRelativePivotY;
-    }
-
-    /** Notifies the bubble bar that a new bubble animation is starting. */
-    public void onAnimatingBubbleStarted() {
-        mIsAnimatingNewBubble = true;
-    }
-
-    /** Notifies the bubble bar that a new bubble animation is complete. */
-    public void onAnimatingBubbleCompleted() {
-        mIsAnimatingNewBubble = false;
     }
 
     /** Add a new bubble to the bubble bar. */
@@ -1280,6 +1280,13 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /**
+     * Returns whether the bubble bar is expanding.
+     */
+    public boolean isExpanding() {
+        return mWidthAnimator.isRunning() && mIsBarExpanded;
+    }
+
+    /**
      * Get width of the bubble bar as if it would be expanded.
      *
      * @return width of the bubble bar in its expanded state, regardless of current width
@@ -1334,19 +1341,12 @@ public class BubbleBarView extends FrameLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (mIsAnimatingNewBubble) {
-            mController.onBubbleBarTouchedWhileAnimating();
-        }
+        mController.onBubbleBarTouched();
         if (!mIsBarExpanded) {
             // When the bar is collapsed, all taps on it should expand it.
             return true;
         }
         return super.onInterceptTouchEvent(ev);
-    }
-
-    /** Whether a new bubble is currently animating. */
-    public boolean isAnimatingNewBubble() {
-        return mIsAnimatingNewBubble;
     }
 
     private boolean hasOverflow() {
@@ -1481,7 +1481,6 @@ public class BubbleBarView extends FrameLayout {
             pw.println("    bubble key: " + key);
         }
         pw.println("  isExpanded: " + isExpanded());
-        pw.println("  mIsAnimatingNewBubble: " + mIsAnimatingNewBubble);
         if (mBubbleAnimator != null) {
             pw.println("  mBubbleAnimator.isRunning(): " + mBubbleAnimator.isRunning());
             pw.println("  mBubbleAnimator is null");
@@ -1506,8 +1505,8 @@ public class BubbleBarView extends FrameLayout {
         /** Returns the translation Y that the bubble bar should have. */
         float getBubbleBarTranslationY();
 
-        /** Notifies the controller that the bubble bar was touched while it was animating. */
-        void onBubbleBarTouchedWhileAnimating();
+        /** Notifies the controller that the bubble bar was touched. */
+        void onBubbleBarTouched();
 
         /** Requests the controller to expand bubble bar */
         void expandBubbleBar();
