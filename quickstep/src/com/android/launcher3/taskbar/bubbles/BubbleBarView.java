@@ -124,8 +124,6 @@ public class BubbleBarView extends FrameLayout {
 
     private final BubbleBarBackground mBubbleBarBackground;
 
-    private boolean mIsAnimatingNewBubble = false;
-
     /**
      * The current bounds of all the bubble bar. Note that these bounds may not account for
      * translation. The bounds should be retrieved using {@link #getBubbleBarBounds()} which
@@ -418,6 +416,7 @@ public class BubbleBarView extends FrameLayout {
         LayoutParams lp = (LayoutParams) getLayoutParams();
         lp.gravity = Gravity.BOTTOM | (onLeft ? Gravity.LEFT : Gravity.RIGHT);
         setLayoutParams(lp); // triggers a relayout
+        updateBubbleAccessibilityStates();
     }
 
     /**
@@ -660,13 +659,25 @@ public class BubbleBarView extends FrameLayout {
         return displayHeight - bubbleBarHeight + (int) mController.getBubbleBarTranslationY();
     }
 
-    /**
-     * Updates the bounds with translation that may have been applied and returns the result.
-     */
+    /** Returns the bounds with translation that may have been applied. */
     public Rect getBubbleBarBounds() {
-        mBubbleBarBounds.top = getTop() + (int) getTranslationY() + mPointerSize;
-        mBubbleBarBounds.bottom = getBottom() + (int) getTranslationY();
-        return mBubbleBarBounds;
+        Rect bounds = new Rect(mBubbleBarBounds);
+        bounds.top = getTop() + (int) getTranslationY() + mPointerSize;
+        bounds.bottom = getBottom() + (int) getTranslationY();
+        return bounds;
+    }
+
+    /** Returns the expanded bounds with translation that may have been applied. */
+    public Rect getBubbleBarExpandedBounds() {
+        Rect expandedBounds = getBubbleBarBounds();
+        if (!isExpanded() || isExpanding()) {
+            if (mBubbleBarLocation.isOnLeft(isLayoutRtl())) {
+                expandedBounds.right = expandedBounds.left + (int) expandedWidth();
+            } else {
+                expandedBounds.left = expandedBounds.right - (int) expandedWidth();
+            }
+        }
+        return expandedBounds;
     }
 
     /**
@@ -699,16 +710,6 @@ public class BubbleBarView extends FrameLayout {
      */
     public float getRelativePivotY() {
         return mRelativePivotY;
-    }
-
-    /** Notifies the bubble bar that a new bubble animation is starting. */
-    public void onAnimatingBubbleStarted() {
-        mIsAnimatingNewBubble = true;
-    }
-
-    /** Notifies the bubble bar that a new bubble animation is complete. */
-    public void onAnimatingBubbleCompleted() {
-        mIsAnimatingNewBubble = false;
     }
 
     /** Add a new bubble to the bubble bar. */
@@ -885,6 +886,33 @@ public class BubbleBarView extends FrameLayout {
         updateContentDescription();
         mDismissedByDragBubbleView = null;
         updateNotificationDotsIfCollapsed();
+    }
+
+    /**
+     * Return child views in the order which they are shown on the screen.
+     * <p>
+     * Child views (bubbles) are always ordered based on recency. The most recent bubble is at index
+     * 0.
+     * For example if the child views are (1)(2)(3) then (1) is the most recent bubble and at index
+     * 0.<br>
+     *
+     * How bubbles show up on the screen depends on the bubble bar location. If the bar is on the
+     * left, the most recent bubble is shown on the right. The bubbles from the example above would
+     * be shown as: (3)(2)(1).<br>
+     *
+     * If bubble bar is on the right, then the most recent bubble is on the left. Bubbles from the
+     * example above would be shown as: (1)(2)(3).
+     */
+    private List<View> getChildViewsInOnScreenOrder() {
+        List<View> childViews = new ArrayList<>(getChildCount());
+        for (int i = 0; i < getChildCount(); i++) {
+            childViews.add(getChildAt(i));
+        }
+        if (mBubbleBarLocation.isOnLeft(isLayoutRtl())) {
+            // Visually child views are shown in reverse order when bar is on the left
+            return childViews.reversed();
+        }
+        return childViews;
     }
 
     private void updateNotificationDotsIfCollapsed() {
@@ -1252,6 +1280,13 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /**
+     * Returns whether the bubble bar is expanding.
+     */
+    public boolean isExpanding() {
+        return mWidthAnimator.isRunning() && mIsBarExpanded;
+    }
+
+    /**
      * Get width of the bubble bar as if it would be expanded.
      *
      * @return width of the bubble bar in its expanded state, regardless of current width
@@ -1306,19 +1341,12 @@ public class BubbleBarView extends FrameLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (mIsAnimatingNewBubble) {
-            mController.onBubbleBarTouchedWhileAnimating();
-        }
+        mController.onBubbleBarTouched();
         if (!mIsBarExpanded) {
             // When the bar is collapsed, all taps on it should expand it.
             return true;
         }
         return super.onInterceptTouchEvent(ev);
-    }
-
-    /** Whether a new bubble is currently animating. */
-    public boolean isAnimatingNewBubble() {
-        return mIsAnimatingNewBubble;
     }
 
     private boolean hasOverflow() {
@@ -1331,21 +1359,39 @@ public class BubbleBarView extends FrameLayout {
     }
 
     private void updateBubbleAccessibilityStates() {
-        final int childA11y;
         if (mIsBarExpanded) {
             // Bar is expanded, focus on the bubbles
             setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-            childA11y = View.IMPORTANT_FOR_ACCESSIBILITY_YES;
+
+            // Set up a11y navigation order. Get list of child views in the order they are shown
+            // on screen. And use that to set up navigation so that swiping left focuses the view
+            // on the left and swiping right focuses view on the right.
+            View prevChild = null;
+            for (View childView : getChildViewsInOnScreenOrder()) {
+                childView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+                childView.setFocusable(true);
+                final View finalPrevChild = prevChild;
+                // Always need to set a new delegate to clear out any previous.
+                childView.setAccessibilityDelegate(new AccessibilityDelegate() {
+                    @Override
+                    public void onInitializeAccessibilityNodeInfo(View host,
+                            AccessibilityNodeInfo info) {
+                        super.onInitializeAccessibilityNodeInfo(host, info);
+                        if (finalPrevChild != null) {
+                            info.setTraversalAfter(finalPrevChild);
+                        }
+                    }
+                });
+                prevChild = childView;
+            }
         } else {
             // Bar is collapsed, only focus on the bar
             setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-            childA11y = View.IMPORTANT_FOR_ACCESSIBILITY_NO;
-        }
-        for (int i = 0; i < getChildCount(); i++) {
-            getChildAt(i).setImportantForAccessibility(childA11y);
-            // Only allowing focusing on bubbles when bar is expanded. Otherwise, in talkback mode,
-            // bubbles can be navigates to in collapsed mode.
-            getChildAt(i).setFocusable(mIsBarExpanded);
+            for (int i = 0; i < getChildCount(); i++) {
+                View childView = getChildAt(i);
+                childView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+                childView.setFocusable(false);
+            }
         }
     }
 
@@ -1435,7 +1481,6 @@ public class BubbleBarView extends FrameLayout {
             pw.println("    bubble key: " + key);
         }
         pw.println("  isExpanded: " + isExpanded());
-        pw.println("  mIsAnimatingNewBubble: " + mIsAnimatingNewBubble);
         if (mBubbleAnimator != null) {
             pw.println("  mBubbleAnimator.isRunning(): " + mBubbleAnimator.isRunning());
             pw.println("  mBubbleAnimator is null");
@@ -1460,8 +1505,8 @@ public class BubbleBarView extends FrameLayout {
         /** Returns the translation Y that the bubble bar should have. */
         float getBubbleBarTranslationY();
 
-        /** Notifies the controller that the bubble bar was touched while it was animating. */
-        void onBubbleBarTouchedWhileAnimating();
+        /** Notifies the controller that the bubble bar was touched. */
+        void onBubbleBarTouched();
 
         /** Requests the controller to expand bubble bar */
         void expandBubbleBar();
