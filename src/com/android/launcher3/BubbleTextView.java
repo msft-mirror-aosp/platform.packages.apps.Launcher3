@@ -504,7 +504,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             mLastOriginalText = label;
             mLastModifiedText = mLastOriginalText;
             mBreakPointsIntArray = StringMatcherUtility.getListOfBreakpoints(label, MATCHER);
-            if (Flags.enableNewArchivingIcon()
+            if (Flags.useNewIconForArchivedApps()
                     && info instanceof ItemInfoWithIcon infoWithIcon
                     && infoWithIcon.isInactiveArchive()) {
                 setTextWithArchivingIcon(label);
@@ -820,7 +820,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     getLineSpacingExtra());
             if (!TextUtils.equals(modifiedString, mLastModifiedText)) {
                 mLastModifiedText = modifiedString;
-                if (Flags.enableNewArchivingIcon()
+                if (Flags.useNewIconForArchivedApps()
                         && getTag() instanceof ItemInfoWithIcon infoWithIcon
                         && infoWithIcon.isInactiveArchive()) {
                     setTextWithArchivingIcon(modifiedString);
@@ -873,7 +873,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         if (drawable == null) {
             setText(text);
             Log.w(TAG, "setTextWithStartIcon: start icon Drawable not found from resources"
-                    + ", will just set text instead. text=" + text);
+                    + ", will just set text instead.");
             return;
         }
         drawable.setTint(getCurrentTextColor());

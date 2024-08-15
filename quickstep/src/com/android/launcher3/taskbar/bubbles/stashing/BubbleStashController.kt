@@ -52,7 +52,7 @@ interface BubbleStashController {
     /** Execute passed action only after controllers are initiated. */
     interface ControllersAfterInitAction {
         /** Execute action after controllers are initiated. */
-        fun runAfterInit(action: () -> Unit)
+        fun runAfterInit(action: Runnable)
     }
 
     /** Whether bubble bar is currently stashed */
@@ -142,6 +142,9 @@ interface BubbleStashController {
     // TODO(b/354218264): Move to BubbleBarViewAnimator
     /** Set the translation Y for the stashed handle. */
     fun setHandleTranslationY(translationY: Float)
+
+    /** Returns the translation of the handle. */
+    fun getHandleTranslationY(): Float?
 
     /**
      * Returns bubble bar Y position according to [isBubblesShowingOnHome] and
