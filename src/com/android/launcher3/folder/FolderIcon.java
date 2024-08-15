@@ -19,6 +19,7 @@ package com.android.launcher3.folder;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.MAX_NUM_ITEMS_IN_PREVIEW;
+import static com.android.launcher3.folder.FolderGridOrganizer.createFolderGridOrganizer;
 import static com.android.launcher3.folder.PreviewItemManager.INITIAL_ITEM_ANIMATION_DURATION;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_AUTO_LABELED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_FOLDER_AUTO_LABELING_SKIPPED_EMPTY_PRIMARY;
@@ -223,7 +224,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
         icon.setAccessibilityDelegate(activity.getAccessibilityDelegate());
 
-        icon.mPreviewVerifier = new FolderGridOrganizer(activity.getDeviceProfile());
+        icon.mPreviewVerifier = createFolderGridOrganizer(activity.getDeviceProfile());
         icon.mPreviewVerifier.setFolderInfo(folderInfo);
         icon.updatePreviewItems(false);
 
@@ -458,7 +459,7 @@ public class FolderIcon extends FrameLayout implements FolderListener, IconLabel
 
         mInfo.setTitle(newTitle, mFolder.mLauncherDelegate.getModelWriter());
         onTitleChanged(mInfo.title);
-        mFolder.mFolderName.setText(mInfo.title);
+        mFolder.getFolderName().setText(mInfo.title);
 
         // Logging for folder creation flow
         StatsLogManager.newInstance(getContext()).logger()

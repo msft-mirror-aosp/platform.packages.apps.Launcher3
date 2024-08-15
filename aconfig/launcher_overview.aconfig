@@ -1,0 +1,33 @@
+package: "com.android.launcher3"
+container: "system_ext"
+
+flag {
+    name: "enable_grid_only_overview"
+    namespace: "launcher_overview"
+    description: "Enable a grid-only overview without a focused task."
+    bug: "257950105"
+}
+
+flag {
+    name: "enable_overview_icon_menu"
+    namespace: "launcher_overview"
+    description: "Enable updated overview icon and menu within task."
+    bug: "257950105"
+}
+
+flag {
+    name: "enable_refactor_task_thumbnail"
+    namespace: "launcher_overview"
+    description: "Enables rewritten version of TaskThumbnailViews in Overview"
+    bug: "331753115"
+}
+
+flag {
+    name: "enable_hover_of_child_elements_in_taskview"
+    namespace: "launcher_overview"
+    description: "Enables child elements to receive hover events in TaskView and respond visually to those hover events."
+    bug: "342594235"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}

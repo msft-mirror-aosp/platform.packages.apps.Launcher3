@@ -39,7 +39,6 @@ import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 
 import com.android.internal.jank.Cuj;
-import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorPlaybackController;
@@ -88,13 +87,17 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
     // Normal to Hint animation has flag SKIP_OVERVIEW, so we update this scrim with this animator.
     private ObjectAnimator mNormalToHintOverviewScrimAnimator;
 
+    private final QuickstepLauncher mLauncher;
+    private boolean mIsTrackpadSwipe;
+
     /**
      * @param cancelSplitRunnable Called when split placeholder view needs to be cancelled.
      *                            Animation should be added to the provided AnimatorSet
      */
-    public NoButtonNavbarToOverviewTouchController(Launcher l,
+    public NoButtonNavbarToOverviewTouchController(QuickstepLauncher l,
             BiConsumer<AnimatorSet, Long> cancelSplitRunnable) {
         super(l);
+        mLauncher = l;
         mRecentsView = l.getOverviewPanel();
         mMotionPauseDetector = new MotionPauseDetector(l);
         mMotionPauseMinDisplacement = ViewConfiguration.get(l).getScaledTouchSlop();
@@ -104,7 +107,9 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
 
     @Override
     protected boolean canInterceptTouch(MotionEvent ev) {
-        if (!isTrackpadMotionEvent(ev) && DisplayController.getNavigationMode(mLauncher)
+        mIsTrackpadSwipe = isTrackpadMotionEvent(ev);
+        mLauncher.setCanShowAllAppsEducationView(!mIsTrackpadSwipe);
+        if (!mIsTrackpadSwipe && DisplayController.getNavigationMode(mLauncher)
                 == THREE_BUTTONS) {
             return false;
         }
@@ -148,6 +153,7 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
         super.onDragStart(start, startDisplacement);
 
         mMotionPauseDetector.clear();
+        mMotionPauseDetector.setIsTrackpadGesture(mIsTrackpadSwipe);
 
         if (handlingOverviewAnim()) {
             InteractionJankMonitorWrapper.begin(mRecentsView, Cuj.CUJ_LAUNCHER_APP_SWIPE_TO_RECENTS,
@@ -191,6 +197,7 @@ public class NoButtonNavbarToOverviewTouchController extends PortraitStatesTouch
         }
 
         mMotionPauseDetector.clear();
+        mIsTrackpadSwipe = false;
         mNormalToHintOverviewScrimAnimator = null;
         if (mLauncher.isInState(OVERVIEW)) {
             // Normally we would cleanup the state based on mCurrentAnimation, but since we stop

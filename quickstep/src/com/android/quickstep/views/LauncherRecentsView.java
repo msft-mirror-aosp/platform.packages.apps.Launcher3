@@ -26,7 +26,7 @@ import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
 import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SPLIT_SELECTION_EXIT_HOME;
-import static com.android.window.flags.Flags.enableDesktopWindowingWallpaperActivity;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -37,6 +37,7 @@ import android.view.MotionEvent;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.AbstractFloatingView;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.desktop.DesktopRecentsTransitionController;
@@ -53,6 +54,7 @@ import com.android.quickstep.GestureState;
 import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.RotationTouchHelper;
 import com.android.quickstep.SystemUiProxy;
+import com.android.quickstep.util.AnimUtils;
 import com.android.quickstep.util.SplitSelectStateController;
 import com.android.systemui.shared.recents.model.Task;
 
@@ -90,10 +92,12 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
     protected void handleStartHome(boolean animated) {
         StateManager stateManager = getStateManager();
         animated &= stateManager.shouldAnimateStateChange();
-        stateManager.goToState(NORMAL, animated);
-        if (FeatureFlags.enableSplitContextually()) {
-            mSplitSelectStateController.getSplitAnimationController()
-                    .playPlaceholderDismissAnim(mContainer, LAUNCHER_SPLIT_SELECTION_EXIT_HOME);
+        if (mSplitSelectStateController.isSplitSelectActive()) {
+            AnimUtils.goToNormalStateWithSplitDismissal(stateManager, mContainer,
+                    LAUNCHER_SPLIT_SELECTION_EXIT_HOME,
+                    mSplitSelectStateController.getSplitAnimationController());
+        } else {
+            stateManager.goToState(NORMAL, animated);
         }
         AbstractFloatingView.closeAllOpenViews(mContainer, animated);
     }
@@ -104,7 +108,7 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
     }
 
     @Override
-    public StateManager<LauncherState> getStateManager() {
+    public StateManager<LauncherState, Launcher> getStateManager() {
         return mContainer.getStateManager();
     }
 
@@ -264,7 +268,7 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
         super.onGestureAnimationStart(runningTasks, rotationTouchHelper);
         DesktopVisibilityController desktopVisibilityController =
                 mContainer.getDesktopVisibilityController();
-        if (!enableDesktopWindowingWallpaperActivity() && desktopVisibilityController != null) {
+        if (!WALLPAPER_ACTIVITY.isEnabled(mContext) && desktopVisibilityController != null) {
             // TODO: b/333533253 - Remove after flag rollout
             desktopVisibilityController.setRecentsGestureStart();
         }
@@ -287,7 +291,7 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
             }
         }
         super.onGestureAnimationEnd();
-        if (!enableDesktopWindowingWallpaperActivity() && desktopVisibilityController != null) {
+        if (!WALLPAPER_ACTIVITY.isEnabled(mContext) && desktopVisibilityController != null) {
             // TODO: b/333533253 - Remove after flag rollout
             desktopVisibilityController.setRecentsGestureEnd(endTarget);
         }

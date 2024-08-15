@@ -18,6 +18,7 @@ package com.android.quickstep;
 import static android.os.Process.THREAD_PRIORITY_BACKGROUND;
 
 import static com.android.launcher3.Flags.enableGridOnlyOverview;
+import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.TaskUtils.checkCurrentOrManagedUserId;
 
@@ -42,6 +43,7 @@ import com.android.launcher3.util.Executors.SimpleThreadFactory;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.quickstep.recents.data.RecentTasksDataSource;
+import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TaskVisualsChangeListener;
 import com.android.systemui.shared.recents.model.Task;
@@ -88,9 +90,12 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
 
     private RecentsModel(Context context, IconProvider iconProvider) {
         this(context,
-                new RecentTasksList(MAIN_EXECUTOR,
+                new RecentTasksList(
+                        context,
+                        MAIN_EXECUTOR,
                         context.getSystemService(KeyguardManager.class),
-                        SystemUiProxy.INSTANCE.get(context)),
+                        SystemUiProxy.INSTANCE.get(context),
+                        TopTaskTracker.INSTANCE.get(context)),
                 new TaskIconCache(context, RECENTS_MODEL_EXECUTOR, iconProvider),
                 new TaskThumbnailCache(context, RECENTS_MODEL_EXECUTOR),
                 iconProvider,
@@ -106,7 +111,7 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
         mIconCache = iconCache;
         mIconCache.registerTaskVisualsChangeListener(this);
         mThumbnailCache = thumbnailCache;
-        if (enableGridOnlyOverview()) {
+        if (isCachePreloadingEnabled()) {
             mCallbacks = new ComponentCallbacks() {
                 @Override
                 public void onConfigurationChanged(Configuration configuration) {
@@ -300,6 +305,8 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
 
     /**
      * Registers a listener for running tasks
+     * TODO(b/343292503): Should we remove RunningTasksListener entirely if it's not needed?
+     *  (Note that Desktop mode gets the running tasks by checking {@link DesktopTask#tasks}
      */
     public void registerRunningTasksListener(RunningTasksListener listener) {
         mTaskList.registerRunningTasksListener(listener);
@@ -310,6 +317,20 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
      */
     public void unregisterRunningTasksListener() {
         mTaskList.unregisterRunningTasksListener();
+    }
+
+    /**
+     * Registers a listener for recent tasks
+     */
+    public void registerRecentTasksChangedListener(RecentTasksChangedListener listener) {
+        mTaskList.registerRecentTasksChangedListener(listener);
+    }
+
+    /**
+     * Removes the previously registered running tasks listener
+     */
+    public void unregisterRecentTasksChangedListener() {
+        mTaskList.unregisterRecentTasksChangedListener();
     }
 
     /**
@@ -324,7 +345,7 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
      * highResLoadingState is enabled
      */
     public void preloadCacheIfNeeded() {
-        if (!enableGridOnlyOverview()) {
+        if (!isCachePreloadingEnabled()) {
             return;
         }
 
@@ -350,7 +371,7 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
      * Updates cache size and preloads more tasks if cache size increases
      */
     public void updateCacheSizeAndPreloadIfNeeded() {
-        if (!enableGridOnlyOverview()) {
+        if (!isCachePreloadingEnabled()) {
             return;
         }
 
@@ -369,6 +390,10 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
         mTaskStackChangeListeners.unregisterTaskStackListener(this);
     }
 
+    private boolean isCachePreloadingEnabled() {
+        return enableGridOnlyOverview() || enableRefactorTaskThumbnail();
+    }
+
     /**
      * Listener for receiving running tasks changes
      */
@@ -377,5 +402,15 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
          * Called when there's a change to running tasks
          */
         void onRunningTasksChanged();
+    }
+
+    /**
+     * Listener for receiving recent tasks changes
+     */
+    public interface RecentTasksChangedListener {
+        /**
+         * Called when there's a change to recent tasks
+         */
+        void onRecentTasksChanged();
     }
 }

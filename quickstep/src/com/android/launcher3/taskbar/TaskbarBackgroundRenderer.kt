@@ -21,6 +21,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.RectF
 import com.android.app.animation.Interpolators
 import com.android.launcher3.R
@@ -37,8 +38,6 @@ import kotlin.math.min
 class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
 
     private val isInSetup: Boolean = !context.isUserSetupComplete
-    private val DARK_THEME_SHADOW_ALPHA = 51f
-    private val LIGHT_THEME_SHADOW_ALPHA = 25f
 
     private val maxTransientTaskbarHeight =
         context.transientTaskbarDeviceProfile.taskbarHeight.toFloat()
@@ -54,27 +53,30 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
     var isAnimatingPinning = false
 
     val paint = Paint()
+    private val strokePaint = Paint()
     val lastDrawnTransientRect = RectF()
     var backgroundHeight = context.deviceProfile.taskbarHeight.toFloat()
     var translationYForSwipe = 0f
     var translationYForStash = 0f
 
+    // When not empty, we can use this to transform transient taskbar background to hotseat bounds.
+    val taskbarToHotseatOffsetRect = Rect()
+
     private val transientBackgroundBounds = context.transientTaskbarBounds
 
     private val shadowAlpha: Float
+    private val strokeAlpha: Int
     private var shadowBlur = 0f
     private var keyShadowDistance = 0f
     private var bottomMargin = 0
 
-    private val fullLeftCornerRadius = context.leftCornerRadius.toFloat()
-    private val fullRightCornerRadius = context.rightCornerRadius.toFloat()
-    private var leftCornerRadius = fullLeftCornerRadius
-    private var rightCornerRadius = fullRightCornerRadius
+    private val fullCornerRadius = context.cornerRadius.toFloat()
+    private var cornerRadius = fullCornerRadius
     private var widthInsetPercentage = 0f
-    private val square: Path = Path()
-    private val circle: Path = Path()
-    private val invertedLeftCornerPath: Path = Path()
-    private val invertedRightCornerPath: Path = Path()
+    private val square = Path()
+    private val circle = Path()
+    private val invertedLeftCornerPath = Path()
+    private val invertedRightCornerPath = Path()
 
     private var stashedHandleWidth =
         context.resources.getDimensionPixelSize(R.dimen.taskbar_stashed_handle_width)
@@ -86,10 +88,18 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
         paint.color = context.getColor(R.color.taskbar_background)
         paint.flags = Paint.ANTI_ALIAS_FLAG
         paint.style = Paint.Style.FILL
-
-        shadowAlpha =
-            if (Utilities.isDarkTheme(context)) DARK_THEME_SHADOW_ALPHA
-            else LIGHT_THEME_SHADOW_ALPHA
+        strokePaint.color = context.getColor(R.color.taskbar_stroke)
+        strokePaint.flags = Paint.ANTI_ALIAS_FLAG
+        strokePaint.style = Paint.Style.STROKE
+        strokePaint.strokeWidth =
+            context.resources.getDimension(R.dimen.transient_taskbar_stroke_width)
+        if (Utilities.isDarkTheme(context)) {
+            strokeAlpha = DARK_THEME_STROKE_ALPHA
+            shadowAlpha = DARK_THEME_SHADOW_ALPHA
+        } else {
+            strokeAlpha = LIGHT_THEME_STROKE_ALPHA
+            shadowAlpha = LIGHT_THEME_SHADOW_ALPHA
+        }
 
         setCornerRoundness(DEFAULT_ROUNDNESS)
     }
@@ -106,7 +116,7 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
     }
 
     /**
-     * Sets the roundness of the round corner above Taskbar. No effect on transient Taskkbar.
+     * Sets the roundness of the round corner above Taskbar. No effect on transient Taskbar.
      *
      * @param cornerRoundness 0 has no round corner, 1 has complete round corner.
      */
@@ -115,21 +125,18 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
             return
         }
 
-        leftCornerRadius = fullLeftCornerRadius * cornerRoundness
-        rightCornerRadius = fullRightCornerRadius * cornerRoundness
+        cornerRadius = fullCornerRadius * cornerRoundness
 
         // Create the paths for the inverted rounded corners above the taskbar. Start with a filled
         // square, and then subtract out a circle from the appropriate corner.
         square.reset()
-        square.addRect(0f, 0f, leftCornerRadius, leftCornerRadius, Path.Direction.CW)
+        square.addRect(0f, 0f, cornerRadius, cornerRadius, Path.Direction.CW)
         circle.reset()
-        circle.addCircle(leftCornerRadius, 0f, leftCornerRadius, Path.Direction.CW)
+        circle.addCircle(cornerRadius, 0f, cornerRadius, Path.Direction.CW)
         invertedLeftCornerPath.op(square, circle, Path.Op.DIFFERENCE)
 
-        square.reset()
-        square.addRect(0f, 0f, rightCornerRadius, rightCornerRadius, Path.Direction.CW)
         circle.reset()
-        circle.addCircle(0f, 0f, rightCornerRadius, Path.Direction.CW)
+        circle.addCircle(0f, 0f, cornerRadius, Path.Direction.CW)
         invertedRightCornerPath.op(square, circle, Path.Op.DIFFERENCE)
     }
 
@@ -163,10 +170,10 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
         }
 
         // Draw the inverted rounded corners above the taskbar.
-        canvas.translate(0f, -leftCornerRadius)
+        canvas.translate(0f, -cornerRadius)
         canvas.drawPath(invertedLeftCornerPath, paint)
-        canvas.translate(0f, leftCornerRadius)
-        canvas.translate(canvas.width - rightCornerRadius, -rightCornerRadius)
+        canvas.translate(0f, cornerRadius)
+        canvas.translate(canvas.width - cornerRadius, -cornerRadius)
         canvas.drawPath(invertedRightCornerPath, paint)
     }
 
@@ -215,6 +222,12 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
         val radius = newBackgroundHeight / 2f
         val bottomMarginProgress = bottomMargin * ((1f - progress) / 2f)
 
+        // Used to transform the background so that it wraps around the items on the hotseat.
+        val hotseatOffsetLeft = taskbarToHotseatOffsetRect.left * progress
+        val hotseatOffsetTop = taskbarToHotseatOffsetRect.top * progress
+        val hotseatOffsetRight = taskbarToHotseatOffsetRect.right * progress
+        val hotseatOffsetBottom = taskbarToHotseatOffsetRect.bottom * progress
+
         // Aligns the bottom with the bottom of the stashed handle.
         val bottom =
             canvas.height - bottomMargin +
@@ -236,17 +249,19 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
             keyShadowDistance,
             setColorAlphaBound(Color.BLACK, Math.round(newShadowAlpha))
         )
+        strokePaint.alpha = (paint.alpha * strokeAlpha) / 255
 
         lastDrawnTransientRect.set(
-            transientBackgroundBounds.left + halfWidthDelta,
-            bottom - newBackgroundHeight,
-            transientBackgroundBounds.right - halfWidthDelta,
-            bottom
+            transientBackgroundBounds.left + halfWidthDelta + hotseatOffsetLeft,
+            bottom - newBackgroundHeight + hotseatOffsetTop,
+            transientBackgroundBounds.right - halfWidthDelta + hotseatOffsetRight,
+            bottom + hotseatOffsetBottom
         )
         val horizontalInset = fullWidth * widthInsetPercentage
         lastDrawnTransientRect.inset(horizontalInset, 0f)
 
         canvas.drawRoundRect(lastDrawnTransientRect, radius, radius, paint)
+        canvas.drawRoundRect(lastDrawnTransientRect, radius, radius, strokePaint)
     }
 
     /**
@@ -259,5 +274,9 @@ class TaskbarBackgroundRenderer(private val context: TaskbarActivityContext) {
 
     companion object {
         const val DEFAULT_ROUNDNESS = 1f
+        private const val DARK_THEME_STROKE_ALPHA = 51
+        private const val LIGHT_THEME_STROKE_ALPHA = 41
+        private const val DARK_THEME_SHADOW_ALPHA = 51f
+        private const val LIGHT_THEME_SHADOW_ALPHA = 25f
     }
 }

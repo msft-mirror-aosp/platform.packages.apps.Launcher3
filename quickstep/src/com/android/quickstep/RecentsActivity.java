@@ -27,7 +27,6 @@ import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_O
 import static com.android.quickstep.OverviewComponentObserver.startHomeIntentSafely;
 import static com.android.quickstep.TaskUtils.taskIsATargetWithMode;
 import static com.android.quickstep.TaskViewUtils.createRecentsWindowAnimator;
-import static com.android.window.flags.Flags.enableDesktopWindowingMode;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -57,6 +56,7 @@ import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAnimationRunner;
 import com.android.launcher3.LauncherAnimationRunner.AnimationResult;
 import com.android.launcher3.LauncherAnimationRunner.RemoteAnimationFactory;
+import com.android.launcher3.LauncherRootView;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
@@ -87,6 +87,7 @@ import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskView;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -115,7 +116,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
     private TISBindHelper mTISBindHelper;
     private @Nullable FallbackTaskbarUIController mTaskbarUIController;
 
-    private StateManager<RecentsState> mStateManager;
+    private StateManager<RecentsState, RecentsActivity> mStateManager;
 
     // Strong refs to runners which are cleared when the activity is destroyed
     private RemoteAnimationFactory mActivityLaunchAnimationRunner;
@@ -132,21 +133,22 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
      * Init drag layer and overview panel views.
      */
     protected void setupViews() {
-        inflateRootView(R.layout.fallback_recents_activity);
-        setContentView(getRootView());
-        mDragLayer = findViewById(R.id.drag_layer);
-        mScrimView = findViewById(R.id.scrim_view);
-        mFallbackRecentsView = findViewById(R.id.overview_panel);
-        mActionsView = findViewById(R.id.overview_actions_view);
-        getRootView().getSysUiScrim().getSysUIProgress().updateValue(0);
         SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(this);
+        // SplitSelectStateController needs to be created before setContentView()
         mSplitSelectStateController =
                 new SplitSelectStateController(this, mHandler, getStateManager(),
                         null /* depthController */, getStatsLogManager(),
                         systemUiProxy, RecentsModel.INSTANCE.get(this),
                         null /*activityBackCallback*/);
-        mDragLayer.recreateControllers();
-        if (enableDesktopWindowingMode()) {
+        // Setup root and child views
+        inflateRootView(R.layout.fallback_recents_activity);
+        LauncherRootView rootView = getRootView();
+        mDragLayer = rootView.findViewById(R.id.drag_layer);
+        mScrimView = rootView.findViewById(R.id.scrim_view);
+        mFallbackRecentsView = rootView.findViewById(R.id.overview_panel);
+        mActionsView = rootView.findViewById(R.id.overview_actions_view);
+
+        if (DesktopModeStatus.canEnterDesktopMode(this)) {
             mDesktopRecentsTransitionController = new DesktopRecentsTransitionController(
                     getStateManager(), systemUiProxy, getIApplicationThread(),
                     null /* depthController */
@@ -154,6 +156,10 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
         }
         mFallbackRecentsView.init(mActionsView, mSplitSelectStateController,
                 mDesktopRecentsTransitionController);
+
+        setContentView(rootView);
+        rootView.getSysUiScrim().getSysUIProgress().updateValue(0);
+        mDragLayer.recreateControllers();
 
         mTISBindHelper = new TISBindHelper(this, this::onTISConnected);
     }
@@ -386,6 +392,11 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
         }
     }
 
+    @Override
+    public boolean shouldAnimateStateChange() {
+        return false;
+    }
+
     /**
      * Initialize/update the device profile.
      */
@@ -462,12 +473,12 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
             };
 
     @Override
-    protected void collectStateHandlers(List<StateHandler> out) {
+    public void collectStateHandlers(List<StateHandler<RecentsState>> out) {
         out.add(new FallbackRecentsStateController(this));
     }
 
     @Override
-    public StateManager<RecentsState> getStateManager() {
+    public StateManager<RecentsState, RecentsActivity> getStateManager() {
         return mStateManager;
     }
 
