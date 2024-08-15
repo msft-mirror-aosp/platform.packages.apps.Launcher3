@@ -49,7 +49,6 @@ import android.platform.test.flag.junit.SetFlagsRule;
 import android.view.View;
 
 import androidx.test.annotation.UiThreadTest;
-import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import com.android.launcher3.allapps.PrivateProfileManager;
@@ -60,9 +59,12 @@ import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.LauncherModelHelper.SandboxModelContext;
+import com.android.launcher3.util.LauncherMultivalentJUnit;
 import com.android.launcher3.util.TestSandboxModelContextWrapper;
 import com.android.launcher3.util.UserIconInfo;
 import com.android.launcher3.views.BaseDragLayer;
+import com.android.launcher3.widget.picker.model.WidgetPickerDataProvider;
+import com.android.launcher3.widget.picker.model.data.WidgetPickerData;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -73,10 +75,8 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.util.ArrayList;
-
 @SmallTest
-@RunWith(AndroidJUnit4.class)
+@RunWith(LauncherMultivalentJUnit.class)
 public class SystemShortcutTest {
     @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule(DEVICE_DEFAULT);
     private static final UserHandle PRIVATE_HANDLE = new UserHandle(11);
@@ -86,7 +86,7 @@ public class SystemShortcutTest {
     private TestSandboxModelContextWrapper mTestContext;
     private final SandboxModelContext mSandboxContext = new SandboxModelContext();
     private PrivateProfileManager mPrivateProfileManager;
-    private PopupDataProvider mPopupDataProvider;
+    private WidgetPickerDataProvider mWidgetPickerDataProvider;
     private AppInfo mAppInfo;
     @Mock UserCache mUserCache;
     @Mock ApiWrapper mApiWrapper;
@@ -119,8 +119,8 @@ public class SystemShortcutTest {
         spyOn(mPrivateProfileManager);
         when(mPrivateProfileManager.getProfileUser()).thenReturn(PRIVATE_HANDLE);
 
-        mPopupDataProvider = mTestContext.getPopupDataProvider();
-        spyOn(mPopupDataProvider);
+        mWidgetPickerDataProvider = mTestContext.getWidgetPickerDataProvider();
+        spyOn(mWidgetPickerDataProvider);
     }
 
     @After
@@ -141,7 +141,7 @@ public class SystemShortcutTest {
         mAppInfo = new AppInfo();
         mAppInfo.componentName = new ComponentName(mTestContext, getClass());
         assertNotNull(mAppInfo.getTargetComponent());
-        doReturn(new ArrayList<>()).when(mPopupDataProvider).getWidgetsForPackageUser(any());
+        doReturn(new WidgetPickerData()).when(mWidgetPickerDataProvider).get();
         spyOn(mAppInfo);
         SystemShortcut systemShortcut = SystemShortcut.WIDGETS
                 .getShortcut(mTestContext, mAppInfo, mView);

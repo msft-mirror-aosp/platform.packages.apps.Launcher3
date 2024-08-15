@@ -158,6 +158,11 @@ public class ShortcutAndWidgetContainer extends ViewGroup implements FolderIcon.
             final PointF appWidgetScale = dp.getAppWidgetScale((ItemInfo) child.getTag());
             lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX, mCountY,
                     appWidgetScale.x, appWidgetScale.y, mBorderSpace, dp.widgetPadding);
+        } else if (isChildQsb(child)) {
+            lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX, mCountY,
+                    mBorderSpace);
+            // No need to add padding for Qsb, which is either Smartspace (actual or preview), or
+            // QsbContainerView.
         } else {
             lp.setup(mCellWidth, mCellHeight, invertLayoutHorizontally(), mCountX, mCountY,
                     mBorderSpace);
@@ -183,6 +188,10 @@ public class ShortcutAndWidgetContainer extends ViewGroup implements FolderIcon.
         int childWidthMeasureSpec = MeasureSpec.makeMeasureSpec(lp.width, MeasureSpec.EXACTLY);
         int childheightMeasureSpec = MeasureSpec.makeMeasureSpec(lp.height, MeasureSpec.EXACTLY);
         child.measure(childWidthMeasureSpec, childheightMeasureSpec);
+    }
+
+    private boolean isChildQsb(View child) {
+        return child.getId() == R.id.search_container_workspace;
     }
 
     public boolean invertLayoutHorizontally() {
@@ -236,7 +245,7 @@ public class ShortcutAndWidgetContainer extends ViewGroup implements FolderIcon.
         }
         child.layout(childLeft, childTop, childLeft + lp.width, childTop + lp.height);
         if (mTranslationProvider != null) {
-            final float tx = mTranslationProvider.getTranslationX(child);
+            final float tx = mTranslationProvider.getTranslationX(lp.getCellX());
             if (child instanceof Reorderable) {
                 ((Reorderable) child).getTranslateDelegate()
                         .getTranslationX(INDEX_BUBBLE_ADJUSTMENT_ANIM)
@@ -321,6 +330,6 @@ public class ShortcutAndWidgetContainer extends ViewGroup implements FolderIcon.
 
     /** Provides translation values to apply when laying out child views. */
     interface TranslationProvider {
-        float getTranslationX(View child);
+        float getTranslationX(int cellX);
     }
 }

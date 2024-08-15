@@ -17,6 +17,7 @@
 package com.android.launcher3.widget;
 
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_BOTTOM_WIDGETS_TRAY;
+import static com.android.launcher3.widget.picker.model.data.WidgetPickerDataUtils.findAllWidgetsForPackageUser;
 
 import android.content.Context;
 import android.graphics.Rect;
@@ -31,7 +32,6 @@ import android.view.ViewParent;
 import android.view.animation.Interpolator;
 import android.widget.ScrollView;
 import android.widget.TableLayout;
-import android.widget.TableRow;
 import android.widget.TextView;
 
 import androidx.annotation.Px;
@@ -41,6 +41,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.PackageUserKey;
+import com.android.launcher3.widget.picker.model.data.WidgetPickerData;
 import com.android.launcher3.widget.util.WidgetsTableUtils;
 
 import java.util.List;
@@ -125,10 +126,10 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
 
     @Override
     public void onWidgetsBound() {
-        List<WidgetItem> widgets = mActivityContext.getPopupDataProvider().getWidgetsForPackageUser(
-                new PackageUserKey(
-                        mOriginalItemInfo.getTargetComponent().getPackageName(),
-                        mOriginalItemInfo.user));
+        final WidgetPickerData data = mActivityContext.getWidgetPickerDataProvider().get();
+        final PackageUserKey packageUserKey = PackageUserKey.fromItemInfo(mOriginalItemInfo);
+        List<WidgetItem> widgets = packageUserKey != null ? findAllWidgetsForPackageUser(data,
+                packageUserKey) : List.of();
 
         TableLayout widgetsTable = findViewById(R.id.widgets_table);
         widgetsTable.removeAllViews();
@@ -137,8 +138,9 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
                 mActivityContext.getDeviceProfile(), mMaxHorizontalSpan,
                 mWidgetCellHorizontalPadding)
                 .forEach(row -> {
-                    TableRow tableRow = new TableRow(getContext());
+                    WidgetTableRow tableRow = new WidgetTableRow(getContext());
                     tableRow.setGravity(Gravity.TOP);
+                    tableRow.setupRow(row.size(), /*resizeDelayMs=*/ 0);
                     row.forEach(widgetItem -> {
                         WidgetCell widget = addItemCell(tableRow);
                         widget.applyFromCellItem(widgetItem);
@@ -163,9 +165,10 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
         return super.onControllerInterceptTouchEvent(ev);
     }
 
-    protected WidgetCell addItemCell(ViewGroup parent) {
+    protected WidgetCell addItemCell(WidgetTableRow parent) {
         WidgetCell widget = (WidgetCell) LayoutInflater.from(getContext())
                 .inflate(R.layout.widget_cell, parent, false);
+        widget.addPreviewReadyListener(parent);
         widget.setOnClickListener(this);
 
         View previewContainer = widget.findViewById(R.id.widget_preview_container);
@@ -246,4 +249,7 @@ public class WidgetsBottomSheet extends BaseWidgetSheet {
             }
         }
     }
+
+    @Override
+    public void onRecommendedWidgetsBound() {} // no op
 }

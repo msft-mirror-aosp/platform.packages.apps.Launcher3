@@ -82,6 +82,10 @@ public class Hotseat extends CellLayout implements Insettable {
         return mHasVerticalHotseat ? (getCountY() - (rank + 1)) : 0;
     }
 
+    boolean isHasVerticalHotseat() {
+        return mHasVerticalHotseat;
+    }
+
     public void resetLayout(boolean hasVerticalHotseat) {
         ActivityContext activityContext = ActivityContext.lookupContext(getContext());
         boolean bubbleBarEnabled = activityContext.isBubbleBarEnabled();
@@ -93,10 +97,9 @@ public class Hotseat extends CellLayout implements Insettable {
         if (bubbleBarEnabled) {
             float adjustedBorderSpace = dp.getHotseatAdjustedBorderSpaceForBubbleBar(getContext());
             if (hasBubbles && Float.compare(adjustedBorderSpace, 0f) != 0) {
-                getShortcutsAndWidgets().setTranslationProvider(child -> {
-                    int index = getShortcutsAndWidgets().indexOfChild(child);
+                getShortcutsAndWidgets().setTranslationProvider(cellX -> {
                     float borderSpaceDelta = adjustedBorderSpace - dp.hotseatBorderSpace;
-                    return dp.iconSizePx + index * borderSpaceDelta;
+                    return dp.iconSizePx + cellX * borderSpaceDelta;
                 });
                 if (mQsb instanceof HorizontalInsettableView) {
                     HorizontalInsettableView insettableQsb = (HorizontalInsettableView) mQsb;
@@ -143,10 +146,7 @@ public class Hotseat extends CellLayout implements Insettable {
 
         // update the translation provider for future layout passes of hotseat icons.
         if (isBubbleBarVisible) {
-            icons.setTranslationProvider(child -> {
-                int index = icons.indexOfChild(child);
-                return dp.iconSizePx + index * borderSpaceDelta;
-            });
+            icons.setTranslationProvider(cellX -> dp.iconSizePx + cellX * borderSpaceDelta);
         } else {
             icons.setTranslationProvider(null);
         }
@@ -162,14 +162,14 @@ public class Hotseat extends CellLayout implements Insettable {
                 animatorSet.play(ObjectAnimator.ofFloat(child, VIEW_TRANSLATE_X, tx));
             }
         }
-        if (mQsb instanceof HorizontalInsettableView) {
-            HorizontalInsettableView horizontalInsettableQsb = (HorizontalInsettableView) mQsb;
-            ValueAnimator qsbAnimator = ValueAnimator.ofFloat(0f, 1f);
+        if (mQsb instanceof HorizontalInsettableView horizontalInsettableQsb) {
+            final float currentInsetFraction = horizontalInsettableQsb.getHorizontalInsets();
+            final float targetInsetFraction =
+                    isBubbleBarVisible ? (float) dp.iconSizePx / dp.hotseatQsbWidth : 0;
+            ValueAnimator qsbAnimator =
+                    ValueAnimator.ofFloat(currentInsetFraction, targetInsetFraction);
             qsbAnimator.addUpdateListener(animation -> {
-                float fraction = qsbAnimator.getAnimatedFraction();
-                float insetFraction = isBubbleBarVisible
-                        ? (float) dp.iconSizePx * fraction / dp.hotseatQsbWidth
-                        : (float) dp.iconSizePx * (1 - fraction) / dp.hotseatQsbWidth;
+                float insetFraction = (float) animation.getAnimatedValue();
                 horizontalInsettableQsb.setHorizontalInsets(insetFraction);
             });
             animatorSet.play(qsbAnimator);

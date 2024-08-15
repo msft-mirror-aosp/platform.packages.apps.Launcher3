@@ -172,8 +172,6 @@
     <dimen name="padded_rounded_button_height">48dp</dimen>
     <dimen name="rounded_button_height">48dp</dimen>
     <dimen name="rounded_button_radius">200dp</dimen>
-    <dimen name="rounded_button_padding">8dp</dimen>
-
 
     <!-- Widget tray -->
     <dimen name="widget_cell_vertical_padding">8dp</dimen>
@@ -308,6 +306,7 @@
     <dimen name="blur_size_medium_outline">2dp</dimen>
     <dimen name="blur_size_click_shadow">4dp</dimen>
     <dimen name="click_shadow_high_shift">2dp</dimen>
+    <dimen name="app_title_icon_shadow_inset">1dp</dimen>
 
     <!-- Pending widget -->
     <dimen name="pending_widget_min_padding">8dp</dimen>
@@ -320,6 +319,8 @@
     <dimen name="bg_popup_item_height">52dp</dimen>
     <dimen name="bg_popup_item_vertical_padding">12dp</dimen>
     <dimen name="pre_drag_view_scale">6dp</dimen>
+    <!-- Minimum size of the widget dragged view to keep it visible under the finger. -->
+    <dimen name="widget_drag_view_min_scale_down_size">70dp</dimen>
     <!-- an icon with shortcuts must be dragged this far before the container is removed. -->
     <dimen name="deep_shortcuts_start_drag_threshold">16dp</dimen>
     <!-- Possibly related to b/235886078, icon needs to be scaled up to match expected visual size of 32 dp -->
@@ -445,6 +446,9 @@
 
     <!-- Size of the maximum radius for the enforced rounded rectangles. -->
     <dimen name="enforced_rounded_corner_max_radius">16dp</dimen>
+
+    <!-- Size of the radius for the rounded corners of Persistent Taskbar. -->
+    <dimen name="persistent_taskbar_corner_radius">16dp</dimen>
 
     <!-- Base Swipe Detector, speed in dp/s -->
     <dimen name="base_swift_detector_fling_release_velocity">1dp</dimen>

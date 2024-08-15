@@ -143,10 +143,10 @@ public class BubbleDismissController {
         if (mMagnetizedObject.getUnderlyingObject() instanceof BubbleView) {
             BubbleView bubbleView = (BubbleView) mMagnetizedObject.getUnderlyingObject();
             if (bubbleView.getBubble() != null) {
-                mBubbleBarViewController.onDismissBubbleWhileDragging(bubbleView.getBubble());
+                mBubbleBarViewController.notifySysUiBubbleDismissed(bubbleView.getBubble());
             }
         } else if (mMagnetizedObject.getUnderlyingObject() instanceof BubbleBarView) {
-            mBubbleBarViewController.onDismissAllBubblesWhileDragging();
+            mBubbleBarViewController.onDismissAllBubbles();
         }
     }
 
@@ -169,7 +169,8 @@ public class BubbleDismissController {
 
     private void setupMagnetizedObject(@NonNull View magnetizedView) {
         mMagnetizedObject = new MagnetizedObject<>(mActivity.getApplicationContext(),
-                magnetizedView, DynamicAnimation.TRANSLATION_X, DynamicAnimation.TRANSLATION_Y) {
+                magnetizedView, BubbleDragController.DRAG_TRANSLATION_X,
+                DynamicAnimation.TRANSLATION_Y) {
             @Override
             public float getWidth(@NonNull View underlyingObject) {
                 return underlyingObject.getWidth() * underlyingObject.getScaleX();

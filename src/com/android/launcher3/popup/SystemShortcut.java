@@ -5,14 +5,17 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_APP_INFO_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_DONT_SUGGEST_APP_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_WIDGETS_TAP;
+import static com.android.launcher3.widget.picker.model.data.WidgetPickerDataUtils.findAllWidgetsForPackageUser;
 
 import android.app.ActivityOptions;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ShortcutInfo;
 import android.graphics.Rect;
 import android.os.Process;
 import android.os.UserHandle;
+import android.util.Log;
 import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ImageView;
@@ -24,11 +27,11 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.AbstractFloatingViewHelper;
 import com.android.launcher3.Flags;
+import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.SecondaryDropTarget;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.allapps.PrivateProfileManager;
-import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.UserCache;
@@ -39,9 +42,9 @@ import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.widget.WidgetsBottomSheet;
+import com.android.launcher3.widget.picker.model.data.WidgetPickerData;
 
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * Represents a system shortcut for a given app. The shortcut should have a label and icon, and an
@@ -53,6 +56,7 @@ import java.util.List;
  */
 public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
         implements View.OnClickListener {
+    private static final String TAG = "SystemShortcut";
 
     private final int mIconResId;
     protected final int mLabelResId;
@@ -107,11 +111,12 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
     }
 
     public static final Factory<ActivityContext> WIDGETS = (context, itemInfo, originalView) -> {
-        if (itemInfo.getTargetComponent() == null) return null;
-        final List<WidgetItem> widgets =
-                context.getPopupDataProvider().getWidgetsForPackageUser(new PackageUserKey(
-                        itemInfo.getTargetComponent().getPackageName(), itemInfo.user));
-        if (widgets.isEmpty()) {
+        final PackageUserKey packageUserKey = PackageUserKey.fromItemInfo(itemInfo);
+        if (packageUserKey == null) return null;
+
+        final WidgetPickerData data = context.getWidgetPickerDataProvider().get();
+        if (findAllWidgetsForPackageUser(data, packageUserKey).isEmpty()) {
+            // hides widget picker shortcut if there are no widgets for the package.
             return null;
         }
         return new Widgets(context, itemInfo, originalView);
@@ -381,5 +386,64 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
     protected void dismissTaskMenuView() {
         mAbstractFloatingViewHelper.closeOpenViews(mTarget, true,
                 AbstractFloatingView.TYPE_ALL & ~AbstractFloatingView.TYPE_REBIND_SAFE);
+    }
+
+    public static final Factory<ActivityContext> BUBBLE_SHORTCUT =
+            (activity, itemInfo, originalView) -> {
+                if ((itemInfo.itemType != LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT)
+                        && (itemInfo.itemType != LauncherSettings.Favorites.ITEM_TYPE_APPLICATION)
+                        && !(itemInfo instanceof WorkspaceItemInfo)) {
+                    return null;
+                }
+                return new BubbleShortcut(activity, itemInfo, originalView);
+            };
+
+    public interface BubbleActivityStarter {
+        /** Tell SysUI to show the provided shortcut in a bubble. */
+        void showShortcutBubble(ShortcutInfo info);
+
+        /** Tell SysUI to show the provided intent in a bubble. */
+        void showAppBubble(Intent intent);
+    }
+
+    public static class BubbleShortcut<T extends ActivityContext> extends SystemShortcut<T> {
+
+        private BubbleActivityStarter mStarter;
+
+        public BubbleShortcut(T target, ItemInfo itemInfo, View originalView) {
+            super(R.drawable.ic_bubble_button, R.string.bubble, target,
+                    itemInfo, originalView);
+            if (target instanceof BubbleActivityStarter) {
+                mStarter = (BubbleActivityStarter) target;
+            }
+        }
+
+        @Override
+        public void onClick(View view) {
+            dismissTaskMenuView();
+            if (mStarter == null) {
+                Log.w(TAG, "starter null!");
+                return;
+            }
+            // TODO: handle GroupTask (single) items so that recent items in taskbar work
+            if (mItemInfo instanceof WorkspaceItemInfo) {
+                WorkspaceItemInfo workspaceItemInfo = (WorkspaceItemInfo) mItemInfo;
+                ShortcutInfo shortcutInfo = workspaceItemInfo.getDeepShortcutInfo();
+                if (shortcutInfo != null) {
+                    mStarter.showShortcutBubble(shortcutInfo);
+                    return;
+                }
+            }
+            // If we're here check for an intent
+            Intent intent = mItemInfo.getIntent();
+            if (intent != null) {
+                if (intent.getPackage() == null) {
+                    intent.setPackage(mItemInfo.getTargetPackage());
+                }
+                mStarter.showAppBubble(intent);
+            } else {
+                Log.w(TAG, "unable to bubble, no intent: " + mItemInfo);
+            }
+        }
     }
 }

@@ -345,17 +345,34 @@ public final class Workspace extends Home {
      * @return map of text -> center of the view. In case of icons with the same name, the one with
      * lower x coordinate is selected.
      */
-    public Map<String, Point> getWorkspaceIconsPositions() {
+    public Map<String, Point> getAllWorkspaceIconsPositions() {
         final UiObject2 workspace = verifyActiveContainer();
-        mLauncher.waitForLauncherInitialized(); // b/319501259
         List<UiObject2> workspaceIcons =
                 mLauncher.waitForObjectsInContainer(workspace, AppIcon.getAnyAppIconSelector());
-        return workspaceIcons.stream()
+        return getIconPositionMap(workspaceIcons);
+    }
+
+    /**
+     * @return point where icon is found for given the app name,
+     * point is visible center of the icon.
+     */
+    @NonNull
+    public Point getWorkspaceIconPosition(String appName) {
+        final UiObject2 workspace = verifyActiveContainer();
+
+        UiObject2 workspaceIcon =
+                mLauncher.waitForObjectInContainer(workspace,
+                        AppIcon.getAppIconSelector(appName, mLauncher));
+        return workspaceIcon.getVisibleCenter();
+    }
+
+    private Map<String, Point> getIconPositionMap(List<UiObject2> icons) {
+        return icons.stream()
                 .collect(
                         Collectors.toMap(
                                 /* keyMapper= */ uiObject21 -> {
-                                    Log.d(UIOBJECT_STALE_ELEMENT, "keyText: " +
-                                            uiObject21.getText());
+                                    Log.d(UIOBJECT_STALE_ELEMENT, "keyText: "
+                                            + uiObject21.getText());
                                     return uiObject21.getText();
                                 },
                                 /* valueMapper= */ uiObject2 -> {
@@ -444,6 +461,8 @@ public final class Workspace extends Home {
             Runnable expectLongClickEvents) {
         try (LauncherInstrumentation.Closable c = launcher.addContextLayer(
                 "uninstalling app icon")) {
+
+            final String appNameToUninstall = homeAppIcon.getAppName();
             dragIconToWorkspace(
                     launcher,
                     homeAppIcon,
@@ -468,7 +487,10 @@ public final class Workspace extends Home {
 
             try (LauncherInstrumentation.Closable c1 = launcher.addContextLayer(
                     "uninstalled app by dragging to the drop bar")) {
-                return new Workspace(launcher);
+                final Workspace newWorkspace = new Workspace(launcher);
+                launcher.waitUntilLauncherObjectGone(
+                        AppIcon.getAppIconSelector(appNameToUninstall));
+                return newWorkspace;
             }
         }
     }

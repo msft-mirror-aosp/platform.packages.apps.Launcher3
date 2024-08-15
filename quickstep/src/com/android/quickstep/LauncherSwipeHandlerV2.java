@@ -144,8 +144,6 @@ public class LauncherSwipeHandlerV2 extends
         return new FloatingViewHomeAnimationFactory(floatingIconView) {
             @Nullable
             private RectF mTargetRect;
-            @Nullable
-            private RectFSpringAnim mSiblingAnimation;
 
             @Nullable
             @Override
@@ -169,18 +167,6 @@ public class LauncherSwipeHandlerV2 extends
                     return mTargetRect;
                 } else {
                     return iconLocation;
-                }
-            }
-
-            @Override
-            public void playAtomicAnimation(float velocity) {
-                if (enableScalingRevealHomeAnimation()) {
-                    if (mContainer != null) {
-                        new ScalingWorkspaceRevealAnim(
-                                mContainer, mSiblingAnimation, getWindowTargetRect()).start();
-                    }
-                } else {
-                    super.playAtomicAnimation(velocity);
                 }
             }
 
@@ -249,6 +235,8 @@ public class LauncherSwipeHandlerV2 extends
                 isTargetTranslucent, fallbackBackgroundColor);
 
         return new FloatingViewHomeAnimationFactory(floatingWidgetView) {
+            @Nullable
+            private RectF mTargetRect;
 
             @Override
             @Nullable
@@ -258,8 +246,14 @@ public class LauncherSwipeHandlerV2 extends
 
             @Override
             public RectF getWindowTargetRect() {
-                super.getWindowTargetRect();
-                return backgroundLocation;
+                if (enableScalingRevealHomeAnimation()) {
+                    if (mTargetRect == null) {
+                        mTargetRect = new RectF(backgroundLocation);
+                    }
+                    return mTargetRect;
+                } else {
+                    return backgroundLocation;
+                }
             }
 
             @Override
@@ -270,10 +264,11 @@ public class LauncherSwipeHandlerV2 extends
             @Override
             public void setAnimation(RectFSpringAnim anim) {
                 super.setAnimation(anim);
-
-                anim.addAnimatorListener(floatingWidgetView);
-                floatingWidgetView.setOnTargetChangeListener(anim::onTargetPositionChanged);
-                floatingWidgetView.setFastFinishRunnable(anim::end);
+                mSiblingAnimation = anim;
+                mSiblingAnimation.addAnimatorListener(floatingWidgetView);
+                floatingWidgetView.setOnTargetChangeListener(
+                        mSiblingAnimation::onTargetPositionChanged);
+                floatingWidgetView.setFastFinishRunnable(mSiblingAnimation::end);
             }
 
             @Override
@@ -334,11 +329,20 @@ public class LauncherSwipeHandlerV2 extends
     }
 
     private class FloatingViewHomeAnimationFactory extends LauncherHomeAnimationFactory {
-
         private final FloatingView mFloatingView;
+        @Nullable
+        protected RectFSpringAnim mSiblingAnimation;
 
         FloatingViewHomeAnimationFactory(FloatingView floatingView) {
             mFloatingView = floatingView;
+        }
+
+        @Override
+        protected void playScalingRevealAnimation() {
+            if (mContainer != null) {
+                new ScalingWorkspaceRevealAnim(mContainer, mSiblingAnimation,
+                        getWindowTargetRect()).start();
+            }
         }
 
         @Override
@@ -370,9 +374,25 @@ public class LauncherSwipeHandlerV2 extends
 
         @Override
         public void playAtomicAnimation(float velocity) {
-            new StaggeredWorkspaceAnim(mContainer, velocity, true /* animateOverviewScrim */,
-                    getViewIgnoredInWorkspaceRevealAnimation())
-                    .start();
+            if (enableScalingRevealHomeAnimation()) {
+                playScalingRevealAnimation();
+            } else {
+                new StaggeredWorkspaceAnim(mContainer, velocity, true /* animateOverviewScrim */,
+                        getViewIgnoredInWorkspaceRevealAnimation())
+                        .start();
+            }
+        }
+
+        /**
+         * Extracted in a different method so subclasses that have a custom window animation with a
+         * target (icons, widgets) can pass the optional parameters.
+         */
+        protected void playScalingRevealAnimation() {
+            if (mContainer != null) {
+                new ScalingWorkspaceRevealAnim(
+                        mContainer, null /* siblingAnimation */,
+                        null /* windowTargetRect */).start();
+            }
         }
     }
 }

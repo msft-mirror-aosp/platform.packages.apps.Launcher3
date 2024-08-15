@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.allapps;
 
+import static com.android.launcher3.allapps.BaseAllAppsAdapter.VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO;
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_BOTTOM_LEFT;
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_BOTTOM_RIGHT;
 import static com.android.launcher3.allapps.SectionDecorationInfo.ROUND_NOTHING;
@@ -295,6 +296,14 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             if (Flags.enablePrivateSpace()) {
                 position = addPrivateSpaceItems(position);
             }
+            if (!mFastScrollerSections.isEmpty()) {
+                // After all the adapterItems are added, add a view to the bottom so that user can
+                // scroll all the way down.
+                mAdapterItems.add(new AdapterItem(VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO));
+                mFastScrollerSections.add(new FastScrollSectionInfo(
+                        mFastScrollerSections.get(mFastScrollerSections.size() - 1).sectionName,
+                        position++));
+            }
         }
         mAccessibilityResultsCount = (int) mAdapterItems.stream()
                 .filter(AdapterItem::isCountedForAccessibility).count();
@@ -337,6 +346,8 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                 && !mPrivateApps.isEmpty()) {
             // Always add PS Header if Space is present and visible.
             position = mPrivateProviderManager.addPrivateSpaceHeader(mAdapterItems);
+            mFastScrollerSections.add(new FastScrollSectionInfo(
+                    mPrivateProfileAppScrollerBadge, position));
             int privateSpaceState = mPrivateProviderManager.getCurrentState();
             switch (privateSpaceState) {
                 case PrivateProfileManager.STATE_DISABLED:
@@ -401,9 +412,8 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             // Apply decorator to private apps.
             if (hasPrivateApps) {
                 mAdapterItems.add(AdapterItem.asAppWithDecorationInfo(info,
-                        new SectionDecorationInfo(mActivityContext.getApplicationContext(),
-                                getRoundRegions(i, appList.size()),
-                                true /* decorateTogether */)));
+                        new SectionDecorationInfo(mActivityContext,
+                                getRoundRegions(i, appList.size()), true /* decorateTogether */)));
             } else {
                 mAdapterItems.add(AdapterItem.asApp(info));
             }

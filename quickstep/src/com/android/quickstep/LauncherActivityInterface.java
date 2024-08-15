@@ -35,7 +35,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 
 import com.android.launcher3.DeviceProfile;
-import com.android.launcher3.Flags;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAnimUtils;
 import com.android.launcher3.LauncherInitListener;
 import com.android.launcher3.LauncherState;
@@ -212,10 +212,10 @@ public final class LauncherActivityInterface extends
         if (launcher.isStarted() && (isInLiveTileMode() || launcher.hasBeenResumed())) {
             return launcher;
         }
-        if (Flags.useActivityOverlay()
-                && SystemUiProxy.INSTANCE.get(launcher).getHomeVisibilityState().isHomeVisible()) {
+        if (isInMinusOne()) {
             return launcher;
         }
+
         return null;
     }
 
@@ -242,7 +242,8 @@ public final class LauncherActivityInterface extends
 
     @Override
     public void onExitOverview(RotationTouchHelper deviceState, Runnable exitRunnable) {
-        final StateManager<LauncherState> stateManager = getCreatedContainer().getStateManager();
+        final StateManager<LauncherState, Launcher> stateManager =
+                getCreatedContainer().getStateManager();
         stateManager.addStateListener(
                 new StateManager.StateListener<LauncherState>() {
                     @Override
@@ -291,6 +292,15 @@ public final class LauncherActivityInterface extends
                 && TopTaskTracker.INSTANCE.get(launcher).getCachedTopTask(false).isHomeTask();
     }
 
+    private boolean isInMinusOne() {
+        QuickstepLauncher launcher = getCreatedContainer();
+
+        return launcher != null
+                && launcher.getStateManager().getState() == NORMAL
+                && !launcher.isStarted()
+                && TopTaskTracker.INSTANCE.get(launcher).getCachedTopTask(false).isHomeTask();
+    }
+
     @Override
     public void onLaunchTaskFailed() {
         QuickstepLauncher launcher = getCreatedContainer();
@@ -308,7 +318,8 @@ public final class LauncherActivityInterface extends
             return;
         }
         LauncherOverlayManager om = launcher.getOverlayManager();
-        if (!launcher.isStarted() || launcher.isForceInvisible()) {
+        if (!SystemUiProxy.INSTANCE.get(launcher).getHomeVisibilityState().isHomeVisible()
+                || launcher.isForceInvisible()) {
             om.hideOverlay(false /* animate */);
         } else {
             om.hideOverlay(150);

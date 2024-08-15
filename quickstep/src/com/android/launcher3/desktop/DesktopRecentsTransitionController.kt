@@ -30,11 +30,12 @@ import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.quickstep.SystemUiProxy
 import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.views.DesktopTaskView
+import com.android.wm.shell.common.desktopmode.DesktopModeTransitionSource
 import java.util.function.Consumer
 
 /** Manage recents related operations with desktop tasks */
 class DesktopRecentsTransitionController(
-    private val stateManager: StateManager<*>,
+    private val stateManager: StateManager<*, *>,
     private val systemUiProxy: SystemUiProxy,
     private val appThread: IApplicationThread,
     private val depthController: DepthController?
@@ -43,11 +44,13 @@ class DesktopRecentsTransitionController(
     /** Launch desktop tasks from recents view */
     fun launchDesktopFromRecents(
         desktopTaskView: DesktopTaskView,
+        animated: Boolean,
         callback: Consumer<Boolean>? = null
     ) {
         val animRunner =
             RemoteDesktopLaunchTransitionRunner(
                 desktopTaskView,
+                animated,
                 stateManager,
                 depthController,
                 callback
@@ -57,13 +60,14 @@ class DesktopRecentsTransitionController(
     }
 
     /** Launch desktop tasks from recents view */
-    fun moveToDesktop(taskId: Int) {
-        systemUiProxy.moveToDesktop(taskId)
+    fun moveToDesktop(taskId: Int, transitionSource: DesktopModeTransitionSource) {
+        systemUiProxy.moveToDesktop(taskId, transitionSource)
     }
 
     private class RemoteDesktopLaunchTransitionRunner(
         private val desktopTaskView: DesktopTaskView,
-        private val stateManager: StateManager<*>,
+        private val animated: Boolean,
+        private val stateManager: StateManager<*, *>,
         private val depthController: DepthController?,
         private val successCallback: Consumer<Boolean>?
     ) : RemoteTransitionStub() {
@@ -83,16 +87,21 @@ class DesktopRecentsTransitionController(
             }
 
             MAIN_EXECUTOR.execute {
-                TaskViewUtils.composeRecentsDesktopLaunchAnimator(
-                    desktopTaskView,
-                    stateManager,
-                    depthController,
-                    info,
-                    t
-                ) {
-                    errorHandlingFinishCallback.run()
-                    successCallback?.accept(true)
+                val animator =
+                    TaskViewUtils.composeRecentsDesktopLaunchAnimator(
+                        desktopTaskView,
+                        stateManager,
+                        depthController,
+                        info,
+                        t
+                    ) {
+                        errorHandlingFinishCallback.run()
+                        successCallback?.accept(true)
+                    }
+                if (!animated) {
+                    animator.setDuration(0)
                 }
+                animator.start()
             }
         }
     }

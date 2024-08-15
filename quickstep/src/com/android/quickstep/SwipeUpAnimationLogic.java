@@ -17,6 +17,7 @@ package com.android.quickstep;
 
 import static com.android.app.animation.Interpolators.ACCELERATE_1_5;
 import static com.android.app.animation.Interpolators.LINEAR;
+import static com.android.launcher3.Flags.enableAdditionalHomeAnimations;
 import static com.android.launcher3.PagedView.INVALID_PAGE;
 
 import android.animation.Animator;
@@ -25,6 +26,7 @@ import android.graphics.Matrix;
 import android.graphics.Matrix.ScaleToFit;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.util.Log;
 import android.view.RemoteAnimationTarget;
 
 import androidx.annotation.NonNull;
@@ -380,6 +382,8 @@ public abstract class SwipeUpAnimationLogic implements
     protected class SpringAnimationRunner extends AnimationSuccessListener
             implements RectFSpringAnim.OnUpdateListener, BuilderProxy {
 
+        private static final String TAG = "SpringAnimationRunner";
+
         final Rect mCropRect = new Rect();
         final Matrix mMatrix = new Matrix();
 
@@ -449,7 +453,7 @@ public abstract class SwipeUpAnimationLogic implements
             float alpha = mAnimationFactory.getWindowAlpha(progress);
 
             mHomeAnim.setPlayFraction(progress);
-            if (mTargetTaskView == null) {
+            if (!enableAdditionalHomeAnimations() || mTargetTaskView == null) {
                 mHomeToWindowPositionMap.mapRect(mWindowCurrentRect, currentRect);
                 mMatrix.setRectToRect(mCropRectF, mWindowCurrentRect, ScaleToFit.FILL);
                 mLocalTransformParams
@@ -464,10 +468,15 @@ public abstract class SwipeUpAnimationLogic implements
 
             mLocalTransformParams.applySurfaceParams(
                     mLocalTransformParams.createSurfaceParams(this));
-            mAnimationFactory.update(
-                    currentRect, progress, mMatrix.mapRadius(cornerRadius), (int) (alpha * 255));
 
-            if (mTargetTaskView == null) {
+            mAnimationFactory.update(
+                    currentRect,
+                    progress,
+                    mMatrix.mapRadius(cornerRadius),
+                    !enableAdditionalHomeAnimations() || mTargetTaskView == null
+                            ? 0 : (int) (alpha * 255));
+
+            if (!enableAdditionalHomeAnimations() || mTargetTaskView == null) {
                 return;
             }
             if (mAnimationFactory.isAnimatingIntoIcon() && mAnimationFactory.isAnimationReady()) {
@@ -475,10 +484,26 @@ public abstract class SwipeUpAnimationLogic implements
                 return;
             }
             mTargetTaskView.setAlpha(mAnimationFactory.isAnimatingIntoIcon() ? 1f : alpha);
-            float width = mThumbnailStartBounds.width();
-            float height =  mThumbnailStartBounds.height();
-            float scale = Math.min(currentRect.width(), currentRect.height())
-                    / Math.min(width, height);
+            float startWidth = mThumbnailStartBounds.width();
+            float startHeight =  mThumbnailStartBounds.height();
+            float currentWidth = currentRect.width();
+            float currentHeight = currentRect.height();
+            float scale;
+
+            boolean isStartWidthValid = Float.compare(startWidth, 0f) > 0;
+            boolean isStartHeightValid = Float.compare(startHeight, 0f) > 0;
+            if (isStartWidthValid && isStartHeightValid) {
+                scale = Math.min(currentWidth, currentHeight) / Math.min(startWidth, startHeight);
+            } else {
+                Log.e(TAG, "TaskView starting bounds are invalid: " + mThumbnailStartBounds);
+                if (isStartWidthValid) {
+                    scale = currentWidth / startWidth;
+                } else if (isStartHeightValid) {
+                    scale = currentHeight / startHeight;
+                } else {
+                    scale = 1f;
+                }
+            }
 
             mTargetTaskView.setScaleX(scale);
             mTargetTaskView.setScaleY(scale);
@@ -506,7 +531,7 @@ public abstract class SwipeUpAnimationLogic implements
         public void onAnimationStart(Animator animation) {
             setUp();
             mHomeAnim.dispatchOnStart();
-            if (mTargetTaskView == null) {
+            if (!enableAdditionalHomeAnimations() || mTargetTaskView == null) {
                 return;
             }
             Rect thumbnailBounds = new Rect();
@@ -521,7 +546,7 @@ public abstract class SwipeUpAnimationLogic implements
         }
 
         private void setUp() {
-            if (mTargetTaskView == null) {
+            if (!enableAdditionalHomeAnimations() || mTargetTaskView == null) {
                 return;
             }
             RecentsView recentsView = mTargetTaskView.getRecentsView();
@@ -542,7 +567,7 @@ public abstract class SwipeUpAnimationLogic implements
         }
 
         private void cleanUp() {
-            if (mTargetTaskView == null) {
+            if (!enableAdditionalHomeAnimations() || mTargetTaskView == null) {
                 return;
             }
             RecentsView recentsView = mTargetTaskView.getRecentsView();
