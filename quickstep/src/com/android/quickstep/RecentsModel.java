@@ -18,6 +18,7 @@ package com.android.quickstep;
 import static android.os.Process.THREAD_PRIORITY_BACKGROUND;
 
 import static com.android.launcher3.Flags.enableGridOnlyOverview;
+import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.quickstep.TaskUtils.checkCurrentOrManagedUserId;
 
@@ -89,7 +90,9 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
 
     private RecentsModel(Context context, IconProvider iconProvider) {
         this(context,
-                new RecentTasksList(MAIN_EXECUTOR,
+                new RecentTasksList(
+                        context,
+                        MAIN_EXECUTOR,
                         context.getSystemService(KeyguardManager.class),
                         SystemUiProxy.INSTANCE.get(context),
                         TopTaskTracker.INSTANCE.get(context)),
@@ -108,7 +111,7 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
         mIconCache = iconCache;
         mIconCache.registerTaskVisualsChangeListener(this);
         mThumbnailCache = thumbnailCache;
-        if (enableGridOnlyOverview()) {
+        if (isCachePreloadingEnabled()) {
             mCallbacks = new ComponentCallbacks() {
                 @Override
                 public void onConfigurationChanged(Configuration configuration) {
@@ -342,7 +345,7 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
      * highResLoadingState is enabled
      */
     public void preloadCacheIfNeeded() {
-        if (!enableGridOnlyOverview()) {
+        if (!isCachePreloadingEnabled()) {
             return;
         }
 
@@ -368,7 +371,7 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
      * Updates cache size and preloads more tasks if cache size increases
      */
     public void updateCacheSizeAndPreloadIfNeeded() {
-        if (!enableGridOnlyOverview()) {
+        if (!isCachePreloadingEnabled()) {
             return;
         }
 
@@ -385,6 +388,10 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
         }
         mIconCache.removeTaskVisualsChangeListener();
         mTaskStackChangeListeners.unregisterTaskStackListener(this);
+    }
+
+    private boolean isCachePreloadingEnabled() {
+        return enableGridOnlyOverview() || enableRefactorTaskThumbnail();
     }
 
     /**

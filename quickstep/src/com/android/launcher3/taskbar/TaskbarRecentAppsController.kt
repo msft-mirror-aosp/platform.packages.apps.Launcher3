@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.taskbar
 
+import android.content.Context
 import androidx.annotation.VisibleForTesting
 import com.android.launcher3.Flags.enableRecentsInTaskbar
 import com.android.launcher3.model.data.ItemInfo
@@ -26,8 +27,8 @@ import com.android.launcher3.util.CancellableTask
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
-import com.android.window.flags.Flags.enableDesktopWindowingMode
-import com.android.window.flags.Flags.enableDesktopWindowingTaskbarRunningApps
+import com.android.wm.shell.shared.desktopmode.DesktopModeFlags
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import java.io.PrintWriter
 
 /**
@@ -36,18 +37,22 @@ import java.io.PrintWriter
  * - When in Desktop Mode: show the currently running (open) Tasks
  */
 class TaskbarRecentAppsController(
+    context: Context,
     private val recentsModel: RecentsModel,
     // Pass a provider here instead of the actual DesktopVisibilityController instance since that
     // instance might not be available when this constructor is called.
     private val desktopVisibilityControllerProvider: () -> DesktopVisibilityController?,
 ) : LoggableTaskbarController {
 
-    // TODO(b/335401172): unify DesktopMode checks in Launcher.
     var canShowRunningApps =
-        enableDesktopWindowingMode() && enableDesktopWindowingTaskbarRunningApps()
+        DesktopModeStatus.canEnterDesktopMode(context) &&
+            DesktopModeFlags.TASKBAR_RUNNING_APPS.isEnabled(context)
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest
+            if (!field && !canShowRecentApps) {
+                recentsModel.unregisterRecentTasksChangedListener()
+            }
         }
 
     // TODO(b/343532825): Add a setting to disable Recents even when the flag is on.
@@ -55,6 +60,9 @@ class TaskbarRecentAppsController(
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest
+            if (!field && !canShowRunningApps) {
+                recentsModel.unregisterRecentTasksChangedListener()
+            }
         }
 
     // Initialized in init.
@@ -73,7 +81,7 @@ class TaskbarRecentAppsController(
     private val desktopVisibilityController: DesktopVisibilityController?
         get() = desktopVisibilityControllerProvider()
 
-    private val isInDesktopMode: Boolean
+    val isInDesktopMode: Boolean
         get() = desktopVisibilityController?.areDesktopTasksVisible() ?: false
 
     val runningTaskIds: Set<Int>
@@ -114,8 +122,10 @@ class TaskbarRecentAppsController(
 
     fun init(taskbarControllers: TaskbarControllers) {
         controllers = taskbarControllers
-        recentsModel.registerRecentTasksChangedListener(recentTasksChangedListener)
-        reloadRecentTasksIfNeeded()
+        if (canShowRunningApps || canShowRecentApps) {
+            recentsModel.registerRecentTasksChangedListener(recentTasksChangedListener)
+            reloadRecentTasksIfNeeded()
+        }
     }
 
     fun onDestroy() {

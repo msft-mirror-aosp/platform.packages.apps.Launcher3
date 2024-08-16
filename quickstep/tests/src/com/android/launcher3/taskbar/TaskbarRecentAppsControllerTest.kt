@@ -18,10 +18,14 @@ package com.android.launcher3.taskbar
 
 import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.os.Process
 import android.os.UserHandle
+import android.platform.test.rule.TestWatcher
 import android.testing.AndroidTestingRunner
+import com.android.internal.R
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION
 import com.android.launcher3.model.data.AppInfo
@@ -39,12 +43,14 @@ import java.util.function.Consumer
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.junit.MockitoJUnit
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -53,32 +59,65 @@ import org.mockito.kotlin.whenever
 class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
 
     @get:Rule val mockitoRule = MockitoJUnit.rule()
+    @get:Rule
+    val disableControllerForCertainTestsWatcher =
+        object : TestWatcher() {
+            override fun starting(description: Description) {
+                // Update canShowRunningAndRecentAppsAtInit before setUp() is called for each test.
+                canShowRunningAndRecentAppsAtInit =
+                    description.methodName !in
+                        listOf(
+                            "canShowRunningAndRecentAppsAtInitIsFalse_getTasksNeverCalled",
+                        )
+            }
+        }
 
     @Mock private lateinit var mockIconCache: TaskIconCache
     @Mock private lateinit var mockRecentsModel: RecentsModel
+    @Mock private lateinit var mockContext: Context
+    @Mock private lateinit var mockResources: Resources
     @Mock private lateinit var mockDesktopVisibilityController: DesktopVisibilityController
 
     private var taskListChangeId: Int = 1
 
     private lateinit var recentAppsController: TaskbarRecentAppsController
-    private lateinit var recentTasksChangedListener: RecentTasksChangedListener
     private lateinit var userHandle: UserHandle
+
+    private var canShowRunningAndRecentAppsAtInit = true
+    private var recentTasksChangedListener: RecentTasksChangedListener? = null
 
     @Before
     fun setUp() {
         super.setup()
         userHandle = Process.myUserHandle()
 
-        whenever(mockRecentsModel.iconCache).thenReturn(mockIconCache)
-        recentAppsController =
-            TaskbarRecentAppsController(mockRecentsModel) { mockDesktopVisibilityController }
-        recentAppsController.init(taskbarControllers)
-        recentAppsController.canShowRunningApps = true
-        recentAppsController.canShowRecentApps = true
+        // Set desktop mode supported
+        whenever(mockContext.getResources()).thenReturn(mockResources)
+        whenever(mockResources.getBoolean(R.bool.config_isDesktopModeSupported)).thenReturn(true)
 
-        val listenerCaptor = ArgumentCaptor.forClass(RecentTasksChangedListener::class.java)
-        verify(mockRecentsModel).registerRecentTasksChangedListener(listenerCaptor.capture())
-        recentTasksChangedListener = listenerCaptor.value
+        whenever(mockRecentsModel.iconCache).thenReturn(mockIconCache)
+        whenever(mockRecentsModel.unregisterRecentTasksChangedListener()).then {
+            recentTasksChangedListener = null
+            it
+        }
+        recentAppsController =
+            TaskbarRecentAppsController(mockContext, mockRecentsModel) {
+                mockDesktopVisibilityController
+            }
+        recentAppsController.canShowRunningApps = canShowRunningAndRecentAppsAtInit
+        recentAppsController.canShowRecentApps = canShowRunningAndRecentAppsAtInit
+        recentAppsController.init(taskbarControllers)
+
+        recentTasksChangedListener =
+            if (canShowRunningAndRecentAppsAtInit) {
+                val listenerCaptor = ArgumentCaptor.forClass(RecentTasksChangedListener::class.java)
+                verify(mockRecentsModel)
+                    .registerRecentTasksChangedListener(listenerCaptor.capture())
+                listenerCaptor.value
+            } else {
+                verify(mockRecentsModel, never()).registerRecentTasksChangedListener(any())
+                null
+            }
 
         // Make sure updateHotseatItemInfos() is called after commitRunningAppsToUI()
         whenever(taskbarViewController.commitRunningAppsToUI()).then {
@@ -86,6 +125,32 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
                 recentAppsController.shownHotseatItems.toTypedArray()
             )
         }
+    }
+
+    // See the TestWatcher rule at the top which sets canShowRunningAndRecentAppsAtInit = false.
+    @Test
+    fun canShowRunningAndRecentAppsAtInitIsFalse_getTasksNeverCalled() {
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2),
+            runningTasks = listOf(createTask(1, RUNNING_APP_PACKAGE_1)),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+        )
+        verify(mockRecentsModel, never()).getTasks(any<Consumer<List<GroupTask>>>())
+    }
+
+    @Test
+    fun canShowRunningAndRecentAppsIsFalseAfterInit_getTasksOnlyCalledInInit() {
+        // getTasks() should have been called once from init().
+        verify(mockRecentsModel, times(1)).getTasks(any<Consumer<List<GroupTask>>>())
+        recentAppsController.canShowRunningApps = false
+        recentAppsController.canShowRecentApps = false
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2),
+            runningTasks = listOf(createTask(1, RUNNING_APP_PACKAGE_1)),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+        )
+        // Verify that getTasks() was not called again after the init().
+        verify(mockRecentsModel, times(1)).getTasks(any<Consumer<List<GroupTask>>>())
     }
 
     @Test
@@ -518,7 +583,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         )
 
         setInDesktopMode(true)
-        recentTasksChangedListener.onRecentTasksChanged()
+        recentTasksChangedListener!!.onRecentTasksChanged()
         val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
         assertThat(shownPackages).containsExactly(RUNNING_APP_PACKAGE_1, RUNNING_APP_PACKAGE_2)
     }
@@ -535,7 +600,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             recentTaskPackages = recentTaskPackages
         )
         setInDesktopMode(false)
-        recentTasksChangedListener.onRecentTasksChanged()
+        recentTasksChangedListener!!.onRecentTasksChanged()
         val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
         // Don't expect RECENT_PACKAGE_3 because it is currently running.
         val expectedPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
@@ -705,7 +770,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             }
             .whenever(mockRecentsModel)
             .getTasks(any<Consumer<List<GroupTask>>>())
-        recentTasksChangedListener.onRecentTasksChanged()
+        recentTasksChangedListener?.onRecentTasksChanged()
     }
 
     private fun createHotseatItemsFromPackageNames(packageNames: List<String>): List<ItemInfo> {

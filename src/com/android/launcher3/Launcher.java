@@ -70,6 +70,7 @@ import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.Utilities.postAsyncCallback;
 import static com.android.launcher3.config.FeatureFlags.FOLDABLE_SINGLE_PAGE;
 import static com.android.launcher3.config.FeatureFlags.MULTI_SELECT_EDIT_MODE;
+import static com.android.launcher3.folder.FolderGridOrganizer.createFolderGridOrganizer;
 import static com.android.launcher3.logging.KeyboardStateManager.KeyboardState.HIDE;
 import static com.android.launcher3.logging.KeyboardStateManager.KeyboardState.SHOW;
 import static com.android.launcher3.logging.StatsLogManager.EventEnum;
@@ -188,7 +189,6 @@ import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.dragndrop.LauncherDragController;
 import com.android.launcher3.folder.Folder;
-import com.android.launcher3.folder.FolderGridOrganizer;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.keyboard.ViewGroupFocusHelper;
@@ -266,6 +266,7 @@ import com.android.launcher3.widget.WidgetManagerHelper;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
 import com.android.launcher3.widget.picker.WidgetsFullSheet;
+import com.android.launcher3.widget.picker.model.WidgetPickerDataProvider;
 import com.android.launcher3.widget.util.WidgetSizes;
 import com.android.systemui.plugins.LauncherOverlayPlugin;
 import com.android.systemui.plugins.PluginListener;
@@ -371,6 +372,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     private LauncherAccessibilityDelegate mAccessibilityDelegate;
 
     private PopupDataProvider mPopupDataProvider;
+    private WidgetPickerDataProvider mWidgetPickerDataProvider;
 
     // We only want to get the SharedPreferences once since it does an FS stat each time we get
     // it from the context.
@@ -532,6 +534,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                 mFocusHandler, new CellLayout(mWorkspace.getContext(), mWorkspace));
 
         mPopupDataProvider = new PopupDataProvider(this::updateNotificationDots);
+        mWidgetPickerDataProvider = new WidgetPickerDataProvider();
 
         boolean internalStateHandled = ACTIVITY_TRACKER.handleCreate(this);
         if (internalStateHandled) {
@@ -816,7 +819,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             View collectionIcon = getWorkspace().getHomescreenIconByItemId(info.container);
             if (collectionIcon instanceof FolderIcon folderIcon
                     && collectionIcon.getTag() instanceof FolderInfo) {
-                if (new FolderGridOrganizer(getDeviceProfile())
+                if (createFolderGridOrganizer(getDeviceProfile())
                         .setFolderInfo((FolderInfo) folderIcon.getTag())
                         .isItemInPreview(info.rank)) {
                     folderIcon.invalidate();
@@ -2702,8 +2705,13 @@ public class Launcher extends StatefulActivity<LauncherState>
         mDragLayer.dump(prefix, writer);
         mStateManager.dump(prefix, writer);
         mPopupDataProvider.dump(prefix, writer);
+        mWidgetPickerDataProvider.dump(prefix, writer);
         mDeviceProfile.dump(this, prefix, writer);
         mAppsView.getAppsStore().dump(prefix, writer);
+        mAppsView.getPersonalAppList().dump(prefix, writer);
+        if (mAppsView.shouldShowTabs()) {
+            mAppsView.getWorkAppList().dump(prefix, writer);
+        }
 
         try {
             FileLog.flushAll(writer);
@@ -3009,6 +3017,12 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Override
     public PopupDataProvider getPopupDataProvider() {
         return mPopupDataProvider;
+    }
+
+    @NonNull
+    @Override
+    public WidgetPickerDataProvider getWidgetPickerDataProvider() {
+        return mWidgetPickerDataProvider;
     }
 
     @Override

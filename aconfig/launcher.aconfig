@@ -311,8 +311,24 @@ flag {
 }
 
 flag {
-    name: "enable_new_archiving_icon"
+    name: "enable_multi_instance_menu_taskbar"
     namespace: "launcher"
-    description: "Archived apps will use new icon in app title"
+    description: "Menu in Taskbar with options to launch and manage multiple instances of the same app"
+    bug: "355237285"
+}
+flag {
+    name: "navigate_to_child_preference"
+    namespace: "launcher"
+    description: "Settings screen supports navigating to child preference if the key is not on the screen"
+    bug: "293390881"
+}
+
+flag {
+    name: "use_new_icon_for_archived_apps"
+    namespace: "launcher"
+    description: "Archived apps will use new cloud icon in app title instead of overlay"
     bug: "350758155"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
