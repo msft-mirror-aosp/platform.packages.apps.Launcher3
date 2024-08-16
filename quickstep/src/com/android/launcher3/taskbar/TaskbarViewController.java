@@ -33,6 +33,7 @@ import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VAL
 import static com.android.launcher3.util.MultiTranslateDelegate.INDEX_TASKBAR_ALIGNMENT_ANIM;
 import static com.android.launcher3.util.MultiTranslateDelegate.INDEX_TASKBAR_PINNING_ANIM;
 import static com.android.launcher3.util.MultiTranslateDelegate.INDEX_TASKBAR_REVEAL_ANIM;
+import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
@@ -46,6 +47,7 @@ import android.view.View;
 import android.view.animation.Interpolator;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.view.OneShotPreDrawListener;
 
 import com.android.app.animation.Interpolators;
@@ -63,6 +65,7 @@ import com.android.launcher3.anim.RevealOutlineAnimation;
 import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.TaskItemInfo;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LauncherBindableItemsContainer;
@@ -93,7 +96,11 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     public static final int ALPHA_INDEX_NOTIFICATION_EXPANDED = 4;
     public static final int ALPHA_INDEX_ASSISTANT_INVOKED = 5;
     public static final int ALPHA_INDEX_SMALL_SCREEN = 6;
-    private static final int NUM_ALPHA_CHANNELS = 7;
+
+    public static final int ALPHA_INDEX_BUBBLE_BAR = 7;
+    private static final int NUM_ALPHA_CHANNELS = 8;
+
+    private static boolean sEnableModelLoadingForTests = true;
 
     private final TaskbarActivityContext mActivity;
     private final TaskbarView mTaskbarView;
@@ -191,7 +198,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mTaskbarIconTranslationXForPinning.updateValue(pinningValue);
 
         mModelCallbacks.init(controllers);
-        if (mActivity.isUserSetupComplete()) {
+        if (mActivity.isUserSetupComplete() && sEnableModelLoadingForTests) {
             // Only load the callbacks if user setup is completed
             LauncherAppState.getInstance(mActivity).getModel().addCallbacksAndLoad(mModelCallbacks);
         }
@@ -228,6 +235,13 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         mActivity.removeOnDeviceProfileChangeListener(mDeviceProfileChangeListener);
     }
 
+    /**
+     * Gets the taskbar {@link View.Visibility visibility}.
+     */
+    public int getTaskbarVisibility() {
+        return mTaskbarView.getVisibility();
+    }
+
     public boolean areIconsVisible() {
         return mTaskbarView.areIconsVisible();
     }
@@ -258,6 +272,10 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      */
     public void addOneTimePreDrawListener(@NonNull Runnable listener) {
         OneShotPreDrawListener.add(mTaskbarView, listener);
+    }
+
+    public Rect getIconLayoutVisualBounds() {
+        return mTaskbarView.getIconLayoutVisualBounds();
     }
 
     public Rect getIconLayoutBounds() {
@@ -450,14 +468,14 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         if (mControllers.getSharedState().startTaskbarVariantIsTransient) {
             float transY =
                     mTransientTaskbarDp.taskbarBottomMargin + (mTransientTaskbarDp.taskbarHeight
-                            - mTaskbarView.getIconLayoutBounds().bottom)
+                            - mTaskbarView.getIconLayoutVisualBounds().bottom)
                             - (mPersistentTaskbarDp.taskbarHeight
                                     - mTransientTaskbarDp.taskbarIconSize) / 2f;
             taskbarIconTranslationYForPinningValue = mapRange(scale, 0f, transY);
         } else {
             float transY =
                     -mTransientTaskbarDp.taskbarBottomMargin + (mPersistentTaskbarDp.taskbarHeight
-                            - mTaskbarView.getIconLayoutBounds().bottom)
+                            - mTaskbarView.getIconLayoutVisualBounds().bottom)
                             - (mTransientTaskbarDp.taskbarHeight
                                     - mTransientTaskbarDp.taskbarIconSize) / 2f;
             taskbarIconTranslationYForPinningValue = mapRange(scale, transY, 0f);
@@ -515,35 +533,38 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         return mTaskbarView.getTaskbarDividerView();
     }
 
-    /** Updates which icons are marked as running given the Set of currently running packages. */
-    public void updateIconViewsRunningStates(Set<String> runningPackages,
-            Set<String> minimizedPackages) {
+    /**
+     * Updates which icons are marked as running or minimized given the Sets of currently running
+     * and minimized tasks.
+     */
+    public void updateIconViewsRunningStates(Set<Integer> runningTaskIds,
+            Set<Integer> minimizedTaskIds) {
         for (View iconView : getIconViews()) {
             if (iconView instanceof BubbleTextView btv) {
                 btv.updateRunningState(
-                        getRunningAppState(btv, runningPackages, minimizedPackages));
+                        getRunningAppState(btv, runningTaskIds, minimizedTaskIds));
             }
         }
     }
 
     private BubbleTextView.RunningAppState getRunningAppState(
             BubbleTextView btv,
-            Set<String> runningPackages,
-            Set<String> minimizedPackages) {
+            Set<Integer> runningTaskIds,
+            Set<Integer> minimizedTaskIds) {
         Object tag = btv.getTag();
-        if (tag instanceof ItemInfo itemInfo) {
-            if (minimizedPackages.contains(itemInfo.getTargetPackage())) {
+        if (tag instanceof TaskItemInfo itemInfo) {
+            if (minimizedTaskIds.contains(itemInfo.getTaskId())) {
                 return BubbleTextView.RunningAppState.MINIMIZED;
             }
-            if (runningPackages.contains(itemInfo.getTargetPackage())) {
+            if (runningTaskIds.contains(itemInfo.getTaskId())) {
                 return BubbleTextView.RunningAppState.RUNNING;
             }
         }
         if (tag instanceof GroupTask groupTask && !groupTask.hasMultipleTasks()) {
-            if (minimizedPackages.contains(groupTask.task1.key.getPackageName())) {
+            if (minimizedTaskIds.contains(groupTask.task1.key.id)) {
                 return BubbleTextView.RunningAppState.MINIMIZED;
             }
-            if (runningPackages.contains(groupTask.task1.key.getPackageName())) {
+            if (runningTaskIds.contains(groupTask.task1.key.id)) {
                 return BubbleTextView.RunningAppState.RUNNING;
             }
         }
@@ -567,7 +588,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      * @param interpolator The interpolator to use for all animations.
      */
     public void addRevealAnimToIsStashed(AnimatorSet as, boolean isStashed, long duration,
-            Interpolator interpolator, boolean dispatchOnAnimationStart) {
+            Interpolator interpolator, boolean dispatchOnAnimationStart,
+            boolean isHomeToAppAnimation) {
         AnimatorSet reveal = new AnimatorSet();
 
         Rect stashedBounds = new Rect();
@@ -616,8 +638,21 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 reveal.play(ObjectAnimator.ofFloat(mtd.getTranslationX(INDEX_TASKBAR_REVEAL_ANIM),
                         MULTI_PROPERTY_VALUE, transX)
                         .setDuration(duration));
-                reveal.play(ObjectAnimator.ofFloat(mtd.getTranslationY(INDEX_TASKBAR_REVEAL_ANIM),
-                        MULTI_PROPERTY_VALUE, transY));
+
+                if (enableScalingRevealHomeAnimation()) {
+                    // Delay y-translation by 1 frame to keep icons within the bounds of the bg.
+                    int delay = isHomeToAppAnimation ? getSingleFrameMs(mActivity) : 0;
+                    ObjectAnimator yAnimator =
+                            ObjectAnimator.ofFloat(mtd.getTranslationY(INDEX_TASKBAR_REVEAL_ANIM),
+                                            MULTI_PROPERTY_VALUE, transY)
+                                    .setDuration(Math.max(0, duration - delay));
+                    yAnimator.setStartDelay(delay);
+                    reveal.play(yAnimator);
+                } else {
+                    reveal.play(
+                            ObjectAnimator.ofFloat(mtd.getTranslationY(INDEX_TASKBAR_REVEAL_ANIM),
+                                    MULTI_PROPERTY_VALUE, transY));
+                }
                 as.addListener(forEndCallback(() ->
                         mtd.setTranslation(INDEX_TASKBAR_REVEAL_ANIM, 0, 0)));
             } else {
@@ -919,5 +954,11 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 "ALPHA_INDEX_SMALL_SCREEN");
 
         mModelCallbacks.dumpLogs(prefix + "\t", pw);
+    }
+
+    /** Enables model loading for tests. */
+    @VisibleForTesting
+    public static void enableModelLoadingForTests(boolean enable) {
+        sEnableModelLoadingForTests = enable;
     }
 }

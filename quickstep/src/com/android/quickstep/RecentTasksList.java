@@ -20,13 +20,13 @@ import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.util.SplitScreenUtils.convertShellSplitBoundsToLauncher;
-import static com.android.window.flags.Flags.enableDesktopWindowingMode;
 import static com.android.wm.shell.util.GroupedRecentTaskInfo.TYPE_FREEFORM;
 
 import android.app.ActivityManager;
 import android.app.KeyguardManager;
 import android.app.TaskInfo;
 import android.content.ComponentName;
+import android.content.Context;
 import android.os.Process;
 import android.os.RemoteException;
 import android.util.SparseBooleanArray;
@@ -40,6 +40,7 @@ import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.wm.shell.recents.IRecentTasksListener;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.util.GroupedRecentTaskInfo;
 
 import java.io.PrintWriter;
@@ -58,6 +59,7 @@ public class RecentTasksList {
 
     private static final TaskLoadResult INVALID_RESULT = new TaskLoadResult(-1, false, 0);
 
+    private final Context mContext;
     private final KeyguardManager mKeyguardManager;
     private final LooperExecutor mMainThreadExecutor;
     private final SystemUiProxy mSysUiProxy;
@@ -76,8 +78,10 @@ public class RecentTasksList {
     // Tasks are stored in order of least recently launched to most recently launched.
     private ArrayList<ActivityManager.RunningTaskInfo> mRunningTasks;
 
-    public RecentTasksList(LooperExecutor mainThreadExecutor, KeyguardManager keyguardManager,
-            SystemUiProxy sysUiProxy, TopTaskTracker topTaskTracker) {
+    public RecentTasksList(Context context, LooperExecutor mainThreadExecutor,
+            KeyguardManager keyguardManager, SystemUiProxy sysUiProxy,
+            TopTaskTracker topTaskTracker) {
+        mContext = context;
         mMainThreadExecutor = mainThreadExecutor;
         mKeyguardManager = keyguardManager;
         mChangeId = 1;
@@ -300,8 +304,12 @@ public class RecentTasksList {
     @VisibleForTesting
     TaskLoadResult loadTasksInBackground(int numTasks, int requestId, boolean loadKeysOnly) {
         int currentUserId = Process.myUserHandle().getIdentifier();
-        ArrayList<GroupedRecentTaskInfo> rawTasks =
-                mSysUiProxy.getRecentTasks(numTasks, currentUserId);
+        ArrayList<GroupedRecentTaskInfo> rawTasks;
+        try {
+            rawTasks = mSysUiProxy.getRecentTasks(numTasks, currentUserId);
+        } catch (SystemUiProxy.GetRecentTasksException e) {
+            return INVALID_RESULT;
+        }
         // The raw tasks are given in most-recent to least-recent order, we need to reverse it
         Collections.reverse(rawTasks);
 
@@ -321,9 +329,9 @@ public class RecentTasksList {
         int numVisibleTasks = 0;
         for (GroupedRecentTaskInfo rawTask : rawTasks) {
             if (rawTask.getType() == TYPE_FREEFORM) {
-                // TYPE_FREEFORM tasks is only created when enableDesktopWindowingMode() is true,
+                // TYPE_FREEFORM tasks is only created when desktop mode can be entered,
                 // leftover TYPE_FREEFORM tasks created when flag was on should be ignored.
-                if (enableDesktopWindowingMode()) {
+                if (DesktopModeStatus.canEnterDesktopMode(mContext)) {
                     GroupTask desktopTask = createDesktopTask(rawTask);
                     if (desktopTask != null) {
                         allTasks.add(desktopTask);
@@ -416,8 +424,12 @@ public class RecentTasksList {
         }
         writer.println(prefix + "  ]");
         int currentUserId = Process.myUserHandle().getIdentifier();
-        ArrayList<GroupedRecentTaskInfo> rawTasks =
-                mSysUiProxy.getRecentTasks(Integer.MAX_VALUE, currentUserId);
+        ArrayList<GroupedRecentTaskInfo> rawTasks;
+        try {
+            rawTasks = mSysUiProxy.getRecentTasks(Integer.MAX_VALUE, currentUserId);
+        } catch (SystemUiProxy.GetRecentTasksException e) {
+            rawTasks = new ArrayList<>();
+        }
         writer.println(prefix + "  rawTasks=[");
         for (GroupedRecentTaskInfo task : rawTasks) {
             TaskInfo taskInfo1 = task.getTaskInfo1();

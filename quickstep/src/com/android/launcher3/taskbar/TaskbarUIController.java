@@ -61,6 +61,8 @@ public class TaskbarUIController {
     // Initialized in init.
     protected TaskbarControllers mControllers;
 
+    protected boolean mSkipLauncherVisibilityChange;
+
     @CallSuper
     protected void init(TaskbarControllers taskbarControllers) {
         mControllers = taskbarControllers;
@@ -174,11 +176,11 @@ public class TaskbarUIController {
                 || mControllers.navbarButtonsViewController.isEventOverAnyItem(ev);
     }
 
-    /** Checks if the given {@link MotionEvent} is over the bubble bar stash handle. */
-    public boolean isEventOverBubbleBarStashHandle(MotionEvent ev) {
+    /** Checks if the given {@link MotionEvent} is over the bubble bar views. */
+    public boolean isEventOverBubbleBarViews(MotionEvent ev) {
         return mControllers.bubbleControllers.map(
                 bubbleControllers ->
-                        bubbleControllers.bubbleStashController.isEventOverStashHandle(ev))
+                        bubbleControllers.bubbleStashController.isEventOverBubbleBarViews(ev))
                 .orElse(false);
     }
 
@@ -270,7 +272,7 @@ public class TaskbarUIController {
                                     foundTask,
                                     taskContainer.getIconView().getDrawable(),
                                     taskContainer.getSnapshotView(),
-                                    taskContainer.getThumbnail(),
+                                    taskContainer.getSplitAnimationThumbnail(),
                                     null /* intent */,
                                     null /* user */,
                                     info);
@@ -417,5 +419,13 @@ public class TaskbarUIController {
      */
     public void setUserIsNotGoingHome(boolean isNotGoingHome) {
         mControllers.taskbarStashController.setUserIsNotGoingHome(isNotGoingHome);
+    }
+
+    /**
+     * Sets whether to prevent taskbar from reacting to launcher visibility during the recents
+     * transition animation.
+     */
+    public void setSkipLauncherVisibilityChange(boolean skip) {
+        mSkipLauncherVisibilityChange = skip;
     }
 }

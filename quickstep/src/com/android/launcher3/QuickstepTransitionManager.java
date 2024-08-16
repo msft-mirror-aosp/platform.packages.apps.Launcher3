@@ -1244,15 +1244,25 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         TransitionFilter homeCheck = new TransitionFilter();
         // No need to handle the transition that also dismisses keyguard.
         homeCheck.mNotFlags = TRANSIT_FLAG_KEYGUARD_GOING_AWAY;
+
         homeCheck.mRequirements =
                 new TransitionFilter.Requirement[]{new TransitionFilter.Requirement(),
+                        new TransitionFilter.Requirement(),
                         new TransitionFilter.Requirement()};
+
         homeCheck.mRequirements[0].mActivityType = ACTIVITY_TYPE_HOME;
         homeCheck.mRequirements[0].mTopActivity = mLauncher.getComponentName();
         homeCheck.mRequirements[0].mModes = new int[]{TRANSIT_OPEN, TRANSIT_TO_FRONT};
         homeCheck.mRequirements[0].mOrder = CONTAINER_ORDER_TOP;
+
         homeCheck.mRequirements[1].mActivityType = ACTIVITY_TYPE_STANDARD;
         homeCheck.mRequirements[1].mModes = new int[]{TRANSIT_CLOSE, TRANSIT_TO_BACK};
+
+        homeCheck.mRequirements[2].mNot = true;
+        homeCheck.mRequirements[2].mCustomAnimation = true;
+        homeCheck.mRequirements[2].mMustBeTask = true;
+        homeCheck.mRequirements[2].mMustBeIndependent = true;
+
         SystemUiProxy.INSTANCE.get(mLauncher)
                 .registerRemoteTransition(mLauncherOpenTransition, homeCheck);
         if (mBackAnimationController != null) {
@@ -1644,7 +1654,15 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
     }
 
     private void addCujInstrumentation(Animator anim, int cuj) {
-        anim.addListener(new AnimationSuccessListener() {
+        anim.addListener(getCujAnimationSuccessListener(cuj));
+    }
+
+    private void addCujInstrumentation(RectFSpringAnim anim, int cuj) {
+        anim.addAnimatorListener(getCujAnimationSuccessListener(cuj));
+    }
+
+    private AnimationSuccessListener getCujAnimationSuccessListener(int cuj) {
+        return new AnimationSuccessListener() {
             @Override
             public void onAnimationStart(Animator animation) {
                 mDragLayer.getViewTreeObserver().addOnDrawListener(
@@ -1678,7 +1696,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
             public void onAnimationSuccess(Animator animator) {
                 InteractionJankMonitorWrapper.end(cuj);
             }
-        });
+        };
     }
 
     /**
@@ -1759,10 +1777,6 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         // invisibility on touch down, and only reset it after the animation to home
         // is initialized.
         if (launcherIsForceInvisibleOrOpening || fromPredictiveBack) {
-            addCujInstrumentation(anim, playFallBackAnimation
-                    ? Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_HOME_FALLBACK
-                    : Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_HOME);
-
             AnimatorListenerAdapter endListener = new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
@@ -1771,6 +1785,14 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                             mLauncher, WALLPAPER_OPEN_ANIMATION_FINISHED_MESSAGE);
                 }
             };
+
+            if (rectFSpringAnim != null && anim.getChildAnimations().isEmpty()) {
+                addCujInstrumentation(rectFSpringAnim, Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_HOME);
+            } else {
+                addCujInstrumentation(anim, playFallBackAnimation
+                        ? Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_HOME_FALLBACK
+                        : Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_HOME);
+            }
 
             if (fromPredictiveBack && rectFSpringAnim != null) {
                 rectFSpringAnim.addAnimatorListener(endListener);

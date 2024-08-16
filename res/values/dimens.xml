@@ -172,8 +172,6 @@
     <dimen name="padded_rounded_button_height">48dp</dimen>
     <dimen name="rounded_button_height">48dp</dimen>
     <dimen name="rounded_button_radius">200dp</dimen>
-    <dimen name="rounded_button_padding">8dp</dimen>
-
 
     <!-- Widget tray -->
     <dimen name="widget_cell_vertical_padding">8dp</dimen>
@@ -308,6 +306,7 @@
     <dimen name="blur_size_medium_outline">2dp</dimen>
     <dimen name="blur_size_click_shadow">4dp</dimen>
     <dimen name="click_shadow_high_shift">2dp</dimen>
+    <dimen name="app_title_icon_shadow_inset">1dp</dimen>
 
     <!-- Pending widget -->
     <dimen name="pending_widget_min_padding">8dp</dimen>
