@@ -19,13 +19,13 @@ import static android.view.View.VISIBLE;
 
 import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.window.flags.Flags.enableDesktopWindowingWallpaperActivity;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
 import android.os.Debug;
-import android.os.SystemProperties;
 import android.util.Log;
 import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.Launcher;
@@ -39,6 +39,7 @@ import com.android.wm.shell.desktopmode.IDesktopTaskListener;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 /**
  * Controls the visibility of the workspace and the resumed / paused state when desktop mode
@@ -57,7 +58,7 @@ public class DesktopVisibilityController {
     private boolean mGestureInProgress;
 
     @Nullable
-    private IDesktopTaskListener mDesktopTaskListener;
+    private DesktopTaskListenerImpl mDesktopTaskListener;
 
     public DesktopVisibilityController(Launcher launcher) {
         mLauncher = launcher;
@@ -67,24 +68,7 @@ public class DesktopVisibilityController {
      * Register a listener with System UI to receive updates about desktop tasks state
      */
     public void registerSystemUiListener() {
-        mDesktopTaskListener = new IDesktopTaskListener.Stub() {
-            @Override
-            public void onTasksVisibilityChanged(int displayId, int visibleTasksCount) {
-                MAIN_EXECUTOR.execute(() -> {
-                    if (displayId == mLauncher.getDisplayId()) {
-                        if (DEBUG) {
-                            Log.d(TAG, "desktop visible tasks count changed=" + visibleTasksCount);
-                        }
-                        setVisibleDesktopTasksCount(visibleTasksCount);
-                    }
-                });
-            }
-
-            @Override
-            public void onStashedChanged(int displayId, boolean stashed) {
-              Log.w(TAG, "IDesktopTaskListener: onStashedChanged is deprecated");
-            }
-        };
+        mDesktopTaskListener = new DesktopTaskListenerImpl(this, mLauncher.getDisplayId());
         SystemUiProxy.INSTANCE.get(mLauncher).setDesktopTaskListener(mDesktopTaskListener);
     }
 
@@ -93,6 +77,7 @@ public class DesktopVisibilityController {
      */
     public void unregisterSystemUiListener() {
         SystemUiProxy.INSTANCE.get(mLauncher).setDesktopTaskListener(null);
+        mDesktopTaskListener.release();
         mDesktopTaskListener = null;
     }
 
@@ -145,7 +130,7 @@ public class DesktopVisibilityController {
                 notifyDesktopVisibilityListeners(areDesktopTasksVisibleNow);
             }
 
-            if (!enableDesktopWindowingWallpaperActivity() && wasVisible != isVisible) {
+            if (!WALLPAPER_ACTIVITY.isEnabled(mLauncher) && wasVisible != isVisible) {
                 // TODO: b/333533253 - Remove after flag rollout
                 if (mVisibleDesktopTasksCount > 0) {
                     setLauncherViewsVisibility(View.INVISIBLE);
@@ -189,7 +174,7 @@ public class DesktopVisibilityController {
                 notifyDesktopVisibilityListeners(areDesktopTasksVisibleNow);
             }
 
-            if (enableDesktopWindowingWallpaperActivity()) {
+            if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
                 return;
             }
             // TODO: b/333533253 - Clean up after flag rollout
@@ -289,7 +274,7 @@ public class DesktopVisibilityController {
      * TODO: b/333533253 - Remove after flag rollout
      */
     private void setLauncherViewsVisibility(int visibility) {
-        if (enableDesktopWindowingWallpaperActivity()) {
+        if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
             return;
         }
         if (DEBUG) {
@@ -314,7 +299,7 @@ public class DesktopVisibilityController {
      * TODO: b/333533253 - Remove after flag rollout
      */
     private void markLauncherPaused() {
-        if (enableDesktopWindowingWallpaperActivity()) {
+        if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
             return;
         }
         if (DEBUG) {
@@ -331,7 +316,7 @@ public class DesktopVisibilityController {
      * TODO: b/333533253 - Remove after flag rollout
      */
     private void markLauncherResumed() {
-        if (enableDesktopWindowingWallpaperActivity()) {
+        if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
             return;
         }
         if (DEBUG) {
@@ -355,5 +340,44 @@ public class DesktopVisibilityController {
          * @param visible whether Desktop Mode is now visible
          */
         void onDesktopVisibilityChanged(boolean visible);
+    }
+
+    /**
+     * Wrapper for the IDesktopTaskListener stub to prevent lingering references to the launcher
+     * activity via the controller.
+     */
+    private static class DesktopTaskListenerImpl extends IDesktopTaskListener.Stub {
+
+        private DesktopVisibilityController mController;
+        private final int mDisplayId;
+
+        DesktopTaskListenerImpl(@NonNull DesktopVisibilityController controller, int displayId) {
+            mController = controller;
+            mDisplayId = displayId;
+        }
+
+        /**
+         * Clears any references to the controller.
+         */
+        void release() {
+            mController = null;
+        }
+
+        @Override
+        public void onTasksVisibilityChanged(int displayId, int visibleTasksCount) {
+            MAIN_EXECUTOR.execute(() -> {
+                if (mController != null && displayId == mDisplayId) {
+                    if (DEBUG) {
+                        Log.d(TAG, "desktop visible tasks count changed=" + visibleTasksCount);
+                    }
+                    mController.setVisibleDesktopTasksCount(visibleTasksCount);
+                }
+            });
+        }
+
+        @Override
+        public void onStashedChanged(int displayId, boolean stashed) {
+            Log.w(TAG, "IDesktopTaskListener: onStashedChanged is deprecated");
+        }
     }
 }

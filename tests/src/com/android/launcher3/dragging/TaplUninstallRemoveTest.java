@@ -46,7 +46,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Map;
 
 /**
  * Test runs in Out of process (Oop) and In process (Ipc)
@@ -60,6 +59,7 @@ public class TaplUninstallRemoveTest extends AbstractLauncherUiTest<Launcher> {
      */
     @Test
     @PortraitLandscape
+    @ScreenRecordRule.ScreenRecord // b/349439239
     public void testDeleteFromWorkspace() {
         for (String appName : new String[]{GMAIL_APP_NAME, STORE_APP_NAME, TEST_APP_NAME}) {
             final HomeAppIcon homeAppIcon = createShortcutInCenterIfNotExist(appName);
@@ -155,18 +155,14 @@ public class TaplUninstallRemoveTest extends AbstractLauncherUiTest<Launcher> {
                 createShortcutIfNotExist(appNames[i], gridPositions[i]);
             }
 
-            Map<String, Point> initialPositions =
-                    mLauncher.getWorkspace().getWorkspaceIconsPositions();
-            assertThat(initialPositions.keySet()).containsAtLeastElementsIn(appNames);
+            Point initialPosition =
+                    mLauncher.getWorkspace().getWorkspaceIconPosition(DUMMY_APP_NAME);
+            assertThat(initialPosition).isNotNull();
 
-            mLauncher.getWorkspace().getWorkspaceAppIcon(DUMMY_APP_NAME).uninstall();
-            mLauncher.getWorkspace().verifyWorkspaceAppIconIsGone(
+            final Workspace workspace = mLauncher.getWorkspace().getWorkspaceAppIcon(
+                    DUMMY_APP_NAME).uninstall();
+            workspace.verifyWorkspaceAppIconIsGone(
                     DUMMY_APP_NAME + " was expected to disappear after uninstall.", DUMMY_APP_NAME);
-
-            Log.d(UIOBJECT_STALE_ELEMENT, "second getWorkspaceIconsPositions()");
-            Map<String, Point> finalPositions =
-                    mLauncher.getWorkspace().getWorkspaceIconsPositions();
-            assertThat(finalPositions).doesNotContainKey(DUMMY_APP_NAME);
         } finally {
             TestUtil.uninstallDummyApp();
         }
@@ -177,8 +173,6 @@ public class TaplUninstallRemoveTest extends AbstractLauncherUiTest<Launcher> {
      */
     @Test
     @PortraitLandscape
-    @ScreenRecordRule.ScreenRecord // b/338869019
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/338869019
     public void testAddDeleteShortcutOnHotseat() {
         mLauncher.getWorkspace()
                 .deleteAppIcon(mLauncher.getWorkspace().getHotseatAppIcon(0))

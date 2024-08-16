@@ -153,6 +153,8 @@ public class BubbleDragController {
             @Override
             protected void onDragDismiss() {
                 mBubblePinController.onDragEnd();
+                mBubbleBarViewController.onBubbleDismissed(bubbleView);
+                mBubbleBarViewController.onBubbleDragEnd();
             }
 
             @Override

@@ -165,6 +165,7 @@ public class TaskbarControllers {
         taskbarOverlayController.init(this);
         taskbarAllAppsController.init(this, sharedState.allAppsVisible);
         navButtonController.init(this);
+        bubbleControllers.ifPresent(controllers -> controllers.init(this));
         taskbarInsetsController.init(this);
         voiceInteractionWindowController.init(this);
         taskbarRecentAppsController.init(this);
@@ -172,7 +173,6 @@ public class TaskbarControllers {
         taskbarEduTooltipController.init(this);
         keyboardQuickSwitchController.init(this);
         taskbarPinningController.init(this, mSharedState);
-        bubbleControllers.ifPresent(controllers -> controllers.init(this));
 
         mControllersToLog = new LoggableTaskbarController[] {
                 taskbarDragController, navButtonController, navbarButtonsViewController,
@@ -180,8 +180,9 @@ public class TaskbarControllers {
                 taskbarUnfoldAnimationController, taskbarKeyguardController,
                 stashedHandleViewController, taskbarStashController,
                 taskbarAutohideSuspendController, taskbarPopupController, taskbarInsetsController,
-                voiceInteractionWindowController, taskbarTranslationController,
-                taskbarEduTooltipController, keyboardQuickSwitchController, taskbarPinningController
+                voiceInteractionWindowController, taskbarRecentAppsController,
+                taskbarTranslationController, taskbarEduTooltipController,
+                keyboardQuickSwitchController, taskbarPinningController,
         };
         mBackgroundRendererControllers = new BackgroundRendererController[] {
                 taskbarDragLayerController, taskbarScrimViewController,
@@ -281,6 +282,11 @@ public class TaskbarControllers {
         }
         uiController.dumpLogs(prefix + "\t", pw);
         rotationButtonController.dumpLogs(prefix + "\t", pw);
+        if (bubbleControllers.isPresent()) {
+            bubbleControllers.get().dump(pw);
+        } else {
+            pw.println(String.format("%s\t%s", prefix, "Bubble controllers are empty."));
+        }
     }
 
     /**

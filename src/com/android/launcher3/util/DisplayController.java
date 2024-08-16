@@ -49,6 +49,7 @@ import android.util.Log;
 import android.view.Display;
 
 import androidx.annotation.AnyThread;
+import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 
@@ -76,6 +77,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
 
     private static final String TAG = "DisplayController";
     private static final boolean DEBUG = false;
+    private static boolean sTaskbarModePreferenceStatusForTests = false;
     private static boolean sTransientTaskbarStatusForTests = true;
 
     // TODO(b/254119092) remove all logs with this tag
@@ -109,7 +111,10 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     private DisplayInfoChangeListener mPriorityListener;
     private final ArrayList<DisplayInfoChangeListener> mListeners = new ArrayList<>();
 
-    private final SimpleBroadcastReceiver mReceiver = new SimpleBroadcastReceiver(this::onIntent);
+    // We will register broadcast receiver on main thread to ensure not missing changes on
+    // TARGET_OVERLAY_PACKAGE and ACTION_OVERLAY_CHANGED.
+    private final SimpleBroadcastReceiver mReceiver =
+            new SimpleBroadcastReceiver(MAIN_EXECUTOR, this::onIntent);
 
     private Info mInfo;
     private boolean mDestroyed = false;
@@ -182,6 +187,11 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         return INSTANCE.get(context).getInfo().isTransientTaskbar();
     }
 
+    /** Returns whether we are currently in Desktop mode. */
+    public static boolean isInDesktopMode(Context context) {
+        return INSTANCE.get(context).getInfo().isInDesktopMode();
+    }
+
     /**
      * Handles info change for desktop mode.
      */
@@ -195,6 +205,14 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     @VisibleForTesting
     public static void enableTransientTaskbarForTests(boolean enable) {
         sTransientTaskbarStatusForTests = enable;
+    }
+
+    /**
+     * Enables respecting taskbar mode preference during test.
+     */
+    @VisibleForTesting
+    public static void enableTaskbarModePreferenceForTests(boolean enable) {
+        sTaskbarModePreferenceStatusForTests = enable;
     }
 
     /**
@@ -218,6 +236,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
         } else {
             // TODO: unregister broadcast receiver
         }
+        mReceiver.unregisterReceiverSafely(mContext);
     }
 
     /**
@@ -455,7 +474,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             if (navigationMode != NavigationMode.NO_BUTTON) {
                 return false;
             }
-            if (Utilities.isRunningInTestHarness()) {
+            if (Utilities.isRunningInTestHarness() && !sTaskbarModePreferenceStatusForTests) {
                 // TODO(b/258604917): Once ENABLE_TASKBAR_PINNING is enabled, remove usage of
                 //  sTransientTaskbarStatusForTests and update test to directly
                 //  toggle shared preference to switch transient taskbar on/off.
@@ -507,9 +526,8 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
             return Collections.unmodifiableSet(mPerDisplayBounds.keySet());
         }
 
-        /**
-         * Returns all {@link WindowBounds}s for the current display.
-         */
+        /** Returns all {@link WindowBounds}s for the current display. */
+        @Nullable
         public List<WindowBounds> getCurrentBounds() {
             return mPerDisplayBounds.get(normalizedDisplayInfo);
         }
