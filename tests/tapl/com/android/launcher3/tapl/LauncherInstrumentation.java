@@ -1229,7 +1229,8 @@ public final class LauncherInstrumentation {
     void pressBackImpl() {
         waitForLauncherInitialized();
         final boolean launcherVisible =
-                isTablet() ? isLauncherContainerVisible() : isLauncherVisible();
+                (isTablet() || isTaskbarNavbarUnificationEnabled()) ? isLauncherContainerVisible()
+                        : isLauncherVisible();
         boolean isThreeFingerTrackpadGesture =
                 mTrackpadGestureType == TrackpadGestureType.THREE_FINGER;
         if (getNavigationModel() == NavigationModel.ZERO_BUTTON
@@ -1584,7 +1585,7 @@ public final class LauncherInstrumentation {
         return objects;
     }
 
-    private UiObject2 waitForObjectBySelector(BySelector selector) {
+    UiObject2 waitForObjectBySelector(BySelector selector) {
         Log.d(TEST_DRAG_APP_ICON_TO_MULTIPLE_WORKSPACES_FAILURE,
                 "LauncherInstrumentation.waitForObjectBySelector");
         final UiObject2 object = mDevice.wait(Until.findObject(selector), WAIT_TIME_MS);

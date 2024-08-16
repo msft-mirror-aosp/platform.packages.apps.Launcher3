@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,32 +14,14 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.celllayout.board;
+package com.android.launcher3.util
 
-import android.graphics.Point;
+import com.android.launcher3.util.coroutines.DispatcherProvider
+import kotlinx.coroutines.CoroutineDispatcher
 
-public class IconPoint {
-    public Point coord;
-    public char mType;
-
-    public IconPoint(Point coord, char type) {
-        this.coord = coord;
-        mType = type;
-    }
-
-    public char getType() {
-        return mType;
-    }
-
-    public void setType(char type) {
-        mType = type;
-    }
-
-    public Point getCoord() {
-        return coord;
-    }
-
-    public void setCoord(Point coord) {
-        this.coord = coord;
-    }
+class TestDispatcherProvider(testDispatcher: CoroutineDispatcher) : DispatcherProvider {
+    override val default: CoroutineDispatcher = testDispatcher
+    override val io: CoroutineDispatcher = testDispatcher
+    override val main: CoroutineDispatcher = testDispatcher
+    override val unconfined: CoroutineDispatcher = testDispatcher
 }

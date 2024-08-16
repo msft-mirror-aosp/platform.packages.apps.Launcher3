@@ -38,10 +38,8 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"এপ্‌ পেয়াৰ কৰাৰ সুবিধাটো উপলব্ধ নহয়"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"ৱিজেট স্থানান্তৰ কৰিবলৈ টিপি ধৰি ৰাখক।"</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"কোনো ৱিজেট স্থানান্তৰ কৰিবলৈ দুবাৰ টিপি ধৰি ৰাখক অথবা কাষ্টম কাৰ্য ব্যৱহাৰ কৰক।"</string>
-    <!-- no translation found for widget_picker_widget_options_button_description (4770099264476852363) -->
-    <skip />
-    <!-- no translation found for widget_picker_show_all_widgets_menu_item_title (9023638224586908119) -->
-    <skip />
+    <string name="widget_picker_widget_options_button_description" msgid="4770099264476852363">"অধিক বিকল্প"</string>
+    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"আটাইবোৰ ৱিজেট দেখুৱাওক"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"%1$d বহল x %2$d ওখ"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> ৱিজেট"</string>
@@ -94,6 +92,8 @@
     <string name="install_drop_target_label" msgid="2539096853673231757">"ইনষ্টল কৰক"</string>
     <string name="dismiss_prediction_label" msgid="3357562989568808658">"পৰামৰ্শ নিদিব"</string>
     <string name="pin_prediction" msgid="4196423321649756498">"পূৰ্বানুমান কৰা এপ্‌টো পিন কৰক"</string>
+    <!-- no translation found for bubble (3072951361014076670) -->
+    <skip />
     <string name="permlab_install_shortcut" msgid="5632423390354674437">"শ্বৰ্টকাট ইনষ্টল কৰিব পাৰে"</string>
     <string name="permdesc_install_shortcut" msgid="923466509822011139">"ব্য়ৱহাৰকাৰীৰ হস্তক্ষেপ অবিহনেই কোনো এপক শ্বৰ্টকাটবোৰ যোগ কৰাৰ অনুমতি দিয়ে।"</string>
     <string name="permlab_read_settings" msgid="5136500343007704955">"গৃহ স্ক্ৰীনত ছেটিং আৰু শ্বৰ্টকাটসমূহ পঢ়া"</string>
