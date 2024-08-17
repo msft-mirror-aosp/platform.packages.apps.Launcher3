@@ -144,8 +144,8 @@ public class BubbleBarViewController {
             }
 
             @Override
-            public void onBubbleBarTouchedWhileAnimating() {
-                BubbleBarViewController.this.onBubbleBarTouchedWhileAnimating();
+            public void onBubbleBarTouched() {
+                BubbleBarViewController.this.onBubbleBarTouched();
             }
 
             @Override
@@ -206,9 +206,12 @@ public class BubbleBarViewController {
         }
     }
 
-    private void onBubbleBarTouchedWhileAnimating() {
-        mBubbleBarViewAnimator.onBubbleBarTouchedWhileAnimating();
-        mBubbleStashController.onNewBubbleAnimationInterrupted(false, mBarView.getTranslationY());
+    private void onBubbleBarTouched() {
+        if (isAnimatingNewBubble()) {
+            mBubbleBarViewAnimator.onBubbleBarTouchedWhileAnimating();
+            mBubbleStashController.onNewBubbleAnimationInterrupted(false,
+                    mBarView.getTranslationY());
+        }
     }
 
     private void expandBubbleBar() {
@@ -307,8 +310,11 @@ public class BubbleBarViewController {
 
     /** Whether a new bubble is animating. */
     public boolean isAnimatingNewBubble() {
-        return mBarView.isAnimatingNewBubble()
-                || (mBubbleBarViewAnimator != null && mBubbleBarViewAnimator.hasAnimatingBubble());
+        return mBubbleBarViewAnimator != null && mBubbleBarViewAnimator.isAnimating();
+    }
+
+    public boolean isNewBubbleAnimationRunningOrPending() {
+        return mBubbleBarViewAnimator != null && mBubbleBarViewAnimator.hasAnimation();
     }
 
     /** The horizontal margin of the bubble bar from the edge of the screen. */
@@ -490,8 +496,10 @@ public class BubbleBarViewController {
 
     /** Adds a new bubble and removes an old bubble at the same time. */
     public void addBubbleAndRemoveBubble(BubbleBarBubble addedBubble,
-            BubbleBarBubble removedBubble, boolean isExpanding, boolean suppressAnimation) {
-        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), removedBubble.getView());
+            BubbleBarBubble removedBubble, boolean isExpanding, boolean suppressAnimation,
+            boolean addOverflowToo) {
+        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), removedBubble.getView(),
+                addOverflowToo ? () -> showOverflow(true) : null);
         addedBubble.getView().setOnClickListener(mBubbleClickListener);
         addedBubble.getView().setController(mBubbleViewController);
         removedBubble.getView().setController(null);
@@ -525,7 +533,8 @@ public class BubbleBarViewController {
     public void addOverflowAndRemoveBubble(BubbleBarBubble removedBubble) {
         if (mOverflowAdded) return;
         mOverflowAdded = true;
-        mBarView.addBubbleAndRemoveBubble(mOverflowBubble.getView(), removedBubble.getView());
+        mBarView.addBubbleAndRemoveBubble(mOverflowBubble.getView(), removedBubble.getView(),
+                null /* onEndRunnable */);
         mOverflowBubble.getView().setOnClickListener(mBubbleClickListener);
         mOverflowBubble.getView().setController(mBubbleViewController);
         removedBubble.getView().setController(null);
@@ -535,7 +544,8 @@ public class BubbleBarViewController {
     public void removeOverflowAndAddBubble(BubbleBarBubble addedBubble) {
         if (!mOverflowAdded) return;
         mOverflowAdded = false;
-        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), mOverflowBubble.getView());
+        mBarView.addBubbleAndRemoveBubble(addedBubble.getView(), mOverflowBubble.getView(),
+                null /* onEndRunnable */);
         addedBubble.getView().setOnClickListener(mBubbleClickListener);
         addedBubble.getView().setController(mBubbleViewController);
         mOverflowBubble.getView().setController(null);
@@ -652,7 +662,7 @@ public class BubbleBarViewController {
      * from SystemUI.
      */
     public void setExpandedFromSysui(boolean isExpanded) {
-        if (isAnimatingNewBubble() && isExpanded) {
+        if (isNewBubbleAnimationRunningOrPending() && isExpanded) {
             mBubbleBarViewAnimator.expandedWhileAnimating();
             return;
         }
