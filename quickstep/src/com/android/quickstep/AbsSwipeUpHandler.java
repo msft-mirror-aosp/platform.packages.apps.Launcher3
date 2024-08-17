@@ -53,6 +53,7 @@ import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
 import static com.android.quickstep.GestureState.STATE_END_TARGET_ANIMATION_FINISHED;
 import static com.android.quickstep.GestureState.STATE_END_TARGET_SET;
 import static com.android.quickstep.GestureState.STATE_RECENTS_ANIMATION_CANCELED;
+import static com.android.quickstep.GestureState.STATE_RECENTS_ANIMATION_STARTED;
 import static com.android.quickstep.GestureState.STATE_RECENTS_SCROLLING_FINISHED;
 import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.CANCEL_RECENTS_ANIMATION;
@@ -105,6 +106,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.AnimatorPlaybackController;
+import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.logging.StatsLogManager.StatsLogger;
@@ -140,6 +142,7 @@ import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
+import com.android.systemui.contextualeducation.GestureType;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -148,10 +151,10 @@ import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.SysUiStatsLog;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
-import com.android.wm.shell.common.TransactionPool;
+import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.desktopmode.DesktopModeFlags;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
-import com.android.wm.shell.startingsurface.SplashScreenExitAnimationUtils;
+import com.android.wm.shell.shared.startingsurface.SplashScreenExitAnimationUtils;
 
 import kotlin.Unit;
 
@@ -466,6 +469,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         mGestureState.runOnceAtState(STATE_END_TARGET_ANIMATION_FINISHED
                         | STATE_RECENTS_SCROLLING_FINISHED,
                 this::onSettledOnEndTarget);
+        mGestureState.runOnceAtState(STATE_END_TARGET_SET | STATE_RECENTS_ANIMATION_STARTED,
+                this::onCalculateEndTarget);
 
         mStateCallback.runOnceAtState(STATE_HANDLER_INVALIDATED, this::invalidateHandler);
         mStateCallback.runOnceAtState(STATE_LAUNCHER_PRESENT | STATE_HANDLER_INVALIDATED,
@@ -1150,6 +1155,22 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         }
     }
 
+    /**
+     * Called if the end target has been set and the recents animation is started.
+     */
+    private void onCalculateEndTarget() {
+        final GestureEndTarget endTarget = mGestureState.getEndTarget();
+
+        switch (endTarget) {
+            case HOME:
+                // Early detach the nav bar if endTarget is determined as HOME
+                if (mRecentsAnimationController != null) {
+                    mRecentsAnimationController.detachNavigationBarFromApp(true);
+                }
+                break;
+        }
+    }
+
     private void onSettledOnEndTarget() {
         // Fast-finish the attaching animation if it's still running.
         maybeUpdateRecentsAttachedState(false);
@@ -1404,10 +1425,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             duration = mContainer != null && mContainer.getDeviceProfile().isTaskbarPresent
                     ? StaggeredWorkspaceAnim.DURATION_TASKBAR_MS
                     : StaggeredWorkspaceAnim.DURATION_MS;
-            // Early detach the nav bar once the endTarget is determined as HOME
-            if (mRecentsAnimationController != null) {
-                mRecentsAnimationController.detachNavigationBarFromApp(true);
-            }
+            ContextualEduStatsManager.INSTANCE.get(mContext).updateEduStats(
+                    mGestureState.isTrackpadGesture(), GestureType.HOME);
         } else if (endTarget == RECENTS) {
             if (mRecentsView != null) {
                 int nearestPage = mRecentsView.getDestinationPage();
@@ -1432,6 +1451,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 if (!mGestureState.isHandlingAtomicEvent() || isScrolling) {
                     duration = Math.max(duration, mRecentsView.getScroller().getDuration());
                 }
+                ContextualEduStatsManager.INSTANCE.get(mContext).updateEduStats(
+                        mGestureState.isTrackpadGesture(), GestureType.OVERVIEW);
             }
         } else if (endTarget == LAST_TASK && mRecentsView != null
                 && mRecentsView.getNextPage() != mRecentsView.getRunningTaskIndex()) {

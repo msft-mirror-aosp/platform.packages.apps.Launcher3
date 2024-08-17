@@ -85,7 +85,6 @@ import com.android.wm.shell.common.bubbles.BubbleBarLocation;
 import com.android.wm.shell.common.desktopmode.DesktopModeTransitionSource;
 import com.android.wm.shell.common.pip.IPip;
 import com.android.wm.shell.common.pip.IPipAnimationListener;
-import com.android.wm.shell.common.split.SplitScreenConstants.PersistentSnapPosition;
 import com.android.wm.shell.desktopmode.IDesktopMode;
 import com.android.wm.shell.desktopmode.IDesktopTaskListener;
 import com.android.wm.shell.draganddrop.IDragAndDrop;
@@ -95,6 +94,7 @@ import com.android.wm.shell.recents.IRecentTasksListener;
 import com.android.wm.shell.shared.IShellTransitions;
 import com.android.wm.shell.shared.desktopmode.DesktopModeFlags;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
+import com.android.wm.shell.shared.split.SplitScreenConstants.PersistentSnapPosition;
 import com.android.wm.shell.splitscreen.ISplitScreen;
 import com.android.wm.shell.splitscreen.ISplitScreenListener;
 import com.android.wm.shell.splitscreen.ISplitSelectListener;
@@ -234,6 +234,17 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
                 mSystemUiProxy.onImeSwitcherLongPress();
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call onImeSwitcherLongPress");
+            }
+        }
+    }
+
+    @Override
+    public void updateContextualEduStats(boolean isTrackpadGesture, String gestureType) {
+        if (mSystemUiProxy != null) {
+            try {
+                mSystemUiProxy.updateContextualEduStats(isTrackpadGesture, gestureType);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call updateContextualEduStats");
             }
         }
     }
