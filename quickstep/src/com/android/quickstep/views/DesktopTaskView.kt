@@ -19,7 +19,6 @@ import android.content.Context
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
-import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RoundRectShape
 import android.util.AttributeSet
@@ -27,6 +26,7 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.updateLayoutParams
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
 import com.android.launcher3.R
@@ -86,9 +86,15 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             }
         iconView =
             getOrInflateIconView(R.id.icon).apply {
-                val iconBackground = resources.getDrawable(R.drawable.bg_circle, context.theme)
-                val icon = resources.getDrawable(R.drawable.ic_desktop, context.theme)
-                setIcon(this, LayerDrawable(arrayOf(iconBackground, icon)))
+                setIcon(
+                    this,
+                    ResourcesCompat.getDrawable(
+                        context.resources,
+                        R.drawable.ic_desktop_with_bg,
+                        context.theme
+                    )
+                )
+                setText(resources.getText(R.string.recent_task_desktop))
             }
         childCountAtInflation = childCount
     }
@@ -236,7 +242,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         }
     }
 
-    override fun launchTaskAnimated(): RunnableList? {
+    private fun launchTaskWithDesktopController(animated: Boolean): RunnableList? {
         val recentsView = recentsView ?: return null
         TestLogging.recordEvent(
             TestProtocol.SEQUENCE_MAIN,
@@ -246,17 +252,23 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         val endCallback = RunnableList()
         val desktopController = recentsView.desktopRecentsController
         checkNotNull(desktopController) { "recentsController is null" }
-        desktopController.launchDesktopFromRecents(this) { endCallback.executeAllAndDestroy() }
-        Log.d(TAG, "launchTaskAnimated - launchDesktopFromRecents: ${taskIds.contentToString()}")
+        desktopController.launchDesktopFromRecents(this, animated) {
+            endCallback.executeAllAndDestroy()
+        }
+        Log.d(
+            TAG,
+            "launchTaskAnimated - launchTaskWithDesktopController: ${taskIds.contentToString()}, withRemoteTransition: $animated"
+        )
 
         // Callbacks get run from recentsView for case when recents animation already running
         recentsView.addSideTaskLaunchCallback(endCallback)
         return endCallback
     }
 
+    override fun launchTaskAnimated() = launchTaskWithDesktopController(animated = true)
+
     override fun launchTask(callback: (launched: Boolean) -> Unit, isQuickSwitch: Boolean) {
-        launchTasks()
-        callback(true)
+        launchTaskWithDesktopController(animated = false)?.add { callback(true) } ?: callback(false)
     }
 
     // Desktop tile can't be in split screen
@@ -266,8 +278,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
     override fun setOverlayEnabled(overlayEnabled: Boolean) {}
 
     override fun onFullscreenProgressChanged(fullscreenProgress: Float) {
-        // Don't show background while we are transitioning to/from fullscreen
-        backgroundView.visibility = if (fullscreenProgress > 0) INVISIBLE else VISIBLE
+        backgroundView.alpha = 1 - fullscreenProgress
     }
 
     override fun updateCurrentFullscreenParams() {
@@ -281,6 +292,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         private const val TAG = "DesktopTaskView"
         private const val DEBUG = false
         private const val VIEW_POOL_MAX_SIZE = 10
+
         // As DesktopTaskView is inflated in background, use initialSize=0 to avoid initPool.
         private const val VIEW_POOL_INITIAL_SIZE = 0
         private val ORIGIN = Point(0, 0)
