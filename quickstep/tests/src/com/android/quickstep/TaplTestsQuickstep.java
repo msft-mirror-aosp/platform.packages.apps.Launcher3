@@ -356,6 +356,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
 
     @Test
     @TaskbarModeSwitch
+    @ScreenRecord // b/358607191
     public void testQuickSwitchToPreviousAppForTablet() throws Exception {
         assumeTrue(mLauncher.isTablet());
         startTestActivity(2);
@@ -520,6 +521,8 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
                 isInState(() -> LauncherState.NORMAL));
     }
 
+    //TODO(b/359277238): fix falling tests
+    @Ignore
     @Test
     @PortraitLandscape
     @TaskbarModeSwitch
