@@ -124,8 +124,6 @@ public class BubbleBarView extends FrameLayout {
 
     private final BubbleBarBackground mBubbleBarBackground;
 
-    private boolean mIsAnimatingNewBubble = false;
-
     /**
      * The current bounds of all the bubble bar. Note that these bounds may not account for
      * translation. The bounds should be retrieved using {@link #getBubbleBarBounds()} which
@@ -649,7 +647,9 @@ public class BubbleBarView extends FrameLayout {
         }
         setAlphaDuringBubbleDrag(1f);
         setTranslationX(0f);
-        setAlpha(1f);
+        if (getBubbleChildCount() > 0) {
+            setAlpha(1f);
+        }
     }
 
     /**
@@ -714,16 +714,6 @@ public class BubbleBarView extends FrameLayout {
         return mRelativePivotY;
     }
 
-    /** Notifies the bubble bar that a new bubble animation is starting. */
-    public void onAnimatingBubbleStarted() {
-        mIsAnimatingNewBubble = true;
-    }
-
-    /** Notifies the bubble bar that a new bubble animation is complete. */
-    public void onAnimatingBubbleCompleted() {
-        mIsAnimatingNewBubble = false;
-    }
-
     /** Add a new bubble to the bubble bar. */
     public void addBubble(BubbleView bubble) {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams((int) mIconSize, (int) mIconSize,
@@ -768,7 +758,8 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /** Add a new bubble and remove an old bubble from the bubble bar. */
-    public void addBubbleAndRemoveBubble(BubbleView addedBubble, BubbleView removedBubble) {
+    public void addBubbleAndRemoveBubble(BubbleView addedBubble, BubbleView removedBubble,
+            Runnable onEndRunnable) {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams((int) mIconSize, (int) mIconSize,
                 Gravity.LEFT);
         boolean isOverflowSelected = mSelectedBubbleView.isOverflow();
@@ -802,6 +793,9 @@ public class BubbleBarView extends FrameLayout {
                 removeView(removedBubble);
                 updateWidth();
                 mBubbleAnimator = null;
+                if (onEndRunnable != null) {
+                    onEndRunnable.run();
+                }
             }
 
             @Override
@@ -1353,19 +1347,12 @@ public class BubbleBarView extends FrameLayout {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (mIsAnimatingNewBubble) {
-            mController.onBubbleBarTouchedWhileAnimating();
-        }
+        mController.onBubbleBarTouched();
         if (!mIsBarExpanded) {
             // When the bar is collapsed, all taps on it should expand it.
             return true;
         }
         return super.onInterceptTouchEvent(ev);
-    }
-
-    /** Whether a new bubble is currently animating. */
-    public boolean isAnimatingNewBubble() {
-        return mIsAnimatingNewBubble;
     }
 
     private boolean hasOverflow() {
@@ -1500,7 +1487,6 @@ public class BubbleBarView extends FrameLayout {
             pw.println("    bubble key: " + key);
         }
         pw.println("  isExpanded: " + isExpanded());
-        pw.println("  mIsAnimatingNewBubble: " + mIsAnimatingNewBubble);
         if (mBubbleAnimator != null) {
             pw.println("  mBubbleAnimator.isRunning(): " + mBubbleAnimator.isRunning());
             pw.println("  mBubbleAnimator is null");
@@ -1525,8 +1511,8 @@ public class BubbleBarView extends FrameLayout {
         /** Returns the translation Y that the bubble bar should have. */
         float getBubbleBarTranslationY();
 
-        /** Notifies the controller that the bubble bar was touched while it was animating. */
-        void onBubbleBarTouchedWhileAnimating();
+        /** Notifies the controller that the bubble bar was touched. */
+        void onBubbleBarTouched();
 
         /** Requests the controller to expand bubble bar */
         void expandBubbleBar();

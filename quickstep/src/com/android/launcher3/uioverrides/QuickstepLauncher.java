@@ -67,7 +67,7 @@ import static com.android.quickstep.util.AnimUtils.completeRunnableListCallback;
 import static com.android.quickstep.util.SplitAnimationTimings.TABLET_HOME_TO_SPLIT;
 import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
-import static com.android.wm.shell.common.split.SplitScreenConstants.SNAP_TO_50_50;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_50_50;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -1388,10 +1388,11 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
      */
     public void launchSplitTasks(
             @NonNull GroupTask groupTask, @Nullable RemoteTransition remoteTransition) {
-        // Top/left and bottom/right tasks respectively.
-        Task task1 = groupTask.task1;
+        // SplitBounds can be null if coming from Taskbar launch.
+        final boolean firstTaskIsLeftTopTask = isFirstTaskLeftTopTask(groupTask);
         // task2 should never be null when calling this method. Allow a crash to catch invalid calls
-        Task task2 = groupTask.task2;
+        Task task1 = firstTaskIsLeftTopTask ? groupTask.task1 : groupTask.task2;
+        Task task2 = firstTaskIsLeftTopTask ? groupTask.task2 : groupTask.task1;
         mSplitSelectStateController.launchExistingSplitPair(
                 null /* launchingTaskView */,
                 task1.key.id,
@@ -1403,6 +1404,11 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
                         ? SNAP_TO_50_50
                         : groupTask.mSplitBounds.snapPosition,
                 remoteTransition);
+    }
+
+    private static boolean isFirstTaskLeftTopTask(@NonNull GroupTask groupTask) {
+        return groupTask.mSplitBounds == null
+                || groupTask.mSplitBounds.leftTopTaskId == groupTask.task1.key.id;
     }
 
     /**
