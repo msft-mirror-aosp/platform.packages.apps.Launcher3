@@ -250,7 +250,7 @@ public class TaskbarLauncherStateController {
 
         applyState(0);
 
-        mCanSyncViews = true;
+        mCanSyncViews = !mControllers.taskbarActivityContext.isPhoneMode();
         mLauncher.addOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
         updateOverviewDragState(mLauncherState);
     }
@@ -263,7 +263,7 @@ public class TaskbarLauncherStateController {
         mLauncher.getHotseat().setIconsAlpha(1f);
         mLauncher.getStateManager().removeStateListener(mStateListener);
 
-        mCanSyncViews = true;
+        mCanSyncViews = !mControllers.taskbarActivityContext.isPhoneMode();
         mLauncher.removeOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
     }
 
@@ -433,6 +433,11 @@ public class TaskbarLauncherStateController {
         return animator;
     }
 
+    /** Returns {@code true} if launcher is currently presenting the home screen. */
+    public boolean isOnHome() {
+        return isInLauncher() && mLauncherState == LauncherState.NORMAL;
+    }
+
     private Animator onStateChangeApplied(int changedFlags, long duration, boolean start) {
         final boolean isInLauncher = isInLauncher();
         final boolean isIconAlignedWithHotseat = isIconAlignedWithHotseat();
@@ -445,9 +450,8 @@ public class TaskbarLauncherStateController {
         }
         mControllers.bubbleControllers.ifPresent(controllers -> {
             // Show the bubble bar when on launcher home or in overview.
-            boolean onHome = isInLauncher && mLauncherState == LauncherState.NORMAL;
             boolean onOverview = mLauncherState == LauncherState.OVERVIEW;
-            controllers.bubbleStashController.setBubblesShowingOnHome(onHome);
+            controllers.bubbleStashController.setBubblesShowingOnHome(isOnHome());
             controllers.bubbleStashController.setBubblesShowingOnOverview(onOverview);
         });
 
@@ -470,7 +474,8 @@ public class TaskbarLauncherStateController {
                 // We're changing state to home, should close open popups e.g. Taskbar AllApps
                 handleOpenFloatingViews = true;
             }
-            if (mLauncherState == LauncherState.OVERVIEW) {
+            if (mLauncherState == LauncherState.OVERVIEW
+                    && !mControllers.taskbarActivityContext.isPhoneMode()) {
                 // Calling to update the insets in TaskbarInsetController#updateInsetsTouchability
                 mControllers.taskbarActivityContext.notifyUpdateLayoutParams();
             }
@@ -743,8 +748,7 @@ public class TaskbarLauncherStateController {
         if (firstFrameVisChanged && mCanSyncViews && !Utilities.isRunningInTestHarness()) {
             ViewRootSync.synchronizeNextDraw(mLauncher.getHotseat(),
                     mControllers.taskbarActivityContext.getDragLayer(),
-                    () -> {
-                    });
+                    () -> {});
         }
     }
 

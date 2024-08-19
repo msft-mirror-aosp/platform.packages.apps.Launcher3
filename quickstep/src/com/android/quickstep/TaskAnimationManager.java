@@ -18,6 +18,7 @@ package com.android.quickstep;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 
 import static com.android.launcher3.Flags.enableHandleDelayedGestureCallbacks;
+import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.NavigationMode.NO_BUTTON;
@@ -44,6 +45,7 @@ import androidx.annotation.UiThread;
 import com.android.internal.util.ArrayUtils;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.util.DisplayController;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.SystemUiFlagUtils;
@@ -100,6 +102,11 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
     TaskAnimationManager(Context ctx) {
         mCtx = ctx;
     }
+
+    SystemUiProxy getSystemUiProxy() {
+        return SystemUiProxy.INSTANCE.get(mCtx);
+    }
+
     /**
      * Preloads the recents animation.
      */
@@ -153,7 +160,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         final BaseContainerInterface containerInterface = gestureState.getContainerInterface();
         mLastGestureState = gestureState;
         RecentsAnimationCallbacks newCallbacks = new RecentsAnimationCallbacks(
-                SystemUiProxy.INSTANCE.get(mCtx), containerInterface.allowMinimizeSplitScreen());
+                getSystemUiProxy(), containerInterface.allowMinimizeSplitScreen());
         mCallbacks = newCallbacks;
         mCallbacks.addListener(new RecentsAnimationCallbacks.RecentsAnimationListener() {
             @Override
@@ -259,12 +266,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                     }
                 }
 
-                RemoteAnimationTarget[] nonAppTargets = ENABLE_SHELL_TRANSITIONS
-                        ? null : SystemUiProxy.INSTANCE.get(mCtx).onStartingSplitLegacy(
-                                appearedTaskTargets);
-                if (nonAppTargets == null) {
-                    nonAppTargets = new RemoteAnimationTarget[0];
-                }
+                RemoteAnimationTarget[] nonAppTargets = new RemoteAnimationTarget[0];
                 if ((containerInterface.isInLiveTileMode()
                             || mLastGestureState.getEndTarget() == RECENTS
                             || isNonRecentsStartedTasksAppeared(appearedTaskTargets))
@@ -327,12 +329,36 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
 
         if (ENABLE_SHELL_TRANSITIONS) {
             final ActivityOptions options = ActivityOptions.makeBasic();
+            options.setPendingIntentBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
             // Use regular (non-transient) launch for all apps page to control IME.
             if (!containerInterface.allowAllAppsFromOverview()) {
                 options.setTransientLaunch();
             }
             options.setSourceInfo(ActivityOptions.SourceInfo.TYPE_RECENTS_ANIMATION, eventTime);
-            mRecentsAnimationStartPending = SystemUiProxy.INSTANCE.get(mCtx)
+
+            // Notify taskbar that we should skip reacting to launcher visibility change to
+            // avoid a jumping taskbar.
+            TaskbarUIController taskbarUIController = containerInterface.getTaskbarController();
+            if (enableScalingRevealHomeAnimation() && taskbarUIController != null) {
+                taskbarUIController.setSkipLauncherVisibilityChange(true);
+
+                mCallbacks.addListener(new RecentsAnimationCallbacks.RecentsAnimationListener() {
+                    @Override
+                    public void onRecentsAnimationCanceled(
+                            @NonNull HashMap<Integer, ThumbnailData> thumbnailDatas) {
+                        taskbarUIController.setSkipLauncherVisibilityChange(false);
+                    }
+
+                    @Override
+                    public void onRecentsAnimationFinished(
+                            @NonNull RecentsAnimationController controller) {
+                        taskbarUIController.setSkipLauncherVisibilityChange(false);
+                    }
+                });
+            }
+
+            mRecentsAnimationStartPending = getSystemUiProxy()
                     .startRecentsActivity(intent, options, mCallbacks);
             if (enableHandleDelayedGestureCallbacks()) {
                 ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(

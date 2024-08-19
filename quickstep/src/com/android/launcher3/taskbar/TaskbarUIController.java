@@ -43,8 +43,8 @@ import com.android.quickstep.OverviewCommandHelper;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
+import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
-import com.android.quickstep.views.TaskView.TaskContainer;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 
@@ -60,6 +60,8 @@ public class TaskbarUIController {
 
     // Initialized in init.
     protected TaskbarControllers mControllers;
+
+    protected boolean mSkipLauncherVisibilityChange;
 
     @CallSuper
     protected void init(TaskbarControllers taskbarControllers) {
@@ -174,11 +176,11 @@ public class TaskbarUIController {
                 || mControllers.navbarButtonsViewController.isEventOverAnyItem(ev);
     }
 
-    /** Checks if the given {@link MotionEvent} is over the bubble bar stash handle. */
-    public boolean isEventOverBubbleBarStashHandle(MotionEvent ev) {
+    /** Checks if the given {@link MotionEvent} is over the bubble bar views. */
+    public boolean isEventOverBubbleBarViews(MotionEvent ev) {
         return mControllers.bubbleControllers.map(
                 bubbleControllers ->
-                        bubbleControllers.bubbleStashController.isEventOverStashHandle(ev))
+                        bubbleControllers.bubbleStashController.isEventOverBubbleBarViews(ev))
                 .orElse(false);
     }
 
@@ -269,8 +271,8 @@ public class TaskbarUIController {
                                     foundTaskView,
                                     foundTask,
                                     taskContainer.getIconView().getDrawable(),
-                                    taskContainer.getThumbnailViewDeprecated(),
-                                    taskContainer.getThumbnailViewDeprecated().getThumbnail(),
+                                    taskContainer.getSnapshotView(),
+                                    taskContainer.getSplitAnimationThumbnail(),
                                     null /* intent */,
                                     null /* user */,
                                     info);
@@ -410,5 +412,20 @@ public class TaskbarUIController {
      */
     public void setSkipNextRecentsAnimEnd() {
         // Overridden
+    }
+
+    /**
+     * Sets whether the user is going home based on the current gesture.
+     */
+    public void setUserIsNotGoingHome(boolean isNotGoingHome) {
+        mControllers.taskbarStashController.setUserIsNotGoingHome(isNotGoingHome);
+    }
+
+    /**
+     * Sets whether to prevent taskbar from reacting to launcher visibility during the recents
+     * transition animation.
+     */
+    public void setSkipLauncherVisibilityChange(boolean skip) {
+        mSkipLauncherVisibilityChange = skip;
     }
 }

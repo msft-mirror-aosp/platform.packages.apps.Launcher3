@@ -53,6 +53,7 @@ import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.LogUtils;
 
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
@@ -68,6 +69,9 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
 
     private static final SystemShortcut.Factory<BaseTaskbarContext>
             APP_INFO = SystemShortcut.AppInfo::new;
+
+    private static final SystemShortcut.Factory<BaseTaskbarContext>
+            BUBBLE = SystemShortcut.BubbleShortcut::new;
 
     private final TaskbarActivityContext mContext;
     private final PopupDataProvider mPopupDataProvider;
@@ -148,8 +152,8 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
             icon.clearFocus();
             return null;
         }
-        ItemInfo item = (ItemInfo) icon.getTag();
-        if (!ShortcutUtil.supportsShortcuts(item)) {
+        // TODO(b/344657629) support GroupTask as well, for Taskbar Recent apps
+        if (!(icon.getTag() instanceof ItemInfo item) || !ShortcutUtil.supportsShortcuts(item)) {
             return null;
         }
 
@@ -181,11 +185,17 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
 
     // Create a Stream of all applicable system shortcuts
     private Stream<SystemShortcut.Factory> getSystemShortcuts() {
-        // append split options to APP_INFO shortcut, the order here will reflect in the popup
-        return Stream.concat(
-                Stream.of(APP_INFO),
-                mControllers.uiController.getSplitMenuOptions()
-        );
+        // append split options to APP_INFO shortcut if not in Desktop Windowing mode, the order
+        // here will reflect in the popup
+        ArrayList<SystemShortcut.Factory> shortcuts = new ArrayList<>();
+        shortcuts.add(APP_INFO);
+        if (!mControllers.taskbarRecentAppsController.isInDesktopMode()) {
+            shortcuts.addAll(mControllers.uiController.getSplitMenuOptions().toList());
+        }
+        if (com.android.wm.shell.Flags.enableBubbleAnything()) {
+            shortcuts.add(BUBBLE);
+        }
+        return shortcuts.stream();
     }
 
     @Override
