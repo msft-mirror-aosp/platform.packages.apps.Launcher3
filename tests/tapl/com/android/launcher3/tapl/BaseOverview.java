@@ -23,6 +23,8 @@ import static com.android.launcher3.tapl.LauncherInstrumentation.log;
 import static com.android.launcher3.tapl.OverviewTask.TASK_START_EVENT;
 import static com.android.launcher3.tapl.TestHelpers.getOverviewPackageName;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
+import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH;
+import static com.android.launcher3.testing.shared.TestProtocol.testLogD;
 
 import android.graphics.Rect;
 import android.util.Log;
@@ -533,9 +535,13 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             return null;
         }
         int focusedTaskHeight = mLauncher.getFocusedTaskHeightForTablet();
+        testLogD(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH,
+                "getFocusedTaskForTablet: " + focusedTaskHeight);
         for (UiObject2 task : taskViews) {
             OverviewTask overviewTask = new OverviewTask(mLauncher, task, this);
 
+            testLogD(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH,
+                    "overviewTask.getVisibleHeight(): " + overviewTask.getVisibleHeight());
             if (overviewTask.getVisibleHeight() == focusedTaskHeight) {
                 return overviewTask;
             }
