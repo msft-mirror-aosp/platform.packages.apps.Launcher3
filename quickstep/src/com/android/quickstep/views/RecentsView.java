@@ -1838,6 +1838,9 @@ public abstract class RecentsView<
         // the new set of views are added
         int previousCurrentPage = mCurrentPage;
         int previousFocusedPage = indexOfChild(getFocusedChild());
+        // TaskIds will no longer be valid after remove and re-add, clearing mTopRowIdSet.
+        mAnyTaskHasBeenDismissed = false;
+        mTopRowIdSet.clear();
         removeAllViews();
 
         // If we are entering Overview as a result of initiating a split from somewhere else
@@ -2949,8 +2952,8 @@ public abstract class RecentsView<
         setCurrentTask(runningTaskViewId);
 
         boolean shouldFocusRunningTask = !(enableGridOnlyOverview()
-                && (enableLargeDesktopWindowingTile()
-                || getRunningTaskView() instanceof DesktopTaskView));
+                || (enableLargeDesktopWindowingTile()
+                && getRunningTaskView() instanceof DesktopTaskView));
         setFocusedTaskViewId(shouldFocusRunningTask ? runningTaskViewId : INVALID_TASK_ID);
         runOnPageScrollsInitialized(() -> setCurrentPage(getRunningTaskIndex()));
         setRunningTaskViewShowScreenshot(false);
@@ -3032,6 +3035,10 @@ public abstract class RecentsView<
         TaskView runningTaskView = getRunningTaskView();
         if (runningTaskView != null) {
             runningTaskView.setShouldShowScreenshot(mRunningTaskShowScreenshot);
+            if (!enableRefactorTaskThumbnail()) {
+                runningTaskView.getTaskContainers().forEach(
+                        taskContainer -> taskContainer.getThumbnailViewDeprecated().refresh());
+            }
         }
         if (enableRefactorTaskThumbnail()) {
             mRecentsViewModel.setRunningTaskShowScreenshot(showScreenshot);
