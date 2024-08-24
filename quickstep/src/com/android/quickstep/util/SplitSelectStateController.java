@@ -55,11 +55,11 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
-import android.os.SystemClock;
 import android.os.UserHandle;
 import android.util.Log;
 import android.util.Pair;
 import android.view.SurfaceControl;
+import android.view.View;
 import android.window.IRemoteTransitionFinishedCallback;
 import android.window.RemoteTransition;
 import android.window.RemoteTransitionStub;
@@ -97,7 +97,6 @@ import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.SplitInstructionsView;
 import com.android.systemui.shared.recents.model.Task;
-import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.wm.shell.shared.split.SplitScreenConstants.PersistentSnapPosition;
@@ -150,9 +149,10 @@ public class SplitSelectStateController {
 
     /**
      * Should be a constant from {@link com.android.internal.jank.Cuj} or -1, does not need to be
-     * set for all launches.
+     * set for all launches. Used in conjunction with {@link #mLaunchingViewCuj} below.
      */
     private int mLaunchCuj = -1;
+    private View mLaunchingViewCuj;
 
     private FloatingTaskView mFirstFloatingTaskView;
     private SplitInstructionsView mSplitInstructionsView;
@@ -652,7 +652,12 @@ public class SplitSelectStateController {
         return mSplitAnimationController;
     }
 
-    public void setLaunchingCuj(int launchCuj) {
+    /**
+     * Set params to invoke a trace session for the given view and CUJ when we begin animating the
+     * split launch AFTER we get a response from Shell.
+     */
+    public void setLaunchingCuj(View launchingView, int launchCuj) {
+        mLaunchingViewCuj = launchingView;
         mLaunchCuj = launchCuj;
     }
 
@@ -690,6 +695,9 @@ public class SplitSelectStateController {
                         && mLaunchingTaskView.getRecentsView() != null
                         && mLaunchingTaskView.getRecentsView().isTaskViewVisible(
                         mLaunchingTaskView);
+                if (mLaunchingViewCuj != null && mLaunchCuj != -1) {
+                    InteractionJankMonitorWrapper.begin(mLaunchingViewCuj, mLaunchCuj);
+                }
                 mSplitAnimationController.playSplitLaunchAnimation(
                         shouldLaunchFromTaskView ? mLaunchingTaskView : null,
                         mLaunchingIconView,
@@ -752,6 +760,7 @@ public class SplitSelectStateController {
             InteractionJankMonitorWrapper.end(mLaunchCuj);
         }
         mLaunchCuj = -1;
+        mLaunchingViewCuj = null;
 
         if (mSessionInstanceIds != null) {
             mStatsLogManager.logger()
@@ -883,14 +892,17 @@ public class SplitSelectStateController {
             DesktopSplitRecentsAnimationListener listener =
                     new DesktopSplitRecentsAnimationListener(splitPosition, taskBounds);
 
-            MAIN_EXECUTOR.execute(() -> {
-                callbacks.addListener(listener);
-                UI_HELPER_EXECUTOR.execute(
-                        // Transition from app to enter stage split in launcher with
-                        // recents animation.
-                        () -> ActivityManagerWrapper.getInstance().startRecentsActivity(
-                                mOverviewComponentObserver.getOverviewIntent(),
-                                SystemClock.uptimeMillis(), callbacks, null, null));
+            callbacks.addListener(listener);
+            UI_HELPER_EXECUTOR.execute(() -> {
+                // Transition from app to enter stage split in launcher with recents animation
+                final ActivityOptions options = ActivityOptions.makeBasic();
+                options.setPendingIntentBackgroundActivityStartMode(
+                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
+                options.setTransientLaunch();
+                SystemUiProxy.INSTANCE.get(mLauncher.getApplicationContext())
+                        .startRecentsActivity(
+                                mOverviewComponentObserver.getOverviewIntent(), options,
+                                callbacks);
             });
         }
 
