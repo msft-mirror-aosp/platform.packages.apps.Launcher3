@@ -148,10 +148,8 @@ public final class TestProtocol {
 
     public static final String REQUEST_HOTSEAT_CELL_CENTER = "hotseat-cell-center";
 
-    public static final String REQUEST_GET_FOCUSED_TASK_HEIGHT_FOR_TABLET =
-            "get-focused-task-height-for-tablet";
-    public static final String REQUEST_GET_GRID_TASK_SIZE_RECT_FOR_TABLET =
-            "get-grid-task-size-rect-for-tablet";
+    public static final String REQUEST_GET_OVERVIEW_TASK_SIZE = "get-overivew-task-size";
+    public static final String REQUEST_GET_OVERVIEW_GRID_TASK_SIZE = "get-overivew-grid-task-size";
     public static final String REQUEST_GET_OVERVIEW_PAGE_SPACING = "get-overview-page-spacing";
     public static final String REQUEST_GET_OVERVIEW_CURRENT_PAGE_INDEX =
             "get-overview-current-page-index";
