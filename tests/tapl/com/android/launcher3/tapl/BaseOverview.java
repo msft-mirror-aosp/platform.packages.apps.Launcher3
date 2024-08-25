@@ -23,11 +23,9 @@ import static com.android.launcher3.tapl.LauncherInstrumentation.log;
 import static com.android.launcher3.tapl.OverviewTask.TASK_START_EVENT;
 import static com.android.launcher3.tapl.TestHelpers.getOverviewPackageName;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
-import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH;
 import static com.android.launcher3.testing.shared.TestProtocol.testLogD;
 
 import android.graphics.Rect;
-import android.util.Log;
 import android.view.KeyEvent;
 
 import androidx.annotation.NonNull;
@@ -280,7 +278,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
                     if (mLauncher.isTablet()) {
                         mLauncher.assertTrue("current task is not grid height",
                                 getCurrentTask().getVisibleHeight() == mLauncher
-                                        .getGridTaskRectForTablet().height());
+                                        .getOverviewGridTaskSize().height());
                     }
                     mLauncher.assertTrue("Current task not scrolled off screen",
                             !getCurrentTask().equals(task));
@@ -356,7 +354,7 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
         final List<UiObject2> taskViews = getTasks();
         mLauncher.assertNotEquals("Unable to find a task", 0, taskViews.size());
 
-        final int gridTaskWidth = mLauncher.getGridTaskRectForTablet().width();
+        final int gridTaskWidth = mLauncher.getOverviewGridTaskSize().width();
 
         return taskViews.stream().filter(t -> t.getVisibleBounds().width() == gridTaskWidth).map(
                 t -> new OverviewTask(mLauncher, t, this)).collect(Collectors.toList());
@@ -424,31 +422,32 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
 
     protected boolean isActionsViewVisible() {
         if (!hasTasks() || isClearAllVisible()) {
-            Log.d(TAG, "Not expecting an actions bar: no tasks/'Clear all' is visible");
+            testLogD(TAG, "Not expecting an actions bar: no tasks/'Clear all' is visible");
             return false;
         }
         boolean isTablet = mLauncher.isTablet();
         if (isTablet && mLauncher.isGridOnlyOverviewEnabled()) {
-            Log.d(TAG, "Not expecting an actions bar: device is tablet with grid-only Overview");
+            testLogD(TAG, "Not expecting an actions bar: device is tablet with grid-only Overview");
             return false;
         }
         OverviewTask task = isTablet ? getFocusedTaskForTablet() : getCurrentTask();
         if (task == null) {
-            Log.d(TAG, "Not expecting an actions bar: no current task");
+            testLogD(TAG, "Not expecting an actions bar: no current task");
             return false;
         }
         // In tablets, if focused task is not in center, overview actions aren't visible.
         if (isTablet && Math.abs(task.getExactCenterX() - mLauncher.getExactScreenCenterX()) >= 1) {
-            Log.d(TAG, "Not expecting an actions bar: device is tablet and task is not centered");
+            testLogD(TAG,
+                    "Not expecting an actions bar: device is tablet and task is not centered");
             return false;
         }
         if (task.isTaskSplit() && (!mLauncher.isAppPairsEnabled() || !isTablet)) {
-            Log.d(TAG, "Not expecting an actions bar: device is phone and task is split");
+            testLogD(TAG, "Not expecting an actions bar: device is phone and task is split");
             // Overview actions aren't visible for split screen tasks, except for save app pair
             // button on tablets.
             return false;
         }
-        Log.d(TAG, "Expecting an actions bar");
+        testLogD(TAG, "Expecting an actions bar");
         return true;
     }
 
@@ -531,17 +530,13 @@ public class BaseOverview extends LauncherInstrumentation.VisibleContainer {
             throw new IllegalStateException("Must be run on tablet device.");
         }
         final List<UiObject2> taskViews = getTasks();
-        if (taskViews.size() == 0) {
+        if (taskViews.isEmpty()) {
             return null;
         }
-        int focusedTaskHeight = mLauncher.getFocusedTaskHeightForTablet();
-        testLogD(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH,
-                "getFocusedTaskForTablet: " + focusedTaskHeight);
+        Rect focusTaskSize = mLauncher.getOverviewTaskSize();
+        int focusedTaskHeight = focusTaskSize.height();
         for (UiObject2 task : taskViews) {
             OverviewTask overviewTask = new OverviewTask(mLauncher, task, this);
-
-            testLogD(OVERVIEW_FOCUS_TASK_HEIGHT_MISMATCH,
-                    "overviewTask.getVisibleHeight(): " + overviewTask.getVisibleHeight());
             if (overviewTask.getVisibleHeight() == focusedTaskHeight) {
                 return overviewTask;
             }

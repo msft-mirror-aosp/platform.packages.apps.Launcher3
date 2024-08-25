@@ -308,6 +308,15 @@ public class BubbleBarViewController {
         return mBarView.getBubbleBarBounds();
     }
 
+    /** Checks that bubble bar is visible and that the motion event is within bounds. */
+    public boolean isEventOverBubbleBar(MotionEvent event) {
+        if (!isBubbleBarVisible()) return false;
+        final Rect bounds = getBubbleBarBounds();
+        final int bubbleBarTopOnScreen = mBarView.getRestingTopPositionOnScreen();
+        final float x = event.getX();
+        return event.getRawY() >= bubbleBarTopOnScreen && x >= bounds.left && x <= bounds.right;
+    }
+
     /** Whether a new bubble is animating. */
     public boolean isAnimatingNewBubble() {
         return mBubbleBarViewAnimator != null && mBubbleBarViewAnimator.isAnimating();
@@ -583,9 +592,8 @@ public class BubbleBarViewController {
     public void animateBubbleNotification(BubbleBarBubble bubble, boolean isExpanding,
             boolean isUpdate) {
         boolean isInApp = mTaskbarStashController.isInApp();
-        // if this is the first bubble, animate to the initial state. one bubble is the overflow
-        // so check for at most 2 children.
-        if (mBarView.getChildCount() <= 2 && !isUpdate) {
+        // if this is the first bubble, animate to the initial state.
+        if (mBarView.getBubbleChildCount() == 1 && !isUpdate) {
             mBubbleBarViewAnimator.animateToInitialState(bubble, isInApp, isExpanding);
             return;
         }
