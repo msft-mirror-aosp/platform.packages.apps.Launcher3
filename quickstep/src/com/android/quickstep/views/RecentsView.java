@@ -36,6 +36,7 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_TASK_MENU;
 import static com.android.launcher3.AbstractFloatingView.getTopOpenViewWithType;
 import static com.android.launcher3.BaseActivity.STATE_HANDLER_INVISIBILITY_FLAGS;
 import static com.android.launcher3.Flags.enableAdditionalHomeAnimations;
+import static com.android.launcher3.Flags.enableDesktopTaskAlphaAnimation;
 import static com.android.launcher3.Flags.enableGridOnlyOverview;
 import static com.android.launcher3.Flags.enableLargeDesktopWindowingTile;
 import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
@@ -317,6 +318,27 @@ public abstract class RecentsView<
                 @Override
                 public Float get(RecentsView recentsView) {
                     return recentsView.mAdjacentPageHorizontalOffset;
+                }
+            };
+
+    public static final FloatProperty<RecentsView> RUNNING_TASK_ATTACH_ALPHA =
+            new FloatProperty<RecentsView>("runningTaskAttachAlpha") {
+                @Override
+                public void setValue(RecentsView recentsView, float v) {
+                    TaskView runningTask = recentsView.getRunningTaskView();
+                    if (runningTask == null) {
+                        return;
+                    }
+                    runningTask.setAttachAlpha(v);
+                }
+
+                @Override
+                public Float get(RecentsView recentsView) {
+                    TaskView runningTask = recentsView.getRunningTaskView();
+                    if (runningTask == null) {
+                        return null;
+                    }
+                    return runningTask.getAttachAlpha();
                 }
             };
 
@@ -2737,8 +2759,15 @@ public abstract class RecentsView<
         showCurrentTask(mActiveGestureRunningTasks);
         setEnableFreeScroll(false);
         setEnableDrawingLiveTile(false);
-        setRunningTaskHidden(true);
+        setRunningTaskHidden(!shouldUpdateRunningTaskAlpha());
         setTaskIconScaledDown(true);
+    }
+
+    /**
+     * Returns whether the running task's attach alpha should be updated during the attach animation
+     */
+    public boolean shouldUpdateRunningTaskAlpha() {
+        return enableDesktopTaskAlphaAnimation() && getRunningTaskView() instanceof DesktopTaskView;
     }
 
     private boolean isGestureActive() {
@@ -3021,12 +3050,13 @@ public abstract class RecentsView<
     public void setRunningTaskHidden(boolean isHidden) {
         mRunningTaskTileHidden = isHidden;
         TaskView runningTask = getRunningTaskView();
-        if (runningTask != null) {
-            runningTask.setStableAlpha(isHidden ? 0 : mContentAlpha);
-            if (!isHidden) {
-                AccessibilityManagerCompat.sendCustomAccessibilityEvent(runningTask,
-                        AccessibilityEvent.TYPE_VIEW_FOCUSED, null);
-            }
+        if (runningTask == null) {
+            return;
+        }
+        runningTask.setStableAlpha(isHidden ? 0 : mContentAlpha);
+        if (!isHidden) {
+            AccessibilityManagerCompat.sendCustomAccessibilityEvent(
+                    runningTask, AccessibilityEvent.TYPE_VIEW_FOCUSED, null);
         }
     }
 
@@ -4701,8 +4731,11 @@ public abstract class RecentsView<
                     : showAsGrid
                             ? gridOffsetSize
                             : i < modalMidpoint ? modalLeftOffsetSize : modalRightOffsetSize;
-            float totalTranslationX = translation + modalTranslation;
             View child = getChildAt(i);
+            boolean skipTranslationOffset = enableDesktopTaskAlphaAnimation()
+                    && i == getRunningTaskIndex()
+                    && child instanceof DesktopTaskView;
+            float totalTranslationX = (skipTranslationOffset ? 0f : translation) + modalTranslation;
             FloatProperty translationPropertyX = child instanceof TaskView
                     ? ((TaskView) child).getPrimaryTaskOffsetTranslationProperty()
                     : getPagedOrientationHandler().getPrimaryViewTranslate();
