@@ -339,3 +339,13 @@ flag {
     description: "Change fast scroller to a lettered list"
     bug: "358673724"
 }
+
+flag {
+    name: "enable_desktop_task_alpha_animation"
+    namespace: "launcher"
+    description: "Enables the animation of the desktop task's background view"
+    bug: "320307666"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
