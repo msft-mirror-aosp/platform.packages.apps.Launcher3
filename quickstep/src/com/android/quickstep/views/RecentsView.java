@@ -1079,7 +1079,6 @@ public abstract class RecentsView<
     @Nullable
     public Task onTaskThumbnailChanged(int taskId, ThumbnailData thumbnailData) {
         if (enableRefactorTaskThumbnail()) {
-            mHelper.onTaskThumbnailChanged(taskId, thumbnailData);
             return null;
         }
         if (mHandleTaskStackChanges) {
@@ -1100,8 +1099,7 @@ public abstract class RecentsView<
     }
 
     @Override
-    public void onTaskIconChanged(String pkg, UserHandle user) {
-        // TODO(b/342560598): Listen in TaskRepository and reload.
+    public void onTaskIconChanged(@NonNull String pkg, @NonNull UserHandle user) {
         for (int i = 0; i < getTaskViewCount(); i++) {
             TaskView tv = requireTaskViewAt(i);
             Task task = tv.getFirstTask();
@@ -2549,7 +2547,6 @@ public abstract class RecentsView<
         }
 
         if (enableRefactorTaskThumbnail()) {
-            // TODO(b/342560598): Listen in TaskRepository and reload.
             return;
         }
 
