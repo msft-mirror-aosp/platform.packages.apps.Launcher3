@@ -48,6 +48,7 @@ import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.RecentsAnimationController;
@@ -590,6 +591,12 @@ public class TaskbarLauncherStateController {
         }
 
         float cornerRoundness = isInLauncher ? 0 : 1;
+
+        if (DisplayController.isInDesktopMode(mLauncher) && mControllers.getSharedState() != null) {
+            cornerRoundness =
+                    mControllers.taskbarDesktopModeController.getTaskbarCornerRoundness(
+                            mControllers.getSharedState().showCornerRadiusInDesktopMode);
+        }
 
         // Don't animate if corner roundness has reached desired value.
         if (mTaskbarCornerRoundness.isAnimating()
