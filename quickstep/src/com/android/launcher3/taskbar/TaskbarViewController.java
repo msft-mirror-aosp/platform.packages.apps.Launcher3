@@ -72,7 +72,6 @@ import com.android.launcher3.util.LauncherBindableItemsContainer;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiTranslateDelegate;
 import com.android.launcher3.util.MultiValueAlpha;
-import com.android.launcher3.views.IconButtonView;
 import com.android.quickstep.util.GroupTask;
 import com.android.systemui.shared.recents.model.Task;
 
@@ -150,6 +149,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     private Runnable mOnControllerPreCreateCallback = NO_OP;
 
     // Stored here as signals to determine if the mIconAlignController needs to be recreated.
+    private boolean mIsIconAlignedWithHotseat;
     private boolean mIsHotseatIconOnTopWhenAligned;
     private boolean mIsStashed;
 
@@ -218,8 +218,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         if (ENABLE_TASKBAR_NAVBAR_UNIFICATION) {
             // This gets modified in NavbarButtonsViewController, but the initial value it reads
             // may be incorrect since it's state gets destroyed on taskbar recreate, so reset here
-            mTaskbarIconAlpha.get(ALPHA_INDEX_SMALL_SCREEN)
-                    .animateToValue(mActivity.isPhoneButtonNavMode() ? 0 : 1).start();
+            mTaskbarIconAlpha.get(ALPHA_INDEX_SMALL_SCREEN).setValue(
+                    mActivity.isPhoneMode() ? 0 : 1);
         }
         if (enableTaskbarPinning()) {
             mTaskbarView.addOnLayoutChangeListener(mTaskbarViewLayoutChangeListener);
@@ -298,7 +298,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
 
     @Nullable
     public View getAllAppsButtonView() {
-        return mTaskbarView.getAllAppsButtonView();
+        return mTaskbarView.getAllAppsButtonContainer();
     }
 
     public AnimatedFloat getTaskbarIconScaleForStash() {
@@ -365,9 +365,9 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         View[] iconViews = mTaskbarView.getIconViews();
         float scale = mTaskbarIconTranslationXForPinning.value;
         float transientTaskbarAllAppsOffset = mActivity.getResources().getDimension(
-                mTaskbarView.getAllAppsButtonTranslationXOffset(true));
+                mTaskbarView.getAllAppsButtonContainer().getAllAppsButtonTranslationXOffset(true));
         float persistentTaskbarAllAppsOffset = mActivity.getResources().getDimension(
-                mTaskbarView.getAllAppsButtonTranslationXOffset(false));
+                mTaskbarView.getAllAppsButtonContainer().getAllAppsButtonTranslationXOffset(false));
 
         float allAppIconTranslateRange = mapRange(scale, transientTaskbarAllAppsOffset,
                 persistentTaskbarAllAppsOffset);
@@ -382,7 +382,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         }
 
         if (mActivity.isThreeButtonNav()) {
-            ((IconButtonView) mTaskbarView.getAllAppsButtonView())
+            mTaskbarView.getAllAppsButtonContainer()
                     .setTranslationXForTaskbarAllAppsIcon(allAppIconTranslateRange);
             return;
         }
@@ -407,8 +407,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                         -finalMarginScale * (iconIndex - halfIconCount));
             }
 
-            if (iconView.equals(mTaskbarView.getAllAppsButtonView())) {
-                ((IconButtonView) iconView).setTranslationXForTaskbarAllAppsIcon(
+            if (iconView.equals(mTaskbarView.getAllAppsButtonContainer())) {
+                mTaskbarView.getAllAppsButtonContainer().setTranslationXForTaskbarAllAppsIcon(
                         allAppIconTranslateRange);
             }
         }
@@ -536,7 +536,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     }
 
     public View getTaskbarDividerView() {
-        return mTaskbarView.getTaskbarDividerView();
+        return mTaskbarView.getTaskbarDividerViewContainer();
     }
 
     /**
@@ -687,15 +687,17 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
             mIconAlignControllerLazy = null;
             return;
         }
-
         boolean isHotseatIconOnTopWhenAligned =
                 mControllers.uiController.isHotseatIconOnTopWhenAligned();
+        boolean isIconAlignedWithHotseat = mControllers.uiController.isIconAlignedWithHotseat();
         boolean isStashed = mControllers.taskbarStashController.isStashed();
-        // Re-create animation when mIsHotseatIconOnTopWhenAligned or mIsStashed changes.
+        // Re-create animation when any of these values change.
         if (mIconAlignControllerLazy == null
                 || mIsHotseatIconOnTopWhenAligned != isHotseatIconOnTopWhenAligned
+                || mIsIconAlignedWithHotseat != isIconAlignedWithHotseat
                 || mIsStashed != isStashed) {
             mIsHotseatIconOnTopWhenAligned = isHotseatIconOnTopWhenAligned;
+            mIsIconAlignedWithHotseat = isIconAlignedWithHotseat;
             mIsStashed = isStashed;
             mIconAlignControllerLazy = createIconAlignmentController(launcherDp);
         }
@@ -750,8 +752,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         int firstRecentTaskIndex = -1;
         for (int i = 0; i < mTaskbarView.getChildCount(); i++) {
             View child = mTaskbarView.getChildAt(i);
-            boolean isAllAppsButton = child == mTaskbarView.getAllAppsButtonView();
-            boolean isTaskbarDividerView = child == mTaskbarView.getTaskbarDividerView();
+            boolean isAllAppsButton = child == mTaskbarView.getAllAppsButtonContainer();
+            boolean isTaskbarDividerView = child == mTaskbarView.getTaskbarDividerViewContainer();
             boolean isRecentTask = child.getTag() instanceof GroupTask;
             // TODO(b/343522351): show recents on the home screen.
             final boolean isRecentsInHotseat = false;
