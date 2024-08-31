@@ -31,7 +31,6 @@ import com.android.launcher3.taskbar.TaskbarInsetsController
 import com.android.launcher3.taskbar.bubbles.BubbleBarView
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController
 import com.android.launcher3.taskbar.bubbles.BubbleStashedHandleViewController
-import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Companion.STASHED_BAR_SCALE
 import com.android.launcher3.util.MultiValueAlpha
 import com.android.wm.shell.shared.animation.PhysicsAnimator
 import com.android.wm.shell.shared.animation.PhysicsAnimatorTestUtils
@@ -59,7 +58,7 @@ class TransientBubbleStashControllerTest {
         const val HOTSEAT_TRANSLATION_Y = -45f
         const val TASK_BAR_TRANSLATION_Y = -TASKBAR_BOTTOM_SPACE
         const val HANDLE_VIEW_HEIGHT = 4
-        const val BUBBLE_BAR_STASHED_TRANSLATION_Y = 48
+        const val BUBBLE_BAR_STASHED_TRANSLATION_Y = -2.5f
     }
 
     @get:Rule val animatorTestRule: AnimatorTestRule = AnimatorTestRule(this)
@@ -90,7 +89,7 @@ class TransientBubbleStashControllerTest {
         val taskbarHotseatDimensionsProvider =
             DefaultDimensionsProvider(taskBarBottomSpace = TASKBAR_BOTTOM_SPACE)
         mTransientBubbleStashController =
-            TransientBubbleStashController(taskbarHotseatDimensionsProvider, context.resources)
+            TransientBubbleStashController(taskbarHotseatDimensionsProvider, context)
         setUpBubbleBarView()
         setUpBubbleBarController()
         setUpStashedHandleView()
@@ -174,8 +173,8 @@ class TransientBubbleStashControllerTest {
         assertThat(mTransientBubbleStashController.isStashed).isTrue()
         assertThat(bubbleBarView.translationY).isEqualTo(BUBBLE_BAR_STASHED_TRANSLATION_Y)
         assertThat(bubbleBarView.alpha).isEqualTo(0f)
-        assertThat(bubbleBarView.scaleX).isEqualTo(STASHED_BAR_SCALE)
-        assertThat(bubbleBarView.scaleY).isEqualTo(STASHED_BAR_SCALE)
+        assertThat(bubbleBarView.scaleX).isEqualTo(mTransientBubbleStashController.getStashScale())
+        assertThat(bubbleBarView.scaleY).isEqualTo(mTransientBubbleStashController.getStashScale())
         // Handle view is visible
         assertThat(stashedHandleView.translationY).isEqualTo(0)
         assertThat(stashedHandleView.alpha).isEqualTo(1)
@@ -243,8 +242,8 @@ class TransientBubbleStashControllerTest {
         // Then all property values are updated
         assertThat(bubbleBarView.translationY).isEqualTo(BUBBLE_BAR_STASHED_TRANSLATION_Y)
         assertThat(bubbleBarView.alpha).isEqualTo(0)
-        assertThat(bubbleBarView.scaleX).isEqualTo(STASHED_BAR_SCALE)
-        assertThat(bubbleBarView.scaleY).isEqualTo(STASHED_BAR_SCALE)
+        assertThat(bubbleBarView.scaleX).isEqualTo(mTransientBubbleStashController.getStashScale())
+        assertThat(bubbleBarView.scaleY).isEqualTo(mTransientBubbleStashController.getStashScale())
         // Handle is visible at correct Y position
         assertThat(stashedHandleView.alpha).isEqualTo(1)
         assertThat(stashedHandleView.translationY).isEqualTo(0)
@@ -306,7 +305,7 @@ class TransientBubbleStashControllerTest {
 
         whenever(bubbleBarViewController.hasBubbles()).thenReturn(true)
         whenever(bubbleBarViewController.bubbleBarTranslationY).thenReturn(barTranslationY)
-        whenever(bubbleBarViewController.bubbleBarScale).thenReturn(barScale)
+        whenever(bubbleBarViewController.bubbleBarScaleY).thenReturn(barScale)
         whenever(bubbleBarViewController.bubbleBarAlpha).thenReturn(barAlpha)
         whenever(bubbleBarViewController.bubbleBarCollapsedHeight).thenReturn(BUBBLE_BAR_HEIGHT)
     }
