@@ -173,6 +173,13 @@ public class BubbleStashedHandleViewController {
     }
 
     /**
+     * Returns the width of the stashed handle.
+     */
+    public int getStashedWidth() {
+        return mStashedHandleWidth;
+    }
+
+    /**
      * Returns the height of the stashed handle.
      */
     public int getStashedHeight() {

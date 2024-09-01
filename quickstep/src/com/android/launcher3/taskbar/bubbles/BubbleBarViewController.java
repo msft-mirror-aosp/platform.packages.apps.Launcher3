@@ -80,6 +80,7 @@ public class BubbleBarViewController {
 
     // These are exposed to {@link BubbleStashController} to animate for stashing/un-stashing
     private final MultiValueAlpha mBubbleBarAlpha;
+    private final AnimatedFloat mBubbleBarScaleX = new AnimatedFloat(this::updateScaleX);
     private final AnimatedFloat mBubbleBarScaleY = new AnimatedFloat(this::updateScaleY);
     private final AnimatedFloat mBubbleBarTranslationY = new AnimatedFloat(
             this::updateTranslationY);
@@ -257,12 +258,20 @@ public class BubbleBarViewController {
         return mBubbleBarAlpha;
     }
 
+    public AnimatedFloat getBubbleBarScaleX() {
+        return mBubbleBarScaleX;
+    }
+
     public AnimatedFloat getBubbleBarScaleY() {
         return mBubbleBarScaleY;
     }
 
     public AnimatedFloat getBubbleBarTranslationY() {
         return mBubbleBarTranslationY;
+    }
+
+    public float getBubbleBarCollapsedWidth() {
+        return mBarView.collapsedWidth();
     }
 
     public float getBubbleBarCollapsedHeight() {
@@ -307,6 +316,14 @@ public class BubbleBarViewController {
      */
     public BubbleBarLocation getBubbleBarLocation() {
         return mBarView.getBubbleBarLocation();
+    }
+
+    /**
+     * @return {@code true} if bubble bar is on the left edge of the screen, {@code false} if on
+     * the right
+     */
+    public boolean isBubbleBarOnLeft() {
+        return mBarView.getBubbleBarLocation().isOnLeft(mBarView.isLayoutRtl());
     }
 
     /**
@@ -508,6 +525,10 @@ public class BubbleBarViewController {
     private void updateTranslationY() {
         mBarView.setTranslationY(mBubbleBarTranslationY.value + mBubbleBarSwipeUpTranslationY
                 + mBubbleBarStashTranslationY);
+    }
+
+    private void updateScaleX(float scale) {
+        mBarView.setScaleX(scale);
     }
 
     private void updateScaleY(float scale) {
