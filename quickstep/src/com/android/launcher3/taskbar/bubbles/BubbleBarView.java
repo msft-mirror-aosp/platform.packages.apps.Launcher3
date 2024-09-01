@@ -1303,7 +1303,10 @@ public class BubbleBarView extends FrameLayout {
         return totalIconSize + totalSpace + horizontalPadding;
     }
 
-    private float collapsedWidth() {
+    /**
+     * Get width of the bubble bar if it is collapsed
+     */
+    float collapsedWidth() {
         final int bubbleChildCount = getBubbleChildCount();
         final float horizontalPadding = 2 * mBubbleBarPadding;
         // If there are more than 2 bubbles, the first 2 should be visible when collapsed,
@@ -1473,8 +1476,9 @@ public class BubbleBarView extends FrameLayout {
         pw.println("BubbleBarView state:");
         pw.println("  visibility: " + getVisibility());
         pw.println("  alpha: " + getAlpha());
-        pw.println("  translation Y: " + getTranslationY());
-        pw.println("  bubbles in bar (childCount = " + getChildCount() + ")");
+        pw.println("  translationY: " + getTranslationY());
+        pw.println("  childCount: " + getChildCount());
+        pw.println("  hasOverflow:  " + hasOverflow());
         for (BubbleView bubbleView: getBubbles()) {
             BubbleBarItem bubble = bubbleView.getBubble();
             String key = bubble == null ? "null" : bubble.getKey();
