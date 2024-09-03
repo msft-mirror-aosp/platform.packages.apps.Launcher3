@@ -40,8 +40,8 @@ import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Comp
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.ControllersAfterInitAction
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.TaskbarHotseatDimensionsProvider
 import com.android.launcher3.util.MultiPropertyFactory
-import com.android.wm.shell.common.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.animation.PhysicsAnimator
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import kotlin.math.max
 
 class TransientBubbleStashController(
@@ -67,7 +67,8 @@ class TransientBubbleStashController(
     // bubble bar properties
     private lateinit var bubbleBarAlpha: MultiPropertyFactory<View>.MultiProperty
     private lateinit var bubbleBarTranslationYAnimator: AnimatedFloat
-    private lateinit var bubbleBarScale: AnimatedFloat
+    private lateinit var bubbleBarScaleX: AnimatedFloat
+    private lateinit var bubbleBarScaleY: AnimatedFloat
     private val handleCenterFromScreenBottom =
         context.resources.getDimensionPixelSize(R.dimen.bubblebar_stashed_size) / 2f
 
@@ -148,7 +149,8 @@ class TransientBubbleStashController(
         bubbleBarTranslationYAnimator = bubbleBarViewController.bubbleBarTranslationY
         // bubble bar has only alpha property, getting it at index 0
         bubbleBarAlpha = bubbleBarViewController.bubbleBarAlpha.get(/* index= */ 0)
-        bubbleBarScale = bubbleBarViewController.bubbleBarScaleY
+        bubbleBarScaleX = bubbleBarViewController.bubbleBarScaleX
+        bubbleBarScaleY = bubbleBarViewController.bubbleBarScaleY
         stashedHeight = bubbleStashedHandleViewController?.stashedHeight ?: 0
         stashHandleViewAlpha = bubbleStashedHandleViewController?.stashedHandleAlpha?.get(0)
     }
@@ -158,7 +160,8 @@ class TransientBubbleStashController(
         if (isBubblesShowingOnHome || isBubblesShowingOnOverview) {
             isStashed = false
             animatorSet.playTogether(
-                bubbleBarScale.animateToValue(1f),
+                bubbleBarScaleX.animateToValue(1f),
+                bubbleBarScaleY.animateToValue(1f),
                 bubbleBarTranslationYAnimator.animateToValue(bubbleBarTranslationY),
                 bubbleBarAlpha.animateToValue(1f)
             )
@@ -178,7 +181,8 @@ class TransientBubbleStashController(
         stashHandleViewAlpha?.value = 0f
         this.bubbleBarTranslationYAnimator.updateValue(bubbleBarTranslationY)
         bubbleBarAlpha.setValue(1f)
-        bubbleBarScale.updateValue(1f)
+        bubbleBarScaleX.updateValue(1f)
+        bubbleBarScaleY.updateValue(1f)
         isStashed = false
         onIsStashedChanged()
     }
@@ -188,7 +192,8 @@ class TransientBubbleStashController(
         stashHandleViewAlpha?.value = 1f
         this.bubbleBarTranslationYAnimator.updateValue(getStashTranslation())
         bubbleBarAlpha.setValue(0f)
-        bubbleBarScale.updateValue(getStashScale())
+        bubbleBarScaleX.updateValue(getStashScaleX())
+        bubbleBarScaleY.updateValue(getStashScaleY())
         isStashed = true
         onIsStashedChanged()
     }
@@ -258,7 +263,13 @@ class TransientBubbleStashController(
     }
 
     @VisibleForTesting
-    fun getStashScale(): Float {
+    fun getStashScaleX(): Float {
+        val handleWidth = bubbleStashedHandleViewController?.stashedWidth ?: 0
+        return handleWidth / bubbleBarViewController.bubbleBarCollapsedWidth
+    }
+
+    @VisibleForTesting
+    fun getStashScaleY(): Float {
         val handleHeight = bubbleStashedHandleViewController?.stashedHeight ?: 0
         return handleHeight / bubbleBarViewController.bubbleBarCollapsedHeight
     }
@@ -298,12 +309,12 @@ class TransientBubbleStashController(
             }
         )
 
-        val scaleTarget = if (isStashed) getStashScale() else 1f
+        val pivotX = if (bubbleBarViewController.isBubbleBarOnLeft) 0f else 1f
         animatorSet.play(
-            bubbleBarScale.animateToValue(scaleTarget).apply {
+            createScaleAnimator(isStashed).apply {
                 this.duration = duration
                 this.interpolator = EMPHASIZED
-                this.setBubbleBarPivotDuringAnim(0.5f, 1f)
+                this.setBubbleBarPivotDuringAnim(pivotX, 1f)
             }
         )
 
@@ -349,6 +360,15 @@ class TransientBubbleStashController(
             .setStiffness(SpringForce.STIFFNESS_LOW)
             .setStartVelocity(stashHandleStashVelocity)
             .build(translationYDuringStash, AnimatedFloat.VALUE)
+    }
+
+    private fun createScaleAnimator(isStashed: Boolean): AnimatorSet {
+        val scaleXTarget = if (isStashed) getStashScaleX() else 1f
+        val scaleYTarget = if (isStashed) getStashScaleY() else 1f
+        return AnimatorSet().apply {
+            play(bubbleBarScaleX.animateToValue(scaleXTarget))
+            play(bubbleBarScaleY.animateToValue(scaleYTarget))
+        }
     }
 
     private fun onIsStashedChanged() {
