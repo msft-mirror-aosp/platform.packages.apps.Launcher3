@@ -30,14 +30,16 @@ import static org.mockito.Mockito.when;
 import android.app.ActivityManager;
 import android.app.KeyguardManager;
 import android.content.Context;
+import android.content.res.Resources;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.internal.R;
 import com.android.launcher3.util.LooperExecutor;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.views.TaskViewType;
 import com.android.systemui.shared.recents.model.Task;
-import com.android.wm.shell.util.GroupedRecentTaskInfo;
+import com.android.wm.shell.shared.GroupedRecentTaskInfo;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -57,6 +59,8 @@ public class RecentTasksListTest {
     @Mock
     private Context mContext;
     @Mock
+    private Resources mResources;
+    @Mock
     private SystemUiProxy mSystemUiProxy;
     @Mock
     private TopTaskTracker mTopTaskTracker;
@@ -69,6 +73,11 @@ public class RecentTasksListTest {
         MockitoAnnotations.initMocks(this);
         LooperExecutor mockMainThreadExecutor = mock(LooperExecutor.class);
         KeyguardManager mockKeyguardManager = mock(KeyguardManager.class);
+
+        // Set desktop mode supported
+        when(mContext.getResources()).thenReturn(mResources);
+        when(mResources.getBoolean(R.bool.config_isDesktopModeSupported)).thenReturn(true);
+
         mRecentTasksList = new RecentTasksList(mContext, mockMainThreadExecutor,
                 mockKeyguardManager, mSystemUiProxy, mTopTaskTracker);
     }

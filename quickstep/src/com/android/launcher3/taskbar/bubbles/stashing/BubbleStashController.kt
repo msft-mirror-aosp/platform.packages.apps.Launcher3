@@ -23,8 +23,8 @@ import com.android.launcher3.taskbar.TaskbarInsetsController
 import com.android.launcher3.taskbar.bubbles.BubbleBarView
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController
 import com.android.launcher3.taskbar.bubbles.BubbleStashedHandleViewController
-import com.android.wm.shell.common.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.animation.PhysicsAnimator
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import java.io.PrintWriter
 
 /** StashController that defines stashing behaviour for the taskbar modes. */
@@ -52,7 +52,7 @@ interface BubbleStashController {
     /** Execute passed action only after controllers are initiated. */
     interface ControllersAfterInitAction {
         /** Execute action after controllers are initiated. */
-        fun runAfterInit(action: () -> Unit)
+        fun runAfterInit(action: Runnable)
     }
 
     /** Whether bubble bar is currently stashed */
@@ -143,6 +143,9 @@ interface BubbleStashController {
     /** Set the translation Y for the stashed handle. */
     fun setHandleTranslationY(translationY: Float)
 
+    /** Returns the translation of the handle. */
+    fun getHandleTranslationY(): Float?
+
     /**
      * Returns bubble bar Y position according to [isBubblesShowingOnHome] and
      * [isBubblesShowingOnOverview] values. Default implementation only analyse
@@ -176,10 +179,10 @@ interface BubbleStashController {
         /** How long to stash/unstash. */
         const val BAR_STASH_DURATION = InsetsController.ANIMATION_DURATION_RESIZE.toLong()
 
+        const val BAR_STASH_ALPHA_DURATION = 50L
+        const val BAR_STASH_ALPHA_DELAY = 33L
+
         /** How long to translate Y coordinate of the BubbleBar. */
         const val BAR_TRANSLATION_DURATION = 300L
-
-        /** The scale bubble bar animates to when being stashed. */
-        const val STASHED_BAR_SCALE = 0.5f
     }
 }

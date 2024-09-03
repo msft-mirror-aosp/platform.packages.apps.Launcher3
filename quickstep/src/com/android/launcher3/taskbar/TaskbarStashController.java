@@ -42,6 +42,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ValueAnimator;
 import android.app.RemoteAction;
+import android.graphics.Rect;
 import android.graphics.drawable.Icon;
 import android.os.SystemClock;
 import android.util.Log;
@@ -95,7 +96,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     public static final int FLAG_STASHED_SYSUI = 1 << 9; //  app pinning,...
     public static final int FLAG_STASHED_DEVICE_LOCKED = 1 << 10; // device is locked: keyguard, ...
     public static final int FLAG_IN_OVERVIEW = 1 << 11; // launcher is in overview
-    public static final int FLAG_IGNORE_IN_APP = 1 << 12; // used to sync with app launch animation
 
     // If any of these flags are enabled, isInApp should return true.
     private static final int FLAGS_IN_APP = FLAG_IN_APP | FLAG_IN_SETUP;
@@ -202,6 +202,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      * by not scaling the height of the taskbar background.
      */
     private static final int TRANSITION_UNSTASH_SUW_MANUAL = 3;
+    private static final Rect EMPTY_RECT = new Rect();
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(value = {
@@ -421,6 +422,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     public boolean isInApp() {
         return hasAnyFlag(FLAGS_IN_APP);
+    }
+
+    /** Returns whether the taskbar is currently in overview screen. */
+    public boolean isInOverview() {
+        return hasAnyFlag(FLAG_IN_OVERVIEW);
     }
 
     /**
@@ -713,7 +719,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
 
         fullLengthAnimatorSet.play(mControllers.stashedHandleViewController
-                .createRevealAnimToIsStashed(isStashed));
+                .createRevealAnimToIsStashed(isStashed, EMPTY_RECT));
         // Return the stashed handle to its default scale in case it was changed as part of the
         // feedforward hint. Note that the reveal animation above also visually scales it.
         fullLengthAnimatorSet.play(mTaskbarStashedHandleHintScale.animateToValue(1f));
@@ -763,6 +769,19 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             }
         }
 
+
+        Rect taskbarToHotseatOffsets = new Rect();
+        if (enableScalingRevealHomeAnimation() && animationType == TRANSITION_HOME_TO_APP) {
+            Rect hotseatRect = new Rect();
+            mActivity.getHotseatBounds(hotseatRect);
+
+            // Calculate and store offsets so that we can sync with the taskbar stashed handle
+            taskbarToHotseatOffsets.set(
+                    mActivity.calculateTaskbarToHotseatOffsets(hotseatRect));
+            as.addListener(AnimatorListeners.forEndCallback(
+                    () -> mActivity.calculateTaskbarToHotseatOffsets(EMPTY_RECT)));
+        }
+
         play(as, mTaskbarStashedHandleAlpha.animateToValue(stashedHandleAlphaTarget),
                 backgroundAndHandleAlphaStartDelay,
                 backgroundAndHandleAlphaDuration, LINEAR);
@@ -808,10 +827,12 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
 
         mControllers.taskbarViewController.addRevealAnimToIsStashed(skippable, isStashed, duration,
-                EMPHASIZED, animationType == TRANSITION_UNSTASH_SUW_MANUAL);
+                EMPHASIZED, animationType == TRANSITION_UNSTASH_SUW_MANUAL,
+                animationType == TRANSITION_HOME_TO_APP);
 
         play(skippable, mControllers.stashedHandleViewController
-                .createRevealAnimToIsStashed(isStashed), 0, duration, EMPHASIZED);
+                .createRevealAnimToIsStashed(isStashed, taskbarToHotseatOffsets), 0, duration,
+                EMPHASIZED);
 
         // Return the stashed handle to its default scale in case it was changed as part of the
         // feedforward hint. Note that the reveal animation above also visually scales it.
@@ -1005,6 +1026,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     /** Called when some system ui state has changed. (See SYSUI_STATE_... in QuickstepContract) */
     public void updateStateForSysuiFlags(long systemUiStateFlags, boolean skipAnim) {
+        if (mActivity.isPhoneMode()) {
+            return;
+        }
+
         long animDuration = TASKBAR_STASH_DURATION;
         long startDelay = 0;
 
@@ -1126,7 +1151,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      */
     public void setUpTaskbarSystemAction(boolean visible) {
         UI_HELPER_EXECUTOR.execute(() -> {
-            if (!visible || !DisplayController.isTransientTaskbar(mActivity)) {
+            if (!visible || !DisplayController.isTransientTaskbar(mActivity)
+                    || mActivity.isPhoneMode()) {
                 mAccessibilityManager.unregisterSystemAction(SYSTEM_ACTION_ID_TASKBAR);
                 mIsTaskbarSystemActionRegistered = false;
                 return;
@@ -1264,11 +1290,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
          */
         @Nullable
         public Animator createSetStateAnimator(long flags, long duration) {
-            // We do this when we want to synchronize the app launch and taskbar stash animations.
-            if (hasAnyFlag(FLAG_IGNORE_IN_APP) && hasAnyFlag(flags, FLAG_IN_APP)) {
-                flags = flags & ~FLAG_IN_APP;
-            }
-
             boolean isStashed = mStashCondition.test(flags);
 
             if (DEBUG) {
