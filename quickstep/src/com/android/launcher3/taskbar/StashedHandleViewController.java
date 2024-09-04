@@ -41,8 +41,8 @@ import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.NavHandle;
-import com.android.systemui.shared.navigationbar.RegionSamplingHelper;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
+import com.android.wm.shell.shared.handles.RegionSamplingHelper;
 
 import java.io.PrintWriter;
 
@@ -212,7 +212,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
      *                                stashed handle to wrap around the hotseat items.
      */
     public Animator createRevealAnimToIsStashed(boolean isStashed, Rect taskbarToHotseatOffsets) {
-        Rect visualBounds = new Rect(mControllers.taskbarViewController.getIconLayoutBounds());
+        Rect visualBounds = mControllers.taskbarViewController.getIconLayoutVisualBounds();
         float startRadius = mStashedHandleRadius;
 
         if (DisplayController.isTransientTaskbar(mActivity)) {
