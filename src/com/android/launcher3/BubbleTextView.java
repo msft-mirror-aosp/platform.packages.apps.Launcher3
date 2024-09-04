@@ -16,6 +16,8 @@
 
 package com.android.launcher3;
 
+import static android.graphics.fonts.FontStyle.FONT_WEIGHT_BOLD;
+import static android.graphics.fonts.FontStyle.FONT_WEIGHT_NORMAL;
 import static android.text.Layout.Alignment.ALIGN_NORMAL;
 
 import static com.android.launcher3.Flags.enableCursorHoverStates;
@@ -87,7 +89,7 @@ import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ShortcutUtil;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
-import com.android.launcher3.views.IconLabelDotView;
+import com.android.launcher3.views.FloatingIconViewCompanion;
 
 import java.text.NumberFormat;
 import java.util.HashMap;
@@ -99,7 +101,7 @@ import java.util.Locale;
  * too aggressive.
  */
 public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
-        IconLabelDotView, DraggableView, Reorderable {
+        FloatingIconViewCompanion, DraggableView, Reorderable {
 
     public static final String TAG = "BubbleTextView";
 
@@ -118,6 +120,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private static final String EMPTY = "";
     private static final StringMatcherUtility.StringMatcher MATCHER =
             StringMatcherUtility.StringMatcher.getInstance();
+    private static final int BOLD_TEXT_ADJUSTMENT = FONT_WEIGHT_BOLD - FONT_WEIGHT_NORMAL;
 
     private static final int[] STATE_PRESSED = new int[]{android.R.attr.state_pressed};
 
@@ -173,7 +176,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     @ViewDebug.ExportedProperty(category = "launcher")
     private boolean mSkipUserBadge = false;
     @ViewDebug.ExportedProperty(category = "launcher")
-    private boolean mIsIconVisible = true;
+    protected boolean mIsIconVisible = true;
     @ViewDebug.ExportedProperty(category = "launcher")
     private int mTextColor;
     @ViewDebug.ExportedProperty(category = "launcher")
@@ -501,10 +504,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             mLastOriginalText = label;
             mLastModifiedText = mLastOriginalText;
             mBreakPointsIntArray = StringMatcherUtility.getListOfBreakpoints(label, MATCHER);
-            if (Flags.enableNewArchivingIcon()
+            if (Flags.useNewIconForArchivedApps()
                     && info instanceof ItemInfoWithIcon infoWithIcon
                     && infoWithIcon.isInactiveArchive()) {
-                setTextWithStartIcon(label, R.drawable.cloud_download_24px);
+                setTextWithArchivingIcon(label);
             } else {
                 setText(label);
             }
@@ -817,10 +820,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     getLineSpacingExtra());
             if (!TextUtils.equals(modifiedString, mLastModifiedText)) {
                 mLastModifiedText = modifiedString;
-                if (Flags.enableNewArchivingIcon()
+                if (Flags.useNewIconForArchivedApps()
                         && getTag() instanceof ItemInfoWithIcon infoWithIcon
                         && infoWithIcon.isInactiveArchive()) {
-                    setTextWithStartIcon(modifiedString, R.drawable.cloud_download_24px);
+                    setTextWithArchivingIcon(modifiedString);
                 } else {
                     setText(modifiedString);
                 }
@@ -845,16 +848,32 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     /**
+     * Sets text with a start icon for App Archiving.
+     * Uses a bolded drawable if text is bolded.
+     * @param text
+     */
+    private void setTextWithArchivingIcon(CharSequence text) {
+        var drawableId = R.drawable.cloud_download_24px;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+                && getResources().getConfiguration().fontWeightAdjustment >= BOLD_TEXT_ADJUSTMENT) {
+            // If System bold text setting is on, then use a bolded icon
+            drawableId = R.drawable.cloud_download_semibold_24px;
+        }
+        setTextWithStartIcon(text, drawableId);
+    }
+
+    /**
      * Uses a SpannableString to set text with a Drawable at the start of the TextView
      * @param text text to use for TextView
-     * @param drawableRes Drawable Resource to use for drawing image at start of text
+     * @param drawableId Drawable Resource to use for drawing image at start of text
      */
-    private void setTextWithStartIcon(CharSequence text, @DrawableRes int drawableRes) {
-        Drawable drawable = getContext().getDrawable(drawableRes);
+    @VisibleForTesting
+    public void setTextWithStartIcon(CharSequence text, @DrawableRes int drawableId) {
+        Drawable drawable = getContext().getDrawable(drawableId);
         if (drawable == null) {
             setText(text);
             Log.w(TAG, "setTextWithStartIcon: start icon Drawable not found from resources"
-                    + ", will just set text instead. text=" + text);
+                    + ", will just set text instead.");
             return;
         }
         drawable.setTint(getCurrentTextColor());
@@ -1024,12 +1043,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     /** Applies the given progress level to the this icon's progress bar. */
     @Nullable
     public PreloadIconDrawable applyProgressLevel() {
-        if (!(getTag() instanceof ItemInfoWithIcon)
+        if (!(getTag() instanceof ItemInfoWithIcon info)
                 || ((ItemInfoWithIcon) getTag()).isInactiveArchive()) {
             return null;
         }
 
-        ItemInfoWithIcon info = (ItemInfoWithIcon) getTag();
         int progressLevel = info.getProgressLevel();
         if (progressLevel >= 100) {
             setContentDescription(info.contentDescription != null
@@ -1049,6 +1067,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             } else {
                 preloadIconDrawable = makePreloadIcon();
                 setIcon(preloadIconDrawable);
+                if (info.isArchived() && Flags.useNewIconForArchivedApps()) {
+                    // reapply text without cloud icon as soon as unarchiving is triggered
+                    applyLabel(info);
+                }
             }
             return preloadIconDrawable;
         }
