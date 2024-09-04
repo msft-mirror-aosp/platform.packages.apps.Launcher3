@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.taskbar.bubbles
 
+import android.app.Notification
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -24,7 +25,7 @@ import android.util.PathParser
 import android.view.LayoutInflater
 import androidx.test.core.app.ApplicationProvider
 import com.android.launcher3.R
-import com.android.wm.shell.common.bubbles.BubbleInfo
+import com.android.wm.shell.shared.bubbles.BubbleInfo
 import com.google.android.apps.nexuslauncher.imagecomparison.goldenpathmanager.ViewScreenshotGoldenPathManager
 import org.junit.Rule
 import org.junit.Test
@@ -72,7 +73,7 @@ class BubbleViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
     fun bubbleView_seen() {
         screenshotRule.screenshotTest("bubbleView_seen") { activity ->
             activity.actionBar?.hide()
-            setupBubbleView().apply { markSeen() }
+            setupBubbleView(suppressNotification = true)
         }
     }
 
@@ -84,7 +85,7 @@ class BubbleViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
         }
     }
 
-    private fun setupBubbleView(): BubbleView {
+    private fun setupBubbleView(suppressNotification: Boolean = false): BubbleView {
         val inflater = LayoutInflater.from(context)
 
         val iconSize = 100
@@ -95,7 +96,10 @@ class BubbleViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
         val icon = createCircleBitmap(radius = iconSize / 2, color = Color.LTGRAY)
         val badge = createCircleBitmap(radius = badgeRadius.toInt(), color = Color.RED)
 
-        val bubbleInfo = BubbleInfo("key", 0, null, null, 0, context.packageName, null, null, false)
+        val flags =
+            if (suppressNotification) Notification.BubbleMetadata.FLAG_SUPPRESS_NOTIFICATION else 0
+        val bubbleInfo =
+            BubbleInfo("key", flags, null, null, 0, context.packageName, null, null, false, true)
         val bubbleView = inflater.inflate(R.layout.bubblebar_item_view, null) as BubbleView
         val dotPath =
             PathParser.createPathFromPathData(

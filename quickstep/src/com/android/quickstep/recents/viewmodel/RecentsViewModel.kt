@@ -58,15 +58,11 @@ class RecentsViewModel(
         recentsViewData.thumbnailSplashProgress.value = taskThumbnailSplashAlpha
     }
 
-    fun addOrUpdateThumbnailOverride(thumbnailOverride: Map<Int, ThumbnailData>) {
-        recentsTasksRepository.addOrUpdateThumbnailOverride(thumbnailOverride)
-    }
-
     suspend fun waitForThumbnailsToUpdate(updatedThumbnails: Map<Int, ThumbnailData>) {
         combine(
                 updatedThumbnails.map {
                     recentsTasksRepository.getThumbnailById(it.key).filter { thumbnailData ->
-                        thumbnailData == it.value
+                        thumbnailData?.snapshotId == it.value.snapshotId
                     }
                 }
             ) {}

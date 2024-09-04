@@ -26,8 +26,11 @@
     <string name="recent_task_option_pin">Pin</string>
     <!-- Title for an option to enter freeform mode for a given app -->
     <string name="recent_task_option_freeform">Freeform</string>
-    <!-- Title for an option to enter desktop windowing mode for a given app -->
+    <!-- Title and content description for an option to enter desktop windowing mode for a given app -->
     <string name="recent_task_option_desktop">Desktop</string>
+
+    <!-- Title and content description for Desktop tile in Recents screen that contains apps opened inside desktop windowing mode [CHAR LIMIT=NONE] -->
+    <string name="recent_task_desktop">Desktop</string>
 
     <!-- Recents: The empty recents string. [CHAR LIMIT=NONE] -->
     <string name="recents_empty_message">No recent items</string>
@@ -237,7 +240,7 @@
     <!-- Label for toast with instructions for split screen selection mode. [CHAR_LIMIT=50] -->
     <string name="toast_split_select_app">Tap another app to use split screen</string>
     <string name="toast_contextual_split_select_app">Choose another app to use split screen</string>
-    <string name="toast_split_select_app_cancel"><b>Cancel</b></string>
+    <string name="toast_split_select_app_cancel">Cancel</string>
     <string name="toast_split_select_cont_desc">Exit split screen selection</string>
     <!-- Label for toast when app selected for split isn't supported. [CHAR_LIMIT=50] -->
     <string name="toast_split_app_unsupported">Choose another app to use split screen</string>
@@ -324,17 +327,14 @@
     <!-- Label for moving drop target to the bottom or right side of the screen, depending on orientation (from the Taskbar only). -->
     <string name="move_drop_target_bottom_or_right">Move to bottom&#47;right</string>
 
-    <!-- Label for quick switch tile showing how many more apps are available [CHAR LIMIT=NONE] -->
+    <!-- Label for quick switch tile showing how many more apps are available. The number will be displayed above this text. [CHAR LIMIT=NONE] -->
     <string name="quick_switch_overflow">{count, plural,
-            =1{Show # more app.}
-            other{Show # more apps.}
+            =1{more app}
+            other{more apps}
         }</string>
 
-    <!-- Label for quick switch tile showing how many apps are available in desktop mode [CHAR LIMIT=NONE] -->
-    <string name="quick_switch_desktop">{count, plural,
-            =1{Show # desktop app.}
-            other{Show # desktop apps.}
-        }</string>
+    <!-- Label for quick switch tile to launch desktop mode [CHAR LIMIT=NONE] -->
+    <string name="quick_switch_desktop">Desktop</string>
 
     <!-- Accessibility label for quick switch tiles showing split tasks [CHAR LIMIT=NONE] -->
     <string name="quick_switch_split_task"><xliff:g id="app_name_1" example="Chrome">%1$s</xliff:g> and <xliff:g id="app_name_2" example="Gmail">%2$s</xliff:g></string>

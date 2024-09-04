@@ -96,7 +96,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     public static final int FLAG_STASHED_SYSUI = 1 << 9; //  app pinning,...
     public static final int FLAG_STASHED_DEVICE_LOCKED = 1 << 10; // device is locked: keyguard, ...
     public static final int FLAG_IN_OVERVIEW = 1 << 11; // launcher is in overview
-    public static final int FLAG_IGNORE_IN_APP = 1 << 12; // used to sync with app launch animation
 
     // If any of these flags are enabled, isInApp should return true.
     private static final int FLAGS_IN_APP = FLAG_IN_APP | FLAG_IN_SETUP;
@@ -153,12 +152,12 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * How long to delay the icon/stash handle alpha.
      */
-    private static final long TASKBAR_STASH_ALPHA_START_DELAY = 33;
+    public static final long TASKBAR_STASH_ALPHA_START_DELAY = 33;
 
     /**
      * How long the icon/stash handle alpha animation plays.
      */
-    private static final long TASKBAR_STASH_ALPHA_DURATION = 50;
+    public static final long TASKBAR_STASH_ALPHA_DURATION = 50;
 
     /**
      * How long to delay the icon/stash handle alpha for the home to app taskbar animation.
@@ -423,6 +422,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     public boolean isInApp() {
         return hasAnyFlag(FLAGS_IN_APP);
+    }
+
+    /** Returns whether the taskbar is currently in overview screen. */
+    public boolean isInOverview() {
+        return hasAnyFlag(FLAG_IN_OVERVIEW);
     }
 
     /**
@@ -1022,6 +1026,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     /** Called when some system ui state has changed. (See SYSUI_STATE_... in QuickstepContract) */
     public void updateStateForSysuiFlags(long systemUiStateFlags, boolean skipAnim) {
+        if (mActivity.isPhoneMode()) {
+            return;
+        }
+
         long animDuration = TASKBAR_STASH_DURATION;
         long startDelay = 0;
 
@@ -1143,7 +1151,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      */
     public void setUpTaskbarSystemAction(boolean visible) {
         UI_HELPER_EXECUTOR.execute(() -> {
-            if (!visible || !DisplayController.isTransientTaskbar(mActivity)) {
+            if (!visible || !DisplayController.isTransientTaskbar(mActivity)
+                    || mActivity.isPhoneMode()) {
                 mAccessibilityManager.unregisterSystemAction(SYSTEM_ACTION_ID_TASKBAR);
                 mIsTaskbarSystemActionRegistered = false;
                 return;
@@ -1281,11 +1290,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
          */
         @Nullable
         public Animator createSetStateAnimator(long flags, long duration) {
-            // We do this when we want to synchronize the app launch and taskbar stash animations.
-            if (hasAnyFlag(FLAG_IGNORE_IN_APP) && hasAnyFlag(flags, FLAG_IN_APP)) {
-                flags = flags & ~FLAG_IN_APP;
-            }
-
             boolean isStashed = mStashCondition.test(flags);
 
             if (DEBUG) {
