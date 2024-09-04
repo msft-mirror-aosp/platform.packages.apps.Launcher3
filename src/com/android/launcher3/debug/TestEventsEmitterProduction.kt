@@ -17,6 +17,7 @@
 package com.android.launcher3.debug
 
 import android.content.Context
+import android.util.Log
 import com.android.launcher3.util.MainThreadInitializedObject
 import com.android.launcher3.util.SafeCloseable
 
@@ -26,6 +27,8 @@ enum class TestEvent(val event: String) {
     WORKSPACE_ON_DROP("WORKSPACE_ON_DROP"),
     RESIZE_FRAME_SHOWING("RESIZE_FRAME_SHOWING"),
     WORKSPACE_FINISH_LOADING("WORKSPACE_FINISH_LOADING"),
+    SPRING_LOADED_STATE_STARTED("SPRING_LOADED_STATE_STARTED"),
+    SPRING_LOADED_STATE_COMPLETED("SPRING_LOADED_STATE_COMPLETED"),
 }
 
 /** Interface to create TestEventEmitters. */
@@ -50,5 +53,7 @@ class TestEventsEmitterProduction : TestEventEmitter {
 
     override fun close() {}
 
-    override fun sendEvent(event: TestEvent) {}
+    override fun sendEvent(event: TestEvent) {
+        Log.d("TestEventsEmitterProduction", "Event sent ${event.event}")
+    }
 }

@@ -34,9 +34,9 @@ import androidx.constraintlayout.widget.ConstraintLayout;
 
 import com.android.launcher3.R;
 import com.android.launcher3.icons.DotRenderer;
-import com.android.wm.shell.animation.Interpolators;
-import com.android.wm.shell.common.bubbles.BubbleBarLocation;
-import com.android.wm.shell.common.bubbles.BubbleInfo;
+import com.android.wm.shell.shared.animation.Interpolators;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.bubbles.BubbleInfo;
 
 // TODO: (b/276978250) This is will be similar to WMShell's BadgedImageView, it'd be nice to share.
 
@@ -74,6 +74,7 @@ public class BubbleView extends ConstraintLayout {
     private boolean mOnLeft = false;
 
     private BubbleBarItem mBubble;
+    private boolean mIsOverflow;
 
     private Bitmap mIcon;
 
@@ -236,7 +237,11 @@ public class BubbleView extends ConstraintLayout {
         mBubble = bubble;
         mIcon = bubble.getIcon();
         updateBubbleIcon();
-        mAppIcon.setImageBitmap(bubble.getBadge());
+        if (bubble.getInfo().showAppBadge()) {
+            mAppIcon.setImageBitmap(bubble.getBadge());
+        } else {
+            mAppIcon.setVisibility(GONE);
+        }
         mDotColor = bubble.getDotColor();
         mDotRenderer = new DotRenderer(mBubbleSize, bubble.getDotPath(), DEFAULT_PATH_SIZE);
         String contentDesc = bubble.getInfo().getTitle();
@@ -271,10 +276,16 @@ public class BubbleView extends ConstraintLayout {
      */
     public void setOverflow(BubbleBarOverflow overflow, Bitmap bitmap) {
         mBubble = overflow;
+        mIsOverflow = true;
         mIcon = bitmap;
         updateBubbleIcon();
         mAppIcon.setVisibility(GONE); // Overflow doesn't show the app badge
         setContentDescription(getResources().getString(R.string.bubble_bar_overflow_description));
+    }
+
+    /** Whether this view represents the overflow button. */
+    public boolean isOverflow() {
+        return mIsOverflow;
     }
 
     /** Returns the bubble being rendered in this view. */
@@ -295,8 +306,10 @@ public class BubbleView extends ConstraintLayout {
     }
 
     void setBadgeScale(float fraction) {
-        mAppIcon.setScaleX(fraction);
-        mAppIcon.setScaleY(fraction);
+        if (mAppIcon.getVisibility() == VISIBLE) {
+            mAppIcon.setScaleX(fraction);
+            mAppIcon.setScaleY(fraction);
+        }
     }
 
     boolean hasUnseenContent() {

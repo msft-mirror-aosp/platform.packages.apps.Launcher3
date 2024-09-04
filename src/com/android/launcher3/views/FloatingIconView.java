@@ -22,7 +22,7 @@ import static com.android.launcher3.Flags.enableAdditionalHomeAnimations;
 import static com.android.launcher3.Utilities.getFullDrawable;
 import static com.android.launcher3.Utilities.mapToRange;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
-import static com.android.launcher3.views.IconLabelDotView.setIconAndDotVisible;
+import static com.android.launcher3.views.FloatingIconViewCompanion.setPropertiesVisible;
 
 import android.animation.Animator;
 import android.content.Context;
@@ -175,8 +175,9 @@ public class FloatingIconView extends FrameLayout implements
                 mLauncher.getDeviceProfile(), taskViewDrawAlpha);
 
         if (mFadeOutView != null) {
-            // The alpha goes from 1 to 0 when progress is 0 and 0.33 respectively.
-            mFadeOutView.setAlpha(1 - Math.min(1f, mapToRange(progress, 0, 0.33f, 0, 1, LINEAR)));
+            // The alpha goes from 1 to 0 when progress is 0 and 0.15 respectively.
+            // This value minimizes view display time while still allowing the view to fade out.
+            mFadeOutView.setAlpha(1 - Math.min(1f, mapToRange(progress, 0, 0.15f, 0, 1, LINEAR)));
         }
     }
 
@@ -515,6 +516,10 @@ public class FloatingIconView extends FrameLayout implements
             // When closing an app, we want the item on the workspace to be invisible immediately
             updateViewsVisibility(false  /* isVisible */);
         }
+        if (mFadeOutView instanceof FloatingIconViewCompanion fivc) {
+            fivc.setForceHideDot(true);
+            fivc.setForceHideRing(true);
+        }
     }
 
     @Override
@@ -652,6 +657,10 @@ public class FloatingIconView extends FrameLayout implements
             if (view.mFadeOutView != null) {
                 view.mFadeOutView.setAlpha(1f);
             }
+            if (view.mFadeOutView instanceof FloatingIconViewCompanion fivc) {
+                fivc.setForceHideDot(false);
+                fivc.setForceHideRing(false);
+            }
 
             if (hideOriginal) {
                 view.updateViewsVisibility(true /* isVisible */);
@@ -673,10 +682,10 @@ public class FloatingIconView extends FrameLayout implements
 
     private void updateViewsVisibility(boolean isVisible) {
         if (mOriginalIcon != null) {
-            setIconAndDotVisible(mOriginalIcon, isVisible);
+            setPropertiesVisible(mOriginalIcon, isVisible);
         }
         if (mMatchVisibilityView != null) {
-            setIconAndDotVisible(mMatchVisibilityView, isVisible);
+            setPropertiesVisible(mMatchVisibilityView, isVisible);
         }
     }
 

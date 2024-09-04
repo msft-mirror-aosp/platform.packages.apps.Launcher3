@@ -26,11 +26,11 @@ import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
-import static com.android.wm.shell.common.split.SplitScreenConstants.SNAP_TO_50_50;
-import static com.android.wm.shell.common.split.SplitScreenConstants.SNAP_TO_NONE;
-import static com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT;
-import static com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_TOP_OR_LEFT;
-import static com.android.wm.shell.common.split.SplitScreenConstants.isPersistentSnapPosition;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_50_50;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_NONE;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_TOP_OR_LEFT;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.isPersistentSnapPosition;
 
 import android.content.Context;
 import android.content.Intent;
@@ -70,10 +70,11 @@ import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
-import com.android.wm.shell.common.split.SplitScreenConstants.PersistentSnapPosition;
+import com.android.wm.shell.shared.split.SplitScreenConstants.PersistentSnapPosition;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Controller class that handles app pair interactions: saving, modifying, deleting, etc.
@@ -232,14 +233,16 @@ public class AppPairsController {
      *
      * @param cuj Should be an integer from {@link Cuj} or -1 if no CUJ needs to be logged for jank
      *            monitoring
+     * @param callback Called after the app pair launch finishes animating, or null if no method is
+     *                 to be called
      */
-    public void launchAppPair(AppPairIcon appPairIcon, int cuj) {
+    public void launchAppPair(AppPairIcon appPairIcon, int cuj,
+            @Nullable Consumer<Boolean> callback) {
         WorkspaceItemInfo app1 = appPairIcon.getInfo().getFirstApp();
         WorkspaceItemInfo app2 = appPairIcon.getInfo().getSecondApp();
         ComponentKey app1Key = new ComponentKey(app1.getTargetComponent(), app1.user);
         ComponentKey app2Key = new ComponentKey(app2.getTargetComponent(), app2.user);
-        mSplitSelectStateController.setLaunchingCuj(cuj);
-        InteractionJankMonitorWrapper.begin(appPairIcon, cuj);
+        mSplitSelectStateController.setLaunchingCuj(appPairIcon, cuj);
 
         mSplitSelectStateController.findLastActiveTasksAndRunCallback(
                 Arrays.asList(app1Key, app2Key),
@@ -273,9 +276,16 @@ public class AppPairsController {
                     mSplitSelectStateController.setLaunchingIconView(appPairIcon);
 
                     mSplitSelectStateController.launchSplitTasks(
-                            AppPairsController.convertRankToSnapPosition(app1.rank));
+                            AppPairsController.convertRankToSnapPosition(app1.rank), callback);
                 }
         );
+    }
+
+    /**
+     * Launches an app pair but does not specify a callback
+     */
+    public void launchAppPair(AppPairIcon appPairIcon, int cuj) {
+        launchAppPair(appPairIcon, cuj, null);
     }
 
     /**
