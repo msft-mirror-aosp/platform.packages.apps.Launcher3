@@ -19,8 +19,6 @@ import static com.android.launcher3.QuickstepTransitionManager.TRANSIENT_TASKBAR
 import static com.android.launcher3.statemanager.BaseState.FLAG_NON_INTERACTIVE;
 import static com.android.launcher3.taskbar.TaskbarEduTooltipControllerKt.TOOLTIP_STEP_FEATURES;
 import static com.android.launcher3.taskbar.TaskbarLauncherStateController.FLAG_VISIBLE;
-import static com.android.launcher3.taskbar.TaskbarStashController.FLAG_IGNORE_IN_APP;
-import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
 import android.animation.Animator;
@@ -139,6 +137,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         mHomeState.removeListener(mVisibilityChangeListener);
     }
 
+    /** Returns {@code true} if launcher is currently presenting the home screen. */
+    public boolean isOnHome() {
+        return mTaskbarLauncherStateController.isOnHome();
+    }
+
     private void onInAppDisplayProgressChanged() {
         if (mControllers != null) {
             // Update our shared state so we can restore it if taskbar gets recreated.
@@ -225,9 +228,10 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         // Launcher is resumed during the swipe-to-overview gesture under shell-transitions, so
         // avoid updating taskbar state in that situation (when it's non-interactive -- or
         // "background") to avoid premature animations.
-        if (ENABLE_SHELL_TRANSITIONS && isVisible
-                && mLauncher.getStateManager().getState().hasFlag(FLAG_NON_INTERACTIVE)
-                && !mLauncher.getStateManager().getState().isTaskbarAlignedWithHotseat(mLauncher)) {
+        LauncherState state = mLauncher.getStateManager().getState();
+        boolean nonInteractiveState = state.hasFlag(FLAG_NON_INTERACTIVE)
+                && !state.isTaskbarAlignedWithHotseat(mLauncher);
+        if (isVisible && (nonInteractiveState || mSkipLauncherVisibilityChange)) {
             return null;
         }
 
@@ -241,7 +245,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         }
 
         mTaskbarLauncherStateController.updateStateForFlag(FLAG_VISIBLE, isVisible);
-        if (fromInit) {
+        if (fromInit || mControllers == null) {
             duration = 0;
         }
         return mTaskbarLauncherStateController.applyState(duration, startAnimation);
@@ -276,35 +280,18 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         return mTaskbarLauncherStateController.createAnimToLauncher(toState, callbacks, duration);
     }
 
-    /**
-     * Create Taskbar animation to be played alongside the Launcher app launch animation.
-     */
-    public @Nullable Animator createAnimToApp() {
-        TaskbarStashController stashController = mControllers.taskbarStashController;
-        stashController.updateStateForFlag(TaskbarStashController.FLAG_IN_APP, true);
-        return stashController.createApplyStateAnimator(stashController.getStashDuration());
-    }
-
-    /**
-     * Temporarily ignore FLAG_IN_APP for app launches to prevent premature taskbar stashing.
-     * This is needed because taskbar gets a signal to stash before we actually start the
-     * app launch animation.
-     */
-    public void setIgnoreInAppFlagForSync(boolean enabled) {
-        if (mControllers == null) {
-            // This method can be called before init() is called.
-            return;
-        }
-        mControllers.taskbarStashController.updateStateForFlag(FLAG_IGNORE_IN_APP, enabled);
-    }
-
     public void updateTaskbarLauncherStateGoingHome() {
         mTaskbarLauncherStateController.updateStateForFlag(FLAG_VISIBLE, true);
         mTaskbarLauncherStateController.applyState();
     }
 
     public boolean isDraggingItem() {
-        return mControllers.taskbarDragController.isDragging();
+        boolean bubblesDragging = false;
+        if (mControllers.bubbleControllers.isPresent()) {
+            bubblesDragging =
+                    mControllers.bubbleControllers.get().bubbleDragController.isDragging();
+        }
+        return mControllers.taskbarDragController.isDragging() || bubblesDragging;
     }
 
     @Override

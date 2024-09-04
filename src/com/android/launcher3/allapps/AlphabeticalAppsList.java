@@ -26,6 +26,7 @@ import android.content.Context;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.style.ImageSpan;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -39,6 +40,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.LabelComparator;
 import com.android.launcher3.views.ActivityContext;
 
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -72,10 +74,16 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         public final CharSequence sectionName;
         // The item position
         public final int position;
+        // The view id associated with this section
+        public int id = -1;
 
         public FastScrollSectionInfo(CharSequence sectionName, int position) {
             this.sectionName = sectionName;
             this.position = position;
+        }
+
+        public void setId(int id) {
+            this.id = id;
         }
     }
 
@@ -270,6 +278,7 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         List<AdapterItem> oldItems = new ArrayList<>(mAdapterItems);
         // Prepare to update the list of sections, filtered apps, etc.
         mFastScrollerSections.clear();
+        Log.d(TAG, "Clearing FastScrollerSections.");
         mAdapterItems.clear();
         mAccessibilityResultsCount = 0;
 
@@ -290,6 +299,7 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                     mFastScrollerSections.add(new FastScrollSectionInfo(
                             mActivityContext.getResources().getString(
                                     R.string.work_profile_edu_section), 0));
+                    Log.d(TAG, "Adding FastScrollSection for work edu card.");
                 }
                 position = addAppsWithSections(mApps, position);
             }
@@ -303,6 +313,7 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                 mFastScrollerSections.add(new FastScrollSectionInfo(
                         mFastScrollerSections.get(mFastScrollerSections.size() - 1).sectionName,
                         position++));
+                Log.d(TAG, "Adding FastScrollSection duplicate to scroll to the bottom.");
             }
         }
         mAccessibilityResultsCount = (int) mAdapterItems.stream()
@@ -346,6 +357,7 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                 && !mPrivateApps.isEmpty()) {
             // Always add PS Header if Space is present and visible.
             position = mPrivateProviderManager.addPrivateSpaceHeader(mAdapterItems);
+            Log.d(TAG, "Adding FastScrollSection for Private Space header. ");
             mFastScrollerSections.add(new FastScrollSectionInfo(
                     mPrivateProfileAppScrollerBadge, position));
             int privateSpaceState = mPrivateProviderManager.getCurrentState();
@@ -407,14 +419,14 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             hasPrivateApps = appList.stream().
                     allMatch(mPrivateProviderManager.getItemInfoMatcher());
         }
+        Log.d(TAG, "Adding apps with sections. HasPrivateApps: " + hasPrivateApps);
         for (int i = 0; i < appList.size(); i++) {
             AppInfo info = appList.get(i);
             // Apply decorator to private apps.
             if (hasPrivateApps) {
                 mAdapterItems.add(AdapterItem.asAppWithDecorationInfo(info,
-                        new SectionDecorationInfo(mActivityContext.getApplicationContext(),
-                                getRoundRegions(i, appList.size()),
-                                true /* decorateTogether */)));
+                        new SectionDecorationInfo(mActivityContext,
+                                getRoundRegions(i, appList.size()), true /* decorateTogether */)));
             } else {
                 mAdapterItems.add(AdapterItem.asApp(info));
             }
@@ -422,6 +434,8 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             String sectionName = info.sectionName;
             // Create a new section if the section names do not match
             if (!sectionName.equals(lastSectionName)) {
+                Log.d(TAG, "addAppsWithSections: adding sectionName: " + sectionName
+                    + " with appInfoTitle: " + info.title);
                 lastSectionName = sectionName;
                 mFastScrollerSections.add(new FastScrollSectionInfo(hasPrivateApps ?
                         mPrivateProfileAppScrollerBadge : sectionName, position));
@@ -470,6 +484,13 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
 
     public PrivateProfileManager getPrivateProfileManager() {
         return mPrivateProviderManager;
+    }
+
+    public void dump(String prefix, PrintWriter writer) {
+        writer.println(prefix + "SectionInfo[] size: " + mFastScrollerSections.size());
+        for (int i = 0; i < mFastScrollerSections.size(); i++) {
+            writer.println("\tFastScrollSection: " + mFastScrollerSections.get(i).sectionName);
+        }
     }
 
     private static class MyDiffCallback extends DiffUtil.Callback {

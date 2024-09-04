@@ -27,7 +27,6 @@ import static com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_O
 import static com.android.quickstep.OverviewComponentObserver.startHomeIntentSafely;
 import static com.android.quickstep.TaskUtils.taskIsATargetWithMode;
 import static com.android.quickstep.TaskViewUtils.createRecentsWindowAnimator;
-import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -88,6 +87,7 @@ import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskView;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -148,7 +148,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
         mFallbackRecentsView = rootView.findViewById(R.id.overview_panel);
         mActionsView = rootView.findViewById(R.id.overview_actions_view);
 
-        if (DESKTOP_WINDOWING_MODE.isEnabled(this)) {
+        if (DesktopModeStatus.canEnterDesktopMode(this)) {
             mDesktopRecentsTransitionController = new DesktopRecentsTransitionController(
                     getStateManager(), systemUiProxy, getIApplicationThread(),
                     null /* depthController */
