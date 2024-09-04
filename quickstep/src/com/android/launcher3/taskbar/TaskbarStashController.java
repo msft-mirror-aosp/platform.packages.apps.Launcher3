@@ -152,12 +152,12 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * How long to delay the icon/stash handle alpha.
      */
-    private static final long TASKBAR_STASH_ALPHA_START_DELAY = 33;
+    public static final long TASKBAR_STASH_ALPHA_START_DELAY = 33;
 
     /**
      * How long the icon/stash handle alpha animation plays.
      */
-    private static final long TASKBAR_STASH_ALPHA_DURATION = 50;
+    public static final long TASKBAR_STASH_ALPHA_DURATION = 50;
 
     /**
      * How long to delay the icon/stash handle alpha for the home to app taskbar animation.
@@ -422,6 +422,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     public boolean isInApp() {
         return hasAnyFlag(FLAGS_IN_APP);
+    }
+
+    /** Returns whether the taskbar is currently in overview screen. */
+    public boolean isInOverview() {
+        return hasAnyFlag(FLAG_IN_OVERVIEW);
     }
 
     /**
@@ -1146,7 +1151,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      */
     public void setUpTaskbarSystemAction(boolean visible) {
         UI_HELPER_EXECUTOR.execute(() -> {
-            if (!visible || !DisplayController.isTransientTaskbar(mActivity)) {
+            if (!visible || !DisplayController.isTransientTaskbar(mActivity)
+                    || mActivity.isPhoneMode()) {
                 mAccessibilityManager.unregisterSystemAction(SYSTEM_ACTION_ID_TASKBAR);
                 mIsTaskbarSystemActionRegistered = false;
                 return;

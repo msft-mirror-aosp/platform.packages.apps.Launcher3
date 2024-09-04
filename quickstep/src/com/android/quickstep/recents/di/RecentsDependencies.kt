@@ -22,12 +22,13 @@ import android.view.View
 import com.android.launcher3.util.coroutines.ProductionDispatchers
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.recents.data.RecentTasksRepository
+import com.android.quickstep.recents.data.TaskVisualsChangedDelegate
+import com.android.quickstep.recents.data.TaskVisualsChangedDelegateImpl
 import com.android.quickstep.recents.data.TasksRepository
 import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.usecase.GetThumbnailUseCase
 import com.android.quickstep.recents.usecase.SysUiStatusNavFlagsUseCase
 import com.android.quickstep.recents.viewmodel.RecentsViewData
-import com.android.quickstep.task.thumbnail.GetSplashSizeUseCase
 import com.android.quickstep.task.thumbnail.SplashAlphaUseCase
 import com.android.quickstep.task.thumbnail.TaskThumbnailViewData
 import com.android.quickstep.task.viewmodel.TaskContainerData
@@ -61,14 +62,22 @@ class RecentsDependencies private constructor(private val appContext: Context) {
             val recentsCoroutineScope =
                 CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("RecentsView"))
             set(CoroutineScope::class.java.simpleName, recentsCoroutineScope)
+            val recentsModel = RecentsModel.INSTANCE.get(appContext)
+            val taskVisualsChangedDelegate =
+                TaskVisualsChangedDelegateImpl(
+                    recentsModel,
+                    recentsModel.thumbnailCache.highResLoadingState
+                )
+            set(TaskVisualsChangedDelegate::class.java.simpleName, taskVisualsChangedDelegate)
 
             // Create RecentsTaskRepository singleton
             val recentTasksRepository: RecentTasksRepository =
-                with(RecentsModel.INSTANCE.get(appContext)) {
+                with(recentsModel) {
                     TasksRepository(
                         this,
                         thumbnailCache,
                         iconCache,
+                        taskVisualsChangedDelegate,
                         recentsCoroutineScope,
                         ProductionDispatchers
                     )
@@ -156,6 +165,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                             thumbnailCache,
                             iconCache,
                             get(),
+                            get(),
                             ProductionDispatchers
                         )
                     }
@@ -176,7 +186,6 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                         getThumbnailPositionUseCase = inject(),
                         tasksRepository = inject(),
                         splashAlphaUseCase = inject(scopeId),
-                        getSplashSizeUseCase = inject(scopeId),
                     )
                 TaskOverlayViewModel::class.java -> {
                     val task = extras["Task"] as Task
@@ -203,12 +212,6 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                         taskThumbnailViewData = inject(scopeId),
                         tasksRepository = inject(),
                         rotationStateRepository = inject(),
-                    )
-                GetSplashSizeUseCase::class.java ->
-                    GetSplashSizeUseCase(
-                        taskThumbnailViewData = inject(scopeId),
-                        taskViewData = inject(scopeId, extras),
-                        deviceProfileRepository = inject(),
                     )
                 else -> {
                     log("Factory for ${modelClass.simpleName} not defined!", Log.ERROR)
