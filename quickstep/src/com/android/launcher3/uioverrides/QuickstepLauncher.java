@@ -22,7 +22,6 @@ import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.internal.jank.Cuj.CUJ_LAUNCHER_LAUNCH_APP_PAIR_FROM_WORKSPACE;
-import static com.android.launcher3.Flags.enablePredictiveBackGesture;
 import static com.android.launcher3.Flags.enableUnfoldStateAnimation;
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.PENDING_SPLIT_SELECT_INFO;
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE;
@@ -67,7 +66,7 @@ import static com.android.quickstep.util.AnimUtils.completeRunnableListCallback;
 import static com.android.quickstep.util.SplitAnimationTimings.TABLET_HOME_TO_SPLIT;
 import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
-import static com.android.wm.shell.common.split.SplitScreenConstants.SNAP_TO_50_50;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_50_50;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -499,10 +498,8 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         boolean started = ((getActivityFlags() & ACTIVITY_STATE_STARTED)) != 0;
         if (started) {
             DeviceProfile profile = getDeviceProfile();
-            boolean willUserBeActive =
-                    (getActivityFlags() & ACTIVITY_STATE_USER_WILL_BE_ACTIVE) != 0;
             boolean visible = (state == NORMAL || state == OVERVIEW)
-                    && (willUserBeActive || isUserActive())
+                    && isUserActive()
                     && !profile.isVerticalBarLayout()
                     && !mIsOverlayVisible;
             SystemUiProxy.INSTANCE.get(this)
@@ -696,9 +693,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         // Back dispatcher is registered in {@link BaseActivity#onCreate}. For predictive back to
         // work, we must opt-in BEFORE registering back dispatcher. So we need to call
         // setEnableOnBackInvokedCallback() before super.onCreate()
-        if (Utilities.ATLEAST_U && enablePredictiveBackGesture()) {
-            getApplicationInfo().setEnableOnBackInvokedCallback(true);
-        }
+        getApplicationInfo().setEnableOnBackInvokedCallback(true);
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
             mPendingSplitSelectInfo = ObjectWrapper.unwrap(
@@ -729,7 +724,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         // Check if there is already an instance of this app running, if so, initiate the split
         // using that.
         mSplitSelectStateController.findLastActiveTasksAndRunCallback(
-                Collections.singletonList(splitSelectSource.itemInfo.getComponentKey()),
+                Collections.singletonList(splitSelectSource.getItemInfo().getComponentKey()),
                 false /* findExactPairMatch */,
                 foundTasks -> {
                     @Nullable Task foundTask = foundTasks[0];
@@ -756,7 +751,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         Rect tempRect = new Rect();
 
         mSplitSelectStateController.setInitialTaskSelect(source.intent,
-                source.position.stagePosition, source.itemInfo, source.splitEvent,
+                source.position.stagePosition, source.getItemInfo(), source.splitEvent,
                 source.alreadyRunningTaskId);
 
         RecentsView recentsView = getOverviewPanel();
@@ -774,6 +769,8 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         floatingTaskView.setOnClickListener(view ->
                 mSplitSelectStateController.getSplitAnimationController().
                         playAnimPlaceholderToFullscreen(this, view, Optional.empty()));
+        floatingTaskView.setContentDescription(source.getItemInfo().contentDescription);
+
         mSplitSelectStateController.setFirstFloatingTaskView(floatingTaskView);
         anim.addListener(new AnimatorListenerAdapter() {
             @Override
@@ -908,8 +905,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         // event won't go through ViewRootImpl#InputStage#onProcess.
         // So when receive back key, try to do the same check thing in
         // ViewRootImpl#NativePreImeInputStage#onProcess
-        if (!Utilities.ATLEAST_U || !enablePredictiveBackGesture()
-                || event.getKeyCode() != KeyEvent.KEYCODE_BACK
+        if (event.getKeyCode() != KeyEvent.KEYCODE_BACK
                 || event.getAction() != KeyEvent.ACTION_UP || event.isCanceled()) {
             return false;
         }
@@ -920,10 +916,6 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
 
     @Override
     protected void registerBackDispatcher() {
-        if (!enablePredictiveBackGesture()) {
-            super.registerBackDispatcher();
-            return;
-        }
         getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                 OnBackInvokedDispatcher.PRIORITY_DEFAULT,
                 new OnBackAnimationCallback() {
@@ -1275,10 +1267,6 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
                 return ObjectWrapper.wrap(NO_MATCHING_ID);
         }
         return ObjectWrapper.wrap(new Integer(info.id));
-    }
-
-    public void setHintUserWillBeActive() {
-        addActivityFlags(ACTIVITY_STATE_USER_WILL_BE_ACTIVE);
     }
 
     @Override

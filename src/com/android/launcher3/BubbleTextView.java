@@ -89,7 +89,7 @@ import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ShortcutUtil;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.views.ActivityContext;
-import com.android.launcher3.views.IconLabelDotView;
+import com.android.launcher3.views.FloatingIconViewCompanion;
 
 import java.text.NumberFormat;
 import java.util.HashMap;
@@ -101,7 +101,7 @@ import java.util.Locale;
  * too aggressive.
  */
 public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
-        IconLabelDotView, DraggableView, Reorderable {
+        FloatingIconViewCompanion, DraggableView, Reorderable {
 
     public static final String TAG = "BubbleTextView";
 
@@ -176,7 +176,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     @ViewDebug.ExportedProperty(category = "launcher")
     private boolean mSkipUserBadge = false;
     @ViewDebug.ExportedProperty(category = "launcher")
-    private boolean mIsIconVisible = true;
+    protected boolean mIsIconVisible = true;
     @ViewDebug.ExportedProperty(category = "launcher")
     private int mTextColor;
     @ViewDebug.ExportedProperty(category = "launcher")
@@ -1043,12 +1043,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     /** Applies the given progress level to the this icon's progress bar. */
     @Nullable
     public PreloadIconDrawable applyProgressLevel() {
-        if (!(getTag() instanceof ItemInfoWithIcon)
+        if (!(getTag() instanceof ItemInfoWithIcon info)
                 || ((ItemInfoWithIcon) getTag()).isInactiveArchive()) {
             return null;
         }
 
-        ItemInfoWithIcon info = (ItemInfoWithIcon) getTag();
         int progressLevel = info.getProgressLevel();
         if (progressLevel >= 100) {
             setContentDescription(info.contentDescription != null
@@ -1068,6 +1067,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             } else {
                 preloadIconDrawable = makePreloadIcon();
                 setIcon(preloadIconDrawable);
+                if (info.isArchived() && Flags.useNewIconForArchivedApps()) {
+                    // reapply text without cloud icon as soon as unarchiving is triggered
+                    applyLabel(info);
+                }
             }
             return preloadIconDrawable;
         }

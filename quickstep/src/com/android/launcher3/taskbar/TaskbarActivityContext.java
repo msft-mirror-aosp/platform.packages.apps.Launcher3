@@ -25,10 +25,10 @@ import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 import static android.window.SplashScreen.SPLASH_SCREEN_STYLE_UNDEFINED;
 
 import static com.android.launcher3.AbstractFloatingView.TYPE_ALL;
+import static com.android.launcher3.AbstractFloatingView.TYPE_ON_BOARD_POPUP;
 import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_OVERLAY_PROXY;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
-import static com.android.launcher3.Flags.enableTaskbarCustomization;
 import static com.android.launcher3.Utilities.calculateTextHeight;
 import static com.android.launcher3.Utilities.isRunningInTestHarness;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
@@ -185,6 +185,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     private final WindowManager mWindowManager;
     private DeviceProfile mDeviceProfile;
     private WindowManager.LayoutParams mWindowLayoutParams;
+    private WindowManager.LayoutParams mLastUpdatedLayoutParams;
     private boolean mIsFullscreen;
     // The size we should return to when we call setTaskbarWindowFullscreen(false)
     private int mLastRequestedNonFullscreenSize;
@@ -228,15 +229,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mNavigationBarPanelContext = navigationBarPanelContext;
         applyDeviceProfile(launcherDp);
         final Resources resources = getResources();
-
-        if (enableTaskbarCustomization()) {
-            mTaskbarFeatureEvaluator = TaskbarFeatureEvaluator.getInstance(this);
-            mTaskbarSpecsEvaluator = new TaskbarSpecsEvaluator(
-                    this,
-                    mTaskbarFeatureEvaluator,
-                    mDeviceProfile.inv.numRows,
-                    mDeviceProfile.inv.numColumns);
-        }
+        mTaskbarFeatureEvaluator = TaskbarFeatureEvaluator.getInstance(this);
+        mTaskbarSpecsEvaluator = new TaskbarSpecsEvaluator(
+                this,
+                mTaskbarFeatureEvaluator,
+                mDeviceProfile.inv.numRows,
+                mDeviceProfile.inv.numColumns);
 
         mImeDrawsImeNavBar = getBoolByName(IME_DRAWS_IME_NAV_BAR_RES_NAME, resources, false);
         mIsSafeModeEnabled = TraceHelper.allowIpcs("isSafeMode",
@@ -285,7 +283,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             TaskbarHotseatDimensionsProvider dimensionsProvider =
                     new DeviceProfileDimensionsProviderAdapter(this);
             BubbleStashController bubbleStashController = isTransientTaskbar
-                    ? new TransientBubbleStashController(dimensionsProvider, getResources())
+                    ? new TransientBubbleStashController(dimensionsProvider, this)
                     : new PersistentBubbleStashController(dimensionsProvider);
             bubbleControllersOptional = Optional.of(new BubbleControllers(
                     new BubbleBarController(this, bubbleBarView),
@@ -346,8 +344,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new KeyboardQuickSwitchController(),
                 new TaskbarPinningController(this, () ->
                         DisplayController.isInDesktopMode(this)),
-                bubbleControllersOptional);
-
+                bubbleControllersOptional,
+                new TaskbarDesktopModeController(
+                        LauncherActivityInterface.INSTANCE::getDesktopVisibilityController));
         mLauncherPrefs = LauncherPrefs.get(this);
     }
 
@@ -441,6 +440,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mImeDrawsImeNavBar = getBoolByName(IME_DRAWS_IME_NAV_BAR_RES_NAME, getResources(), false);
         mLastRequestedNonFullscreenSize = getDefaultTaskbarWindowSize();
         mWindowLayoutParams = createAllWindowParams();
+        mLastUpdatedLayoutParams = new WindowManager.LayoutParams();
 
         // Initialize controllers after all are constructed.
         mControllers.init(sharedState);
@@ -498,6 +498,15 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     /** Returns {@code true} iff a tiny version of taskbar is shown on phone. */
     public boolean isTinyTaskbar() {
         return enableTinyTaskbar() && mDeviceProfile.isPhone && mDeviceProfile.isTaskbarPresent;
+    }
+
+    /**
+     * Returns {@code true} iff bubble bar is enabled (but not necessarily visible /
+     * containing bubbles).
+     */
+    @Override
+    public boolean isBubbleBarEnabled() {
+        return getBubbleControllers() != null && BubbleBarController.isBubbleBarEnabled();
     }
 
     /**
@@ -1514,6 +1523,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 itemView.setHapticFeedbackEnabled(true);
                 return false;
             });
+
+            // Close any open taskbar tooltips.
+            if (AbstractFloatingView.hasOpenView(this, TYPE_ON_BOARD_POPUP)) {
+                AbstractFloatingView.getOpenView(this, TYPE_ON_BOARD_POPUP)
+                        .close(/* animate= */ false);
+            }
         });
     }
 
@@ -1711,6 +1726,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     void notifyUpdateLayoutParams() {
         if (mDragLayer.isAttachedToWindow()) {
+            // Copy the current windowLayoutParams to mLastUpdatedLayoutParams and compare the diff.
+            // If there is no change, we will skip the call to updateViewLayout.
+            int changes = mLastUpdatedLayoutParams.copyFrom(mWindowLayoutParams);
+            if (changes == 0) {
+                return;
+            }
             if (enableTaskbarNoRecreate()) {
                 mWindowManager.updateViewLayout(mDragLayer.getRootView(), mWindowLayoutParams);
             } else {
@@ -1736,12 +1757,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         return mControllers.taskbarStashController.isInStashedLauncherState();
     }
 
-    @Nullable
     public TaskbarFeatureEvaluator getTaskbarFeatureEvaluator() {
         return mTaskbarFeatureEvaluator;
     }
 
-    @Nullable
     public TaskbarSpecsEvaluator getTaskbarSpecsEvaluator() {
         return mTaskbarSpecsEvaluator;
     }

@@ -22,6 +22,7 @@
     <string name="recent_task_option_pin" msgid="7929860679018978258">"تثبيت"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"شكل مجاني"</string>
     <string name="recent_task_option_desktop" msgid="8280879717125435668">"الكمبيوتر المكتبي"</string>
+    <string name="recent_task_desktop" msgid="8081113562549637334">"كمبيوتر مكتبي"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"ما مِن عناصر تم استخدامها مؤخرًا"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"إعدادات استخدام التطبيق"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"محو الكل"</string>
@@ -140,8 +141,8 @@
     <string name="taskbar_divider_a11y_title" msgid="6608690309720242080">"مقسِّم شريط التطبيقات"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"الانتقال إلى يمين الشاشة أو أعلاها"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"الانتقال إلى يسار الشاشة أو أسفلها"</string>
-    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{إظهار تطبيق واحد آخر}zero{إظهار # تطبيق آخر}two{إظهار تطبيقَين آخرَين}few{إظهار # تطبيقات أخرى}many{إظهار # تطبيقًا آخر}other{إظهار # تطبيق آخر}}"</string>
-    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{عرض تطبيق واحد متوافق مع الكمبيوتر المكتبي}zero{عرض # تطبيق متوافق مع الكمبيوتر المكتبي}two{عرض تطبيقَين متوافقين مع الكمبيوتر المكتبي}few{عرض # تطبيقات متوافقة مع الكمبيوتر المكتبي}many{عرض # تطبيقًا متوافقًا مع الكمبيوتر المكتبي}other{عرض # تطبيق متوافق مع الكمبيوتر المكتبي}}"</string>
+    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{تطبيق واحد آخر}zero{تطبيق آخر}two{تطبيقان آخران}few{تطبيقات أخرى}many{تطبيقًا آخر}other{تطبيق آخر}}"</string>
+    <string name="quick_switch_desktop" msgid="8393802056024499749">"وضع الكمبيوتر المكتبي"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"\"<xliff:g id="APP_NAME_1">%1$s</xliff:g>\" و\"<xliff:g id="APP_NAME_2">%2$s</xliff:g>\""</string>
     <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"فقاعة"</string>
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"القائمة الكاملة"</string>
