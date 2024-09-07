@@ -35,10 +35,9 @@ class EventWaiter(val eventToWait: TestEvent) {
 
     companion object {
         private const val TAG = "EventWaiter"
-        private val SIGNAL_TIMEOUT = TimeUnit.SECONDS.toMillis(5)
     }
 
-    fun waitForSignal(timeout: Long = SIGNAL_TIMEOUT) = runBlocking {
+    fun waitForSignal(timeout: Long = TimeUnit.SECONDS.toMillis(10)) = runBlocking {
         var status = withTimeoutOrNull(timeout) { deferrable.await() }
         if (status == null) {
             status = EventStatus.TIMEOUT

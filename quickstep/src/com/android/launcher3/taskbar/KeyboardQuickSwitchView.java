@@ -214,13 +214,11 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
                     groupTask.mSplitBounds == null
                             || groupTask.mSplitBounds.leftTopTaskId == groupTask.task1.key.id
                             || groupTask.task2 == null;
-
-            currentTaskView.setThumbnailsForSplitTasks(
+            currentTaskView.setThumbnails(
                     firstTaskIsLeftTopTask ? groupTask.task1 : groupTask.task2,
                     firstTaskIsLeftTopTask ? groupTask.task2 : groupTask.task1,
                     updateTasks ? mViewCallbacks::updateThumbnailInBackground : null,
-                    updateTasks ? mViewCallbacks::updateIconInBackground : null,
-                    groupTask.mSplitBounds);
+                    updateTasks ? mViewCallbacks::updateIconInBackground : null);
 
             previousTaskView = currentTaskView;
         }

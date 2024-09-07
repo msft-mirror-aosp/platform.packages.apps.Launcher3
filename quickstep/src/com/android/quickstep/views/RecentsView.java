@@ -635,16 +635,13 @@ public abstract class RecentsView<
         @Override
         public void onTaskRemoved(int taskId) {
             if (!mHandleTaskStackChanges) {
-                Log.d(TAG, "onTaskRemoved: " + taskId + ", not handling task stack changes");
                 return;
             }
 
             TaskView taskView = getTaskViewByTaskId(taskId);
             if (taskView == null) {
-                Log.d(TAG, "onTaskRemoved: " + taskId + ", no associated TaskView");
                 return;
             }
-            Log.d(TAG, "onTaskRemoved: " + taskId);
             Task.TaskKey taskKey = taskView.getFirstTask().key;
             UI_HELPER_EXECUTOR.execute(new CancellableTask<>(
                     () -> PackageManagerWrapper.getInstance()
@@ -2141,7 +2138,6 @@ public abstract class RecentsView<
         boolean handleTaskStackChanges = mOverviewStateEnabled && isAttachedToWindow()
                 && getWindowVisibility() == VISIBLE;
         if (handleTaskStackChanges != mHandleTaskStackChanges) {
-            Log.d(TAG, "updateTaskStackListenerState: " + handleTaskStackChanges);
             mHandleTaskStackChanges = handleTaskStackChanges;
             if (handleTaskStackChanges) {
                 reloadIfNeeded();
@@ -2735,12 +2731,9 @@ public abstract class RecentsView<
         if (!mModel.isTaskListValid(mTaskListChangeId)) {
             mTaskListChangeId = mModel.getTasks(this::applyLoadPlan, RecentsFilterState
                     .getFilter(mFilterState.getPackageNameToFilter()));
-            Log.d(TAG, "reloadIfNeeded - getTasks: " + mTaskListChangeId);
             if (enableRefactorTaskThumbnail()) {
                 mRecentsViewModel.refreshAllTaskData();
             }
-        } else {
-            Log.d(TAG, "reloadIfNeeded - task list still valid: " + mTaskListChangeId);
         }
     }
 
@@ -4389,10 +4382,8 @@ public abstract class RecentsView<
     private void dismissTask(int taskId) {
         TaskView taskView = getTaskViewByTaskId(taskId);
         if (taskView == null) {
-            Log.d(TAG, "dismissTask: " + taskId + ",  no associated TaskView");
             return;
         }
-        Log.d(TAG, "dismissTask: " + taskId);
         dismissTask(taskView, true /* animate */, false /* removeTask */);
     }
 

@@ -38,7 +38,6 @@ import android.view.SurfaceControlViewHost;
 import android.view.SurfaceControlViewHost.SurfacePackage;
 import android.view.View;
 import android.view.animation.AccelerateDecelerateInterpolator;
-import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -62,7 +61,6 @@ import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.widget.LocalColorExtractor;
-import com.android.systemui.shared.Flags;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -98,7 +96,6 @@ public class PreviewSurfaceRenderer {
     private boolean mDestroyed = false;
     private LauncherPreviewRenderer mRenderer;
     private boolean mHideQsb;
-    @Nullable private FrameLayout mViewRoot = null;
 
     public PreviewSurfaceRenderer(Context context, Bundle bundle) throws Exception {
         mContext = context;
@@ -194,19 +191,6 @@ public class PreviewSurfaceRenderer {
      */
     public void loadAsync() {
         MODEL_EXECUTOR.execute(this::loadModelData);
-    }
-
-    /**
-     * Update the grid of the launcher preview
-     *
-     * @param gridName Name of the grid, e.g. normal, practical
-     */
-    public void updateGrid(@NonNull String gridName) {
-        if (gridName.equals(mGridName)) {
-            return;
-        }
-        mGridName = gridName;
-        loadAsync();
     }
 
     /**
@@ -318,41 +302,11 @@ public class PreviewSurfaceRenderer {
         view.setPivotY(0);
         view.setTranslationX((mWidth - scale * view.getWidth()) / 2);
         view.setTranslationY((mHeight - scale * view.getHeight()) / 2);
-        if (!Flags.newCustomizationPickerUi()) {
-            view.setAlpha(0);
-            view.animate().alpha(1)
-                    .setInterpolator(new AccelerateDecelerateInterpolator())
-                    .setDuration(FADE_IN_ANIMATION_DURATION)
-                    .start();
-            mSurfaceControlViewHost.setView(
-                    view,
-                    view.getMeasuredWidth(),
-                    view.getMeasuredHeight()
-            );
-            return;
-        }
-
-        if (mViewRoot == null) {
-            mViewRoot = new FrameLayout(inflationContext);
-            FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.WRAP_CONTENT, // Width
-                    FrameLayout.LayoutParams.WRAP_CONTENT  // Height
-            );
-            mViewRoot.setLayoutParams(layoutParams);
-            mViewRoot.addView(view);
-            mViewRoot.setAlpha(0);
-            mViewRoot.animate().alpha(1)
-                    .setInterpolator(new AccelerateDecelerateInterpolator())
-                    .setDuration(FADE_IN_ANIMATION_DURATION)
-                    .start();
-            mSurfaceControlViewHost.setView(
-                    mViewRoot,
-                    view.getMeasuredWidth(),
-                    view.getMeasuredHeight()
-            );
-        } else  {
-            mViewRoot.removeAllViews();
-            mViewRoot.addView(view);
-        }
+        view.setAlpha(0);
+        view.animate().alpha(1)
+                .setInterpolator(new AccelerateDecelerateInterpolator())
+                .setDuration(FADE_IN_ANIMATION_DURATION)
+                .start();
+        mSurfaceControlViewHost.setView(view, view.getMeasuredWidth(), view.getMeasuredHeight());
     }
 }
