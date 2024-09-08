@@ -23,8 +23,8 @@ import com.android.launcher3.taskbar.TaskbarInsetsController
 import com.android.launcher3.taskbar.bubbles.BubbleBarView
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController
 import com.android.launcher3.taskbar.bubbles.BubbleStashedHandleViewController
-import com.android.wm.shell.common.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.animation.PhysicsAnimator
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import java.io.PrintWriter
 
 /** StashController that defines stashing behaviour for the taskbar modes. */
@@ -178,9 +178,6 @@ interface BubbleStashController {
     companion object {
         /** How long to stash/unstash. */
         const val BAR_STASH_DURATION = InsetsController.ANIMATION_DURATION_RESIZE.toLong()
-
-        const val BAR_STASH_ALPHA_DURATION = 50L
-        const val BAR_STASH_ALPHA_DELAY = 33L
 
         /** How long to translate Y coordinate of the BubbleBar. */
         const val BAR_TRANSLATION_DURATION = 300L

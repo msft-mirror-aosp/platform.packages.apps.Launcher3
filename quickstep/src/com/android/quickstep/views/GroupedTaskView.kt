@@ -115,6 +115,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                     R.id.snapshot,
                     R.id.icon,
                     R.id.show_windows,
+                    R.id.digital_wellbeing_toast,
                     STAGE_POSITION_TOP_OR_LEFT,
                     taskOverlayFactory
                 ),
@@ -123,6 +124,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                     R.id.bottomright_snapshot,
                     R.id.bottomRight_icon,
                     R.id.show_windows_right,
+                    R.id.bottomRight_digital_wellbeing_toast,
                     STAGE_POSITION_BOTTOM_OR_RIGHT,
                     taskOverlayFactory
                 )
@@ -211,16 +213,12 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         splitBoundsConfig = splitBounds
         taskContainers.forEach {
             it.digitalWellBeingToast?.splitBounds = splitBoundsConfig
-            it.digitalWellBeingToast?.initialize(it.task)
+            it.digitalWellBeingToast?.initialize()
         }
         invalidate()
     }
 
-    override fun launchTaskAnimated(): RunnableList? {
-        if (taskContainers.isEmpty()) {
-            Log.d(TAG, "launchTaskAnimated - task is not bound")
-            return null
-        }
+    override fun launchAsStaticTile(): RunnableList? {
         val recentsView = recentsView ?: return null
         val endCallback = RunnableList()
         // Callbacks run from remote animation when recents animation not currently running
@@ -239,8 +237,11 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         return endCallback
     }
 
-    override fun launchTask(callback: (launched: Boolean) -> Unit, isQuickSwitch: Boolean) {
-        launchTaskInternal(isQuickSwitch, false, callback /*launchingExistingTaskview*/)
+    override fun launchWithoutAnimation(
+        isQuickSwitch: Boolean,
+        callback: (launched: Boolean) -> Unit
+    ) {
+        launchTaskInternal(isQuickSwitch, launchingExistingTaskView = false, callback)
     }
 
     /**
@@ -264,7 +265,10 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 isQuickSwitch,
                 snapPosition
             )
-            Log.d(TAG, "launchTaskInternal - launchExistingSplitPair: ${taskIds.contentToString()}")
+            Log.d(
+                TAG,
+                "launchTaskInternal - launchExistingSplitPair: ${taskIds.contentToString()}, launchingExistingTaskView: $launchingExistingTaskView"
+            )
         }
     }
 
