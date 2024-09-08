@@ -702,6 +702,7 @@ constructor(
                     R.id.snapshot,
                     R.id.icon,
                     R.id.show_windows,
+                    R.id.digital_wellbeing_toast,
                     STAGE_POSITION_UNDEFINED,
                     taskOverlayFactory
                 )
@@ -715,6 +716,7 @@ constructor(
         @IdRes thumbnailViewId: Int,
         @IdRes iconViewId: Int,
         @IdRes showWindowViewId: Int,
+        @IdRes digitalWellbeingBannerId: Int,
         @StagePosition stagePosition: Int,
         taskOverlayFactory: TaskOverlayFactory,
     ): TaskContainer {
@@ -730,6 +732,7 @@ constructor(
                 thumbnailViewDeprecated
             }
         val iconView = getOrInflateIconView(iconViewId)
+        val digitalWellBeingToast = findViewById<DigitalWellBeingToast>(digitalWellbeingBannerId)!!
         return TaskContainer(
             this,
             task,
@@ -737,7 +740,7 @@ constructor(
             iconView,
             TransformingTouchDelegate(iconView.asView()),
             stagePosition,
-            DigitalWellBeingToast(container, this),
+            digitalWellBeingToast,
             findViewById(showWindowViewId)!!,
             taskOverlayFactory
         )
@@ -775,7 +778,7 @@ constructor(
     protected open fun setThumbnailOrientation(orientationState: RecentsOrientedState) {
         taskContainers.forEach {
             it.overlay.updateOrientationState(orientationState)
-            it.digitalWellBeingToast?.initialize(it.task)
+            it.digitalWellBeingToast?.initialize()
         }
     }
 
@@ -827,10 +830,8 @@ constructor(
         } else {
             nonGridScale = 1f
             boxTranslationY = 0f
-            expectedWidth = if (enableOverviewIconMenu()) taskWidth else LayoutParams.MATCH_PARENT
-            expectedHeight =
-                if (enableOverviewIconMenu()) taskHeight + thumbnailPadding
-                else LayoutParams.MATCH_PARENT
+            expectedWidth = taskWidth
+            expectedHeight = taskHeight + thumbnailPadding
         }
         this.nonGridScale = nonGridScale
         this.boxTranslationY = boxTranslationY
@@ -847,6 +848,7 @@ constructor(
         taskContainers[0].snapshotView.updateLayoutParams<LayoutParams> {
             topMargin = container.deviceProfile.overviewTaskThumbnailTopMarginPx
         }
+        taskContainers.forEach { it.digitalWellBeingToast?.setupLayout() }
     }
 
     /** Returns the thumbnail's bounds, optionally relative to the screen. */
@@ -939,7 +941,7 @@ constructor(
         if (enableOverviewIconMenu()) {
             setText(taskContainer.iconView, taskContainer.task.title)
         }
-        taskContainer.digitalWellBeingToast?.initialize(taskContainer.task)
+        taskContainer.digitalWellBeingToast?.initialize()
     }
 
     protected open fun onIconUnloaded(taskContainer: TaskContainer) {
@@ -1001,7 +1003,7 @@ constructor(
             return
         }
         val callbackList =
-            launchTasks()?.apply {
+            launchWithAnimation()?.apply {
                 add {
                     Log.d("b/310064698", "${taskIds.contentToString()} - onClick - launchCompleted")
                 }
@@ -1013,12 +1015,106 @@ constructor(
             .log(LauncherEvent.LAUNCHER_TASK_LAUNCH_TAP)
     }
 
+    /** Launch of the current task (both live and inactive tasks) with an animation. */
+    fun launchWithAnimation(): RunnableList? {
+        return if (isRunningTask && recentsView?.remoteTargetHandles != null) {
+            launchAsLiveTile()
+        } else {
+            launchAsStaticTile()
+        }
+    }
+
+    private fun launchAsLiveTile(): RunnableList? {
+        val recentsView = recentsView ?: return null
+        val remoteTargetHandles = recentsView.remoteTargetHandles
+        if (!isClickableAsLiveTile) {
+            Log.e(
+                TAG,
+                "launchAsLiveTile - TaskView is not clickable as a live tile; returning to home: ${taskIds.contentToString()}"
+            )
+            return null
+        }
+        isClickableAsLiveTile = false
+        val targets =
+            if (remoteTargetHandles.size == 1) {
+                remoteTargetHandles[0].transformParams.targetSet
+            } else {
+                val apps =
+                    remoteTargetHandles.flatMap { it.transformParams.targetSet.apps.asIterable() }
+                val wallpapers =
+                    remoteTargetHandles.flatMap {
+                        it.transformParams.targetSet.wallpapers.asIterable()
+                    }
+                RemoteAnimationTargets(
+                    apps.toTypedArray(),
+                    wallpapers.toTypedArray(),
+                    remoteTargetHandles[0].transformParams.targetSet.nonApps,
+                    remoteTargetHandles[0].transformParams.targetSet.targetMode
+                )
+            }
+        if (targets == null) {
+            // If the recents animation is cancelled somehow between the parent if block and
+            // here, try to launch the task as a non live tile task.
+            val runnableList = launchAsStaticTile()
+            if (runnableList == null) {
+                Log.e(
+                    TAG,
+                    "launchAsLiveTile - Recents animation cancelled and cannot launch task as non-live tile; returning to home: ${taskIds.contentToString()}"
+                )
+            }
+            isClickableAsLiveTile = true
+            return runnableList
+        }
+        TestLogging.recordEvent(
+            TestProtocol.SEQUENCE_MAIN,
+            "composeRecentsLaunchAnimator",
+            taskIds.contentToString()
+        )
+        val runnableList = RunnableList()
+        with(AnimatorSet()) {
+            TaskViewUtils.composeRecentsLaunchAnimator(
+                this,
+                this@TaskView,
+                targets.apps,
+                targets.wallpapers,
+                targets.nonApps,
+                true /* launcherClosing */,
+                recentsView.stateManager,
+                recentsView,
+                recentsView.depthController
+            )
+            addListener(
+                object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animator: Animator) {
+                        if (taskContainers.any { it.task.key.displayId != rootViewDisplayId }) {
+                            launchAsStaticTile()
+                        }
+                        isClickableAsLiveTile = true
+                        runEndCallback()
+                    }
+
+                    override fun onAnimationCancel(animation: Animator) {
+                        runEndCallback()
+                    }
+
+                    private fun runEndCallback() {
+                        runnableList.executeAllAndDestroy()
+                    }
+                }
+            )
+            start()
+        }
+        Log.d(TAG, "launchAsLiveTile - composeRecentsLaunchAnimator: ${taskIds.contentToString()}")
+        recentsView.onTaskLaunchedInLiveTileMode()
+        return runnableList
+    }
+
     /**
      * Starts the task associated with this view and animates the startup.
      *
      * @return CompletionStage to indicate the animation completion or null if the launch failed.
      */
-    open fun launchTaskAnimated(): RunnableList? {
+    open fun launchAsStaticTile(): RunnableList? {
         TestLogging.recordEvent(
             TestProtocol.SEQUENCE_MAIN,
             "startActivityFromRecentsAsync",
@@ -1034,13 +1130,16 @@ constructor(
         ) {
             Log.d(
                 TAG,
-                "launchTaskAnimated - startActivityFromRecents: ${taskIds.contentToString()}"
+                "launchAsStaticTile - startActivityFromRecents: ${taskIds.contentToString()}"
             )
             ActiveGestureLog.INSTANCE.trackEvent(
                 ActiveGestureErrorDetector.GestureEvent.EXPECTING_TASK_APPEARED
             )
             val recentsView = recentsView ?: return null
-            if (recentsView.runningTaskViewId != -1) {
+            if (
+                recentsView.runningTaskViewId != -1 &&
+                    recentsView.mRecentsAnimationController != null
+            ) {
                 recentsView.onTaskLaunchedInLiveTileMode()
 
                 // Return a fresh callback in the live tile case, so that it's not accidentally
@@ -1055,18 +1154,17 @@ constructor(
             recentsView.addSideTaskLaunchCallback(opts.onEndCallback)
             return opts.onEndCallback
         } else {
-            notifyTaskLaunchFailed()
+            notifyTaskLaunchFailed("launchAsStaticTile")
             return null
         }
     }
 
     /** Starts the task associated with this view without any animation */
-    fun launchTask(callback: (launched: Boolean) -> Unit) {
-        launchTask(callback, isQuickSwitch = false)
-    }
-
-    /** Starts the task associated with this view without any animation */
-    open fun launchTask(callback: (launched: Boolean) -> Unit, isQuickSwitch: Boolean) {
+    @JvmOverloads
+    open fun launchWithoutAnimation(
+        isQuickSwitch: Boolean = false,
+        callback: (launched: Boolean) -> Unit
+    ) {
         TestLogging.recordEvent(
             TestProtocol.SEQUENCE_MAIN,
             "startActivityFromRecentsAsync",
@@ -1079,7 +1177,7 @@ constructor(
             // gesture launcher is in the background state, vs other launches which are in
             // the actual overview state
             failureListener.register(container, firstContainer.task.key.id) {
-                notifyTaskLaunchFailed()
+                notifyTaskLaunchFailed("launchWithoutAnimation")
                 recentsView?.let {
                     // Disable animations for now, as it is an edge case and the app usually
                     // covers launcher and also any state transition animation also gets
@@ -1123,103 +1221,20 @@ constructor(
                 // otherwise, wait for the animation start callback from the activity options
                 // above
                 Executors.MAIN_EXECUTOR.post {
-                    notifyTaskLaunchFailed()
+                    notifyTaskLaunchFailed("launchTask")
                     callback(false)
                 }
             }
-            Log.d(TAG, "launchTask - startActivityFromRecents: ${taskIds.contentToString()}")
+            Log.d(
+                TAG,
+                "launchWithoutAnimation - startActivityFromRecents: ${taskIds.contentToString()}"
+            )
         }
     }
 
-    /** Launch of the current task (both live and inactive tasks) with an animation. */
-    fun launchTasks(): RunnableList? {
-        val recentsView = recentsView ?: return null
-        val remoteTargetHandles = recentsView.mRemoteTargetHandles
-        if (!isRunningTask || remoteTargetHandles == null) {
-            return launchTaskAnimated()
-        }
-        if (!isClickableAsLiveTile) {
-            Log.e(TAG, "TaskView is not clickable as a live tile; returning to home.")
-            return null
-        }
-        isClickableAsLiveTile = false
-        val targets =
-            if (remoteTargetHandles.size == 1) {
-                remoteTargetHandles[0].transformParams.targetSet
-            } else {
-                val apps =
-                    remoteTargetHandles.flatMap { it.transformParams.targetSet.apps.asIterable() }
-                val wallpapers =
-                    remoteTargetHandles.flatMap {
-                        it.transformParams.targetSet.wallpapers.asIterable()
-                    }
-                RemoteAnimationTargets(
-                    apps.toTypedArray(),
-                    wallpapers.toTypedArray(),
-                    remoteTargetHandles[0].transformParams.targetSet.nonApps,
-                    remoteTargetHandles[0].transformParams.targetSet.targetMode
-                )
-            }
-        if (targets == null) {
-            // If the recents animation is cancelled somehow between the parent if block and
-            // here, try to launch the task as a non live tile task.
-            val runnableList = launchTaskAnimated()
-            if (runnableList == null) {
-                Log.e(
-                    TAG,
-                    "Recents animation cancelled and cannot launch task as non-live tile" +
-                        "; returning to home"
-                )
-            }
-            isClickableAsLiveTile = true
-            return runnableList
-        }
-        TestLogging.recordEvent(
-            TestProtocol.SEQUENCE_MAIN,
-            "composeRecentsLaunchAnimator",
-            taskIds.contentToString()
-        )
-        val runnableList = RunnableList()
-        with(AnimatorSet()) {
-            TaskViewUtils.composeRecentsLaunchAnimator(
-                this,
-                this@TaskView,
-                targets.apps,
-                targets.wallpapers,
-                targets.nonApps,
-                true /* launcherClosing */,
-                recentsView.stateManager,
-                recentsView,
-                recentsView.depthController
-            )
-            addListener(
-                object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animator: Animator) {
-                        if (taskContainers.any { it.task.key.displayId != rootViewDisplayId }) {
-                            launchTaskAnimated()
-                        }
-                        isClickableAsLiveTile = true
-                        runEndCallback()
-                    }
-
-                    override fun onAnimationCancel(animation: Animator) {
-                        runEndCallback()
-                    }
-
-                    private fun runEndCallback() {
-                        runnableList.executeAllAndDestroy()
-                    }
-                }
-            )
-            start()
-        }
-        Log.d(TAG, "launchTasks - composeRecentsLaunchAnimator: ${taskIds.contentToString()}")
-        recentsView.onTaskLaunchedInLiveTileMode()
-        return runnableList
-    }
-
-    private fun notifyTaskLaunchFailed() {
-        val sb = StringBuilder("Failed to launch task \n")
+    private fun notifyTaskLaunchFailed(launchMethod: String) {
+        val sb =
+            StringBuilder("$launchMethod - Failed to launch task: ${taskIds.contentToString()}\n")
         taskContainers.forEach {
             sb.append("(task=${it.task.key.baseIntent} userId=${it.task.key.userId})\n")
         }
@@ -1444,7 +1459,7 @@ constructor(
                 it.thumbnailViewDeprecated.dimAlpha = amount
             }
             it.iconView.setIconColorTint(tintColor, amount)
-            it.digitalWellBeingToast?.setBannerColorTint(tintColor, amount)
+            it.digitalWellBeingToast?.setColorTint(tintColor, amount)
         }
     }
 
@@ -1458,7 +1473,7 @@ constructor(
         taskContainers.forEach {
             if (visibility == VISIBLE || it.task.key.id == taskId) {
                 it.snapshotView.visibility = visibility
-                it.digitalWellBeingToast?.setBannerVisibility(visibility)
+                it.digitalWellBeingToast?.visibility = visibility
                 it.showWindowsView?.visibility = visibility
                 it.overlay.setVisibility(visibility)
             }
@@ -1660,6 +1675,12 @@ constructor(
 
     private fun MotionEvent.isWithinThumbnailBounds(): Boolean {
         return thumbnailBounds.contains(x.toInt(), y.toInt())
+    }
+
+    override fun addChildrenForAccessibility(outChildren: ArrayList<View>) {
+        (if (isLayoutRtl) taskContainers.reversed() else taskContainers).forEach {
+            it.addChildForAccessibility(outChildren)
+        }
     }
 
     companion object {

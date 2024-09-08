@@ -31,17 +31,17 @@ import com.android.launcher3.R
 import com.android.launcher3.anim.AnimatedFloat
 import com.android.launcher3.anim.SpringAnimationBuilder
 import com.android.launcher3.taskbar.TaskbarInsetsController
+import com.android.launcher3.taskbar.TaskbarStashController.TASKBAR_STASH_ALPHA_DURATION
+import com.android.launcher3.taskbar.TaskbarStashController.TASKBAR_STASH_ALPHA_START_DELAY
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController
 import com.android.launcher3.taskbar.bubbles.BubbleStashedHandleViewController
-import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Companion.BAR_STASH_ALPHA_DELAY
-import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Companion.BAR_STASH_ALPHA_DURATION
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Companion.BAR_STASH_DURATION
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Companion.BAR_TRANSLATION_DURATION
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.ControllersAfterInitAction
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.TaskbarHotseatDimensionsProvider
 import com.android.launcher3.util.MultiPropertyFactory
-import com.android.wm.shell.common.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.animation.PhysicsAnimator
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import kotlin.math.max
 
 class TransientBubbleStashController(
@@ -285,8 +285,8 @@ class TransientBubbleStashController(
     private fun createStashAnimator(isStashed: Boolean, duration: Long): AnimatorSet {
         val animatorSet = AnimatorSet()
 
-        val alphaDuration = if (isStashed) duration else BAR_STASH_ALPHA_DURATION
-        val alphaDelay = if (isStashed) BAR_STASH_ALPHA_DELAY else 0L
+        val alphaDuration = if (isStashed) duration else TASKBAR_STASH_ALPHA_DURATION
+        val alphaDelay = if (isStashed) TASKBAR_STASH_ALPHA_START_DELAY else 0L
         animatorSet.play(
             createStashAlphaAnimator(isStashed).apply {
                 this.duration = max(0L, alphaDuration - alphaDelay)
