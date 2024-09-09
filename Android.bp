@@ -69,6 +69,15 @@ filegroup {
     ],
 }
 
+// Source code for quickstep dagger
+filegroup {
+    name: "launcher-quickstep-dagger",
+    srcs: [
+        "quickstep/dagger/**/*.java",
+        "quickstep/dagger/**/*.kt",
+    ],
+}
+
 // Source code for quickstep build with compose enabled, on top of launcher-src
 filegroup {
     name: "launcher-quickstep-compose-enabled-src",
@@ -324,7 +333,7 @@ android_library {
         "com_android_wm_shell_flags_lib",
         "dagger2",
         "jsr330",
-
+        "com_android_systemui_shared_flags_lib",
     ],
     manifest: "AndroidManifest-common.xml",
     sdk_version: "current",
@@ -411,6 +420,7 @@ android_library {
     srcs: [
         ":launcher-src",
         ":launcher-quickstep-src",
+        ":launcher-quickstep-dagger",
         "go/quickstep/src/**/*.java",
         "go/quickstep/src/**/*.kt",
     ],
@@ -449,6 +459,7 @@ android_library {
     srcs: [
         ":launcher-src",
         ":launcher-quickstep-src",
+        ":launcher-quickstep-dagger",
         ":launcher-build-config",
     ],
     resource_dirs: [],
