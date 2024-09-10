@@ -82,6 +82,10 @@ public class BubbleBarViewController {
     private final MultiValueAlpha mBubbleBarAlpha;
     private final AnimatedFloat mBubbleBarScaleX = new AnimatedFloat(this::updateScaleX);
     private final AnimatedFloat mBubbleBarScaleY = new AnimatedFloat(this::updateScaleY);
+    private final AnimatedFloat mBubbleBarBackgroundScaleX = new AnimatedFloat(
+            this::updateBackgroundScaleX);
+    private final AnimatedFloat mBubbleBarBackgroundScaleY = new AnimatedFloat(
+            this::updateBackgroundScaleY);
     private final AnimatedFloat mBubbleBarTranslationY = new AnimatedFloat(
             this::updateTranslationY);
 
@@ -264,6 +268,14 @@ public class BubbleBarViewController {
 
     public AnimatedFloat getBubbleBarScaleY() {
         return mBubbleBarScaleY;
+    }
+
+    public AnimatedFloat getBubbleBarBackgroundScaleX() {
+        return mBubbleBarBackgroundScaleX;
+    }
+
+    public AnimatedFloat getBubbleBarBackgroundScaleY() {
+        return mBubbleBarBackgroundScaleY;
     }
 
     public AnimatedFloat getBubbleBarTranslationY() {
@@ -533,6 +545,14 @@ public class BubbleBarViewController {
 
     private void updateScaleY(float scale) {
         mBarView.setScaleY(scale);
+    }
+
+    private void updateBackgroundScaleX(float scale) {
+        mBarView.setBackgroundScaleX(scale);
+    }
+
+    private void updateBackgroundScaleY(float scale) {
+        mBarView.setBackgroundScaleY(scale);
     }
 
     //

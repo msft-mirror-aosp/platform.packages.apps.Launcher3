@@ -93,18 +93,6 @@ public final class FeatureFlags {
             270394468, "ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS", ENABLED,
             "Enable option to show keyboard when going to all-apps");
 
-    // TODO(Block 5): Clean up flags
-    public static final BooleanFlag ENABLE_TWOLINE_DEVICESEARCH = getDebugFlag(201388851,
-            "ENABLE_TWOLINE_DEVICESEARCH", DISABLED,
-            "Enable two line label for icons with labels on device search.");
-
-    public static final BooleanFlag ENABLE_ICON_IN_TEXT_HEADER = getDebugFlag(270395143,
-            "ENABLE_ICON_IN_TEXT_HEADER", DISABLED, "Show icon in textheader");
-
-    public static final BooleanFlag ENABLE_PREMIUM_HAPTICS_ALL_APPS = getDebugFlag(270396358,
-            "ENABLE_PREMIUM_HAPTICS_ALL_APPS", DISABLED,
-            "Enables haptics opening/closing All apps");
-
     // TODO(Block 6): Clean up flags
     public static final BooleanFlag ENABLE_ALL_APPS_SEARCH_IN_TASKBAR = getDebugFlag(270393900,
             "ENABLE_ALL_APPS_SEARCH_IN_TASKBAR", ENABLED,
