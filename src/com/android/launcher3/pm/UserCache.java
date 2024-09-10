@@ -26,7 +26,6 @@ import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.ArrayMap;
 
-import androidx.annotation.AnyThread;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -111,7 +110,7 @@ public class UserCache implements SafeCloseable {
         updateCache();
     }
 
-    @AnyThread
+    @WorkerThread
     private void onUsersChanged(Intent intent) {
         MODEL_EXECUTOR.execute(this::updateCache);
         UserHandle user = intent.getParcelableExtra(Intent.EXTRA_USER);
@@ -123,7 +122,7 @@ public class UserCache implements SafeCloseable {
     }
 
     @WorkerThread
-    private void updateCache() {
+    public void updateCache() {
         mUserToSerialMap = ApiWrapper.INSTANCE.get(mContext).queryAllUsers();
         mUserToPreInstallAppMap = fetchPreInstallApps();
     }

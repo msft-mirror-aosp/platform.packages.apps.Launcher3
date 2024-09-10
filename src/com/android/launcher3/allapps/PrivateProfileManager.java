@@ -16,6 +16,7 @@
 
 package com.android.launcher3.allapps;
 
+import static android.content.pm.LauncherUserInfo.PRIVATE_SPACE_ENTRYPOINT_HIDDEN;
 import static android.view.View.GONE;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
@@ -43,6 +44,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.os.UserHandle;
@@ -78,11 +80,13 @@ import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.SettingsCache;
+import com.android.launcher3.util.UserIconInfo;
 import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.RecyclerViewFastScroller;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
@@ -209,9 +213,20 @@ public class PrivateProfileManager extends UserProfileManager {
     }
 
     /** Whether private profile should be hidden on Launcher. */
+    @SuppressLint("NewApi")
     public boolean isPrivateSpaceHidden() {
-        return getCurrentState() == STATE_DISABLED && SettingsCache.INSTANCE
-                    .get(mAllApps.getContext()).getValue(PRIVATE_SPACE_HIDE_WHEN_LOCKED_URI, 0);
+        UserHandle profileHandle = getProfileUser();
+        if (android.multiuser.Flags.addLauncherUserConfig() && !Objects.isNull(profileHandle)) {
+            UserIconInfo userInconInfo = UserCache.INSTANCE.get(mAllApps.getContext()).getUserInfo(
+                    profileHandle);
+
+            return getCurrentState() == STATE_DISABLED && userInconInfo.getUserConfig().getBoolean(
+                    PRIVATE_SPACE_ENTRYPOINT_HIDDEN, false);
+        }
+
+        return getCurrentState() == STATE_DISABLED && SettingsCache.INSTANCE.get(
+                mAllApps.getContext()).getValue(PRIVATE_SPACE_HIDE_WHEN_LOCKED_URI, 0);
+
     }
 
     /**
