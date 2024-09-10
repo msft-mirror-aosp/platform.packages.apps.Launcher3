@@ -41,8 +41,8 @@ import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.NavHandle;
-import com.android.systemui.shared.navigationbar.RegionSamplingHelper;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
+import com.android.wm.shell.shared.handles.RegionSamplingHelper;
 
 import java.io.PrintWriter;
 
@@ -94,6 +94,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
     // States that affect whether region sampling is enabled or not
     private boolean mIsStashed;
     private boolean mIsLumaSamplingEnabled;
+    private boolean mIsAppTransitionPending;
     private boolean mTaskbarHidden;
 
     private float mTranslationYForSwipe;
@@ -212,7 +213,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
      *                                stashed handle to wrap around the hotseat items.
      */
     public Animator createRevealAnimToIsStashed(boolean isStashed, Rect taskbarToHotseatOffsets) {
-        Rect visualBounds = new Rect(mControllers.taskbarViewController.getIconLayoutBounds());
+        Rect visualBounds = mControllers.taskbarViewController.getIconLayoutVisualBounds();
         float startRadius = mStashedHandleRadius;
 
         if (DisplayController.isTransientTaskbar(mActivity)) {
@@ -267,6 +268,11 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
         updateSamplingState();
     }
 
+    public void setIsAppTransitionPending(boolean pending) {
+        mIsAppTransitionPending = pending;
+        updateSamplingState();
+    }
+
     private void updateSamplingState() {
         updateRegionSamplingWindowVisibility();
         if (shouldSample()) {
@@ -278,7 +284,7 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
     }
 
     private boolean shouldSample() {
-        return mIsStashed && mIsLumaSamplingEnabled;
+        return mIsStashed && mIsLumaSamplingEnabled && !mIsAppTransitionPending;
     }
 
     protected void updateStashedHandleHintScale() {

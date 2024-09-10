@@ -20,6 +20,7 @@ import static com.android.launcher3.Flags.enableUnfoldedTwoPanePicker;
 import static com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder.SEARCH;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WIDGETSTRAY_SEARCHED;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
+import static com.android.launcher3.views.RecyclerViewFastScroller.FastScrollerLocation.WIDGET_SCROLLER;
 
 import android.animation.Animator;
 import android.content.Context;
@@ -119,7 +120,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                     WidgetsRecyclerView searchRecyclerView =
                             mAdapters.get(AdapterHolder.SEARCH).mWidgetsRecyclerView;
                     if (mIsInSearchMode && searchRecyclerView != null) {
-                        searchRecyclerView.bindFastScrollbar(mFastScroller);
+                        searchRecyclerView.bindFastScrollbar(mFastScroller, WIDGET_SCROLLER);
                     }
                 }
 
@@ -276,7 +277,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     }
 
     private void attachScrollbarToRecyclerView(WidgetsRecyclerView recyclerView) {
-        recyclerView.bindFastScrollbar(mFastScroller);
+        recyclerView.bindFastScrollbar(mFastScroller, WIDGET_SCROLLER);
         if (mCurrentWidgetsRecyclerView != recyclerView) {
             // Only reset the scroll position & expanded apps if the currently shown recycler view
             // has been updated.
@@ -290,10 +291,10 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     protected void updateRecyclerViewVisibility(AdapterHolder adapterHolder) {
         // The first item is always an empty space entry. Look for any more items.
         boolean isWidgetAvailable = adapterHolder.mWidgetsListAdapter.hasVisibleEntries();
-        adapterHolder.mWidgetsRecyclerView.setVisibility(isWidgetAvailable ? VISIBLE : GONE);
 
         if (adapterHolder.mAdapterType == AdapterHolder.SEARCH) {
             mNoWidgetsView.setText(R.string.no_search_results);
+            adapterHolder.mWidgetsRecyclerView.setVisibility(isWidgetAvailable ? VISIBLE : GONE);
         } else if (adapterHolder.mAdapterType == AdapterHolder.WORK
                 && mUserCache.getUserProfiles().stream()
                 .filter(userHandle -> mUserCache.getUserInfo(userHandle).isWork())
@@ -556,6 +557,8 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             mNoWidgetsView.setVisibility(GONE);
         } else {
             mAdapters.get(AdapterHolder.SEARCH).mWidgetsRecyclerView.setVisibility(GONE);
+            mAdapters.get(getCurrentAdapterHolderType()).mWidgetsRecyclerView.setVisibility(
+                    VISIBLE);
             // Visibility of recommended widgets, recycler views and headers are handled in methods
             // below.
             post(this::onRecommendedWidgetsBound);
@@ -1057,7 +1060,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             mWidgetsRecyclerView.setClipToOutline(true);
             mWidgetsRecyclerView.setClipChildren(false);
             mWidgetsRecyclerView.setAdapter(mWidgetsListAdapter);
-            mWidgetsRecyclerView.bindFastScrollbar(mFastScroller);
+            mWidgetsRecyclerView.bindFastScrollbar(mFastScroller, WIDGET_SCROLLER);
             mWidgetsRecyclerView.setItemAnimator(isTwoPane() ? null : mWidgetsListItemAnimator);
             mWidgetsRecyclerView.setHeaderViewDimensionsProvider(WidgetsFullSheet.this);
             if (!isTwoPane()) {

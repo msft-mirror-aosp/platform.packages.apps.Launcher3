@@ -27,8 +27,8 @@ import com.android.launcher3.util.CancellableTask
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
-import com.android.window.flags.Flags.enableDesktopWindowingTaskbarRunningApps
-import com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE
+import com.android.wm.shell.shared.desktopmode.DesktopModeFlags
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import java.io.PrintWriter
 
 /**
@@ -44,9 +44,9 @@ class TaskbarRecentAppsController(
     private val desktopVisibilityControllerProvider: () -> DesktopVisibilityController?,
 ) : LoggableTaskbarController {
 
-    // TODO(b/335401172): unify DesktopMode checks in Launcher.
     var canShowRunningApps =
-        DESKTOP_WINDOWING_MODE.isEnabled(context) && enableDesktopWindowingTaskbarRunningApps()
+        DesktopModeStatus.canEnterDesktopMode(context) &&
+            DesktopModeFlags.TASKBAR_RUNNING_APPS.isEnabled(context)
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest
@@ -81,7 +81,7 @@ class TaskbarRecentAppsController(
     private val desktopVisibilityController: DesktopVisibilityController?
         get() = desktopVisibilityControllerProvider()
 
-    private val isInDesktopMode: Boolean
+    val isInDesktopMode: Boolean
         get() = desktopVisibilityController?.areDesktopTasksVisible() ?: false
 
     val runningTaskIds: Set<Int>

@@ -22,6 +22,7 @@
     <string name="recent_task_option_pin" msgid="7929860679018978258">"పిన్ చేయండి"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"సంప్రదాయేతర"</string>
     <string name="recent_task_option_desktop" msgid="8280879717125435668">"డెస్క్‌టాప్"</string>
+    <string name="recent_task_desktop" msgid="8081113562549637334">"డెస్క్‌టాప్"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"ఇటీవలి ఐటెమ్‌లు ఏవీ లేవు"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"యాప్ వినియోగ సెట్టింగ్‌లు"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"అన్నీ తీసివేయండి"</string>
@@ -99,7 +100,7 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"యాప్ పెయిర్‌ను సేవ్ చేయండి"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"స్ప్లిట్ స్క్రీన్ కోసం మరొక యాప్‌ను ట్యాప్ చేయండి"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"స్ప్లిట్ స్క్రీన్‌ను ఉపయోగించడానికి మరొక యాప్ ఎంచుకోండి"</string>
-    <string name="toast_split_select_app_cancel" msgid="1532690483356445639"><b>"రద్దు చేయండి"</b></string>
+    <string name="toast_split_select_app_cancel" msgid="1939025102486630426">"రద్దు చేయండి"</string>
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"స్ప్లిట్ స్క్రీన్ ఎంపిక నుండి ఎగ్జిట్ అవ్వండి"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"స్ప్లిట్ స్క్రీన్ ఉపయోగానికి మరొక యాప్ ఎంచుకోండి"</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"ఈ చర్యను యాప్ గానీ, మీ సంస్థ గానీ అనుమతించవు"</string>
@@ -140,8 +141,8 @@
     <string name="taskbar_divider_a11y_title" msgid="6608690309720242080">"టాస్క్‌బార్ డివైడర్"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"ఎగువ/ఎడమ వైపునకు తరలించండి"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"దిగువ/కుడి వైపునకు తరలించండి"</string>
-    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{మరో # యాప్‌ను చూడండి.}other{మరో # యాప్‌లను చూడండి.}}"</string>
-    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{# డెస్క్‌టాప్ యాప్‌ను చూపండి.}other{# డెస్క్‌టాప్ యాప్‌లను చూపండి.}}"</string>
+    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{మరో యాప్‌}other{మరిన్ని యాప్‌లు}}"</string>
+    <string name="quick_switch_desktop" msgid="8393802056024499749">"డెస్క్‌టాప్"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g>, <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"బబుల్"</string>
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"ఓవర్‌ఫ్లో"</string>

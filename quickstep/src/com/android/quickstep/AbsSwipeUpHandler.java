@@ -45,7 +45,6 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SystemUiController.UI_STATE_FULLSCREEN_TASK;
 import static com.android.launcher3.util.VibratorWrapper.OVERVIEW_HAPTIC;
 import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
-import static com.android.quickstep.GestureState.GestureEndTarget.ALL_APPS;
 import static com.android.quickstep.GestureState.GestureEndTarget.HOME;
 import static com.android.quickstep.GestureState.GestureEndTarget.LAST_TASK;
 import static com.android.quickstep.GestureState.GestureEndTarget.NEW_TASK;
@@ -53,6 +52,7 @@ import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
 import static com.android.quickstep.GestureState.STATE_END_TARGET_ANIMATION_FINISHED;
 import static com.android.quickstep.GestureState.STATE_END_TARGET_SET;
 import static com.android.quickstep.GestureState.STATE_RECENTS_ANIMATION_CANCELED;
+import static com.android.quickstep.GestureState.STATE_RECENTS_ANIMATION_STARTED;
 import static com.android.quickstep.GestureState.STATE_RECENTS_SCROLLING_FINISHED;
 import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.CANCEL_RECENTS_ANIMATION;
@@ -62,7 +62,6 @@ import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.ON_SETTLED_ON_END_TARGET;
 import static com.android.quickstep.views.RecentsView.UPDATE_SYSUI_FLAGS_THRESHOLD;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
-import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.DESKTOP_WINDOWING_MODE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -97,6 +96,7 @@ import android.window.PictureInPictureSurfaceTransaction;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.jank.Cuj;
 import com.android.internal.util.LatencyTracker;
@@ -106,6 +106,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.AnimatorPlaybackController;
+import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.logging.StatsLogManager.StatsLogger;
@@ -141,6 +142,7 @@ import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
+import com.android.systemui.contextualeducation.GestureType;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
@@ -149,9 +151,10 @@ import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.SysUiStatsLog;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
-import com.android.wm.shell.common.TransactionPool;
+import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.desktopmode.DesktopModeFlags;
-import com.android.wm.shell.startingsurface.SplashScreenExitAnimationUtils;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
+import com.android.wm.shell.shared.startingsurface.SplashScreenExitAnimationUtils;
 
 import kotlin.Unit;
 
@@ -167,10 +170,12 @@ import java.util.function.Consumer;
 /**
  * Handles the navigation gestures when Launcher is the default home activity.
  */
-public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
-        Q extends RecentsView, S extends BaseState<S>>
-        extends SwipeUpAnimationLogic implements OnApplyWindowInsetsListener,
-        RecentsAnimationCallbacks.RecentsAnimationListener {
+public abstract class AbsSwipeUpHandler<
+        RECENTS_CONTAINER extends Context & RecentsViewContainer,
+        RECENTS_VIEW extends RecentsView<RECENTS_CONTAINER, STATE>,
+        STATE extends BaseState<STATE>>
+        extends SwipeUpAnimationLogic
+        implements OnApplyWindowInsetsListener, RecentsAnimationCallbacks.RecentsAnimationListener {
     private static final String TAG = "AbsSwipeUpHandler";
 
     private static final ArrayList<String> STATE_NAMES = new ArrayList<>();
@@ -178,7 +183,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     // Fraction of the scroll and transform animation in which the current task fades out
     private static final float KQS_TASK_FADE_ANIMATION_FRACTION = 0.4f;
 
-    protected final BaseContainerInterface<S, T> mContainerInterface;
+    protected final BaseContainerInterface<STATE, RECENTS_CONTAINER> mContainerInterface;
     protected final InputConsumerProxy mInputConsumerProxy;
     protected final ActivityInitListener mActivityInitListener;
     // Callbacks to be made once the recents animation starts
@@ -189,8 +194,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     protected @Nullable RecentsAnimationController mRecentsAnimationController;
     protected @Nullable RecentsAnimationController mDeferredCleanupRecentsAnimationController;
     protected RecentsAnimationTargets mRecentsAnimationTargets;
-    protected @Nullable T mContainer;
-    protected @Nullable Q mRecentsView;
+    protected @Nullable RECENTS_CONTAINER mContainer;
+    protected @Nullable RECENTS_VIEW mRecentsView;
     protected Runnable mGestureEndCallback;
     protected MultiStateCallback mStateCallback;
     protected boolean mCanceled;
@@ -259,8 +264,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             getNextStateFlag("STATE_CURRENT_TASK_FINISHED");
     private static final int STATE_FINISH_WITH_NO_END =
             getNextStateFlag("STATE_FINISH_WITH_NO_END");
-    private static final int STATE_SETTLED_ON_ALL_APPS =
-            getNextStateFlag("STATE_SETTLED_ON_ALL_APPS");
 
     private static final int LAUNCHER_UI_STATES =
             STATE_LAUNCHER_PRESENT | STATE_LAUNCHER_DRAWN | STATE_LAUNCHER_STARTED |
@@ -314,7 +317,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     private boolean mGestureStarted;
     private boolean mLogDirectionUpOrLeft = true;
     private boolean mIsLikelyToStartNewTask;
-    private boolean mIsInAllAppsRegion;
 
     private final long mTouchTimeMs;
     private long mLauncherFrameDrawnTime;
@@ -451,9 +453,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 this::finishCurrentTransitionToHome);
         mStateCallback.runOnceAtState(STATE_SCALED_CONTROLLER_HOME | STATE_CURRENT_TASK_FINISHED,
                 this::reset);
-        mStateCallback.runOnceAtState(STATE_SETTLED_ON_ALL_APPS | STATE_SCREENSHOT_CAPTURED
-                        | STATE_GESTURE_COMPLETED,
-                this::finishCurrentTransitionToAllApps);
 
         mStateCallback.runOnceAtState(STATE_LAUNCHER_PRESENT | STATE_APP_CONTROLLER_RECEIVED
                         | STATE_LAUNCHER_DRAWN | STATE_SCALED_CONTROLLER_RECENTS
@@ -466,6 +465,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         mGestureState.runOnceAtState(STATE_END_TARGET_ANIMATION_FINISHED
                         | STATE_RECENTS_SCROLLING_FINISHED,
                 this::onSettledOnEndTarget);
+        mGestureState.runOnceAtState(STATE_END_TARGET_SET | STATE_RECENTS_ANIMATION_STARTED,
+                this::onCalculateEndTarget);
 
         mStateCallback.runOnceAtState(STATE_HANDLER_INVALIDATED, this::invalidateHandler);
         mStateCallback.runOnceAtState(STATE_LAUNCHER_PRESENT | STATE_HANDLER_INVALIDATED,
@@ -481,11 +482,11 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             return false;
         }
 
-        T createdContainer = (T) mContainerInterface.getCreatedContainer();
+        RECENTS_CONTAINER createdContainer = mContainerInterface.getCreatedContainer();
         if (createdContainer != null) {
             initTransitionEndpoints(createdContainer.getDeviceProfile());
         }
-        final T container = (T) mContainerInterface.getCreatedContainer();
+        final RECENTS_CONTAINER container = mContainerInterface.getCreatedContainer();
         if (mContainer == container) {
             return true;
         }
@@ -559,7 +560,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     }
 
     private void onLauncherStart() {
-        final T container = (T) mContainerInterface.getCreatedContainer();
+        final RECENTS_CONTAINER container = mContainerInterface.getCreatedContainer();
         if (container == null || mContainer != container) {
             return;
         }
@@ -716,9 +717,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 maybeUpdateRecentsAttachedState(true/* animate */, true/* moveRunningTask */);
                 Optional.ofNullable(mContainerInterface.getTaskbarController())
                         .ifPresent(TaskbarUIController::startTranslationSpring);
-                if (!mIsInAllAppsRegion) {
-                    performHapticFeedback();
-                }
+                performHapticFeedback();
             }
 
             @Override
@@ -729,11 +728,18 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     }
 
     private void maybeUpdateRecentsAttachedState() {
-        maybeUpdateRecentsAttachedState(true /* animate */);
+        maybeUpdateRecentsAttachedState(/* animate= */ true);
     }
 
     protected void maybeUpdateRecentsAttachedState(boolean animate) {
-        maybeUpdateRecentsAttachedState(animate, false /* moveRunningTask */);
+        maybeUpdateRecentsAttachedState(animate, /* moveRunningTask= */ false);
+    }
+
+    protected void maybeUpdateRecentsAttachedState(boolean animate, boolean moveRunningTask) {
+        maybeUpdateRecentsAttachedState(
+                animate,
+                moveRunningTask,
+                mRecentsView != null && mRecentsView.shouldUpdateRunningTaskAlpha());
     }
 
     /**
@@ -744,8 +750,10 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
      * Note this method has no effect unless the navigation mode is NO_BUTTON.
      * @param animate whether to animate when attaching RecentsView
      * @param moveRunningTask whether to move running task to front when attaching
+     * @param updateRunningTaskAlpha Whether to update the running task's attached alpha
      */
-    private void maybeUpdateRecentsAttachedState(boolean animate, boolean moveRunningTask) {
+    private void maybeUpdateRecentsAttachedState(
+            boolean animate, boolean moveRunningTask, boolean updateRunningTaskAlpha) {
         if ((!mDeviceState.isFullyGesturalNavMode() && !mGestureState.isTrackpadGesture())
                 || mRecentsView == null) {
             return;
@@ -757,9 +765,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 .findTask(mGestureState.getTopRunningTaskId())
                 : null;
         final boolean recentsAttachedToAppWindow;
-        if (mIsInAllAppsRegion) {
-            recentsAttachedToAppWindow = false;
-        } else if (mGestureState.getEndTarget() != null) {
+        if (mGestureState.getEndTarget() != null) {
             recentsAttachedToAppWindow = mGestureState.getEndTarget().recentsAttachedToAppWindow;
         } else if (mContinuingLastGesture
                 && mRecentsView.getRunningTaskIndex() != mRecentsView.getNextPage()) {
@@ -776,7 +782,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             // TaskView jumping to new position as we move the tasks.
             mRecentsView.moveRunningTaskToFront();
         }
-        mAnimationFactory.setRecentsAttachedToAppWindow(recentsAttachedToAppWindow, animate);
+        mAnimationFactory.setRecentsAttachedToAppWindow(
+                recentsAttachedToAppWindow, animate, updateRunningTaskAlpha);
 
         // Reapply window transform throughout the attach animation, as the animation affects how
         // much the window is bound by overscroll (vs moving freely).
@@ -814,31 +821,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             maybeUpdateRecentsAttachedState(animate);
         }
     }
-
-    /**
-     * Update whether user is currently dragging in a region that will trigger all apps.
-     */
-    private void setIsInAllAppsRegion(boolean isInAllAppsRegion) {
-        if (mIsInAllAppsRegion == isInAllAppsRegion
-                || !mContainerInterface.allowAllAppsFromOverview()) {
-            return;
-        }
-        mIsInAllAppsRegion = isInAllAppsRegion;
-
-        // Newly entering or exiting the zone - do haptic and animate recent tasks.
-        VibratorWrapper.INSTANCE.get(mContext).vibrate(OVERVIEW_HAPTIC);
-        maybeUpdateRecentsAttachedState(true);
-
-        if (mContainer != null) {
-            mContainer.getAppsView().getSearchUiManager()
-                    .prepareToFocusEditText(mIsInAllAppsRegion);
-        }
-
-        // Draw active task below Launcher so that All Apps can appear over it.
-        runActionOnRemoteHandles(remoteTargetHandle ->
-                remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(isInAllAppsRegion));
-    }
-
 
     private void buildAnimationController() {
         if (!canCreateNewOrUpdateExistingLauncherTransitionController()) {
@@ -899,8 +881,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     @UiThread
     @Override
     public void onCurrentShiftUpdated() {
-        float threshold = DeviceConfigWrapper.get().getAllAppsOverviewThreshold() / 100f;
-        setIsInAllAppsRegion(mCurrentShift.value >= threshold);
         updateSysUiFlags(mCurrentShift.value);
         applyScrollAndTransform();
 
@@ -934,7 +914,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             // We will handle the sysui flags based on the centermost task view.
             mRecentsAnimationController.setUseLauncherSystemBarFlags(swipeUpThresholdPassed
                     ||  (quickswitchThresholdPassed && centermostTaskFlags != 0));
-            mRecentsAnimationController.setSplitScreenMinimized(mContext, swipeUpThresholdPassed);
             // Provide a hint to WM the direction that we will be settling in case the animation
             // needs to be canceled
             mRecentsAnimationController.setWillFinishToHome(swipeUpThresholdPassed);
@@ -989,7 +968,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 dp = dp.copy(mContext);
             }
             dp.updateInsets(targets.homeContentInsets);
-            dp.updateIsSeascape(mContext);
             initTransitionEndpoints(dp);
             orientationState.setMultiWindowMode(dp.isMultiWindowMode);
         }
@@ -1083,7 +1061,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
      */
     @UiThread
     private void notifyGestureStarted() {
-        final T curActivity = mContainer;
+        final RECENTS_CONTAINER curActivity = mContainer;
         if (curActivity != null) {
             // Once the gesture starts, we can no longer transition home through the button, so
             // reset the force override of the activity visibility
@@ -1151,7 +1129,25 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         }
     }
 
-    private void onSettledOnEndTarget() {
+    /**
+     * Called if the end target has been set and the recents animation is started.
+     */
+    @VisibleForTesting
+    protected void onCalculateEndTarget() {
+        final GestureEndTarget endTarget = mGestureState.getEndTarget();
+
+        switch (endTarget) {
+            case HOME:
+                // Early detach the nav bar if endTarget is determined as HOME
+                if (mRecentsAnimationController != null) {
+                    mRecentsAnimationController.detachNavigationBarFromApp(true);
+                }
+                break;
+        }
+    }
+
+    @VisibleForTesting
+    protected void onSettledOnEndTarget() {
         // Fast-finish the attaching animation if it's still running.
         maybeUpdateRecentsAttachedState(false);
         final GestureEndTarget endTarget = mGestureState.getEndTarget();
@@ -1169,9 +1165,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         }
 
         switch (endTarget) {
-            case ALL_APPS:
-                mStateCallback.setState(STATE_SETTLED_ON_ALL_APPS | STATE_CAPTURE_SCREENSHOT);
-                break;
             case HOME:
                 mStateCallback.setState(STATE_SCALED_CONTROLLER_HOME | STATE_CAPTURE_SCREENSHOT);
                 // Notify the SysUI to use fade-in animation when entering PiP
@@ -1273,7 +1266,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         TaskView currentPageTaskView = mRecentsView != null
                 ? mRecentsView.getCurrentPageTaskView() : null;
 
-        if (DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+        if (DesktopModeStatus.canEnterDesktopMode(mContext)
                 && !(DesktopModeFlags.WALLPAPER_ACTIVITY.isEnabled(mContext)
                 && DesktopModeFlags.QUICK_SWITCH.isEnabled(mContext))) {
             if ((nextPageTaskView instanceof DesktopTaskView
@@ -1290,9 +1283,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         final boolean willGoToNewTask =
                 isScrollingToNewTask() && Math.abs(velocity.x) > Math.abs(endVelocity);
         final boolean isSwipeUp = endVelocity < 0;
-        if (mIsInAllAppsRegion) {
-            return isSwipeUp ? ALL_APPS : LAST_TASK;
-        }
         if (!isSwipeUp) {
             final boolean isCenteredOnNewTask = mRecentsView != null
                     && mRecentsView.getDestinationPage() != mRecentsView.getRunningTaskIndex();
@@ -1308,9 +1298,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         // Fully gestural mode.
         final boolean isFlingX = Math.abs(velocity.x) > mContext.getResources()
                 .getDimension(R.dimen.quickstep_fling_threshold_speed);
-        if (mIsInAllAppsRegion) {
-            return ALL_APPS;
-        } else if (isScrollingToNewTask && isFlingX) {
+        if (isScrollingToNewTask && isFlingX) {
             // Flinging towards new task takes precedence over mIsMotionPaused (which only
             // checks y-velocity).
             return NEW_TASK;
@@ -1365,8 +1353,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                     .setUserIsNotGoingHome(endTarget != GestureState.GestureEndTarget.HOME);
         }
 
-        float endShift = endTarget == ALL_APPS ? mDragLengthFactor
-                : endTarget.isLauncher ? 1 : 0;
+        float endShift = endTarget.isLauncher ? 1 : 0;
         final float startShift;
         if (!isFling) {
             long expectedDuration = Math.abs(Math.round((endShift - currentShift)
@@ -1387,7 +1374,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             }
         }
         Interpolator interpolator;
-        S state = mContainerInterface.stateFromGestureEndTarget(endTarget);
+        STATE state = mContainerInterface.stateFromGestureEndTarget(endTarget);
         if (isKeyboardTaskFocusPending()) {
             interpolator = EMPHASIZED;
         } else if (state.displayOverviewTasksAsGrid(mDp)) {
@@ -1405,10 +1392,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             duration = mContainer != null && mContainer.getDeviceProfile().isTaskbarPresent
                     ? StaggeredWorkspaceAnim.DURATION_TASKBAR_MS
                     : StaggeredWorkspaceAnim.DURATION_MS;
-            // Early detach the nav bar once the endTarget is determined as HOME
-            if (mRecentsAnimationController != null) {
-                mRecentsAnimationController.detachNavigationBarFromApp(true);
-            }
+            ContextualEduStatsManager.INSTANCE.get(mContext).updateEduStats(
+                    mGestureState.isTrackpadGesture(), GestureType.HOME);
         } else if (endTarget == RECENTS) {
             if (mRecentsView != null) {
                 int nearestPage = mRecentsView.getDestinationPage();
@@ -1433,6 +1418,8 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                 if (!mGestureState.isHandlingAtomicEvent() || isScrolling) {
                     duration = Math.max(duration, mRecentsView.getScroller().getDuration());
                 }
+                ContextualEduStatsManager.INSTANCE.get(mContext).updateEduStats(
+                        mGestureState.isTrackpadGesture(), GestureType.OVERVIEW);
             }
         } else if (endTarget == LAST_TASK && mRecentsView != null
                 && mRecentsView.getNextPage() != mRecentsView.getRunningTaskIndex()) {
@@ -1446,7 +1433,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             setClampScrollOffset(false);
         };
 
-        if (DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+        if (DesktopModeStatus.canEnterDesktopMode(mContext)
                 && !(DesktopModeFlags.WALLPAPER_ACTIVITY.isEnabled(mContext)
                 && DesktopModeFlags.QUICK_SWITCH.isEnabled(mContext))) {
             if (mRecentsView != null && (mRecentsView.getCurrentPageTaskView() != null
@@ -1737,8 +1724,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
 
     private int calculateWindowRotation(RemoteAnimationTarget runningTaskTarget,
             RecentsOrientedState orientationState) {
-        if (runningTaskTarget.rotationChange != 0
-                && TaskAnimationManager.ENABLE_SHELL_TRANSITIONS) {
+        if (runningTaskTarget.rotationChange != 0) {
             return Math.abs(runningTaskTarget.rotationChange) == ROTATION_90
                     ? ROTATION_270 : ROTATION_90;
         } else {
@@ -1994,12 +1980,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
         reset();
     }
 
-    @UiThread
-    private void finishCurrentTransitionToAllApps() {
-        finishCurrentTransitionToHome();
-        reset();
-    }
-
     private void reset() {
         mStateCallback.setStateOnUiThread(STATE_HANDLER_INVALIDATED);
         if (mContainer != null) {
@@ -2100,7 +2080,6 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
             // If there are no targets, then we don't need to capture anything
             mStateCallback.setStateOnUiThread(STATE_SCREENSHOT_CAPTURED);
         } else {
-            boolean finishTransitionPosted = false;
             // If we already have cached screenshot(s) from running tasks, skip update
             boolean shouldUpdate = false;
             int[] runningTaskIds = mGestureState.getRunningTaskIds(mIsSwipeForSplit);
@@ -2124,45 +2103,31 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                         }
 
                         MAIN_EXECUTOR.execute(() -> {
-                            if (!updateThumbnail(false /* refreshView */)) {
-                                setScreenshotCapturedState();
-                            }
+                            updateThumbnail();
+                            setScreenshotCapturedState();
                         });
                     });
                     return;
                 }
 
-                finishTransitionPosted = updateThumbnail(false /* refreshView */);
+                updateThumbnail();
             }
 
-            if (!finishTransitionPosted) {
-                setScreenshotCapturedState();
-            }
+            setScreenshotCapturedState();
         }
     }
 
     // Returns whether finish transition was posted.
-    private boolean updateThumbnail(boolean refreshView) {
+    private void updateThumbnail() {
         if (mGestureState.getEndTarget() == HOME
                 || mGestureState.getEndTarget() == NEW_TASK
-                || mGestureState.getEndTarget() == ALL_APPS
                 || mRecentsView == null) {
             // Capture the screenshot before finishing the transition to home or quickswitching to
             // ensure it's taken in the correct orientation, but no need to update the thumbnail.
-            return false;
+            return;
         }
 
-        boolean finishTransitionPosted = false;
-        TaskView updatedTaskView = mRecentsView.updateThumbnail(mTaskSnapshotCache, refreshView);
-        if (updatedTaskView != null && refreshView && !mCanceled) {
-            // Defer finishing the animation until the next launcher frame with the
-            // new thumbnail
-            finishTransitionPosted = ViewUtils.postFrameDrawn(updatedTaskView,
-                    () -> mStateCallback.setStateOnUiThread(STATE_SCREENSHOT_CAPTURED),
-                    this::isCanceled);
-        }
-
-        return finishTransitionPosted;
+        mRecentsView.updateThumbnail(mTaskSnapshotCache);
     }
 
     private void setScreenshotCapturedState() {
@@ -2294,7 +2259,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                     mRecentsAnimationController, mRecentsAnimationTargets);
         });
 
-        if (DESKTOP_WINDOWING_MODE.isEnabled(mContext)
+        if (DesktopModeStatus.canEnterDesktopMode(mContext)
                 && !(DesktopModeFlags.WALLPAPER_ACTIVITY.isEnabled(mContext)
                         && DesktopModeFlags.QUICK_SWITCH.isEnabled(mContext))) {
             if (mRecentsView.getNextPageTaskView() instanceof DesktopTaskView
@@ -2351,7 +2316,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                     ActiveGestureLog.INSTANCE.trackEvent(EXPECTING_TASK_APPEARED);
                 }
                 ActiveGestureLog.INSTANCE.addLog(nextTaskLog);
-                nextTask.launchTask(success -> {
+                nextTask.launchWithoutAnimation(true, success -> {
                     resultCallback.accept(success);
                     if (success) {
                         if (hasTaskPreviouslyAppeared) {
@@ -2364,7 +2329,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
                         }
                     }
                     return Unit.INSTANCE;
-                }, true /* freezeTaskList */);
+                }  /* freezeTaskList */);
             } else {
                 mContainerInterface.onLaunchTaskFailed();
                 Toast.makeText(mContext, R.string.activity_not_available, LENGTH_SHORT).show();
@@ -2483,7 +2448,7 @@ public abstract class AbsSwipeUpHandler<T extends RecentsViewContainer,
     }
 
     private void animateSplashScreenExit(
-            @NonNull T activity,
+            @NonNull RECENTS_CONTAINER activity,
             @NonNull RemoteAnimationTarget[] appearedTaskTargets,
             @NonNull RemoteAnimationTarget[] animatingTargets) {
         ViewGroup splashView = activity.getDragLayer();

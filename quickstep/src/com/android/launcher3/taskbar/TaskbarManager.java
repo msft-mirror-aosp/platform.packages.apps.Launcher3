@@ -459,10 +459,12 @@ public class TaskbarManager {
                 + " [dp != null (i.e. mUserUnlocked)]=" + (dp != null)
                 + " FLAG_HIDE_NAVBAR_WINDOW=" + ENABLE_TASKBAR_NAVBAR_UNIFICATION
                 + " dp.isTaskbarPresent=" + (dp == null ? "null" : dp.isTaskbarPresent));
-            if (!isTaskbarEnabled) {
+            if (!isTaskbarEnabled || !isLargeScreenTaskbar) {
                 SystemUiProxy.INSTANCE.get(mContext)
                     .notifyTaskbarStatus(/* visible */ false, /* stashed */ false);
-                return;
+                if (!isTaskbarEnabled) {
+                    return;
+                }
             }
 
             if (enableTaskbarNoRecreate() || mTaskbarActivityContext == null) {
@@ -547,7 +549,15 @@ public class TaskbarManager {
 
     public void transitionTo(@BarTransitions.TransitionMode int barMode,
             boolean animate) {
-        mTaskbarActivityContext.transitionTo(barMode, animate);
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.transitionTo(barMode, animate);
+        }
+    }
+
+    public void appTransitionPending(boolean pending) {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.appTransitionPending(pending);
+        }
     }
 
     private boolean isTaskbarEnabled(DeviceProfile deviceProfile) {

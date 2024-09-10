@@ -22,6 +22,7 @@
     <string name="recent_task_option_pin" msgid="7929860679018978258">"Pripni"</string>
     <string name="recent_task_option_freeform" msgid="48863056265284071">"Prosta oblika"</string>
     <string name="recent_task_option_desktop" msgid="8280879717125435668">"Namizni računalnik"</string>
+    <string name="recent_task_desktop" msgid="8081113562549637334">"Namizni način"</string>
     <string name="recents_empty_message" msgid="7040467240571714191">"Ni nedavnih elementov"</string>
     <string name="accessibility_app_usage_settings" msgid="6312864233673544149">"Nastavitve uporabe aplikacij"</string>
     <string name="recents_clear_all" msgid="5328176793634888831">"Počisti vse"</string>
@@ -99,7 +100,7 @@
     <string name="action_save_app_pair" msgid="5974823919237645229">"Shrani par aplikacij"</string>
     <string name="toast_split_select_app" msgid="8464310533320556058">"Za razdeljeni zaslon se dotaknite še 1 aplikacije"</string>
     <string name="toast_contextual_split_select_app" msgid="433510957123687090">"Izberite drugo aplikacijo za uporabo razdeljenega zaslona."</string>
-    <string name="toast_split_select_app_cancel" msgid="1532690483356445639"><b>"Prekliči"</b></string>
+    <string name="toast_split_select_app_cancel" msgid="1939025102486630426">"Prekliči"</string>
     <string name="toast_split_select_cont_desc" msgid="2119685056059607602">"Zapri izbiro razdeljenega zaslona"</string>
     <string name="toast_split_app_unsupported" msgid="2360229567007828914">"Izberite drugo aplikacijo za uporabo razdeljenega zaslona."</string>
     <string name="blocked_by_policy" msgid="2071401072261365546">"Aplikacija ali vaša organizacija ne dovoljuje tega dejanja"</string>
@@ -130,21 +131,18 @@
     <string name="taskbar_button_quick_settings" msgid="227662894293189391">"Hitre nastavitve"</string>
     <string name="taskbar_a11y_title" msgid="6432169809852243110">"Opravilna vrstica"</string>
     <string name="taskbar_a11y_shown_title" msgid="6842833581088937713">"Opravilna vrstica je prikazana"</string>
-    <!-- no translation found for taskbar_a11y_shown_with_bubbles_left_title (4242431789851790046) -->
-    <skip />
-    <!-- no translation found for taskbar_a11y_shown_with_bubbles_right_title (8219065376188180113) -->
-    <skip />
+    <string name="taskbar_a11y_shown_with_bubbles_left_title" msgid="4242431789851790046">"Prikazani so opravilna vrstica in oblački na levi"</string>
+    <string name="taskbar_a11y_shown_with_bubbles_right_title" msgid="8219065376188180113">"Prikazani so opravilna vrstica in oblački na desni"</string>
     <string name="taskbar_a11y_hidden_title" msgid="9154903639589659284">"Opravilna vrstica je skrita"</string>
-    <!-- no translation found for taskbar_a11y_hidden_with_bubbles_title (7397395993149508087) -->
-    <skip />
+    <string name="taskbar_a11y_hidden_with_bubbles_title" msgid="7397395993149508087">"Opravilna vrstica in oblački so skriti"</string>
     <string name="taskbar_phone_a11y_title" msgid="4933360237131229395">"Vrstica za krmarjenje"</string>
     <string name="always_show_taskbar" msgid="3608801276107751229">"Stalen prikaz oprav. vrstice"</string>
     <string name="change_navigation_mode" msgid="9088393078736808968">"Spreminjanje načina navigacije"</string>
     <string name="taskbar_divider_a11y_title" msgid="6608690309720242080">"Razdelilnik opravilne vrstice"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Premakni na vrh/levo"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Premakni na dno/desno"</string>
-    <string name="quick_switch_overflow" msgid="6935266023013283353">"{count,plural, =1{Pokaži še # aplikacijo.}one{Pokaži še # aplikacijo.}two{Pokaži še # aplikaciji.}few{Pokaži še # aplikacije.}other{Pokaži še # aplikacij.}}"</string>
-    <string name="quick_switch_desktop" msgid="4834587349322698616">"{count,plural, =1{Prikaz # aplikacije za namizni računalnik.}one{Prikaz # aplikacije za namizni računalnik.}two{Prikaz # aplikacij za namizni računalnik.}few{Prikaz # aplikacij za namizni računalnik.}other{Prikaz # aplikacij za namizni računalnik.}}"</string>
+    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{dodatna aplikacija}one{dodatna aplikacija}two{dodatni aplikaciji}few{dodatne aplikacije}other{dodatnih aplikacij}}"</string>
+    <string name="quick_switch_desktop" msgid="8393802056024499749">"Namizni računalnik"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> in <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"Oblaček"</string>
     <string name="bubble_bar_overflow_description" msgid="8617628132733151708">"Oblaček z dodatnimi elementi"</string>

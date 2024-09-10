@@ -135,14 +135,12 @@ import android.os.Trace;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.text.method.TextKeyListener;
-import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.util.Log;
 import android.util.Pair;
 import android.util.SparseArray;
 import android.view.KeyEvent;
 import android.view.KeyboardShortcutGroup;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.View;
@@ -214,7 +212,6 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.notification.NotificationListener;
-import com.android.launcher3.pageindicators.WorkspacePageIndicator;
 import com.android.launcher3.pm.PinRequestHelper;
 import com.android.launcher3.popup.ArrowPopup;
 import com.android.launcher3.popup.PopupDataProvider;
@@ -244,6 +241,7 @@ import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.ScreenOnTracker.ScreenOnListener;
 import com.android.launcher3.util.SettingsCache;
+import com.android.launcher3.util.StableViewInfo;
 import com.android.launcher3.util.SystemUiController;
 import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.Thunk;
@@ -438,6 +436,10 @@ public class Launcher extends StatefulActivity<LauncherState>
         mIsColdStartupAfterReboot = sIsNewProcess
             && !LockedUserState.get(this).isUserUnlockedAtLauncherStartup();
         if (mIsColdStartupAfterReboot) {
+            /*
+             * This trace is used to calculate the time from create to the point that icons are
+             * visible.
+             */
             Trace.beginAsyncSection(
                     COLD_STARTUP_TRACE_METHOD_NAME, COLD_STARTUP_TRACE_COOKIE);
         }
@@ -1408,15 +1410,6 @@ public class Launcher extends StatefulActivity<LauncherState>
         mWorkspace.getPageIndicator().setShouldAutoHide(true);
         mWorkspace.getPageIndicator().setPaintColor(Themes.getAttrBoolean(
                 this, R.attr.isWorkspaceDarkText) ? Color.BLACK : Color.WHITE);
-    }
-
-    @Override
-    public View onCreateView(View parent, String name, Context context, AttributeSet attrs) {
-        if (WorkspacePageIndicator.class.getName().equals(name)) {
-            return LayoutInflater.from(context).inflate(R.layout.page_indicator_dots,
-                    (ViewGroup) parent, false);
-        }
-        return super.onCreateView(parent, name, context, attrs);
     }
 
     /**
@@ -2396,10 +2389,6 @@ public class Launcher extends StatefulActivity<LauncherState>
                     .logEnd(LAUNCHER_LATENCY_STARTUP_TOTAL_DURATION)
                     .log()
                     .reset();
-            if (mIsColdStartupAfterReboot) {
-                Trace.endAsyncSection(COLD_STARTUP_TRACE_METHOD_NAME,
-                        COLD_STARTUP_TRACE_COOKIE);
-            }
         });
     }
 
@@ -2408,6 +2397,10 @@ public class Launcher extends StatefulActivity<LauncherState>
             RunnableList onCompleteSignal, int workspaceItemCount, boolean isBindSync) {
         mModelCallbacks.onInitialBindComplete(boundPages, pendingTasks, onCompleteSignal,
                 workspaceItemCount, isBindSync);
+        if (mIsColdStartupAfterReboot) {
+            Trace.endAsyncSection(COLD_STARTUP_TRACE_METHOD_NAME,
+                    COLD_STARTUP_TRACE_COOKIE);
+        }
     }
 
     /**
@@ -2432,17 +2425,16 @@ public class Launcher extends StatefulActivity<LauncherState>
      * Similar to {@link #getFirstMatch} but optimized to finding a suitable view for the app close
      * animation.
      *
-     * @param preferredItemId The id of the preferred item to match to if it exists,
-     *                        or ItemInfo#NO_MATCHING_ID if you want to not match by item id
+     * @param svi The StableViewInfo of the preferred item to match to if it exists or null
      * @param packageName The package name of the app to match.
      * @param user The user of the app to match.
      * @param supportsAllAppsState If true and we are in All Apps state, looks for view in All Apps.
      *                             Else we only looks on the workspace.
      */
-    public @Nullable View getFirstMatchForAppClose(int preferredItemId, String packageName,
+    public @Nullable View getFirstMatchForAppClose(
+            @Nullable StableViewInfo svi, String packageName,
             UserHandle user, boolean supportsAllAppsState) {
-        final Predicate<ItemInfo> preferredItem = info ->
-                info != null && info.id == preferredItemId;
+        final Predicate<ItemInfo> preferredItem = svi == null ? i -> false : svi::matches;
         final Predicate<ItemInfo> packageAndUserAndApp = info ->
                 info != null
                         && info.itemType == ITEM_TYPE_APPLICATION
@@ -2533,6 +2525,9 @@ public class Launcher extends StatefulActivity<LauncherState>
         final int itemCount = container.getChildCount();
         for (int itemIdx = 0; itemIdx < itemCount; itemIdx++) {
             View item = container.getChildAt(itemIdx);
+            if (item.getVisibility() != View.VISIBLE) {
+                continue;
+            }
             if (item instanceof ViewGroup viewGroup) {
                 View view = mapOverViewGroup(viewGroup, op);
                 if (view != null) {
@@ -2701,6 +2696,20 @@ public class Launcher extends StatefulActivity<LauncherState>
         writer.println(prefix + "\tmAppWidgetHolder.isListening: "
                 + mAppWidgetHolder.isListening());
 
+        // b/349929393
+        // The only way to reproduce this bug is to ensure that onLayout never gets called. This
+        // theoretically is impossible, so these logs are being added to test if that actually is
+        // what is happening.
+        writer.println(prefix + "\tmWorkspace.mHasOnLayoutBeenCalled="
+                + mWorkspace.mHasOnLayoutBeenCalled);
+        for (int i = 0; i < mWorkspace.getPageCount(); i++) {
+            CellLayout cellLayout = (CellLayout) mWorkspace.getPageAt(i);
+            writer.println(prefix + "\tcellLayout." + i + ".mHasOnLayoutBeenCalled="
+                    + cellLayout.mHasOnLayoutBeenCalled);
+            writer.println(prefix + "\tshortcutAndWidgetContainer." + i + ".mHasOnLayoutBeenCalled="
+                    + cellLayout.getShortcutsAndWidgets().mHasOnLayoutBeenCalled);
+        }
+
         // Extra logging for general debugging
         mDragLayer.dump(prefix, writer);
         mStateManager.dump(prefix, writer);
@@ -2708,6 +2717,10 @@ public class Launcher extends StatefulActivity<LauncherState>
         mWidgetPickerDataProvider.dump(prefix, writer);
         mDeviceProfile.dump(this, prefix, writer);
         mAppsView.getAppsStore().dump(prefix, writer);
+        mAppsView.getPersonalAppList().dump(prefix, writer);
+        if (mAppsView.shouldShowTabs()) {
+            mAppsView.getWorkAppList().dump(prefix, writer);
+        }
 
         try {
             FileLog.flushAll(writer);
