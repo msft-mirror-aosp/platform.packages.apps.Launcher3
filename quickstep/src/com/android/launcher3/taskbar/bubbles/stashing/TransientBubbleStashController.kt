@@ -67,8 +67,8 @@ class TransientBubbleStashController(
     // bubble bar properties
     private lateinit var bubbleBarAlpha: MultiPropertyFactory<View>.MultiProperty
     private lateinit var bubbleBarTranslationYAnimator: AnimatedFloat
-    private lateinit var bubbleBarScaleX: AnimatedFloat
-    private lateinit var bubbleBarScaleY: AnimatedFloat
+    private lateinit var bubbleBarBackgroundScaleX: AnimatedFloat
+    private lateinit var bubbleBarBackgroundScaleY: AnimatedFloat
     private val handleCenterFromScreenBottom =
         context.resources.getDimensionPixelSize(R.dimen.bubblebar_stashed_size) / 2f
 
@@ -149,8 +149,8 @@ class TransientBubbleStashController(
         bubbleBarTranslationYAnimator = bubbleBarViewController.bubbleBarTranslationY
         // bubble bar has only alpha property, getting it at index 0
         bubbleBarAlpha = bubbleBarViewController.bubbleBarAlpha.get(/* index= */ 0)
-        bubbleBarScaleX = bubbleBarViewController.bubbleBarScaleX
-        bubbleBarScaleY = bubbleBarViewController.bubbleBarScaleY
+        bubbleBarBackgroundScaleX = bubbleBarViewController.bubbleBarBackgroundScaleX
+        bubbleBarBackgroundScaleY = bubbleBarViewController.bubbleBarBackgroundScaleY
         stashedHeight = bubbleStashedHandleViewController?.stashedHeight ?: 0
         stashHandleViewAlpha = bubbleStashedHandleViewController?.stashedHandleAlpha?.get(0)
     }
@@ -160,8 +160,8 @@ class TransientBubbleStashController(
         if (isBubblesShowingOnHome || isBubblesShowingOnOverview) {
             isStashed = false
             animatorSet.playTogether(
-                bubbleBarScaleX.animateToValue(1f),
-                bubbleBarScaleY.animateToValue(1f),
+                bubbleBarBackgroundScaleX.animateToValue(1f),
+                bubbleBarBackgroundScaleY.animateToValue(1f),
                 bubbleBarTranslationYAnimator.animateToValue(bubbleBarTranslationY),
                 bubbleBarAlpha.animateToValue(1f)
             )
@@ -181,8 +181,8 @@ class TransientBubbleStashController(
         stashHandleViewAlpha?.value = 0f
         this.bubbleBarTranslationYAnimator.updateValue(bubbleBarTranslationY)
         bubbleBarAlpha.setValue(1f)
-        bubbleBarScaleX.updateValue(1f)
-        bubbleBarScaleY.updateValue(1f)
+        bubbleBarBackgroundScaleX.updateValue(1f)
+        bubbleBarBackgroundScaleY.updateValue(1f)
         isStashed = false
         onIsStashedChanged()
     }
@@ -192,8 +192,8 @@ class TransientBubbleStashController(
         stashHandleViewAlpha?.value = 1f
         this.bubbleBarTranslationYAnimator.updateValue(getStashTranslation())
         bubbleBarAlpha.setValue(0f)
-        bubbleBarScaleX.updateValue(getStashScaleX())
-        bubbleBarScaleY.updateValue(getStashScaleY())
+        bubbleBarBackgroundScaleX.updateValue(getStashScaleX())
+        bubbleBarBackgroundScaleY.updateValue(getStashScaleY())
         isStashed = true
         onIsStashedChanged()
     }
@@ -259,7 +259,7 @@ class TransientBubbleStashController(
     override fun getHandleTranslationY(): Float? = bubbleStashedHandleViewController?.translationY
 
     private fun getStashTranslation(): Float {
-        return bubbleBarTranslationY / 2f
+        return (bubbleBarTranslationY - stashedHeight) / 2f
     }
 
     @VisibleForTesting
@@ -366,8 +366,8 @@ class TransientBubbleStashController(
         val scaleXTarget = if (isStashed) getStashScaleX() else 1f
         val scaleYTarget = if (isStashed) getStashScaleY() else 1f
         return AnimatorSet().apply {
-            play(bubbleBarScaleX.animateToValue(scaleXTarget))
-            play(bubbleBarScaleY.animateToValue(scaleYTarget))
+            play(bubbleBarBackgroundScaleX.animateToValue(scaleXTarget))
+            play(bubbleBarBackgroundScaleY.animateToValue(scaleYTarget))
         }
     }
 

@@ -306,6 +306,20 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /**
+     * Set scale for bubble bar background in x direction
+     */
+    public void setBackgroundScaleX(float scaleX) {
+        mBubbleBarBackground.setScaleX(scaleX);
+    }
+
+    /**
+     * Set scale for bubble bar background in y direction
+     */
+    public void setBackgroundScaleY(float scaleY) {
+        mBubbleBarBackground.setScaleY(scaleY);
+    }
+
+    /**
      * Sets new icon sizes and newBubbleBarPadding between icons and bubble bar borders.
      *
      * @param newIconSize         new icon size
@@ -322,7 +336,7 @@ public class BubbleBarView extends FrameLayout {
         int childCount = getChildCount();
         for (int i = 0; i < childCount; i++) {
             View childView = getChildAt(i);
-            childView.setScaleY(mIconScale);
+            childView.setScaleX(mIconScale);
             childView.setScaleY(mIconScale);
             FrameLayout.LayoutParams params = (LayoutParams) childView.getLayoutParams();
             params.height = (int) mIconSize;

@@ -60,7 +60,7 @@ class TransientBubbleStashControllerTest {
         const val TASK_BAR_TRANSLATION_Y = -TASKBAR_BOTTOM_SPACE
         const val HANDLE_VIEW_WIDTH = 150
         const val HANDLE_VIEW_HEIGHT = 4
-        const val BUBBLE_BAR_STASHED_TRANSLATION_Y = -2.5f
+        const val BUBBLE_BAR_STASHED_TRANSLATION_Y = -4.5f
     }
 
     @get:Rule val animatorTestRule: AnimatorTestRule = AnimatorTestRule(this)
@@ -302,8 +302,8 @@ class TransientBubbleStashControllerTest {
 
         whenever(bubbleBarViewController.hasBubbles()).thenReturn(true)
         whenever(bubbleBarViewController.bubbleBarTranslationY).thenReturn(barTranslationY)
-        whenever(bubbleBarViewController.bubbleBarScaleX).thenReturn(barScaleX)
-        whenever(bubbleBarViewController.bubbleBarScaleY).thenReturn(barScaleY)
+        whenever(bubbleBarViewController.bubbleBarBackgroundScaleX).thenReturn(barScaleX)
+        whenever(bubbleBarViewController.bubbleBarBackgroundScaleY).thenReturn(barScaleY)
         whenever(bubbleBarViewController.bubbleBarAlpha).thenReturn(barAlpha)
         whenever(bubbleBarViewController.bubbleBarCollapsedWidth).thenReturn(BUBBLE_BAR_WIDTH)
         whenever(bubbleBarViewController.bubbleBarCollapsedHeight).thenReturn(BUBBLE_BAR_HEIGHT)
