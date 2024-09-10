@@ -23,6 +23,7 @@ import static com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_HO
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_AWAKE;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_COMMUNAL_HUB_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DREAMING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_WAKEFULNESS_MASK;
 import static com.android.systemui.shared.system.QuickStepContract.WAKEFULNESS_AWAKE;
@@ -47,6 +48,7 @@ import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.RecentsAnimationController;
@@ -146,6 +148,7 @@ public class TaskbarLauncherStateController {
     private MultiProperty mIconAlphaForHome;
     private QuickstepLauncher mLauncher;
 
+    private boolean mIsDestroyed = false;
     private Integer mPrevState;
     private int mState;
     private LauncherState mLauncherState = LauncherState.NORMAL;
@@ -244,18 +247,21 @@ public class TaskbarLauncherStateController {
 
         resetIconAlignment();
 
-        mLauncher.getStateManager().addStateListener(mStateListener);
+        if (!mControllers.taskbarActivityContext.isPhoneMode()) {
+            mLauncher.getStateManager().addStateListener(mStateListener);
+        }
         mLauncherState = launcher.getStateManager().getState();
         updateStateForSysuiFlags(sysuiStateFlags, /*applyState*/ false);
 
         applyState(0);
 
-        mCanSyncViews = true;
+        mCanSyncViews = !mControllers.taskbarActivityContext.isPhoneMode();
         mLauncher.addOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
         updateOverviewDragState(mLauncherState);
     }
 
     public void onDestroy() {
+        mIsDestroyed = true;
         mCanSyncViews = false;
 
         mIconAlignment.finishAnimation();
@@ -263,7 +269,7 @@ public class TaskbarLauncherStateController {
         mLauncher.getHotseat().setIconsAlpha(1f);
         mLauncher.getStateManager().removeStateListener(mStateListener);
 
-        mCanSyncViews = true;
+        mCanSyncViews = !mControllers.taskbarActivityContext.isPhoneMode();
         mLauncher.removeOnDeviceProfileChangeListener(mOnDeviceProfileChangeListener);
     }
 
@@ -349,8 +355,10 @@ public class TaskbarLauncherStateController {
         // interactive dreams, AoD, screen off. Since the SYSUI_STATE_DEVICE_DREAMING only kicks in
         // when the device is asleep, the second condition extends ensures that the transition from
         // and to the WAKEFULNESS_ASLEEP state also hide the taskbar, and improves the taskbar
-        // hide/reveal animation timings.
-        boolean isTaskbarHidden = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_DEVICE_DREAMING)
+        // hide/reveal animation timings. The Taskbar can show when dreaming if the glanceable hub
+        // is showing on top.
+        boolean isTaskbarHidden = (hasAnyFlag(systemUiStateFlags, SYSUI_STATE_DEVICE_DREAMING)
+                && !hasAnyFlag(systemUiStateFlags, SYSUI_STATE_COMMUNAL_HUB_SHOWING))
                 || (systemUiStateFlags & SYSUI_STATE_WAKEFULNESS_MASK) != WAKEFULNESS_AWAKE;
         updateStateForFlag(FLAG_TASKBAR_HIDDEN, isTaskbarHidden);
 
@@ -407,7 +415,7 @@ public class TaskbarLauncherStateController {
     }
 
     public Animator applyState(long duration, boolean start) {
-        if (mControllers.taskbarActivityContext.isDestroyed()) {
+        if (mIsDestroyed || mControllers.taskbarActivityContext.isPhoneMode()) {
             return null;
         }
         Animator animator = null;
@@ -433,6 +441,11 @@ public class TaskbarLauncherStateController {
         return animator;
     }
 
+    /** Returns {@code true} if launcher is currently presenting the home screen. */
+    public boolean isOnHome() {
+        return isInLauncher() && mLauncherState == LauncherState.NORMAL;
+    }
+
     private Animator onStateChangeApplied(int changedFlags, long duration, boolean start) {
         final boolean isInLauncher = isInLauncher();
         final boolean isIconAlignedWithHotseat = isIconAlignedWithHotseat();
@@ -445,13 +458,13 @@ public class TaskbarLauncherStateController {
         }
         mControllers.bubbleControllers.ifPresent(controllers -> {
             // Show the bubble bar when on launcher home or in overview.
-            boolean onHome = isInLauncher && mLauncherState == LauncherState.NORMAL;
             boolean onOverview = mLauncherState == LauncherState.OVERVIEW;
-            controllers.bubbleStashController.setBubblesShowingOnHome(onHome);
+            controllers.bubbleStashController.setBubblesShowingOnHome(isOnHome());
             controllers.bubbleStashController.setBubblesShowingOnOverview(onOverview);
         });
 
-        mControllers.taskbarStashController.updateStateForFlag(FLAG_IN_OVERVIEW,
+        TaskbarStashController stashController = mControllers.taskbarStashController;
+        stashController.updateStateForFlag(FLAG_IN_OVERVIEW,
                 mLauncherState == LauncherState.OVERVIEW);
 
         AnimatorSet animatorSet = new AnimatorSet();
@@ -470,7 +483,8 @@ public class TaskbarLauncherStateController {
                 // We're changing state to home, should close open popups e.g. Taskbar AllApps
                 handleOpenFloatingViews = true;
             }
-            if (mLauncherState == LauncherState.OVERVIEW) {
+            if (mLauncherState == LauncherState.OVERVIEW
+                    && !mControllers.taskbarActivityContext.isPhoneMode()) {
                 // Calling to update the insets in TaskbarInsetController#updateInsetsTouchability
                 mControllers.taskbarActivityContext.notifyUpdateLayoutParams();
             }
@@ -482,8 +496,6 @@ public class TaskbarLauncherStateController {
                 public void onAnimationStart(Animator animation) {
                     mIsAnimatingToLauncher = isInLauncher;
 
-                    TaskbarStashController stashController =
-                            mControllers.taskbarStashController;
                     if (DEBUG) {
                         Log.d(TAG, "onAnimationStart - FLAG_IN_APP: " + !isInLauncher);
                     }
@@ -499,6 +511,8 @@ public class TaskbarLauncherStateController {
 
             // Handle closing open popups when going home/overview
             handleOpenFloatingViews = true;
+        } else {
+            stashController.applyState();
         }
 
         if (handleOpenFloatingViews && isInLauncher) {
@@ -578,6 +592,12 @@ public class TaskbarLauncherStateController {
         }
 
         float cornerRoundness = isInLauncher ? 0 : 1;
+
+        if (DisplayController.isInDesktopMode(mLauncher) && mControllers.getSharedState() != null) {
+            cornerRoundness =
+                    mControllers.taskbarDesktopModeController.getTaskbarCornerRoundness(
+                            mControllers.getSharedState().showCornerRadiusInDesktopMode);
+        }
 
         // Don't animate if corner roundness has reached desired value.
         if (mTaskbarCornerRoundness.isAnimating()
@@ -743,13 +763,12 @@ public class TaskbarLauncherStateController {
         if (firstFrameVisChanged && mCanSyncViews && !Utilities.isRunningInTestHarness()) {
             ViewRootSync.synchronizeNextDraw(mLauncher.getHotseat(),
                     mControllers.taskbarActivityContext.getDragLayer(),
-                    () -> {
-                    });
+                    () -> {});
         }
     }
 
     private void updateIconAlphaForHome(float alpha) {
-        if (mControllers.taskbarActivityContext.isDestroyed()) {
+        if (mIsDestroyed) {
             return;
         }
         mIconAlphaForHome.setValue(alpha);
@@ -852,7 +871,8 @@ public class TaskbarLauncherStateController {
                 "%s\tmTaskbarBackgroundAlpha=%.2f", prefix, mTaskbarBackgroundAlpha.value));
         pw.println(String.format(
                 "%s\tmIconAlphaForHome=%.2f", prefix, mIconAlphaForHome.getValue()));
-        pw.println(String.format("%s\tmPrevState=%s", prefix, getStateString(mPrevState)));
+        pw.println(String.format("%s\tmPrevState=%s", prefix,
+                mPrevState == null ? null : getStateString(mPrevState)));
         pw.println(String.format("%s\tmState=%s", prefix, getStateString(mState)));
         pw.println(String.format("%s\tmLauncherState=%s", prefix, mLauncherState));
         pw.println(String.format(

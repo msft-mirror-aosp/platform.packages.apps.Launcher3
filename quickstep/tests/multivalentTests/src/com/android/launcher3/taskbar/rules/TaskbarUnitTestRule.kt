@@ -29,10 +29,10 @@ import com.android.launcher3.LauncherAppState
 import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.taskbar.TaskbarManager
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarNavButtonCallbacks
+import com.android.launcher3.taskbar.TaskbarViewController
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.InjectController
 import com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR
 import com.android.launcher3.util.LauncherMultivalentJUnit.Companion.isRunningInRobolectric
-import com.android.launcher3.util.ModelTestExtensions.loadModelSync
 import com.android.launcher3.util.TestUtil
 import com.android.quickstep.AllAppsActionManager
 import com.android.quickstep.TouchInteractionService
@@ -136,17 +136,23 @@ class TaskbarUnitTestRule(
 
                 taskbarManager =
                     TestUtil.getOnUiThread {
-                        TaskbarManager(
-                            context,
-                            AllAppsActionManager(context, UI_HELPER_EXECUTOR) {
-                                PendingIntent(IIntentSender.Default())
-                            },
-                            object : TaskbarNavButtonCallbacks {},
-                        )
+                        object :
+                            TaskbarManager(
+                                context,
+                                AllAppsActionManager(context, UI_HELPER_EXECUTOR) {
+                                    PendingIntent(IIntentSender.Default())
+                                },
+                                object : TaskbarNavButtonCallbacks {},
+                            ) {
+                            override fun recreateTaskbar() {
+                                super.recreateTaskbar()
+                                if (currentActivityContext != null) injectControllers()
+                            }
+                        }
                     }
 
                 try {
-                    LauncherAppState.getInstance(context).model.loadModelSync()
+                    TaskbarViewController.enableModelLoadingForTests(false)
 
                     // Replace Launcher Taskbar window with test instance.
                     instrumentation.runOnMainSync {
@@ -154,7 +160,6 @@ class TaskbarUnitTestRule(
                         taskbarManager.onUserUnlocked() // Required to complete initialization.
                     }
 
-                    injectControllers()
                     base.evaluate()
                 } finally {
                     // Revert Taskbar window.
@@ -162,16 +167,15 @@ class TaskbarUnitTestRule(
                         taskbarManager.destroy()
                         launcherTaskbarManager?.setSuspended(false)
                     }
+
+                    TaskbarViewController.enableModelLoadingForTests(true)
                 }
             }
         }
     }
 
     /** Simulates Taskbar recreation lifecycle. */
-    fun recreateTaskbar() {
-        instrumentation.runOnMainSync { taskbarManager.recreateTaskbar() }
-        injectControllers()
-    }
+    fun recreateTaskbar() = instrumentation.runOnMainSync { taskbarManager.recreateTaskbar() }
 
     private fun injectControllers() {
         val controllers = activityContext.controllers

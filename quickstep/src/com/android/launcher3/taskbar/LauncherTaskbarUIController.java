@@ -19,11 +19,11 @@ import static com.android.launcher3.QuickstepTransitionManager.TRANSIENT_TASKBAR
 import static com.android.launcher3.statemanager.BaseState.FLAG_NON_INTERACTIVE;
 import static com.android.launcher3.taskbar.TaskbarEduTooltipControllerKt.TOOLTIP_STEP_FEATURES;
 import static com.android.launcher3.taskbar.TaskbarLauncherStateController.FLAG_VISIBLE;
-import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
-import static com.android.window.flags.Flags.enableDesktopWindowingWallpaperActivity;
+import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
+import android.graphics.Rect;
 import android.window.RemoteTransition;
 
 import androidx.annotation.NonNull;
@@ -137,6 +137,11 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         mHomeState.removeListener(mVisibilityChangeListener);
     }
 
+    /** Returns {@code true} if launcher is currently presenting the home screen. */
+    public boolean isOnHome() {
+        return mTaskbarLauncherStateController.isOnHome();
+    }
+
     private void onInAppDisplayProgressChanged() {
         if (mControllers != null) {
             // Update our shared state so we can restore it if taskbar gets recreated.
@@ -180,6 +185,24 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     /**
+     * Returns the bounds of launcher's hotseat.
+     */
+    public void getHotseatBounds(Rect hotseatBoundsOut) {
+        DeviceProfile launcherDP = mLauncher.getDeviceProfile();
+        if (launcherDP.isQsbInline) {
+            // Not currently supported.
+            hotseatBoundsOut.setEmpty();
+            return;
+        }
+        int left = (launcherDP.widthPx - launcherDP.getHotseatWidthPx()
+                - mLauncher.getHotseat().getUnusedHorizontalSpace()) / 2;
+        int right = left + launcherDP.getHotseatWidthPx();
+        int bottom = launcherDP.getHotseatLayoutPadding(mLauncher).bottom;
+        int top = bottom - launcherDP.hotseatCellHeightPx;
+        hotseatBoundsOut.set(left, top, right, bottom);
+    }
+
+    /**
      * Should be called from onResume() and onPause(), and animates the Taskbar accordingly.
      */
     @Override
@@ -205,15 +228,16 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         // Launcher is resumed during the swipe-to-overview gesture under shell-transitions, so
         // avoid updating taskbar state in that situation (when it's non-interactive -- or
         // "background") to avoid premature animations.
-        if (ENABLE_SHELL_TRANSITIONS && isVisible
-                && mLauncher.getStateManager().getState().hasFlag(FLAG_NON_INTERACTIVE)
-                && !mLauncher.getStateManager().getState().isTaskbarAlignedWithHotseat(mLauncher)) {
+        LauncherState state = mLauncher.getStateManager().getState();
+        boolean nonInteractiveState = state.hasFlag(FLAG_NON_INTERACTIVE)
+                && !state.isTaskbarAlignedWithHotseat(mLauncher);
+        if (isVisible && (nonInteractiveState || mSkipLauncherVisibilityChange)) {
             return null;
         }
 
         DesktopVisibilityController desktopController =
                 LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
-        if (!enableDesktopWindowingWallpaperActivity()
+        if (!WALLPAPER_ACTIVITY.isEnabled(mLauncher)
                 && desktopController != null
                 && desktopController.areDesktopTasksVisible()) {
             // TODO: b/333533253 - Remove after flag rollout
@@ -221,7 +245,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         }
 
         mTaskbarLauncherStateController.updateStateForFlag(FLAG_VISIBLE, isVisible);
-        if (fromInit) {
+        if (fromInit || mControllers == null) {
             duration = 0;
         }
         return mTaskbarLauncherStateController.applyState(duration, startAnimation);
@@ -262,7 +286,12 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     public boolean isDraggingItem() {
-        return mControllers.taskbarDragController.isDragging();
+        boolean bubblesDragging = false;
+        if (mControllers.bubbleControllers.isPresent()) {
+            bubblesDragging =
+                    mControllers.bubbleControllers.get().bubbleDragController.isDragging();
+        }
+        return mControllers.taskbarDragController.isDragging() || bubblesDragging;
     }
 
     @Override

@@ -106,8 +106,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Predicate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Various utilities shared amongst the Launcher's classes.
@@ -116,8 +114,7 @@ public final class Utilities {
 
     private static final String TAG = "Launcher.Utilities";
 
-    private static final Pattern sTrimPattern =
-            Pattern.compile("^[\\s|\\p{javaSpaceChar}]*(.*)[\\s|\\p{javaSpaceChar}]*$");
+    private static final String TRIM_PATTERN = "(^\\h+|\\h+$)";
 
     private static final Matrix sMatrix = new Matrix();
     private static final Matrix sInverseMatrix = new Matrix();
@@ -179,6 +176,11 @@ public final class Utilities {
 
     public static void enableRunningInTestHarnessForTests() {
         sIsRunningInTestHarness = true;
+    }
+
+    /** Disables running test in test harness mode */
+    public static void disableRunningInTestHarnessForTests() {
+        sIsRunningInTestHarness = false;
     }
 
     public static boolean isPropertyEnabled(String propertyName) {
@@ -445,10 +447,7 @@ public final class Utilities {
         if (s == null) {
             return "";
         }
-
-        // Just strip any sequence of whitespace or java space characters from the beginning and end
-        Matcher m = sTrimPattern.matcher(s);
-        return m.replaceAll("$1");
+        return s.toString().replaceAll(TRIM_PATTERN, "").trim();
     }
 
     /**
@@ -722,9 +721,54 @@ public final class Utilities {
     }
 
     /**
-     * Rotates `inOutBounds` by `delta` 90-degree increments. Rotation is visually CCW. Parent
+     * Rotates `inOutBounds` by `delta` 90-degree increments. Rotation is visually CW. Parent
      * sizes represent the "space" that will rotate carrying inOutBounds along with it to determine
      * the final bounds.
+     *
+     * As an example if this is the input:
+     * +-------------+
+     * |   +-----+   |
+     * |   |     |   |
+     * |   +-----+   |
+     * |             |
+     * |             |
+     * |             |
+     * +-------------+
+     * This would be case delta % 4 == 0:
+     * +-------------+
+     * |   +-----+   |
+     * |   |     |   |
+     * |   +-----+   |
+     * |             |
+     * |             |
+     * |             |
+     * +-------------+
+     * This would be case delta % 4 == 1:
+     * +----------------+
+     * |          +--+  |
+     * |          |  |  |
+     * |          |  |  |
+     * |          +--+  |
+     * |                |
+     * +----------------+
+     * This would be case delta % 4 == 2: // This is case was reverted to previous behaviour which
+     * doesn't match the illustration due to b/353965234
+     * +-------------+
+     * |             |
+     * |             |
+     * |             |
+     * |   +-----+   |
+     * |   |     |   |
+     * |   +-----+   |
+     * +-------------+
+     * This would be case delta % 4 == 3:
+     * +----------------+
+     * |  +--+          |
+     * |  |  |          |
+     * |  |  |          |
+     * |  +--+          |
+     * |                |
+     * +----------------+
      */
     public static void rotateBounds(Rect inOutBounds, int parentWidth, int parentHeight,
             int delta) {
@@ -830,6 +874,9 @@ public final class Utilities {
             @NonNull Rect inclusionBounds,
             @NonNull Rect exclusionBounds,
             @AdjustmentDirection int adjustmentDirection) {
+        if (!Rect.intersects(targetViewBounds, exclusionBounds)) {
+            return;
+        }
         switch (adjustmentDirection) {
             case TRANSLATE_RIGHT:
                 targetView.setTranslationX(Math.min(
