@@ -42,7 +42,7 @@ import androidx.annotation.UiThread;
 import com.android.launcher3.Flags;
 import com.android.launcher3.R;
 import com.android.launcher3.util.SimpleBroadcastReceiver;
-import com.android.quickstep.util.ActiveGestureLog;
+import com.android.quickstep.util.ActiveGestureProtoLogProxy;
 import com.android.systemui.shared.system.PackageManagerWrapper;
 
 import java.io.PrintWriter;
@@ -305,10 +305,11 @@ public final class OverviewComponentObserver {
      * Starts the intent for the current home activity.
      */
     public static void startHomeIntentSafely(
-            @NonNull Context context, @NonNull Intent homeIntent, @Nullable Bundle options,
+            @NonNull Context context,
+            @NonNull Intent homeIntent,
+            @Nullable Bundle options,
             @NonNull String reason) {
-        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
-                "OverviewComponentObserver.startHomeIntent: ").append(reason));
+        ActiveGestureProtoLogProxy.logStartHomeIntent(reason);
         try {
             context.startActivity(homeIntent, options);
         } catch (NullPointerException | ActivityNotFoundException | SecurityException e) {
