@@ -17,7 +17,6 @@
 package com.android.quickstep.fallback.window
 
 import android.animation.AnimatorSet
-import android.annotation.SuppressLint
 import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Context
@@ -49,11 +48,11 @@ import com.android.launcher3.util.RunnableList
 import com.android.launcher3.util.SystemUiController
 import com.android.launcher3.views.BaseDragLayer
 import com.android.launcher3.views.ScrimView
+import com.android.quickstep.FallbackWindowInterface
 import com.android.quickstep.OverviewComponentObserver
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.RemoteAnimationTargets
 import com.android.quickstep.SystemUiProxy
-import com.android.quickstep.TouchInteractionService
 import com.android.quickstep.fallback.FallbackRecentsStateController
 import com.android.quickstep.fallback.FallbackRecentsView
 import com.android.quickstep.fallback.RecentsDragLayer
@@ -77,27 +76,13 @@ import java.util.function.Predicate
  * where needed. This allows us to run RecentsView in a window where needed.
  * todo: b/365776320, b/365777482
  */
-class RecentsWindowManager private constructor(context: Context) :
+class RecentsWindowManager(context: Context) :
     RecentsWindowContext(context), RecentsViewContainer, StatefulContainer<RecentsState> {
 
-    @SuppressLint("StaticFieldLeak")
     companion object {
         private const val HOME_APPEAR_DURATION: Long = 250
         private const val TAG = "RecentsWindowManager"
         private const val DEBUG = false
-
-        @Volatile private var INSTANCE: RecentsWindowManager? = null
-
-        fun getInstanceOrNull(): RecentsWindowManager? {
-            return INSTANCE
-        }
-
-        fun getOrCreateInstance(context: Context): RecentsWindowManager {
-            return INSTANCE
-                ?: synchronized(this) {
-                    INSTANCE ?: RecentsWindowManager(context).also { INSTANCE = it }
-                }
-        }
     }
 
     protected var recentsView: FallbackRecentsView<RecentsWindowManager>? = null
@@ -124,6 +109,15 @@ class RecentsWindowManager private constructor(context: Context) :
     private val mEventCallbacks =
         arrayOf(RunnableList(), RunnableList(), RunnableList(), RunnableList())
     private var onInitListener: Predicate<Boolean>? = null
+
+    init {
+        FallbackWindowInterface.init(this)
+    }
+
+    override fun destroy() {
+        super.destroy()
+        FallbackWindowInterface.getInstance()?.destroy()
+    }
 
     override fun startHome() {
         val recentsView: RecentsView<*, *> = getOverviewPanel()

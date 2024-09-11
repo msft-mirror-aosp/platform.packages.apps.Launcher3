@@ -41,6 +41,7 @@ import androidx.annotation.NonNull;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherRootView;
 import com.android.launcher3.dragndrop.DragLayer;
 import com.android.launcher3.statemanager.BaseState;
@@ -73,7 +74,7 @@ public abstract class AbsSwipeUpHandlerTestCase<
     protected final Context mContext =
             InstrumentationRegistry.getInstrumentation().getTargetContext();
     protected final RecentsWindowManager mRecentsWindowManager =
-            RecentsWindowManager.Companion.getOrCreateInstance(mContext);
+            Flags.enableFallbackOverviewInWindow() ? new RecentsWindowManager(mContext) : null;
     protected final TaskAnimationManager mTaskAnimationManager =
             new TaskAnimationManager(mContext, mRecentsWindowManager);
     protected final RecentsAnimationDeviceState mRecentsAnimationDeviceState =

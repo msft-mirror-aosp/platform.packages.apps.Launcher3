@@ -56,7 +56,7 @@ open class RecentsWindowContext(windowContext: Context) :
 
     override fun getDeviceProfile(): DeviceProfile {
         if (deviceProfile == null) {
-            deviceProfile =  InvariantDeviceProfile.INSTANCE[this].getDeviceProfile(this)
+            deviceProfile = InvariantDeviceProfile.INSTANCE[this].getDeviceProfile(this)
                 .copy(this)
         }
         return deviceProfile!!

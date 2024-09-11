@@ -500,8 +500,8 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         mLastGestureState = null;
         mLastAppearedTaskTargets = null;
 
-        if (Flags.enableFallbackOverviewInWindow()) {
-            RecentsWindowManager.Companion.getInstanceOrNull().cleanup();
+        if(Flags.enableFallbackOverviewInWindow()) {
+            mRecentsWindowsManager.cleanup();
         }
     }
 

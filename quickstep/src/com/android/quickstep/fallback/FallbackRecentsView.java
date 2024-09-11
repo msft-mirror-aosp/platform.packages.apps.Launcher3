@@ -80,7 +80,7 @@ public class FallbackRecentsView<CONTAINER_TYPE extends Context & RecentsViewCon
 
     private static BaseContainerInterface<RecentsState, ?> getContainerInterface() {
         return Flags.enableFallbackOverviewInWindow()
-                ? FallbackWindowInterface.INSTANCE
+                ? FallbackWindowInterface.getInstance()
                 : FallbackActivityInterface.INSTANCE;
     }
 

@@ -294,7 +294,7 @@ public abstract class AbsSwipeUpHandler<
     private static final int LOG_NO_OP_PAGE_INDEX = -1;
 
     protected final TaskAnimationManager mTaskAnimationManager;
-
+    protected final RecentsWindowManager mRecentsWindowManager;
     // Either RectFSpringAnim (if animating home) or ObjectAnimator (from mCurrentShift) otherwise
     private RunningWindowAnim[] mRunningWindowAnim;
     // Possible second animation running at the same time as mRunningWindowAnim
@@ -355,12 +355,11 @@ public abstract class AbsSwipeUpHandler<
     public AbsSwipeUpHandler(Context context, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState,
             long touchTimeMs, boolean continuingLastGesture,
-            InputConsumerController inputConsumer) {
+            InputConsumerController inputConsumer, RecentsWindowManager recentsWindowManager) {
         super(context, deviceState, gestureState);
         mContainerInterface = gestureState.getContainerInterface();
-        if (Flags.enableFallbackOverviewInWindow()) {
-            RecentsWindowManager.Companion.getInstanceOrNull()
-                    .registerInitListener(this::onActivityInit);
+        if (recentsWindowManager != null && Flags.enableFallbackOverviewInWindow()) {
+            recentsWindowManager.registerInitListener(this::onActivityInit);
         }
         mActivityInitListener =
                 mContainerInterface.createActivityInitListener(this::onActivityInit);
@@ -375,6 +374,7 @@ public abstract class AbsSwipeUpHandler<
                     endLauncherTransitionController();
                 }, new InputProxyHandlerFactory(mContainerInterface, mGestureState));
         mTaskAnimationManager = taskAnimationManager;
+        mRecentsWindowManager = recentsWindowManager;
         mTouchTimeMs = touchTimeMs;
         mContinuingLastGesture = continuingLastGesture;
 

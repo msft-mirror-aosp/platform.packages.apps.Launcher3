@@ -108,9 +108,10 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
 
     public RecentsWindowSwipeHandler(Context context, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState, long touchTimeMs,
-            boolean continuingLastGesture, InputConsumerController inputConsumer) {
+            boolean continuingLastGesture, InputConsumerController inputConsumer,
+            RecentsWindowManager recentsWindowManager) {
         super(context, deviceState, taskAnimationManager, gestureState, touchTimeMs,
-                continuingLastGesture, inputConsumer);
+                continuingLastGesture, inputConsumer, recentsWindowManager);
 
         mRunningOverHome = mGestureState.getRunningTask() != null
                 && mGestureState.getRunningTask().isHomeTask();
@@ -188,7 +189,7 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
             // the PiP task appearing.
             recentsCallback = () -> {
                 callback.run();
-                RecentsWindowManager.Companion.getInstanceOrNull().startHome();
+                mRecentsWindowManager.startHome();
             };
         } else {
             recentsCallback = callback;

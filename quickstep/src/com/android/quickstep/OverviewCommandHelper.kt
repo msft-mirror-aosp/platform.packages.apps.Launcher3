@@ -46,19 +46,18 @@ import com.android.quickstep.OverviewCommandHelper.CommandType.SHOW
 import com.android.quickstep.OverviewCommandHelper.CommandType.TOGGLE
 import com.android.quickstep.util.ActiveGestureLog
 import com.android.quickstep.views.RecentsView
-import com.android.quickstep.views.RecentsViewContainer
 import com.android.quickstep.views.TaskView
 import com.android.systemui.shared.recents.model.ThumbnailData
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper
+import java.io.PrintWriter
+import java.util.concurrent.ConcurrentLinkedDeque
+import kotlin.coroutines.resume
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
-import java.io.PrintWriter
-import java.util.concurrent.ConcurrentLinkedDeque
-import kotlin.coroutines.resume
 
 /** Helper class to handle various atomic commands for switching between Overview. */
 class OverviewCommandHelper

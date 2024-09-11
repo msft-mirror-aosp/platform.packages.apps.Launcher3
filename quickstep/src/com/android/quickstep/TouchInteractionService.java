@@ -673,8 +673,8 @@ public class TouchInteractionService extends Service {
         mDesktopVisibilityController = new DesktopVisibilityController(this);
         mTaskbarManager = new TaskbarManager(
                 this, mAllAppsActionManager, mNavCallbacks, mDesktopVisibilityController);
-        if (Flags.enableFallbackOverviewInWindow()) {
-            mRecentsWindowManager = RecentsWindowManager.Companion.getOrCreateInstance(this);
+        if(Flags.enableFallbackOverviewInWindow()) {
+            mRecentsWindowManager = new RecentsWindowManager(this);
         }
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
 
@@ -827,6 +827,10 @@ public class TouchInteractionService extends Service {
         mTrackpadsConnected.clear();
 
         mTaskbarManager.destroy();
+
+        if (mRecentsWindowManager != null) {
+            mRecentsWindowManager.destroy();
+        }
         mDesktopVisibilityController.onDestroy();
         sConnected = false;
 
@@ -1701,6 +1705,6 @@ public class TouchInteractionService extends Service {
             GestureState gestureState, long touchTimeMs) {
         return new RecentsWindowSwipeHandler(this, mDeviceState, mTaskAnimationManager,
                 gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
-                mInputConsumer);
+                mInputConsumer, mRecentsWindowManager);
     }
 }
