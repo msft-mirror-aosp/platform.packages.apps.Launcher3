@@ -62,11 +62,6 @@ public final class FeatureFlags {
      * and set a default value for the flag. This will be the default value on Debug builds.
      * <p>
      */
-    // TODO(Block 2): Clean up flags
-    public static final BooleanFlag ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH = getDebugFlag(270395073,
-            "ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH", DISABLED,
-            "Allow bottom sheet depth to be smaller than 1 for multi-display devices.");
-
     // TODO(Block 3): Clean up flags
     public static final BooleanFlag ENABLE_DISMISS_PREDICTION_UNDO = getDebugFlag(270394476,
             "ENABLE_DISMISS_PREDICTION_UNDO", DISABLED,
@@ -85,25 +80,9 @@ public final class FeatureFlags {
                     + "data preparation for loading the home screen");
 
     // TODO(Block 4): Cleanup flags
-    public static final BooleanFlag ENABLE_ALL_APPS_FROM_OVERVIEW =
-            getDebugFlag(275132633, "ENABLE_ALL_APPS_FROM_OVERVIEW", DISABLED,
-                    "Allow entering All Apps from Overview (e.g. long swipe up from app)");
-
     public static final BooleanFlag ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS = getReleaseFlag(
             270394468, "ENABLE_SHOW_KEYBOARD_OPTION_IN_ALL_APPS", ENABLED,
             "Enable option to show keyboard when going to all-apps");
-
-    // TODO(Block 5): Clean up flags
-    public static final BooleanFlag ENABLE_TWOLINE_DEVICESEARCH = getDebugFlag(201388851,
-            "ENABLE_TWOLINE_DEVICESEARCH", DISABLED,
-            "Enable two line label for icons with labels on device search.");
-
-    public static final BooleanFlag ENABLE_ICON_IN_TEXT_HEADER = getDebugFlag(270395143,
-            "ENABLE_ICON_IN_TEXT_HEADER", DISABLED, "Show icon in textheader");
-
-    public static final BooleanFlag ENABLE_PREMIUM_HAPTICS_ALL_APPS = getDebugFlag(270396358,
-            "ENABLE_PREMIUM_HAPTICS_ALL_APPS", DISABLED,
-            "Enables haptics opening/closing All apps");
 
     // TODO(Block 6): Clean up flags
     public static final BooleanFlag ENABLE_ALL_APPS_SEARCH_IN_TASKBAR = getDebugFlag(270393900,
@@ -124,10 +103,6 @@ public final class FeatureFlags {
     // TODO(Block 11): Clean up flags
     public static final BooleanFlag FOLDABLE_SINGLE_PAGE = getDebugFlag(270395274,
             "FOLDABLE_SINGLE_PAGE", DISABLED, "Use a single page for the workspace");
-
-    public static final BooleanFlag ENABLE_PARAMETRIZE_REORDER = getDebugFlag(289420844,
-            "ENABLE_PARAMETRIZE_REORDER", DISABLED,
-            "Enables generating the reorder using a set of parameters");
 
     // TODO(Block 12): Clean up flags
     public static final BooleanFlag ENABLE_MULTI_INSTANCE = getDebugFlag(270396680,
@@ -174,10 +149,6 @@ public final class FeatureFlags {
     // When enabled the promise icon is visible in all apps while installation an app.
     public static final BooleanFlag PROMISE_APPS_IN_ALL_APPS = getDebugFlag(270390012,
             "PROMISE_APPS_IN_ALL_APPS", DISABLED, "Add promise icon in all-apps");
-
-    public static final BooleanFlag KEYGUARD_ANIMATION = getDebugFlag(270390904,
-            "KEYGUARD_ANIMATION", DISABLED,
-            "Enable animation for keyguard going away on wallpaper");
 
     public static final BooleanFlag ENABLE_DEVICE_SEARCH = getReleaseFlag(270390907,
             "ENABLE_DEVICE_SEARCH", ENABLED, "Allows on device search in all apps");
@@ -235,9 +206,6 @@ public final class FeatureFlags {
             "ENABLE_SEARCH_UNINSTALLED_APPS", ENABLED, "Search uninstalled app results.");
 
     // TODO(Block 20): Clean up flags
-    public static final BooleanFlag ENABLE_SCRIM_FOR_APP_LAUNCH = getDebugFlag(270393276,
-            "ENABLE_SCRIM_FOR_APP_LAUNCH", DISABLED, "Enables scrim during app launch animation.");
-
     public static final BooleanFlag ENABLE_BACK_SWIPE_HOME_ANIMATION = getDebugFlag(270393426,
             "ENABLE_BACK_SWIPE_HOME_ANIMATION", ENABLED,
             "Enables home animation to icon when user swipes back.");
