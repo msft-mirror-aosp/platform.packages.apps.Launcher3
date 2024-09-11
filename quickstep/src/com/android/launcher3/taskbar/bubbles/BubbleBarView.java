@@ -205,7 +205,6 @@ public class BubbleBarView extends FrameLayout {
 
     public BubbleBarView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
-        setAlpha(0);
         setVisibility(INVISIBLE);
         mIconOverlapAmount = getResources().getDimensionPixelSize(R.dimen.bubblebar_icon_overlap);
         mBubbleBarPadding = getResources().getDimensionPixelSize(R.dimen.bubblebar_icon_spacing);
@@ -317,6 +316,22 @@ public class BubbleBarView extends FrameLayout {
      */
     public void setBackgroundScaleY(float scaleY) {
         mBubbleBarBackground.setScaleY(scaleY);
+    }
+
+    /**
+     * Set alpha for bubble views
+     */
+    public void setBubbleAlpha(float alpha) {
+        for (int i = 0; i < getChildCount(); i++) {
+            getChildAt(i).setAlpha(alpha);
+        }
+    }
+
+    /**
+     * Set alpha for bar background
+     */
+    public void setBackgroundAlpha(float alpha) {
+        mBubbleBarBackground.setAlpha((int) (255 * alpha));
     }
 
     /**
@@ -1029,7 +1044,7 @@ public class BubbleBarView extends FrameLayout {
                 // where the bubble will end up when the animation ends
                 final float targetX = expandedX + expandedBarShift;
                 bv.setTranslationX(widthState * (targetX - collapsedX) + collapsedX);
-                bv.setAlpha(1);
+                bv.setVisibility(VISIBLE);
             } else {
                 // If bar is on the right, account for bubble bar expanding and shifting left
                 final float collapsedBarShift = onLeft ? 0 : currentWidth - collapsedWidth;
@@ -1039,9 +1054,9 @@ public class BubbleBarView extends FrameLayout {
                 // the overflow.
                 if (widthState == 0) {
                     if (bv.isOverflow() || i > MAX_VISIBLE_BUBBLES_COLLAPSED - 1) {
-                        bv.setAlpha(0);
+                        bv.setVisibility(INVISIBLE);
                     } else {
-                        bv.setAlpha(1);
+                        bv.setVisibility(VISIBLE);
                     }
                 }
             }
@@ -1349,7 +1364,7 @@ public class BubbleBarView extends FrameLayout {
      * touch bounds.
      */
     public boolean isEventOverAnyItem(MotionEvent ev) {
-        if (getVisibility() == View.VISIBLE) {
+        if (getVisibility() == VISIBLE) {
             getBoundsOnScreen(mTempRect);
             return mTempRect.contains((int) ev.getX(), (int) ev.getY());
         }

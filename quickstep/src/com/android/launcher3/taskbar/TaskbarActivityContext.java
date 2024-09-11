@@ -923,6 +923,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      */
     public void onDestroy() {
         mIsDestroyed = true;
+        mTaskbarFeatureEvaluator.onDestroy();
         setUIController(TaskbarUIController.DEFAULT);
         mControllers.onDestroy();
         if (!enableTaskbarNoRecreate() && !ENABLE_TASKBAR_NAVBAR_UNIFICATION) {
