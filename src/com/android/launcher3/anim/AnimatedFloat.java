@@ -20,8 +20,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.util.FloatProperty;
 
-import java.util.function.Consumer;
-
 /**
  * A mutable float which allows animating the value
  */
@@ -40,9 +38,9 @@ public class AnimatedFloat {
                 }
             };
 
-    private static final Consumer<Float> NO_OP = t -> { };
+    private static final Runnable NO_OP = () -> { };
 
-    private final Consumer<Float> mUpdateCallback;
+    private final Runnable mUpdateCallback;
     private ObjectAnimator mValueAnimator;
     // Only non-null when an animation is playing to this value.
     private Float mEndValue;
@@ -54,19 +52,10 @@ public class AnimatedFloat {
     }
 
     public AnimatedFloat(Runnable updateCallback) {
-        this(v -> updateCallback.run());
-    }
-
-    public AnimatedFloat(Consumer<Float> updateCallback) {
         mUpdateCallback = updateCallback;
     }
 
     public AnimatedFloat(Runnable updateCallback, float initialValue) {
-        this(updateCallback);
-        value = initialValue;
-    }
-
-    public AnimatedFloat(Consumer<Float> updateCallback, float initialValue) {
         this(updateCallback);
         value = initialValue;
     }
@@ -110,7 +99,7 @@ public class AnimatedFloat {
     public void updateValue(float v) {
         if (Float.compare(v, value) != 0) {
             value = v;
-            mUpdateCallback.accept(value);
+            mUpdateCallback.run();
         }
     }
 

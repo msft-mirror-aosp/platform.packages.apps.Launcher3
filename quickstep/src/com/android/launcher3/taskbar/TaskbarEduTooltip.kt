@@ -27,7 +27,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.animation.Interpolator
-import android.window.OnBackInvokedDispatcher
 import androidx.core.view.updateLayoutParams
 import com.android.app.animation.Interpolators.EMPHASIZED_ACCELERATE
 import com.android.app.animation.Interpolators.EMPHASIZED_DECELERATE
@@ -67,14 +66,11 @@ constructor(
     /** Container where the tooltip's body should be inflated. */
     lateinit var content: ViewGroup
         private set
-
     private lateinit var arrow: View
 
     /** Callback invoked when the tooltip is being closed. */
     var onCloseCallback: () -> Unit = {}
     private var openCloseAnimator: AnimatorSet? = null
-    /** Used to set whether users can tap outside the current tooltip window to dismiss it */
-    var allowTouchDismissal = true
 
     /** Animates the tooltip into view. */
     fun show() {
@@ -138,25 +134,14 @@ constructor(
     override fun isOfType(type: Int): Boolean = type and TYPE_TASKBAR_EDUCATION_DIALOG != 0
 
     override fun onControllerInterceptTouchEvent(ev: MotionEvent?): Boolean {
-        if (
-            ev?.action == ACTION_DOWN &&
-                !activityContext.dragLayer.isEventOverView(this, ev) &&
-                allowTouchDismissal
-        ) {
+        if (ev?.action == ACTION_DOWN && !activityContext.dragLayer.isEventOverView(this, ev)) {
             close(true)
         }
         return false
     }
 
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        findOnBackInvokedDispatcher()
-            ?.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, this)
-    }
-
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(this)
         Settings.Secure.putInt(mContext.contentResolver, LAUNCHER_TASKBAR_EDUCATION_SHOWING, 0)
     }
 

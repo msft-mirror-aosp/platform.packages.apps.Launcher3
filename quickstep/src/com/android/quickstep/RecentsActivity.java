@@ -57,7 +57,6 @@ import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAnimationRunner;
 import com.android.launcher3.LauncherAnimationRunner.AnimationResult;
 import com.android.launcher3.LauncherAnimationRunner.RemoteAnimationFactory;
-import com.android.launcher3.LauncherRootView;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.anim.PendingAnimation;
@@ -133,21 +132,20 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
      * Init drag layer and overview panel views.
      */
     protected void setupViews() {
+        inflateRootView(R.layout.fallback_recents_activity);
+        setContentView(getRootView());
+        mDragLayer = findViewById(R.id.drag_layer);
+        mScrimView = findViewById(R.id.scrim_view);
+        mFallbackRecentsView = findViewById(R.id.overview_panel);
+        mActionsView = findViewById(R.id.overview_actions_view);
+        getRootView().getSysUiScrim().getSysUIProgress().updateValue(0);
         SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(this);
-        // SplitSelectStateController needs to be created before setContentView()
         mSplitSelectStateController =
                 new SplitSelectStateController(this, mHandler, getStateManager(),
                         null /* depthController */, getStatsLogManager(),
                         systemUiProxy, RecentsModel.INSTANCE.get(this),
                         null /*activityBackCallback*/);
-        // Setup root and child views
-        inflateRootView(R.layout.fallback_recents_activity);
-        LauncherRootView rootView = getRootView();
-        mDragLayer = rootView.findViewById(R.id.drag_layer);
-        mScrimView = rootView.findViewById(R.id.scrim_view);
-        mFallbackRecentsView = rootView.findViewById(R.id.overview_panel);
-        mActionsView = rootView.findViewById(R.id.overview_actions_view);
-
+        mDragLayer.recreateControllers();
         if (enableDesktopWindowingMode()) {
             mDesktopRecentsTransitionController = new DesktopRecentsTransitionController(
                     getStateManager(), systemUiProxy, getIApplicationThread(),
@@ -156,10 +154,6 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
         }
         mFallbackRecentsView.init(mActionsView, mSplitSelectStateController,
                 mDesktopRecentsTransitionController);
-
-        setContentView(rootView);
-        rootView.getSysUiScrim().getSysUIProgress().updateValue(0);
-        mDragLayer.recreateControllers();
 
         mTISBindHelper = new TISBindHelper(this, this::onTISConnected);
     }

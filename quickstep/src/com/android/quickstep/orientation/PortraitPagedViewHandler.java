@@ -259,8 +259,7 @@ public class PortraitPagedViewHandler extends DefaultPagedViewHandler implements
             return new Pair<>(translationX, translationY);
         }
 
-        bannerParams.gravity =
-                BOTTOM | (deviceProfile.isLeftRightSplit ? START : CENTER_HORIZONTAL);
+        bannerParams.gravity = BOTTOM | ((deviceProfile.isLandscape) ? START : CENTER_HORIZONTAL);
 
         // Set correct width
         if (desiredTaskId == splitBounds.leftTopTaskId) {
