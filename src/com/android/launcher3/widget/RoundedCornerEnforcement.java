@@ -29,7 +29,6 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
-import com.android.launcher3.config.FeatureFlags;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -67,13 +66,13 @@ public class RoundedCornerEnforcement {
     /**
      * Check whether the app widget has opted out of the enforcement.
      */
-    public static boolean hasAppWidgetOptedOut(@NonNull View appWidget, @NonNull View background) {
+    public static boolean hasAppWidgetOptedOut(@NonNull View background) {
         return background.getId() == android.R.id.background && background.getClipToOutline();
     }
 
     /** Check if the app widget is in the deny list. */
     public static boolean isRoundedCornerEnabled() {
-        return Utilities.ATLEAST_S && FeatureFlags.ENABLE_ENFORCED_ROUNDED_CORNERS.get();
+        return Utilities.ATLEAST_S;
     }
 
     /**

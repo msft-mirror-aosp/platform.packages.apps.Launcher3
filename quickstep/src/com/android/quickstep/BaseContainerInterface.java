@@ -68,16 +68,11 @@ public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_
 
     public abstract void onAssistantVisibilityChanged(float assistantVisibility);
 
-    public abstract boolean allowMinimizeSplitScreen();
-
     public abstract boolean isResumed();
 
     public abstract boolean isStarted();
     public abstract boolean deferStartingActivity(RecentsAnimationDeviceState deviceState,
             MotionEvent ev);
-
-    /** @return whether to allow going to All Apps from Overview. */
-    public abstract boolean allowAllAppsFromOverview();
 
     /**
      * Returns the color of the scrim behind overview when at rest in this state.
@@ -133,7 +128,9 @@ public abstract class BaseContainerInterface<STATE_TYPE extends BaseState<STATE_
 
     @Nullable
     public DesktopVisibilityController getDesktopVisibilityController() {
-        return null;
+        CONTAINER_TYPE container = getCreatedContainer();
+
+        return container == null ? null : container.getDesktopVisibilityController();
     }
 
     /**

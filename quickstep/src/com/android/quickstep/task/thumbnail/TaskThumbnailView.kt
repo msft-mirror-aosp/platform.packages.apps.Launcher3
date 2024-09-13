@@ -24,22 +24,24 @@ import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewOutlineProvider
-import android.widget.FrameLayout
-import android.widget.ImageView
 import androidx.annotation.ColorInt
-import androidx.core.view.isVisible
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.view.isInvisible
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.util.ViewPool
+import com.android.quickstep.recents.di.RecentsDependencies
+import com.android.quickstep.recents.di.inject
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
+import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.SnapshotSplash
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
+import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
 import com.android.quickstep.util.TaskCornerRadius
-import com.android.quickstep.views.RecentsView
-import com.android.quickstep.views.RecentsViewContainer
-import com.android.quickstep.views.TaskView
+import com.android.quickstep.views.FixedSizeImageView
 import com.android.systemui.shared.system.QuickStepContract
+import kotlin.math.abs
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,27 +50,20 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
-class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
-    // TODO(b/335649589): Ideally create and obtain this from DI. This ViewModel should be scoped
-    //  to [TaskView], and also shared between [TaskView] and [TaskThumbnailView]
-    //  This is using a lazy for now because the dependencies cannot be obtained without DI.
-    val viewModel by lazy {
-        val recentsView =
-            RecentsViewContainer.containerFromContext<RecentsViewContainer>(context)
-                .getOverviewPanel<RecentsView<*, *>>()
-        TaskThumbnailViewModel(
-            recentsView.mRecentsViewData!!,
-            (parent as TaskView).taskViewData,
-            (parent as TaskView).getTaskContainerForTaskThumbnailView(this)!!.taskContainerData,
-            recentsView.mTasksRepository!!,
-        )
-    }
+class TaskThumbnailView : ConstraintLayout, ViewPool.Reusable {
+
+    private val viewData: TaskThumbnailViewData by RecentsDependencies.inject(this)
+    private val viewModel: TaskThumbnailViewModel by RecentsDependencies.inject(this)
+
     private lateinit var viewAttachedScope: CoroutineScope
 
     private val scrimView: View by lazy { findViewById(R.id.task_thumbnail_scrim) }
     private val liveTileView: LiveTileView by lazy { findViewById(R.id.task_thumbnail_live_tile) }
-    private val thumbnail: ImageView by lazy { findViewById(R.id.task_thumbnail) }
+    private val thumbnailView: FixedSizeImageView by lazy { findViewById(R.id.task_thumbnail) }
+    private val splashBackground: View by lazy { findViewById(R.id.splash_background) }
+    private val splashIcon: FixedSizeImageView by lazy { findViewById(R.id.splash_icon) }
 
+    private var uiState: TaskThumbnailUiState = Uninitialized
     private var inheritedScale: Float = 1f
 
     private val _measuredBounds = Rect()
@@ -97,19 +92,23 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
             CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("TaskThumbnailView"))
         viewModel.uiState
             .onEach { viewModelUiState ->
+                uiState = viewModelUiState
                 resetViews()
                 when (viewModelUiState) {
                     is Uninitialized -> {}
                     is LiveTile -> drawLiveWindow()
-                    is Snapshot -> drawSnapshot(viewModelUiState)
+                    is SnapshotSplash -> drawSnapshotSplash(viewModelUiState)
                     is BackgroundOnly -> drawBackground(viewModelUiState.backgroundColor)
                 }
             }
             .launchIn(viewAttachedScope)
         viewModel.dimProgress
-            .onEach { dimProgress ->
-                // TODO(b/348195366) Add fade in/out for scrim
-                scrimView.alpha = dimProgress * MAX_SCRIM_ALPHA
+            .onEach { dimProgress -> scrimView.alpha = dimProgress }
+            .launchIn(viewAttachedScope)
+        viewModel.splashAlpha
+            .onEach { splashAlpha ->
+                splashBackground.alpha = splashAlpha
+                splashIcon.alpha = splashAlpha
             }
             .launchIn(viewAttachedScope)
         viewModel.cornerRadiusProgress.onEach { invalidateOutline() }.launchIn(viewAttachedScope)
@@ -135,7 +134,34 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
     }
 
     override fun onRecycle() {
-        // Do nothing
+        uiState = Uninitialized
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        if (changed) {
+            viewData.width.value = abs(right - left)
+            viewData.height.value = abs(bottom - top)
+        }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (uiState is SnapshotSplash) {
+            setImageMatrix()
+        }
+    }
+
+    override fun setScaleX(scaleX: Float) {
+        super.setScaleX(scaleX)
+        // Splash icon should ignore scale on TTV
+        splashIcon.scaleX = 1 / scaleX
+    }
+
+    override fun setScaleY(scaleY: Float) {
+        super.setScaleY(scaleY)
+        // Splash icon should ignore scale on TTV
+        splashIcon.scaleY = 1 / scaleY
     }
 
     override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -147,8 +173,10 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
     }
 
     private fun resetViews() {
-        liveTileView.isVisible = false
-        thumbnail.isVisible = false
+        liveTileView.isInvisible = true
+        thumbnailView.isInvisible = true
+        splashBackground.alpha = 0f
+        splashIcon.alpha = 0f
         scrimView.alpha = 0f
         setBackgroundColor(Color.BLACK)
     }
@@ -158,13 +186,25 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
     }
 
     private fun drawLiveWindow() {
-        liveTileView.isVisible = true
+        liveTileView.isInvisible = false
+    }
+
+    private fun drawSnapshotSplash(snapshotSplash: SnapshotSplash) {
+        drawSnapshot(snapshotSplash.snapshot)
+
+        splashBackground.setBackgroundColor(snapshotSplash.snapshot.backgroundColor)
+        splashIcon.setImageDrawable(snapshotSplash.splash)
     }
 
     private fun drawSnapshot(snapshot: Snapshot) {
         drawBackground(snapshot.backgroundColor)
-        thumbnail.setImageBitmap(snapshot.bitmap)
-        thumbnail.isVisible = true
+        thumbnailView.setImageBitmap(snapshot.bitmap)
+        thumbnailView.isInvisible = false
+        setImageMatrix()
+    }
+
+    private fun setImageMatrix() {
+        thumbnailView.imageMatrix = viewModel.getThumbnailPositionState(width, height, isLayoutRtl)
     }
 
     private fun getCurrentCornerRadius() =
@@ -173,8 +213,4 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
             overviewCornerRadius,
             fullscreenCornerRadius
         ) / inheritedScale
-
-    private companion object {
-        const val MAX_SCRIM_ALPHA = 0.4f
-    }
 }

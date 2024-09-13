@@ -60,6 +60,7 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.anim.AnimatorPlaybackController;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarNavButtonCallbacks;
 import com.android.launcher3.taskbar.unfold.NonDestroyableScopedUnfoldTransitionProgressProvider;
@@ -209,12 +210,14 @@ public class TaskbarManager {
                 }
             };
 
+    @NonNull private final DesktopVisibilityController mDesktopVisibilityController;
+
     @SuppressLint("WrongConstant")
     public TaskbarManager(
             Context context,
             AllAppsActionManager allAppsActionManager,
-            TaskbarNavButtonCallbacks navCallbacks) {
-
+            TaskbarNavButtonCallbacks navCallbacks,
+            @NonNull DesktopVisibilityController desktopVisibilityController) {
         Display display =
                 context.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY);
         mContext = context.createWindowContext(display,
@@ -224,6 +227,7 @@ public class TaskbarManager {
         mNavigationBarPanelContext = ENABLE_TASKBAR_NAVBAR_UNIFICATION
                 ? context.createWindowContext(display, TYPE_NAVIGATION_BAR_PANEL, null)
                 : null;
+        mDesktopVisibilityController = desktopVisibilityController;
         if (enableTaskbarNoRecreate()) {
             mWindowManager = mContext.getSystemService(WindowManager.class);
             mTaskbarRootLayout = new FrameLayout(mContext) {
@@ -459,16 +463,18 @@ public class TaskbarManager {
                 + " [dp != null (i.e. mUserUnlocked)]=" + (dp != null)
                 + " FLAG_HIDE_NAVBAR_WINDOW=" + ENABLE_TASKBAR_NAVBAR_UNIFICATION
                 + " dp.isTaskbarPresent=" + (dp == null ? "null" : dp.isTaskbarPresent));
-            if (!isTaskbarEnabled) {
+            if (!isTaskbarEnabled || !isLargeScreenTaskbar) {
                 SystemUiProxy.INSTANCE.get(mContext)
                     .notifyTaskbarStatus(/* visible */ false, /* stashed */ false);
-                return;
+                if (!isTaskbarEnabled) {
+                    return;
+                }
             }
 
             if (enableTaskbarNoRecreate() || mTaskbarActivityContext == null) {
                 mTaskbarActivityContext = new TaskbarActivityContext(mContext,
                         mNavigationBarPanelContext, dp, mNavButtonController,
-                        mUnfoldProgressProvider);
+                        mUnfoldProgressProvider, mDesktopVisibilityController);
             } else {
                 mTaskbarActivityContext.updateDeviceProfile(dp);
             }
@@ -547,7 +553,15 @@ public class TaskbarManager {
 
     public void transitionTo(@BarTransitions.TransitionMode int barMode,
             boolean animate) {
-        mTaskbarActivityContext.transitionTo(barMode, animate);
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.transitionTo(barMode, animate);
+        }
+    }
+
+    public void appTransitionPending(boolean pending) {
+        if (mTaskbarActivityContext != null) {
+            mTaskbarActivityContext.appTransitionPending(pending);
+        }
     }
 
     private boolean isTaskbarEnabled(DeviceProfile deviceProfile) {

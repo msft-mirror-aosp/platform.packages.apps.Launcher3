@@ -65,6 +65,7 @@ public class TaplDragTest extends AbstractLauncherUiTest<Launcher> {
     @Test
     @PortraitLandscape
     @PlatinumTest(focusArea = "launcher")
+    @ScreenRecordRule.ScreenRecord // b/353600888
     public void testDragToFolder() {
         // TODO: add the use case to drag an icon to an existing folder. Currently it either fails
         // on tablets or phones due to difference in resolution.
@@ -97,6 +98,7 @@ public class TaplDragTest extends AbstractLauncherUiTest<Launcher> {
      * icon left.
      */
     @Test
+    @ScreenRecordRule.ScreenRecord // b/353600888
     public void testDragOutOfFolder() {
         final HomeAppIcon playStoreIcon = createShortcutIfNotExist(STORE_APP_NAME, 0, 1);
         final HomeAppIcon photosIcon = createShortcutInCenterIfNotExist(PHOTOS_APP_NAME);

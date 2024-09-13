@@ -18,16 +18,19 @@ package com.android.launcher3.taskbar
 
 import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.os.Process
 import android.os.UserHandle
+import android.platform.test.rule.TestWatcher
 import android.testing.AndroidTestingRunner
+import com.android.internal.R
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.TaskItemInfo
-import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.RecentsModel.RecentTasksChangedListener
 import com.android.quickstep.TaskIconCache
@@ -39,12 +42,14 @@ import java.util.function.Consumer
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.junit.MockitoJUnit
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -53,32 +58,60 @@ import org.mockito.kotlin.whenever
 class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
 
     @get:Rule val mockitoRule = MockitoJUnit.rule()
+    @get:Rule
+    val disableControllerForCertainTestsWatcher =
+        object : TestWatcher() {
+            override fun starting(description: Description) {
+                // Update canShowRunningAndRecentAppsAtInit before setUp() is called for each test.
+                canShowRunningAndRecentAppsAtInit =
+                    description.methodName !in
+                        listOf("canShowRunningAndRecentAppsAtInitIsFalse_getTasksNeverCalled")
+            }
+        }
 
     @Mock private lateinit var mockIconCache: TaskIconCache
     @Mock private lateinit var mockRecentsModel: RecentsModel
-    @Mock private lateinit var mockDesktopVisibilityController: DesktopVisibilityController
+    @Mock private lateinit var mockContext: Context
+    @Mock private lateinit var mockResources: Resources
 
     private var taskListChangeId: Int = 1
 
     private lateinit var recentAppsController: TaskbarRecentAppsController
-    private lateinit var recentTasksChangedListener: RecentTasksChangedListener
     private lateinit var userHandle: UserHandle
+
+    private var canShowRunningAndRecentAppsAtInit = true
+    private var recentTasksChangedListener: RecentTasksChangedListener? = null
 
     @Before
     fun setUp() {
         super.setup()
         userHandle = Process.myUserHandle()
 
-        whenever(mockRecentsModel.iconCache).thenReturn(mockIconCache)
-        recentAppsController =
-            TaskbarRecentAppsController(mockRecentsModel) { mockDesktopVisibilityController }
-        recentAppsController.init(taskbarControllers)
-        recentAppsController.canShowRunningApps = true
-        recentAppsController.canShowRecentApps = true
+        // Set desktop mode supported
+        whenever(mockContext.getResources()).thenReturn(mockResources)
+        whenever(mockResources.getBoolean(R.bool.config_isDesktopModeSupported)).thenReturn(true)
 
-        val listenerCaptor = ArgumentCaptor.forClass(RecentTasksChangedListener::class.java)
-        verify(mockRecentsModel).registerRecentTasksChangedListener(listenerCaptor.capture())
-        recentTasksChangedListener = listenerCaptor.value
+        whenever(mockRecentsModel.iconCache).thenReturn(mockIconCache)
+        whenever(mockRecentsModel.unregisterRecentTasksChangedListener()).then {
+            recentTasksChangedListener = null
+            it
+        }
+        recentAppsController = TaskbarRecentAppsController(mockContext, mockRecentsModel)
+        recentAppsController.canShowRunningApps = canShowRunningAndRecentAppsAtInit
+        recentAppsController.canShowRecentApps = canShowRunningAndRecentAppsAtInit
+        recentAppsController.init(taskbarControllers)
+        taskbarControllers.onPostInit()
+
+        recentTasksChangedListener =
+            if (canShowRunningAndRecentAppsAtInit) {
+                val listenerCaptor = ArgumentCaptor.forClass(RecentTasksChangedListener::class.java)
+                verify(mockRecentsModel)
+                    .registerRecentTasksChangedListener(listenerCaptor.capture())
+                listenerCaptor.value
+            } else {
+                verify(mockRecentsModel, never()).registerRecentTasksChangedListener(any())
+                null
+            }
 
         // Make sure updateHotseatItemInfos() is called after commitRunningAppsToUI()
         whenever(taskbarViewController.commitRunningAppsToUI()).then {
@@ -86,6 +119,32 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
                 recentAppsController.shownHotseatItems.toTypedArray()
             )
         }
+    }
+
+    // See the TestWatcher rule at the top which sets canShowRunningAndRecentAppsAtInit = false.
+    @Test
+    fun canShowRunningAndRecentAppsAtInitIsFalse_getTasksNeverCalled() {
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2),
+            runningTasks = listOf(createTask(1, RUNNING_APP_PACKAGE_1)),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
+        )
+        verify(mockRecentsModel, never()).getTasks(any<Consumer<List<GroupTask>>>())
+    }
+
+    @Test
+    fun canShowRunningAndRecentAppsIsFalseAfterInit_getTasksOnlyCalledInInit() {
+        // getTasks() should have been called once from init().
+        verify(mockRecentsModel, times(1)).getTasks(any<Consumer<List<GroupTask>>>())
+        recentAppsController.canShowRunningApps = false
+        recentAppsController.canShowRecentApps = false
+        prepareHotseatAndRunningAndRecentApps(
+            hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2),
+            runningTasks = listOf(createTask(1, RUNNING_APP_PACKAGE_1)),
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
+        )
+        // Verify that getTasks() was not called again after the init().
+        verify(mockRecentsModel, times(1)).getTasks(any<Consumer<List<GroupTask>>>())
     }
 
     @Test
@@ -97,7 +156,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             prepareHotseatAndRunningAndRecentApps(
                 hotseatPackages = hotseatPackages,
                 runningTasks = emptyList(),
-                recentTaskPackages = emptyList()
+                recentTaskPackages = emptyList(),
             )
         assertThat(newHotseatItems.map { it?.targetPackage })
             .containsExactlyElementsIn(hotseatPackages)
@@ -112,7 +171,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             prepareHotseatAndRunningAndRecentApps(
                 hotseatPackages = hotseatPackages,
                 runningTasks = emptyList(),
-                recentTaskPackages = emptyList()
+                recentTaskPackages = emptyList(),
             )
         assertThat(newHotseatItems.map { it?.targetPackage })
             .containsExactlyElementsIn(hotseatPackages)
@@ -126,7 +185,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             prepareHotseatAndRunningAndRecentApps(
                 hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2, PREDICTED_PACKAGE_1),
                 runningTasks = emptyList(),
-                recentTaskPackages = emptyList()
+                recentTaskPackages = emptyList(),
             )
         val expectedPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2)
         assertThat(newHotseatItems.map { it?.targetPackage })
@@ -141,7 +200,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             prepareHotseatAndRunningAndRecentApps(
                 hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2),
                 runningTasks = listOf(createTask(id = 1, HOTSEAT_PACKAGE_1)),
-                recentTaskPackages = emptyList()
+                recentTaskPackages = emptyList(),
             )
 
         assertThat(newHotseatItems).hasLength(2)
@@ -161,9 +220,9 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
                 runningTasks =
                     listOf(
                         createTask(id = 1, HOTSEAT_PACKAGE_1),
-                        createTask(id = 2, HOTSEAT_PACKAGE_1)
+                        createTask(id = 2, HOTSEAT_PACKAGE_1),
                     ),
-                recentTaskPackages = emptyList()
+                recentTaskPackages = emptyList(),
             )
 
         // First task is in Hotseat Items
@@ -186,7 +245,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             prepareHotseatAndRunningAndRecentApps(
                 hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2, PREDICTED_PACKAGE_1),
                 runningTasks = emptyList(),
-                recentTaskPackages = emptyList()
+                recentTaskPackages = emptyList(),
             )
         val expectedPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2)
         assertThat(newHotseatItems.map { it?.targetPackage })
@@ -202,9 +261,9 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             runningTasks =
                 listOf(
                     createTask(id = 1, RUNNING_APP_PACKAGE_1),
-                    createTask(id = 2, RUNNING_APP_PACKAGE_2)
+                    createTask(id = 2, RUNNING_APP_PACKAGE_2),
                 ),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         assertThat(recentAppsController.shownTasks).isEmpty()
     }
@@ -216,7 +275,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2, PREDICTED_PACKAGE_1),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
         )
         assertThat(recentAppsController.shownTasks).isEmpty()
     }
@@ -229,9 +288,9 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             runningTasks =
                 listOf(
                     createTask(id = 1, RUNNING_APP_PACKAGE_1),
-                    createTask(id = 2, RUNNING_APP_PACKAGE_2)
+                    createTask(id = 2, RUNNING_APP_PACKAGE_2),
                 ),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         assertThat(recentAppsController.shownTasks).isEmpty()
         assertThat(recentAppsController.minimizedTaskIds).isEmpty()
@@ -243,7 +302,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
         )
         assertThat(recentAppsController.shownTasks).isEmpty()
     }
@@ -256,7 +315,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task1, task2),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         val shownTasks = recentAppsController.shownTasks.map { it.task1 }
         assertThat(shownTasks).containsExactlyElementsIn(listOf(task1, task2))
@@ -270,7 +329,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task1, task2),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         assertThat(recentAppsController.runningTaskIds).isEmpty()
         assertThat(recentAppsController.minimizedTaskIds).isEmpty()
@@ -284,7 +343,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task1, task2),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         assertThat(recentAppsController.runningTaskIds).containsExactlyElementsIn(listOf(1, 2))
         assertThat(recentAppsController.minimizedTaskIds).isEmpty()
@@ -297,12 +356,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             listOf(
                 createTask(id = 1, HOTSEAT_PACKAGE_1),
                 createTask(id = 2, RUNNING_APP_PACKAGE_1),
-                createTask(id = 3, RUNNING_APP_PACKAGE_2)
+                createTask(id = 3, RUNNING_APP_PACKAGE_2),
             )
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = listOf(HOTSEAT_PACKAGE_1, HOTSEAT_PACKAGE_2),
             runningTasks = runningTasks,
-            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
         )
         assertThat(recentAppsController.runningTaskIds).containsExactlyElementsIn(listOf(1, 2, 3))
         assertThat(recentAppsController.minimizedTaskIds).isEmpty()
@@ -318,7 +377,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = runningTasks,
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         assertThat(recentAppsController.runningTaskIds).containsExactly(1, 2, 3)
         assertThat(recentAppsController.minimizedTaskIds).containsExactly(3)
@@ -332,7 +391,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task1, task2),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         assertThat(recentAppsController.runningTaskIds).containsExactlyElementsIn(listOf(1, 2))
     }
@@ -345,13 +404,13 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task1, task2),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
 
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task2, task1),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
 
         val shownTasks = recentAppsController.shownTasks.map { it.task1 }
@@ -366,13 +425,13 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task1, task2),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
 
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task2, task1),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
 
         val shownTasks = recentAppsController.shownTasks.map { it.task1 }
@@ -387,17 +446,17 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = listOf(RUNNING_APP_PACKAGE_1),
             runningTasks = listOf(task1, task2),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         updateRecentTasks( // Trigger a recent-tasks change before calling updateHotseatItems()
             runningTasks = listOf(task2, task1),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
 
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = listOf(RUNNING_APP_PACKAGE_1),
             runningTasks = listOf(task2, task1),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
 
         val newHotseatItems = recentAppsController.shownHotseatItems
@@ -414,12 +473,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2, RECENT_PACKAGE_3)
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2, RECENT_PACKAGE_3),
         )
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_2, RECENT_PACKAGE_3, RECENT_PACKAGE_1)
+            recentTaskPackages = listOf(RECENT_PACKAGE_2, RECENT_PACKAGE_3, RECENT_PACKAGE_1),
         )
         val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
         // Most recent packages, minus the currently running one (RECENT_PACKAGE_1).
@@ -435,12 +494,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task1, task2),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task2, task1, task3),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
         val expectedOrder =
@@ -454,12 +513,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_3, RECENT_PACKAGE_2)
+            recentTaskPackages = listOf(RECENT_PACKAGE_3, RECENT_PACKAGE_2),
         )
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_2, RECENT_PACKAGE_3, RECENT_PACKAGE_1)
+            recentTaskPackages = listOf(RECENT_PACKAGE_2, RECENT_PACKAGE_3, RECENT_PACKAGE_1),
         )
         val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
         // Most recent packages, minus the currently running one (RECENT_PACKAGE_1).
@@ -475,12 +534,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task1, task2, task3),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task2, task1),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
         assertThat(shownPackages).isEqualTo(listOf(RUNNING_APP_PACKAGE_1, RUNNING_APP_PACKAGE_2))
@@ -492,12 +551,12 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2, RECENT_PACKAGE_3)
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2, RECENT_PACKAGE_3),
         )
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_2, RECENT_PACKAGE_3)
+            recentTaskPackages = listOf(RECENT_PACKAGE_2, RECENT_PACKAGE_3),
         )
         val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
         // Most recent packages, minus the currently running one (RECENT_PACKAGE_3).
@@ -514,11 +573,11 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(runningTask1, runningTask2),
-            recentTaskPackages = recentTaskPackages
+            recentTaskPackages = recentTaskPackages,
         )
 
         setInDesktopMode(true)
-        recentTasksChangedListener.onRecentTasksChanged()
+        recentTasksChangedListener!!.onRecentTasksChanged()
         val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
         assertThat(shownPackages).containsExactly(RUNNING_APP_PACKAGE_1, RUNNING_APP_PACKAGE_2)
     }
@@ -532,10 +591,10 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(runningTask1, runningTask2),
-            recentTaskPackages = recentTaskPackages
+            recentTaskPackages = recentTaskPackages,
         )
         setInDesktopMode(false)
-        recentTasksChangedListener.onRecentTasksChanged()
+        recentTasksChangedListener!!.onRecentTasksChanged()
         val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
         // Don't expect RECENT_PACKAGE_3 because it is currently running.
         val expectedPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
@@ -548,7 +607,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2, RECENT_PACKAGE_3)
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2, RECENT_PACKAGE_3),
         )
         val shownPackages = recentAppsController.shownTasks.flatMap { it.packageNames }
         // RECENT_PACKAGE_3 is the top task (visible to user) so should be excluded.
@@ -564,7 +623,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(runningTask1, runningTask2),
-            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
         )
         val shownPackages = recentAppsController.shownTasks.map { it.packageNames }
         // Only 2 recent tasks shown: Desktop Tile + 1 Recent Task
@@ -580,7 +639,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_SPLIT_PACKAGES_1, RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+            recentTaskPackages = listOf(RECENT_SPLIT_PACKAGES_1, RECENT_PACKAGE_1, RECENT_PACKAGE_2),
         )
         val shownPackages = recentAppsController.shownTasks.map { it.packageNames }
         // Only 2 recent tasks shown: Pair + 1 Recent Task
@@ -596,14 +655,14 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
         )
         verify(taskbarViewController, times(1)).commitRunningAppsToUI()
         // Call onRecentTasksChanged() again with the same tasks, verify it's a no-op.
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = emptyList(),
-            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2)
+            recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
         )
         verify(taskbarViewController, times(1)).commitRunningAppsToUI()
     }
@@ -616,14 +675,14 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(runningTask1, runningTask2),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         verify(taskbarViewController, times(1)).commitRunningAppsToUI()
         // Call onRecentTasksChanged() again with the same tasks, verify it's a no-op.
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(runningTask1, runningTask2),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         verify(taskbarViewController, times(1)).commitRunningAppsToUI()
     }
@@ -637,7 +696,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task1Minimized, task2Visible),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         verify(taskbarViewController, times(1)).commitRunningAppsToUI()
 
@@ -645,7 +704,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = emptyList(),
             runningTasks = listOf(task1Minimized, task2Minimized),
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
 
         verify(taskbarViewController, times(2)).commitRunningAppsToUI()
@@ -661,7 +720,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = hotseatPackages,
             runningTasks = originalTasks,
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
         verify(taskbarViewController, times(1)).commitRunningAppsToUI()
 
@@ -669,7 +728,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         prepareHotseatAndRunningAndRecentApps(
             hotseatPackages = hotseatPackages,
             runningTasks = newTasks,
-            recentTaskPackages = emptyList()
+            recentTaskPackages = emptyList(),
         )
 
         verify(taskbarViewController, times(2)).commitRunningAppsToUI()
@@ -686,10 +745,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         return recentAppsController.shownHotseatItems.toTypedArray()
     }
 
-    private fun updateRecentTasks(
-        runningTasks: List<Task>,
-        recentTaskPackages: List<String>,
-    ) {
+    private fun updateRecentTasks(runningTasks: List<Task>, recentTaskPackages: List<String>) {
         val recentTasks = createRecentTasksFromPackageNames(recentTaskPackages)
         val allTasks =
             ArrayList<GroupTask>().apply {
@@ -705,7 +761,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             }
             .whenever(mockRecentsModel)
             .getTasks(any<Consumer<List<GroupTask>>>())
-        recentTasksChangedListener.onRecentTasksChanged()
+        recentTasksChangedListener?.onRecentTasksChanged()
     }
 
     private fun createHotseatItemsFromPackageNames(packageNames: List<String>): List<ItemInfo> {
@@ -725,7 +781,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
 
     private fun createTestAppInfo(
         packageName: String = "testPackageName",
-        className: String = "testClassName"
+        className: String = "testClassName",
     ) = AppInfo(ComponentName(packageName, className), className /* title */, userHandle, Intent())
 
     private fun createRecentTasksFromPackageNames(packageNames: List<String>): List<GroupTask> {
@@ -735,7 +791,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
                 GroupTask(
                     createTask(100, splitPackages[0]),
                     createTask(101, splitPackages[1]),
-                    /* splitBounds = */ null
+                    /* splitBounds = */ null,
                 )
             } else {
                 // Use the number at the end of the test packageName as the id.
@@ -753,14 +809,15 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
                     Intent().apply { `package` = packageName },
                     ComponentName(packageName, "TestActivity"),
                     userHandle.identifier,
-                    0
+                    0,
                 )
             )
             .apply { this.isVisible = isVisible }
     }
 
     private fun setInDesktopMode(inDesktopMode: Boolean) {
-        whenever(mockDesktopVisibilityController.areDesktopTasksVisible()).thenReturn(inDesktopMode)
+        whenever(taskbarControllers.taskbarDesktopModeController.areDesktopTasksVisible)
+            .thenReturn(inDesktopMode)
     }
 
     private val GroupTask.packageNames: List<String>

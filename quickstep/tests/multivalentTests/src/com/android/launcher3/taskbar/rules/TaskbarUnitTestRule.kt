@@ -26,13 +26,14 @@ import android.provider.Settings.Secure.USER_SETUP_COMPLETE
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.ServiceTestRule
 import com.android.launcher3.LauncherAppState
+import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.taskbar.TaskbarManager
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarNavButtonCallbacks
+import com.android.launcher3.taskbar.TaskbarViewController
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.InjectController
 import com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR
 import com.android.launcher3.util.LauncherMultivalentJUnit.Companion.isRunningInRobolectric
-import com.android.launcher3.util.ModelTestExtensions.loadModelSync
 import com.android.launcher3.util.TestUtil
 import com.android.quickstep.AllAppsActionManager
 import com.android.quickstep.TouchInteractionService
@@ -143,6 +144,7 @@ class TaskbarUnitTestRule(
                                     PendingIntent(IIntentSender.Default())
                                 },
                                 object : TaskbarNavButtonCallbacks {},
+                                DesktopVisibilityController(context),
                             ) {
                             override fun recreateTaskbar() {
                                 super.recreateTaskbar()
@@ -152,7 +154,7 @@ class TaskbarUnitTestRule(
                     }
 
                 try {
-                    LauncherAppState.getInstance(context).model.loadModelSync()
+                    TaskbarViewController.enableModelLoadingForTests(false)
 
                     // Replace Launcher Taskbar window with test instance.
                     instrumentation.runOnMainSync {
@@ -167,6 +169,8 @@ class TaskbarUnitTestRule(
                         taskbarManager.destroy()
                         launcherTaskbarManager?.setSuspended(false)
                     }
+
+                    TaskbarViewController.enableModelLoadingForTests(true)
                 }
             }
         }

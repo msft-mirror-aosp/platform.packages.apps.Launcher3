@@ -232,9 +232,13 @@ public final class TaskViewUtils {
                         TaskViewSimulator::setTaskRectTranslation, taskRectTranslationPrimary,
                         taskRectTranslationSecondary);
 
-                // Fade in the task during the initial 20% of the animation
-                out.addFloat(targetHandle.getTransformParams(), TransformParams.TARGET_ALPHA, 0, 1,
-                        clampToProgress(LINEAR, 0, 0.2f));
+                if (v instanceof DesktopTaskView) {
+                    targetHandle.getTransformParams().setTargetAlpha(1f);
+                } else {
+                    // Fade in the task during the initial 20% of the animation
+                    out.addFloat(targetHandle.getTransformParams(), TransformParams.TARGET_ALPHA, 0,
+                            1, clampToProgress(LINEAR, 0, 0.2f));
+                }
             }
         }
 
@@ -300,14 +304,6 @@ public final class TaskViewUtils {
                         }
                     }
                 });
-            } else {
-                // There is no transition animation for app launch from recent in live tile mode so
-                // we have to trigger the navigation bar animation from system here.
-                final RecentsAnimationController controller =
-                        recentsView.getRecentsAnimationController();
-                if (controller != null) {
-                    controller.animateNavigationBarToApp(RECENTS_LAUNCH_DURATION);
-                }
             }
             topMostSimulators = remoteTargetHandles;
         }
@@ -558,7 +554,7 @@ public final class TaskViewUtils {
     /**
      * Start recents to desktop animation
      */
-    public static void composeRecentsDesktopLaunchAnimator(
+    public static AnimatorSet composeRecentsDesktopLaunchAnimator(
             @NonNull DesktopTaskView launchingTaskView,
             @NonNull StateManager stateManager, @Nullable DepthController depthController,
             @NonNull TransitionInfo transitionInfo,
@@ -588,7 +584,7 @@ public final class TaskViewUtils {
                 true /* launcherClosing */, stateManager, launchingTaskView.getRecentsView(),
                 depthController);
 
-        animatorSet.start();
+        return animatorSet;
     }
 
     public static void composeRecentsLaunchAnimator(@NonNull AnimatorSet anim, @NonNull View v,
