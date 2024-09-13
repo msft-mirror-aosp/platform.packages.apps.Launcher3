@@ -63,10 +63,8 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.AnimatorListeners;
-import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
-import com.android.quickstep.LauncherActivityInterface;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.SystemUiFlagUtils;
 
@@ -1082,10 +1080,9 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
 
         // Do not stash if hardware keyboard is attached, in 3 button nav and desktop windowing mode
-        DesktopVisibilityController visibilityController =
-                LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
-        if (visibilityController != null && mActivity.isHardwareKeyboard()
-                && mActivity.isThreeButtonNav() && visibilityController.areDesktopTasksVisible()) {
+        if (mActivity.isHardwareKeyboard()
+                && mActivity.isThreeButtonNav()
+                && mControllers.taskbarDesktopModeController.getAreDesktopTasksVisible()) {
             return false;
         }
 
