@@ -73,10 +73,6 @@ public abstract class AbsSwipeUpHandlerTestCase<
 
     protected final Context mContext =
             InstrumentationRegistry.getInstrumentation().getTargetContext();
-    protected final RecentsWindowManager mRecentsWindowManager =
-            Flags.enableFallbackOverviewInWindow() ? new RecentsWindowManager(mContext) : null;
-    protected final TaskAnimationManager mTaskAnimationManager =
-            new TaskAnimationManager(mContext, mRecentsWindowManager);
     protected final RecentsAnimationDeviceState mRecentsAnimationDeviceState =
             new RecentsAnimationDeviceState(mContext, true);
     protected final InputConsumerController mInputConsumerController =
@@ -110,6 +106,9 @@ public abstract class AbsSwipeUpHandlerTestCase<
             /* minimizedHomeBounds= */ null,
             new Bundle());
 
+    protected RecentsWindowManager mRecentsWindowManager;
+    protected TaskAnimationManager mTaskAnimationManager;
+
     @Mock protected ACTIVITY_INTERFACE mActivityInterface;
     @Mock protected ActivityInitListener<?> mActivityInitListener;
     @Mock protected RecentsAnimationController mRecentsAnimationController;
@@ -122,6 +121,16 @@ public abstract class AbsSwipeUpHandlerTestCase<
 
     @Rule
     public final MockitoRule mMockitoRule = MockitoJUnit.rule();
+
+    @Before
+    public void setUpTaskAnimationManager() {
+        runOnMainSync(() -> {
+            if(Flags.enableFallbackOverviewInWindow()){
+                mRecentsWindowManager = new RecentsWindowManager(mContext);
+            }
+            mTaskAnimationManager = new TaskAnimationManager(mContext, mRecentsWindowManager);
+        });
+    }
 
     @Before
     public void setUpRunningTaskInfo() {

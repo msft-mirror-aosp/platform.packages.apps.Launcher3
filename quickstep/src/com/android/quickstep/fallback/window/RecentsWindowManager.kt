@@ -22,7 +22,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.LocusId
 import android.os.Bundle
-import android.os.Handler
 import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -87,8 +86,7 @@ class RecentsWindowManager(context: Context) :
 
     protected var recentsView: FallbackRecentsView<RecentsWindowManager>? = null
     private val windowContext: Context = createWindowContext(TYPE_APPLICATION_OVERLAY, null)
-    private val windowManager: WindowManager =
-        windowContext.getSystemService(WindowManager::class.java)!!
+    private val windowManager: WindowManager = windowContext.getSystemService(WindowManager::class.java)!!
     private var layoutInflater: LayoutInflater = LayoutInflater.from(this).cloneInContext(this)
     private var stateManager: StateManager<RecentsState, RecentsWindowManager> =
         StateManager<RecentsState, RecentsWindowManager>(this, RecentsState.BG_LAUNCHER)
@@ -98,8 +96,6 @@ class RecentsWindowManager(context: Context) :
     private var windowView: View? = null
     private var actionsView: OverviewActionsView<*>? = null
     private var scrimView: ScrimView? = null
-    private val mHandler = Handler()
-
 
     private var isShown = false
 
@@ -201,9 +197,8 @@ class RecentsWindowManager(context: Context) :
         val splitSelectStateController =
             SplitSelectStateController(
                 this,
-                mHandler,
                 getStateManager(),
-                null /* depthController */,
+                null, /* depthController */
                 statsLogManager,
                 systemUiProxy,
                 RecentsModel.INSTANCE[this],
@@ -220,7 +215,7 @@ class RecentsWindowManager(context: Context) :
     }
 
     override fun canStartHomeSafely(): Boolean {
-        val overviewCommandHelper = tisBindHelper!!.overviewCommandHelper
+        val overviewCommandHelper = tisBindHelper.overviewCommandHelper
         return overviewCommandHelper == null || overviewCommandHelper.canStartHomeSafely()
     }
 
