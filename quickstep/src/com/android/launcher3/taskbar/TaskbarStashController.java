@@ -446,6 +446,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         return hasAnyFlag(FLAG_IN_OVERVIEW);
     }
 
+    /** Returns whether the taskbar is currently on launcher home screen. */
+    public boolean isOnHome() {
+        return !isInOverview() && !isInApp();
+    }
+
     /** Returns whether taskbar is hidden for bubbles. */
     public boolean isHiddenForBubbles() {
         return hasAnyFlag(FLAG_STASHED_FOR_BUBBLES);

@@ -51,6 +51,7 @@ import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
 import java.io.PrintWriter;
@@ -485,6 +486,18 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     @Override
     protected String getTaskbarUIControllerName() {
         return "LauncherTaskbarUIController";
+    }
+
+    @Override
+    public void onBubbleBarLocationAnimated(BubbleBarLocation location) {
+        mTaskbarLauncherStateController.onBubbleBarLocationChanged(location, /* animate = */ true);
+        mLauncher.setBubbleBarLocation(location);
+    }
+
+    @Override
+    public void onBubbleBarLocationUpdated(BubbleBarLocation location) {
+        mTaskbarLauncherStateController.onBubbleBarLocationChanged(location, /* animate = */ false);
+        mLauncher.setBubbleBarLocation(location);
     }
 
     @Override
