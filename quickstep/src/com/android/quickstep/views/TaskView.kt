@@ -46,7 +46,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.core.view.updateLayoutParams
 import com.android.app.animation.Interpolators
 import com.android.launcher3.Flags.enableCursorHoverStates
-import com.android.launcher3.Flags.enableFocusOutline
 import com.android.launcher3.Flags.enableGridOnlyOverview
 import com.android.launcher3.Flags.enableHoverOfChildElementsInTaskview
 import com.android.launcher3.Flags.enableLargeDesktopWindowingTile
@@ -55,7 +54,6 @@ import com.android.launcher3.Flags.enableRefactorTaskThumbnail
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.anim.AnimatedFloat
-import com.android.launcher3.config.FeatureFlags.ENABLE_KEYBOARD_QUICK_SWITCH
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.testing.TestLogging
@@ -84,6 +82,7 @@ import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler
 import com.android.quickstep.recents.di.RecentsDependencies
 import com.android.quickstep.recents.di.get
+import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.task.viewmodel.TaskViewModel
 import com.android.quickstep.util.ActiveGestureErrorDetector
 import com.android.quickstep.util.ActiveGestureLog
@@ -398,7 +397,7 @@ constructor(
         }
         get() = taskViewAlpha.get(ALPHA_INDEX_STABLE).value
 
-    var attachAlpha
+    protected var attachAlpha
         set(value) {
             taskViewAlpha.get(ALPHA_INDEX_ATTACH).value = value
         }
@@ -485,27 +484,23 @@ constructor(
             taskViewModel = RecentsDependencies.get(this, "TaskViewType" to type)
         }
 
-        val keyboardFocusHighlightEnabled =
-            (ENABLE_KEYBOARD_QUICK_SWITCH.get() || enableFocusOutline())
         val cursorHoverStatesEnabled = enableCursorHoverStates()
-        setWillNotDraw(!keyboardFocusHighlightEnabled && !cursorHoverStatesEnabled)
+        setWillNotDraw(!cursorHoverStatesEnabled)
         context.obtainStyledAttributes(attrs, R.styleable.TaskView, defStyleAttr, defStyleRes).use {
             this.focusBorderAnimator =
                 focusBorderAnimator
-                    ?: if (keyboardFocusHighlightEnabled)
-                        createSimpleBorderAnimator(
-                            currentFullscreenParams.cornerRadius.toInt(),
-                            context.resources.getDimensionPixelSize(
-                                R.dimen.keyboard_quick_switch_border_width
-                            ),
-                            { bounds: Rect -> getThumbnailBounds(bounds) },
-                            this,
-                            it.getColor(
-                                R.styleable.TaskView_focusBorderColor,
-                                BorderAnimator.DEFAULT_BORDER_COLOR,
-                            ),
-                        )
-                    else null
+                    ?: createSimpleBorderAnimator(
+                        currentFullscreenParams.cornerRadius.toInt(),
+                        context.resources.getDimensionPixelSize(
+                            R.dimen.keyboard_quick_switch_border_width
+                        ),
+                        { bounds: Rect -> getThumbnailBounds(bounds) },
+                        this,
+                        it.getColor(
+                            R.styleable.TaskView_focusBorderColor,
+                            BorderAnimator.DEFAULT_BORDER_COLOR,
+                        ),
+                    )
             this.hoverBorderAnimator =
                 hoverBorderAnimator
                     ?: if (cursorHoverStatesEnabled)
@@ -1592,7 +1587,10 @@ constructor(
         resetViewTransforms()
     }
 
-    fun resetViewTransforms() {
+    fun getTaskContainerForTaskThumbnailView(taskThumbnailView: TaskThumbnailView): TaskContainer? =
+        taskContainers.firstOrNull { it.thumbnailView == taskThumbnailView }
+
+    open fun resetViewTransforms() {
         // fullscreenTranslation and accumulatedTranslation should not be reset, as
         // resetViewTransforms is called during QuickSwitch scrolling.
         dismissTranslationX = 0f
