@@ -40,6 +40,7 @@ public class BubbleControllers {
     public final BubbleDismissController bubbleDismissController;
     public final BubbleBarPinController bubbleBarPinController;
     public final BubblePinController bubblePinController;
+    public final Optional<BubbleBarSwipeController> bubbleBarSwipeController;
     public final BubbleCreator bubbleCreator;
 
     private final RunnableList mPostInitRunnables = new RunnableList();
@@ -58,6 +59,7 @@ public class BubbleControllers {
             BubbleDismissController bubbleDismissController,
             BubbleBarPinController bubbleBarPinController,
             BubblePinController bubblePinController,
+            Optional<BubbleBarSwipeController> bubbleBarSwipeController,
             BubbleCreator bubbleCreator) {
         this.bubbleBarController = bubbleBarController;
         this.bubbleBarViewController = bubbleBarViewController;
@@ -67,6 +69,7 @@ public class BubbleControllers {
         this.bubbleDismissController = bubbleDismissController;
         this.bubbleBarPinController = bubbleBarPinController;
         this.bubblePinController = bubblePinController;
+        this.bubbleBarSwipeController = bubbleBarSwipeController;
         this.bubbleCreator = bubbleCreator;
     }
 
@@ -104,6 +107,7 @@ public class BubbleControllers {
         bubbleDismissController.init(/* bubbleControllers = */ this);
         bubbleBarPinController.init(this);
         bubblePinController.init(this);
+        bubbleBarSwipeController.ifPresent(c -> c.init(this));
 
         mPostInitRunnables.executeAllAndDestroy();
     }
