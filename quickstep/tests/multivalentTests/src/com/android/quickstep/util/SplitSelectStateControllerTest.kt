@@ -38,7 +38,7 @@ import com.android.quickstep.SystemUiProxy
 import com.android.quickstep.util.SplitSelectStateController.SplitFromDesktopController
 import com.android.quickstep.views.RecentsViewContainer
 import com.android.systemui.shared.recents.model.Task
-import com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_50_50
+import com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_2_50_50
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -642,7 +642,7 @@ class SplitSelectStateControllerTest {
         return GroupTask(
             task1,
             task2,
-            SplitConfigurationOptions.SplitBounds(Rect(), Rect(), -1, -1, SNAP_TO_50_50)
+            SplitConfigurationOptions.SplitBounds(Rect(), Rect(), -1, -1, SNAP_TO_2_50_50)
         )
     }
 
@@ -674,7 +674,7 @@ class SplitSelectStateControllerTest {
         return GroupTask(
             task1,
             task2,
-            SplitConfigurationOptions.SplitBounds(Rect(), Rect(), -1, -1, SNAP_TO_50_50)
+            SplitConfigurationOptions.SplitBounds(Rect(), Rect(), -1, -1, SNAP_TO_2_50_50)
         )
     }
 }
