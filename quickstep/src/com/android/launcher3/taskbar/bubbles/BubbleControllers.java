@@ -131,6 +131,7 @@ public class BubbleControllers {
     public void onDestroy() {
         bubbleStashedHandleViewController.ifPresent(BubbleStashedHandleViewController::onDestroy);
         bubbleBarController.onDestroy();
+        bubbleBarViewController.onDestroy();
     }
 
     /** Dumps bubble controllers state. */
