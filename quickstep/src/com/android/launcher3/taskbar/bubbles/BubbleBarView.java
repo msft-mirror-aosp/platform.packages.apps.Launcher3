@@ -689,7 +689,7 @@ public class BubbleBarView extends FrameLayout {
         }
         setAlphaDuringBubbleDrag(1f);
         setTranslationX(0f);
-        if (getBubbleChildCount() > 0) {
+        if (mIsBarExpanded && getBubbleChildCount() > 0) {
             setAlpha(1f);
         }
     }
