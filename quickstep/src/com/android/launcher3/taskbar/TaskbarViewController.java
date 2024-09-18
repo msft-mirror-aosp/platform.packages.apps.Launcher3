@@ -837,7 +837,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 // plays iconAlignment to 1 really fast, therefore moving the fading towards the end
                 // to avoid icons disappearing rather than fading out visually.
                 setter.setViewAlpha(child, 0, Interpolators.clampToProgress(LINEAR, 0.8f, 1f));
-            } else if ((isAllAppsButton && !FeatureFlags.ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT.get())
+            } else if ((isAllAppsButton && !FeatureFlags.enableAllAppsButtonInHotseat())
                     || (isTaskbarDividerView && enableTaskbarPinning())
                     || (isRecentTask && !isRecentsInHotseat)) {
                 if (!isToHome
