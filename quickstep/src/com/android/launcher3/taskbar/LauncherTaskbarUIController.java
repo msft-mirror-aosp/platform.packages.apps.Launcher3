@@ -50,6 +50,7 @@ import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
 import java.io.PrintWriter;
 import java.util.Arrays;
@@ -210,6 +211,9 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
      */
     @Override
     public void onLauncherVisibilityChanged(boolean isVisible) {
+        if (DesktopModeStatus.enterDesktopByDefaultOnFreeformDisplay(mLauncher)) {
+            DisplayController.handleInfoChangeForLauncherVisibilityChanged(mLauncher);
+        }
         onLauncherVisibilityChanged(isVisible, false /* fromInit */);
     }
 
