@@ -33,6 +33,7 @@ import com.android.launcher3.taskbar.bubbles.BubbleBarView
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController
 import com.android.launcher3.taskbar.bubbles.BubbleStashedHandleViewController
 import com.android.launcher3.taskbar.bubbles.BubbleView
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.BubbleLauncherState
 import com.android.launcher3.util.MultiValueAlpha
 import com.android.wm.shell.shared.animation.PhysicsAnimator
 import com.android.wm.shell.shared.animation.PhysicsAnimatorTestUtils
@@ -119,7 +120,7 @@ class TransientBubbleStashControllerTest {
 
         // When switch out of the home screen
         getInstrumentation().runOnMainSync {
-            mTransientBubbleStashController.isBubblesShowingOnHome = true
+            mTransientBubbleStashController.launcherState = BubbleLauncherState.HOME
         }
 
         // Then BubbleBarView is animating, BubbleBarViewController controller is notified
@@ -137,12 +138,12 @@ class TransientBubbleStashControllerTest {
 
     @Test
     fun setBubblesShowingOnOverviewUpdatedToTrue_barPositionYUpdated_controllersNotified() {
-        // Given bubble bar is on home and has bubbles
+        // Given bubble bar is on overview and has bubbles
         whenever(bubbleBarViewController.hasBubbles()).thenReturn(true)
 
         // When switch out of the home screen
         getInstrumentation().runOnMainSync {
-            mTransientBubbleStashController.isBubblesShowingOnOverview = true
+            mTransientBubbleStashController.launcherState = BubbleLauncherState.OVERVIEW
         }
 
         // Then BubbleBarView is animating, BubbleBarViewController controller is notified
@@ -156,6 +157,27 @@ class TransientBubbleStashControllerTest {
         assertThat(barTranslationY.isAnimating).isFalse()
         verify(taskbarInsetsController).onTaskbarOrBubblebarWindowHeightOrInsetsChanged()
         assertThat(bubbleBarView.translationY).isEqualTo(TASK_BAR_TRANSLATION_Y)
+    }
+
+    @Test
+    fun setBubblesShowingOnOverviewUpdatedToTrue_unstashes() {
+        // Given bubble bar is stashed with bubbles
+        whenever(bubbleBarViewController.hasBubbles()).thenReturn(true)
+
+        getInstrumentation().runOnMainSync {
+            mTransientBubbleStashController.updateStashedAndExpandedState(
+                stash = true,
+                expand = false,
+            )
+        }
+        assertThat(mTransientBubbleStashController.isStashed).isTrue()
+
+        // Move to overview
+        getInstrumentation().runOnMainSync {
+            mTransientBubbleStashController.launcherState = BubbleLauncherState.OVERVIEW
+        }
+        // No longer stashed in overview
+        assertThat(mTransientBubbleStashController.isStashed).isFalse()
     }
 
     @Test
@@ -200,7 +222,7 @@ class TransientBubbleStashControllerTest {
         // Given screen is locked and bubble bar has bubbles
         getInstrumentation().runOnMainSync {
             mTransientBubbleStashController.isSysuiLocked = true
-            mTransientBubbleStashController.isBubblesShowingOnOverview = true
+            mTransientBubbleStashController.launcherState = BubbleLauncherState.OVERVIEW
             whenever(bubbleBarViewController.hasBubbles()).thenReturn(true)
         }
         advanceTimeBy(BubbleStashController.BAR_TRANSLATION_DURATION)
