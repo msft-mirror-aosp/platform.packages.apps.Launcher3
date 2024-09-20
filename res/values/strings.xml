@@ -465,6 +465,8 @@
     <string name="work_profile_edu_accept">Got it</string>
     <!-- Info icon unicode for alpha scroller when work edu card is present -->
     <string name="work_profile_edu_section" translatable="false">\u24D8</string>
+    <!-- Intent for work profiler scheduler -->
+    <string name="work_profile_scheduler_intent" translatable="false"/>
 
     <!--- heading shown when user opens work apps tab while work apps are paused -->
     <string name="work_apps_paused_title">Work apps are paused</string>
@@ -483,6 +485,8 @@
     <string name="work_apps_pause_btn_text">Pause work apps</string>
     <!-- button string shown enable work profile -->
     <string name="work_apps_enable_btn_text">Unpause</string>
+    <!-- Label for the work profile scheduler button in the work profile screen. [CHAR_LIMIT=40] -->
+    <string name="work_scheduler_button_content_description">Work apps schedule</string>
 
     <!-- A hint shown in launcher settings develop options filter box -->
     <string name="developer_options_filter_hint">Filter</string>
