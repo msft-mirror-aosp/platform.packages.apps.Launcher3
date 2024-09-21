@@ -53,6 +53,7 @@ import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.RecentsAnimationController;
@@ -299,6 +300,7 @@ public class TaskbarLauncherStateController {
         stashController.updateStateForFlag(FLAG_IN_APP, false);
 
         updateStateForFlag(FLAG_TRANSITION_TO_VISIBLE, true);
+        mLauncherState = toState;
         animatorSet.play(stashController.createApplyStateAnimator(duration));
         animatorSet.play(applyState(duration, false));
 
@@ -662,6 +664,9 @@ public class TaskbarLauncherStateController {
      * This refers to the intended state - a transition to this state might be in progress.
      */
     public boolean isTaskbarAlignedWithHotseat() {
+        if (DisplayController.showLockedTaskbarOnHome(mLauncher) && isInLauncher()) {
+            return false;
+        }
         return mLauncherState.isTaskbarAlignedWithHotseat(mLauncher);
     }
 
@@ -673,8 +678,7 @@ public class TaskbarLauncherStateController {
             boolean isInStashedState = mLauncherState.isTaskbarStashed(mLauncher);
             boolean willStashVisually = isInStashedState
                     && mControllers.taskbarStashController.supportsVisualStashing();
-            boolean isTaskbarAlignedWithHotseat =
-                    mLauncherState.isTaskbarAlignedWithHotseat(mLauncher);
+            boolean isTaskbarAlignedWithHotseat = isTaskbarAlignedWithHotseat();
             return isTaskbarAlignedWithHotseat && !willStashVisually;
         } else {
             return false;
