@@ -29,6 +29,7 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_ON_BOARD_POPUP;
 import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_OVERLAY_PROXY;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
+import static com.android.launcher3.Flags.taskbarOverflow;
 import static com.android.launcher3.Utilities.calculateTextHeight;
 import static com.android.launcher3.Utilities.isRunningInTestHarness;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
@@ -1221,6 +1222,11 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         RecentsView recents = taskbarUIController.getRecentsView();
         boolean shouldCloseAllOpenViews = true;
         Object tag = view.getTag();
+
+        if (taskbarOverflow()) {
+            mControllers.keyboardQuickSwitchController.closeQuickSwitchView(false);
+        }
+
         if (tag instanceof GroupTask groupTask) {
             handleGroupTaskLaunch(
                     groupTask,
@@ -1559,6 +1565,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      * @param delayTaskbarBackground whether we will delay the taskbar background animation
      */
     public void onSwipeToUnstashTaskbar(boolean delayTaskbarBackground) {
+        mControllers.uiController.onSwipeToUnstashTaskbar();
+
         boolean wasStashed = mControllers.taskbarStashController.isStashed();
         mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(/* stash= */ false,
                 SHOULD_BUBBLES_FOLLOW_DEFAULT_VALUE, delayTaskbarBackground);
