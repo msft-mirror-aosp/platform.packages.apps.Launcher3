@@ -681,10 +681,6 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // Back dispatcher is registered in {@link BaseActivity#onCreate}. For predictive back to
-        // work, we must opt-in BEFORE registering back dispatcher. So we need to call
-        // setEnableOnBackInvokedCallback() before super.onCreate()
-        getApplicationInfo().setEnableOnBackInvokedCallback(true);
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
             mPendingSplitSelectInfo = ObjectWrapper.unwrap(
