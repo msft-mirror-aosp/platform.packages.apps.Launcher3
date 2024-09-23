@@ -73,9 +73,21 @@ class RecentsViewUtils {
      * Returns the first TaskView that should be displayed as a large tile.
      *
      * @param taskViews List of [TaskView]s
+     * @param splitSelectActive current split state
      */
-    fun getFirstLargeTaskView(taskViews: Iterable<TaskView>): TaskView? =
-        taskViews.firstOrNull { it.isLargeTile }
+    fun getFirstLargeTaskView(
+        taskViews: MutableIterable<TaskView>,
+        splitSelectActive: Boolean,
+    ): TaskView? =
+        taskViews.firstOrNull { it.isLargeTile && !(splitSelectActive && it is DesktopTaskView) }
+
+    /**
+     * Returns the first TaskView that is not large
+     *
+     * @param taskViews List of [TaskView]s
+     */
+    fun getFirstSmallTaskView(taskViews: MutableIterable<TaskView>): TaskView? =
+        taskViews.firstOrNull { !it.isLargeTile }
 
     /** Returns the last TaskView that should be displayed as a large tile. */
     fun getLastLargeTaskView(taskViews: Iterable<TaskView>): TaskView? =
