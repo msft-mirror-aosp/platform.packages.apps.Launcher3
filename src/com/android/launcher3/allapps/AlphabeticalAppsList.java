@@ -124,7 +124,8 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             mAllAppsStore.addUpdateListener(this);
         }
         mPrivateProfileAppScrollerBadge = new SpannableString(" ");
-        mPrivateProfileAppScrollerBadge.setSpan(new ImageSpan(context,
+        mPrivateProfileAppScrollerBadge.setSpan(new ImageSpan(context, Flags.letterFastScroller()
+                        ? R.drawable.ic_private_profile_letter_list_fast_scroller_badge :
                         R.drawable.ic_private_profile_app_scroller_badge, ImageSpan.ALIGN_CENTER),
                 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
     }
@@ -437,8 +438,11 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                 Log.d(TAG, "addAppsWithSections: adding sectionName: " + sectionName
                     + " with appInfoTitle: " + info.title);
                 lastSectionName = sectionName;
-                mFastScrollerSections.add(new FastScrollSectionInfo(hasPrivateApps ?
-                        mPrivateProfileAppScrollerBadge : sectionName, position));
+                boolean usePrivateAppScrollerBadge = !Flags.letterFastScroller() && hasPrivateApps;
+                FastScrollSectionInfo sectionInfo = new FastScrollSectionInfo(
+                        usePrivateAppScrollerBadge ?
+                                mPrivateProfileAppScrollerBadge : sectionName, position);
+                mFastScrollerSections.add(sectionInfo);
             }
             position++;
         }
