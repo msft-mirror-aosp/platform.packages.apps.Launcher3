@@ -224,22 +224,10 @@ public class IconCache extends BaseIconCache {
      * Updates {@param application} only if a valid entry is found.
      */
     public synchronized void updateTitleAndIcon(AppInfo application) {
-        boolean preferPackageIcon = application.isArchived();
         CacheEntry entry = cacheLocked(application.componentName,
                 application.user, () -> null, mLauncherActivityInfoCachingLogic,
                 false, application.usingLowResIcon());
-        if (entry.bitmap == null || isDefaultIcon(entry.bitmap, application.user)) {
-            return;
-        }
-
-        if (preferPackageIcon) {
-            String packageName = application.getTargetPackage();
-            CacheEntry packageEntry =
-                    cacheLocked(new ComponentName(packageName, packageName + EMPTY_CLASS_NAME),
-                            application.user, () -> null, mLauncherActivityInfoCachingLogic,
-                            true, application.usingLowResIcon());
-            applyPackageEntry(packageEntry, application, entry);
-        } else {
+        if (entry.bitmap != null || !isDefaultIcon(entry.bitmap, application.user)) {
             applyCacheEntry(entry, application);
         }
     }
@@ -253,8 +241,7 @@ public class IconCache extends BaseIconCache {
         boolean isAppArchived = Flags.enableSupportForArchiving() && activityInfo != null
                 && activityInfo.getActivityInfo().isArchived;
         // If we already have activity info, no need to use package icon
-        getTitleAndIcon(info, () -> activityInfo, isAppArchived, useLowResIcon,
-                isAppArchived);
+        getTitleAndIcon(info, () -> activityInfo, isAppArchived, useLowResIcon);
     }
 
     /**
@@ -333,7 +320,7 @@ public class IconCache extends BaseIconCache {
         } else {
             Intent intent = info.getIntent();
             getTitleAndIcon(info, () -> mLauncherApps.resolveActivity(intent, info.user),
-                    true, useLowResIcon, info.isArchived());
+                    true, useLowResIcon);
         }
     }
 
@@ -358,33 +345,6 @@ public class IconCache extends BaseIconCache {
                 activityInfoProvider, mLauncherActivityInfoCachingLogic, usePkgIcon,
                 useLowResIcon);
         applyCacheEntry(entry, infoInOut);
-    }
-
-    /**
-     * Fill in {@param mWorkspaceItemInfo} with the icon and label for {@param info}
-     */
-    public synchronized void getTitleAndIcon(
-            @NonNull ItemInfoWithIcon infoInOut,
-            @NonNull Supplier<LauncherActivityInfo> activityInfoProvider,
-            boolean usePkgIcon, boolean useLowResIcon, boolean preferPackageEntry) {
-        CacheEntry entry = cacheLocked(infoInOut.getTargetComponent(), infoInOut.user,
-                activityInfoProvider, mLauncherActivityInfoCachingLogic, usePkgIcon,
-                useLowResIcon);
-        if (preferPackageEntry) {
-            String packageName = infoInOut.getTargetPackage();
-            CacheEntry packageEntry = cacheLocked(
-                    new ComponentName(packageName, packageName + EMPTY_CLASS_NAME),
-                    infoInOut.user, activityInfoProvider, mLauncherActivityInfoCachingLogic,
-                    usePkgIcon, useLowResIcon);
-            applyPackageEntry(packageEntry, infoInOut, entry);
-        } else if (useLowResIcon || !entry.bitmap.isNullOrLowRes()
-                || infoInOut.bitmap.isNullOrLowRes()) {
-            // Only use cache entry if it will not downgrade the current bitmap in infoInOut
-            applyCacheEntry(entry, infoInOut);
-        } else {
-            Log.d(TAG, "getTitleAndIcon: Cache entry bitmap was a downgrade of existing bitmap"
-                    + " in ItemInfo. Skipping.");
-        }
     }
 
     /**
@@ -603,24 +563,30 @@ public class IconCache extends BaseIconCache {
         info.title = Utilities.trim(entry.title);
         info.contentDescription = entry.contentDescription;
         info.bitmap = entry.bitmap;
+        // Clear any previously set appTitle, if the packageOverride is no longer valid
+        info.appTitle = null;
         if (entry.bitmap == null) {
             // TODO: entry.bitmap can never be null, so this should not happen at all.
             Log.wtf(TAG, "Cannot find bitmap from the cache, default icon was loaded.");
             info.bitmap = getDefaultIcon(info.user);
         }
-    }
 
-    protected void applyPackageEntry(@NonNull final CacheEntry packageEntry,
-            @NonNull final ItemInfoWithIcon info, @NonNull final CacheEntry fallbackEntry) {
+        // apply package override
+        if (!Flags.enableSupportForArchiving() || !info.isArchived()) {
+            return;
+        }
+        String targetPackage = info.getTargetPackage();
+        if (targetPackage == null) {
+            return;
+        }
+        CacheEntry packageEntry = getInMemoryPackageEntryLocked(targetPackage, info.user);
+        if (packageEntry == null || packageEntry.bitmap.isLowRes()) {
+            return;
+        }
+        info.appTitle = Utilities.trim(info.title);
         info.title = Utilities.trim(packageEntry.title);
-        info.appTitle = Utilities.trim(fallbackEntry.title);
         info.contentDescription = packageEntry.contentDescription;
         info.bitmap = packageEntry.bitmap;
-        if (packageEntry.bitmap == null) {
-            // TODO: entry.bitmap can never be null, so this should not happen at all.
-            Log.wtf(TAG, "Cannot find bitmap from the cache, default icon was loaded.");
-            info.bitmap = getDefaultIcon(info.user);
-        }
     }
 
     public Drawable getFullResIcon(LauncherActivityInfo info) {
