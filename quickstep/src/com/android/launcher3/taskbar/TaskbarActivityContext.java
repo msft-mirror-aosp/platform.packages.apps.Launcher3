@@ -131,11 +131,11 @@ import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.touch.ItemClickHandler.ItemClickProxy;
 import com.android.launcher3.util.ActivityOptionsWrapper;
 import com.android.launcher3.util.ApiWrapper;
+import com.android.launcher3.util.ApplicationInfoWrapper;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.NavigationMode;
-import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitSelectSource;
@@ -1233,7 +1233,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                     Intent intent = new Intent(info.getIntent())
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     try {
-                        if (mIsSafeModeEnabled && !PackageManagerHelper.isSystemApp(this, intent)) {
+                        if (mIsSafeModeEnabled
+                                && !new ApplicationInfoWrapper(this, intent).isSystem()) {
                             Toast.makeText(this, R.string.safemode_shortcut_error,
                                     Toast.LENGTH_SHORT).show();
                         } else if (info.isPromise()) {
