@@ -106,6 +106,7 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
     // The of ordered component names as a result of a search query
     private final ArrayList<AdapterItem> mSearchResults = new ArrayList<>();
     private final SpannableString mPrivateProfileAppScrollerBadge;
+    private final SpannableString mPrivateProfileDividerBadge;
     private BaseAllAppsAdapter<T> mAdapter;
     private AppInfoComparator mAppNameComparator;
     private int mNumAppsPerRowAllApps;
@@ -127,6 +128,10 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         mPrivateProfileAppScrollerBadge.setSpan(new ImageSpan(context, Flags.letterFastScroller()
                         ? R.drawable.ic_private_profile_letter_list_fast_scroller_badge :
                         R.drawable.ic_private_profile_app_scroller_badge, ImageSpan.ALIGN_CENTER),
+                0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        mPrivateProfileDividerBadge = new SpannableString(" ");
+        mPrivateProfileDividerBadge.setSpan(new ImageSpan(context,
+                        R.drawable.ic_private_profile_divider_badge, ImageSpan.ALIGN_CENTER),
                 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
     }
 
@@ -405,6 +410,11 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
         // Add system apps separator.
         if (Flags.privateSpaceSysAppsSeparation()) {
             position = mPrivateProviderManager.addSystemAppsDivider(mAdapterItems);
+            if (Flags.letterFastScroller()) {
+                FastScrollSectionInfo sectionInfo =
+                        new FastScrollSectionInfo(mPrivateProfileDividerBadge, position);
+                mFastScrollerSections.add(sectionInfo);
+            }
         }
         // Add system apps.
         position = addAppsWithSections(split.get(false), position);
