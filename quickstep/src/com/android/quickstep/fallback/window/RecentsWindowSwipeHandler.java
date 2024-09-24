@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright (C) 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.quickstep;
+package com.android.quickstep.fallback.window;
 
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.content.Intent.EXTRA_COMPONENT_NAME;
@@ -26,11 +26,9 @@ import static com.android.launcher3.GestureNavContract.EXTRA_ICON_SURFACE;
 import static com.android.launcher3.GestureNavContract.EXTRA_ON_FINISH_CALLBACK;
 import static com.android.launcher3.GestureNavContract.EXTRA_REMOTE_CALLBACK;
 import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
-import static com.android.quickstep.OverviewComponentObserver.startHomeIntentSafely;
 
 import android.animation.ObjectAnimator;
 import android.app.ActivityManager.RunningTaskInfo;
-import android.app.ActivityOptions;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Matrix;
@@ -62,9 +60,13 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.SpringAnimationBuilder;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.util.DisplayController;
+import com.android.quickstep.AbsSwipeUpHandler;
+import com.android.quickstep.GestureState;
+import com.android.quickstep.RecentsAnimationDeviceState;
+import com.android.quickstep.RemoteAnimationTargets;
+import com.android.quickstep.TaskAnimationManager;
 import com.android.quickstep.fallback.FallbackRecentsView;
 import com.android.quickstep.fallback.RecentsState;
-import com.android.quickstep.fallback.window.RecentsWindowManager;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.RectFSpringAnim;
 import com.android.quickstep.util.SurfaceTransaction.SurfaceProperties;
@@ -81,11 +83,13 @@ import java.util.function.Consumer;
 
 /**
  * Handles the navigation gestures when a 3rd party launcher is the default home activity.
+ *
+ * Bugs: b/365775417
  */
-public class FallbackSwipeHandler extends
-        AbsSwipeUpHandler<RecentsActivity, FallbackRecentsView<RecentsActivity>, RecentsState> {
+public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowManager,
+        FallbackRecentsView<RecentsWindowManager>, RecentsState> {
 
-    private static final String TAG = "FallbackSwipeHandler";
+    private static final String TAG = "RecentsWindowSwipeHandler";
 
     /**
      * Message used for receiving gesture nav contract information. We use a static messenger to
@@ -102,18 +106,20 @@ public class FallbackSwipeHandler extends
 
     private boolean mAppCanEnterPip;
 
-    public FallbackSwipeHandler(Context context, RecentsAnimationDeviceState deviceState,
+    public RecentsWindowSwipeHandler(Context context, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState, long touchTimeMs,
-            boolean continuingLastGesture, InputConsumerController inputConsumer) {
+            boolean continuingLastGesture, InputConsumerController inputConsumer,
+            RecentsWindowManager recentsWindowManager) {
         super(context, deviceState, taskAnimationManager, gestureState, touchTimeMs,
-                continuingLastGesture, inputConsumer, null);
+                continuingLastGesture, inputConsumer, recentsWindowManager);
 
         mRunningOverHome = mGestureState.getRunningTask() != null
                 && mGestureState.getRunningTask().isHomeTask();
         if (mRunningOverHome) {
             runActionOnRemoteHandles(remoteTargetHandle ->
                     remoteTargetHandle.getTransformParams().setHomeBuilderProxy(
-                    FallbackSwipeHandler.this::updateHomeActivityTransformDuringSwipeUp));
+                            RecentsWindowSwipeHandler.
+                                    this::updateHomeActivityTransformDuringSwipeUp));
         }
     }
 
@@ -155,33 +161,24 @@ public class FallbackSwipeHandler extends
             return new FallbackPipToHomeAnimationFactory();
         }
         mActiveAnimationFactory = new FallbackHomeAnimationFactory(duration);
-        startHomeIntent(mActiveAnimationFactory, runningTaskTarget, "FallbackSwipeHandler-home");
+        //todo: b/368410893 follow up on this as its intent focused and seems to cut immediately
+        Intent intent = new Intent(mGestureState.getHomeIntent());
+        if (mActiveAnimationFactory != null && runningTaskTarget != null) {
+            mActiveAnimationFactory.addGestureContract(intent, runningTaskTarget.taskInfo);
+        }
         return mActiveAnimationFactory;
     }
 
-    private void startHomeIntent(
-            @Nullable FallbackHomeAnimationFactory gestureContractAnimationFactory,
-            @Nullable RemoteAnimationTarget runningTaskTarget,
-            @NonNull String reason) {
-        ActivityOptions options = ActivityOptions.makeCustomAnimation(mContext, 0, 0);
-        Intent intent = new Intent(mGestureState.getHomeIntent());
-        if (gestureContractAnimationFactory != null && runningTaskTarget != null) {
-            gestureContractAnimationFactory.addGestureContract(intent, runningTaskTarget.taskInfo);
-        }
-        startHomeIntentSafely(mContext, intent, options.toBundle(), reason);
-    }
-
     @Override
-    protected boolean handleTaskAppeared(@NonNull RemoteAnimationTarget[] appearedTaskTarget,
+    protected boolean handleTaskAppeared(@NonNull RemoteAnimationTarget[] appearedTaskTargets,
             @NonNull ActiveGestureLog.CompoundString failureReason) {
         if (mActiveAnimationFactory != null
-                && mActiveAnimationFactory.handleHomeTaskAppeared(appearedTaskTarget)) {
+                && mActiveAnimationFactory.handleHomeTaskAppeared(appearedTaskTargets)) {
             mActiveAnimationFactory = null;
-            failureReason.append("(FallbackSwipeHandler) should be handled as home task appeared");
             return false;
         }
 
-        return super.handleTaskAppeared(appearedTaskTarget, failureReason);
+        return super.handleTaskAppeared(appearedTaskTargets, failureReason);
     }
 
     @Override
@@ -192,8 +189,7 @@ public class FallbackSwipeHandler extends
             // the PiP task appearing.
             recentsCallback = () -> {
                 callback.run();
-                startHomeIntent(null /* gestureContractAnimationFactory */,
-                        null /* runningTaskTarget */, "FallbackSwipeHandler-resumeLauncher");
+                mRecentsWindowManager.startHome();
             };
         } else {
             recentsCallback = callback;
