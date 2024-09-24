@@ -56,7 +56,7 @@ class TaskContainer(
     @SplitConfigurationOptions.StagePosition val stagePosition: Int,
     val digitalWellBeingToast: DigitalWellBeingToast?,
     val showWindowsView: View?,
-    taskOverlayFactory: TaskOverlayFactory
+    taskOverlayFactory: TaskOverlayFactory,
 ) {
     val overlay: TaskOverlayFactory.TaskOverlay<*> = taskOverlayFactory.createOverlay(this)
     lateinit var taskContainerData: TaskContainerData
