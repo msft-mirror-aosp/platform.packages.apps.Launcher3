@@ -3672,8 +3672,8 @@ public abstract class RecentsView<
             float longGridRowWidthDiff = 0;
 
             int topGridRowSize = mTopRowIdSet.size();
-            int bottomGridRowSize = taskCount - mTopRowIdSet.size()
-                    - (enableGridOnlyOverview() ? 0 : 1);
+            int numLargeTiles = mUtils.getLargeTileCount(getTaskViews());
+            int bottomGridRowSize = taskCount - mTopRowIdSet.size() - numLargeTiles;
             boolean topRowLonger = topGridRowSize > bottomGridRowSize;
             boolean bottomRowLonger = bottomGridRowSize > topGridRowSize;
             boolean dismissedTaskFromTop = mTopRowIdSet.contains(dismissedTaskViewId);
@@ -3972,12 +3972,12 @@ public abstract class RecentsView<
         final boolean finalCloseGapBetweenClearAll = closeGapBetweenClearAll;
         final boolean finalSnapToLastTask = snapToLastTask;
         final boolean finalIsFocusedTaskDismissed = isFocusedTaskDismissed;
-        mPendingAnimation.addEndListener(new Consumer<Boolean>() {
+        mPendingAnimation.addEndListener(new Consumer<>() {
             @Override
             public void accept(Boolean success) {
                 if (mEnableDrawingLiveTile && dismissedTaskView.isRunningTask() && success) {
                     finishRecentsAnimation(true /* toRecents */, false /* shouldPip */,
-                            () -> onEnd(success));
+                            () -> onEnd(true));
                 } else {
                     onEnd(success);
                 }
@@ -4147,6 +4147,14 @@ public abstract class RecentsView<
                                 // If snapping to last task, find the last task after dismissal.
                                 pageToSnapTo = indexOfChild(
                                         getLastGridTaskView(topRowIdArray, bottomRowIdArray));
+
+                                if (pageToSnapTo == INVALID_PAGE) {
+                                    // Snap to latest large tile page after dismissing the
+                                    // last grid task. This will prevent snapping to page 0 when
+                                    // desktop task is visible as large tile.
+                                    pageToSnapTo = indexOfChild(
+                                            mUtils.getLastLargeTaskView(getTaskViews()));
+                                }
                             } else if (taskViewIdToSnapTo != -1) {
                                 // If snapping to another page due to indices rearranging, find
                                 // the new index after dismissal & rearrange using the task view id.
