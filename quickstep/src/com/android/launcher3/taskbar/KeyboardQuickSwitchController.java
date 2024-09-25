@@ -102,16 +102,16 @@ public final class KeyboardQuickSwitchController implements
      * @param taskIdsToExclude A list of tasks to exclude in the opened view.
      */
     void openQuickSwitchView(@NonNull Set<Integer> taskIdsToExclude) {
-        openQuickSwitchView(-1, taskIdsToExclude);
+        openQuickSwitchView(-1, taskIdsToExclude, true);
     }
 
-
     private void openQuickSwitchView(int currentFocusedIndex) {
-        openQuickSwitchView(currentFocusedIndex, Collections.emptySet());
+        openQuickSwitchView(currentFocusedIndex, Collections.emptySet(), false);
     }
 
     private void openQuickSwitchView(int currentFocusedIndex,
-            @NonNull Set<Integer> taskIdsToExclude) {
+            @NonNull Set<Integer> taskIdsToExclude,
+            boolean wasOpenedFromTaskbar) {
         if (mQuickSwitchViewController != null) {
             if (!mQuickSwitchViewController.isCloseAnimationRunning()) {
                 return;
@@ -146,7 +146,8 @@ public final class KeyboardQuickSwitchController implements
                             ? 0 : currentFocusedIndex,
                     onDesktop,
                     mHasDesktopTask,
-                    mWasDesktopTaskFilteredOut);
+                    mWasDesktopTaskFilteredOut,
+                    wasOpenedFromTaskbar);
             return;
         }
 
@@ -168,7 +169,8 @@ public final class KeyboardQuickSwitchController implements
                             ? 0 : currentFocusedIndex,
                     onDesktop,
                     mHasDesktopTask,
-                    mWasDesktopTaskFilteredOut);
+                    mWasDesktopTaskFilteredOut,
+                    wasOpenedFromTaskbar);
         });
     }
 
