@@ -3802,74 +3802,15 @@ public abstract class RecentsView<
                     }
                 }
             } else if (!showAsGrid) {
-                // Compute scroll offsets from task dismissal for animation.
-                // If we just take newScroll - oldScroll, everything to the right of dragged task
-                // translates to the left. We need to offset this in some cases:
-                // - In RTL, add page offset to all pages, since we want pages to move to the right
-                // Additionally, add a page offset if:
-                // - Current page is rightmost page (leftmost for RTL)
-                // - Dragging an adjacent page on the left side (right side for RTL)
-                int offset = mIsRtl ? scrollDiffPerPage : 0;
-                if (mCurrentPage == dismissedIndex) {
-                    int lastPage = taskCount - 1;
-                    if (mCurrentPage == lastPage) {
-                        offset += mIsRtl ? -scrollDiffPerPage : scrollDiffPerPage;
-                    }
-                } else {
-                    // Dismissing an adjacent page.
-                    int negativeAdjacent = mCurrentPage - 1; // (Right in RTL, left in LTR)
-                    if (dismissedIndex == negativeAdjacent) {
-                        offset += mIsRtl ? -scrollDiffPerPage : scrollDiffPerPage;
-                    }
-                }
-
+                int offset = getOffsetToDismissedTask(scrollDiffPerPage, dismissedIndex, taskCount);
                 int scrollDiff = newScroll[i] - oldScroll[i] + offset;
                 if (scrollDiff != 0) {
-                    FloatProperty translationProperty = child instanceof TaskView
-                            ? ((TaskView) child).getPrimaryDismissTranslationProperty()
-                            : getPagedOrientationHandler().getPrimaryViewTranslate();
-
-                    float additionalDismissDuration =
-                            ADDITIONAL_DISMISS_TRANSLATION_INTERPOLATION_OFFSET * Math.abs(
-                                    i - dismissedIndex);
-
-                    // We are in non-grid layout.
-                    // If dismissing for split select, use split timings.
-                    // If not, use dismiss timings.
-                    float animationStartProgress = isSplitSelectionActive()
-                            ? Utilities.boundToRange(splitTimings.getGridSlideStartOffset(), 0f, 1f)
-                            : Utilities.boundToRange(
-                                    INITIAL_DISMISS_TRANSLATION_INTERPOLATION_OFFSET
-                                            + additionalDismissDuration, 0f, 1f);
-
-                    float animationEndProgress = isSplitSelectionActive()
-                            ? Utilities.boundToRange(splitTimings.getGridSlideStartOffset()
-                            + splitTimings.getGridSlideDurationOffset(), 0f, 1f)
-                            : 1f;
-
-                    // Slide tiles in horizontally to fill dismissed area
-                    anim.setFloat(child, translationProperty, scrollDiff,
-                            clampToProgress(
-                                    splitTimings.getGridSlidePrimaryInterpolator(),
-                                    animationStartProgress,
-                                    animationEndProgress
-                            )
-                    );
-
-                    if (mEnableDrawingLiveTile && child instanceof TaskView
-                            && ((TaskView) child).isRunningTask()) {
-                        anim.addOnFrameCallback(() -> {
-                            runActionOnRemoteHandles(
-                                    remoteTargetHandle ->
-                                            remoteTargetHandle.getTaskViewSimulator()
-                                                    .taskPrimaryTranslation.value =
-                                                    getPagedOrientationHandler().getPrimaryValue(
-                                                            child.getTranslationX(),
-                                                            child.getTranslationY()
-                                                    ));
-                            redrawLiveTile();
-                        });
-                    }
+                    translateTaskWhenDismissed(
+                            child,
+                            Math.abs(i - dismissedIndex),
+                            mIsRtl ? -scrollDiff : scrollDiff,
+                            anim,
+                            splitTimings);
                     needsCurveUpdates = true;
                 }
             } else if (child instanceof TaskView) {
@@ -4182,6 +4123,87 @@ public abstract class RecentsView<
                 mPendingAnimation = null;
             }
         });
+    }
+
+    /**
+     * Compute scroll offsets from task dismissal for animation.
+     * If we just take newScroll - oldScroll, everything to the right of dragged task
+     * translates to the left. We need to offset this in some cases:
+     * - In RTL, add page offset to all pages, since we want pages to move to the right
+     * Additionally, add a page offset if:
+     * - Current page is rightmost page (leftmost for RTL)
+     * - Dragging an adjacent page on the left side (right side for RTL)
+     */
+    private int getOffsetToDismissedTask(int scrollDiffPerPage, int dismissedIndex, int taskCount) {
+        int offset = mIsRtl ? scrollDiffPerPage : 0;
+        if (mCurrentPage == dismissedIndex) {
+            int lastPage = taskCount - 1;
+            if (mCurrentPage == lastPage) {
+                offset += mIsRtl ? -scrollDiffPerPage : scrollDiffPerPage;
+            }
+        } else {
+            // Dismissing an adjacent page.
+            int negativeAdjacent = mCurrentPage - 1; // (Right in RTL, left in LTR)
+            if (dismissedIndex == negativeAdjacent) {
+                offset += mIsRtl ? -scrollDiffPerPage : scrollDiffPerPage;
+            }
+        }
+        return offset;
+    }
+
+    private void translateTaskWhenDismissed(
+            View view,
+            int indexDiff,
+            int scrollDiffPerPage,
+            PendingAnimation pendingAnimation,
+            SplitAnimationTimings splitTimings) {
+        FloatProperty translationProperty = view instanceof TaskView
+                ? ((TaskView) view).getPrimaryDismissTranslationProperty()
+                : getPagedOrientationHandler().getPrimaryViewTranslate();
+
+        float additionalDismissDuration =
+                ADDITIONAL_DISMISS_TRANSLATION_INTERPOLATION_OFFSET * indexDiff;
+
+        // We are in non-grid layout.
+        // If dismissing for split select, use split timings.
+        // If not, use dismiss timings.
+        float animationStartProgress = isSplitSelectionActive()
+                ? Utilities.boundToRange(splitTimings.getGridSlideStartOffset(), 0f, 1f)
+                : Utilities.boundToRange(
+                        INITIAL_DISMISS_TRANSLATION_INTERPOLATION_OFFSET
+                                + additionalDismissDuration, 0f, 1f);
+
+        float animationEndProgress = isSplitSelectionActive()
+                ? Utilities.boundToRange(splitTimings.getGridSlideStartOffset()
+                + splitTimings.getGridSlideDurationOffset(), 0f, 1f)
+                : 1f;
+
+        // Slide tiles in horizontally to fill dismissed area
+        pendingAnimation.setFloat(
+                view,
+                translationProperty,
+                scrollDiffPerPage,
+                clampToProgress(
+                        splitTimings.getGridSlidePrimaryInterpolator(),
+                        animationStartProgress,
+                        animationEndProgress
+                )
+        );
+
+        if (mEnableDrawingLiveTile && view instanceof TaskView
+                && ((TaskView) view).isRunningTask()) {
+            pendingAnimation.addOnFrameCallback(() -> {
+                runActionOnRemoteHandles(
+                        remoteTargetHandle ->
+                                remoteTargetHandle.getTaskViewSimulator()
+                                        .taskPrimaryTranslation.value =
+                                        getPagedOrientationHandler().getPrimaryValue(
+                                                view.getTranslationX(),
+                                                view.getTranslationY()
+                                        ));
+                redrawLiveTile();
+            });
+        }
     }
 
     /**
