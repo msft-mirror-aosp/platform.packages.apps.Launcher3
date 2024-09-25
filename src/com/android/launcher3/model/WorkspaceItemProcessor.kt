@@ -32,6 +32,7 @@ import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.backuprestore.LauncherRestoreEventLogger.RestoreError
 import com.android.launcher3.config.FeatureFlags
+import com.android.launcher3.icons.CacheableShortcutInfo
 import com.android.launcher3.logging.FileLog
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.model.data.AppPairInfo
@@ -76,7 +77,7 @@ class WorkspaceItemProcessor(
     private val pmHelper: PackageManagerHelper,
     private val iconRequestInfos: MutableList<IconRequestInfo<WorkspaceItemInfo>>,
     private val unlockedUsers: LongSparseArray<Boolean>,
-    private val allDeepShortcuts: MutableList<ShortcutInfo>,
+    private val allDeepShortcuts: MutableList<CacheableShortcutInfo>,
 ) {
 
     private val isSafeMode = app.isSafeModeEnabled
@@ -278,13 +279,14 @@ class WorkspaceItemProcessor(
                     info = WorkspaceItemInfo(pinnedShortcut, app.context)
                     // If the pinned deep shortcut is no longer published,
                     // use the last saved icon instead of the default.
-                    iconCache.getShortcutIcon(info, pinnedShortcut, c::loadIcon)
+                    val csi = CacheableShortcutInfo(pinnedShortcut, appInfoWrapper)
+                    iconCache.getShortcutIcon(info, csi, c::loadIcon)
                     if (appInfoWrapper.isSuspended()) {
                         info.runtimeStatusFlags =
                             info.runtimeStatusFlags or ItemInfoWithIcon.FLAG_DISABLED_SUSPENDED
                     }
                     intent = info.getIntent()
-                    allDeepShortcuts.add(pinnedShortcut)
+                    allDeepShortcuts.add(csi)
                 } else {
                     // Create a shortcut info in disabled mode for now.
                     info = c.loadSimpleWorkspaceItem()
