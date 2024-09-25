@@ -26,9 +26,11 @@ import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCH
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
+import android.app.Activity;
 import android.app.ActivityOptions;
 import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
@@ -46,6 +48,7 @@ import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.AccessibilityDelegate;
+import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.inputmethod.InputMethodManager;
@@ -80,6 +83,7 @@ import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.SplitConfigurationOptions;
+import com.android.launcher3.util.SystemUiController;
 import com.android.launcher3.util.ViewCache;
 import com.android.launcher3.widget.picker.model.WidgetPickerDataProvider;
 
@@ -175,6 +179,23 @@ public interface ActivityContext {
     BaseDragLayer getDragLayer();
 
     /**
+     * @see Activity#getWindow()
+     * @return Window
+     */
+    @Nullable
+    default Window getWindow() {
+        return null;
+    }
+
+    /**
+     * @see Activity#getComponentName()
+     * @return ComponentName
+     */
+    default ComponentName getComponentName() {
+        return null;
+    }
+
+    /**
      * The all apps container, if it exists in this context.
      */
     default ActivityAllAppsContainerView<?> getAppsView() {
@@ -213,6 +234,11 @@ public interface ActivityContext {
      * Controller for supporting item drag-and-drop
      */
     default <T extends DragController> T getDragController() {
+        return null;
+    }
+
+    @Nullable
+    default SystemUiController getSystemUiController() {
         return null;
     }
 
