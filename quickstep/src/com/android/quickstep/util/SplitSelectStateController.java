@@ -52,7 +52,6 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.UserHandle;
@@ -116,7 +115,6 @@ public class SplitSelectStateController {
     private static final String TAG = "SplitSelectStateCtor";
 
     private RecentsViewContainer mContainer;
-    private final Handler mHandler;
     private final RecentsModel mRecentTasksModel;
     @Nullable
     private Runnable mActivityBackCallback;
@@ -182,12 +180,11 @@ public class SplitSelectStateController {
         }
     };
 
-    public SplitSelectStateController(RecentsViewContainer container, Handler handler,
+    public SplitSelectStateController(RecentsViewContainer container,
             StateManager stateManager, DepthController depthController,
             StatsLogManager statsLogManager, SystemUiProxy systemUiProxy, RecentsModel recentsModel,
             Runnable activityBackCallback) {
         mContainer = container;
-        mHandler = handler;
         mStatsLogManager = statsLogManager;
         mSystemUiProxy = systemUiProxy;
         mStateManager = stateManager;

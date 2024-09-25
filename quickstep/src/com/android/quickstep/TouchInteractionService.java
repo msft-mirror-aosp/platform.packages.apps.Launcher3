@@ -76,6 +76,7 @@ import android.view.Choreographer;
 import android.view.InputDevice;
 import android.view.InputEvent;
 import android.view.MotionEvent;
+import android.view.View;
 
 import androidx.annotation.BinderThread;
 import androidx.annotation.NonNull;
@@ -83,7 +84,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.BaseDraggingActivity;
 import com.android.launcher3.ConstantItem;
 import com.android.launcher3.EncryptionType;
 import com.android.launcher3.Flags;
@@ -107,6 +107,8 @@ import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.TraceHelper;
 import com.android.quickstep.OverviewCommandHelper.CommandType;
+import com.android.quickstep.fallback.window.RecentsWindowManager;
+import com.android.quickstep.fallback.window.RecentsWindowSwipeHandler;
 import com.android.quickstep.inputconsumers.AccessibilityInputConsumer;
 import com.android.quickstep.inputconsumers.AssistantInputConsumer;
 import com.android.quickstep.inputconsumers.BubbleBarInputConsumer;
@@ -324,10 +326,10 @@ public class TouchInteractionService extends Service {
         @Override
         public void enterStageSplitFromRunningApp(boolean leftOrTop) {
             executeForTouchInteractionService(tis -> {
-                StatefulActivity activity =
-                        tis.mOverviewComponentObserver.getActivityInterface().getCreatedContainer();
-                if (activity != null) {
-                    activity.enterStageSplitFromRunningApp(leftOrTop);
+                RecentsViewContainer container = tis.mOverviewComponentObserver
+                        .getContainerInterface().getCreatedContainer();
+                if (container != null) {
+                    container.enterStageSplitFromRunningApp(leftOrTop);
                 }
             });
         }
@@ -606,6 +608,8 @@ public class TouchInteractionService extends Service {
             this::createLauncherSwipeHandler;
     private final AbsSwipeUpHandler.Factory mFallbackSwipeHandlerFactory =
             this::createFallbackSwipeHandler;
+    private final AbsSwipeUpHandler.Factory mRecentsWindowSwipeHandlerFactory =
+            this::createRecentsWindowSwipeHandler;
 
     private final ScreenOnTracker.ScreenOnListener mScreenOnListener = this::onScreenOnChanged;
 
@@ -638,6 +642,7 @@ public class TouchInteractionService extends Service {
     private InputEventReceiver mInputEventReceiver;
 
     private TaskbarManager mTaskbarManager;
+    private RecentsWindowManager mRecentsWindowManager;
     private Function<GestureState, AnimatedFloat> mSwipeUpProxyProvider = i -> null;
     private AllAppsActionManager mAllAppsActionManager;
     private InputManager mInputManager;
@@ -668,6 +673,9 @@ public class TouchInteractionService extends Service {
         mDesktopVisibilityController = new DesktopVisibilityController(this);
         mTaskbarManager = new TaskbarManager(
                 this, mAllAppsActionManager, mNavCallbacks, mDesktopVisibilityController);
+        if(Flags.enableFallbackOverviewInWindow()) {
+            mRecentsWindowManager = new RecentsWindowManager(this);
+        }
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
 
         // Call runOnUserUnlocked() before any other callbacks to ensure everything is initialized.
@@ -718,7 +726,7 @@ public class TouchInteractionService extends Service {
     @UiThread
     public void onUserUnlocked() {
         Log.d(TAG, "onUserUnlocked: userId=" + getUserId());
-        mTaskAnimationManager = new TaskAnimationManager(this);
+        mTaskAnimationManager = new TaskAnimationManager(this, mRecentsWindowManager);
         mOverviewComponentObserver = new OverviewComponentObserver(this, mDeviceState);
         mOverviewCommandHelper = new OverviewCommandHelper(this,
                 mOverviewComponentObserver, mTaskAnimationManager);
@@ -761,11 +769,12 @@ public class TouchInteractionService extends Service {
 
     private void onOverviewTargetChange(boolean isHomeAndOverviewSame) {
         mAllAppsActionManager.setHomeAndOverviewSame(isHomeAndOverviewSame);
-
-        StatefulActivity<?> newOverviewActivity =
-                mOverviewComponentObserver.getActivityInterface().getCreatedContainer();
-        if (newOverviewActivity != null) {
-            mTaskbarManager.setActivity(newOverviewActivity);
+        RecentsViewContainer newOverviewContainer =
+                mOverviewComponentObserver.getContainerInterface().getCreatedContainer();
+        if (newOverviewContainer != null
+                && newOverviewContainer instanceof StatefulActivity activity) {
+            //TODO(b/368030750) refactor taskbarManager to accept RecentsViewContainer
+            mTaskbarManager.setActivity(activity);
         }
         mTISBinder.onOverviewTargetChange();
     }
@@ -795,7 +804,7 @@ public class TouchInteractionService extends Service {
     @UiThread
     private void onAssistantVisibilityChanged() {
         if (LockedUserState.get(this).isUserUnlocked()) {
-            mOverviewComponentObserver.getActivityInterface().onAssistantVisibilityChanged(
+            mOverviewComponentObserver.getContainerInterface().onAssistantVisibilityChanged(
                     mDeviceState.getAssistantVisibility());
         }
     }
@@ -818,6 +827,10 @@ public class TouchInteractionService extends Service {
         mTrackpadsConnected.clear();
 
         mTaskbarManager.destroy();
+
+        if (mRecentsWindowManager != null) {
+            mRecentsWindowManager.destroy();
+        }
         mDesktopVisibilityController.onDestroy();
         sConnected = false;
 
@@ -1430,8 +1443,9 @@ public class TouchInteractionService extends Service {
     }
 
     public AbsSwipeUpHandler.Factory getSwipeUpHandlerFactory() {
-        return !mOverviewComponentObserver.isHomeAndOverviewSame()
-                ? mFallbackSwipeHandlerFactory : mLauncherSwipeHandlerFactory;
+        return mOverviewComponentObserver.isHomeAndOverviewSame()
+                ? mLauncherSwipeHandlerFactory : (Flags.enableFallbackOverviewInWindow()
+                ? mRecentsWindowSwipeHandlerFactory : mFallbackSwipeHandlerFactory);
     }
 
     private InputConsumer createOtherActivityInputConsumer(GestureState gestureState,
@@ -1480,7 +1494,8 @@ public class TouchInteractionService extends Service {
                             .append("activity == null, trying to use default input consumer"));
         }
 
-        boolean hasWindowFocus = container.getRootView().hasWindowFocus();
+        View rootview = container.getRootView();
+        boolean hasWindowFocus = rootview != null && rootview.hasWindowFocus();
         boolean isPreviousGestureAnimatingToLauncher =
                 previousGestureState.isRunningAnimationToLauncher()
                         || mDeviceState.isPredictiveBackToHomeInProgress();
@@ -1575,11 +1590,11 @@ public class TouchInteractionService extends Service {
             return;
         }
 
-        final BaseActivityInterface activityInterface =
-                mOverviewComponentObserver.getActivityInterface();
+        final BaseContainerInterface containerInterface =
+                mOverviewComponentObserver.getContainerInterface();
         final Intent overviewIntent = new Intent(
                 mOverviewComponentObserver.getOverviewIntentIgnoreSysUiState());
-        if (activityInterface.getCreatedContainer() != null && fromInit) {
+        if (containerInterface.getCreatedContainer() != null && fromInit) {
             // The activity has been created before the initialization of overview service. It is
             // usually happens when booting or launcher is the top activity, so we should already
             // have the latest state.
@@ -1599,18 +1614,18 @@ public class TouchInteractionService extends Service {
         if (!LockedUserState.get(this).isUserUnlocked()) {
             return;
         }
-        final BaseActivityInterface activityInterface =
-                mOverviewComponentObserver.getActivityInterface();
-        final BaseDraggingActivity activity = activityInterface.getCreatedContainer();
-        if (activity == null || activity.isStarted()) {
+        final BaseContainerInterface containerInterface =
+                mOverviewComponentObserver.getContainerInterface();
+        final RecentsViewContainer container = containerInterface.getCreatedContainer();
+        if (container == null || container.isStarted()) {
             // We only care about the existing background activity.
             return;
         }
-        Configuration oldConfig = activity.getResources().getConfiguration();
+        Configuration oldConfig = container.asContext().getResources().getConfiguration();
         boolean isFoldUnfold = isTablet(oldConfig) != isTablet(newConfig);
         if (!isFoldUnfold && mOverviewComponentObserver.canHandleConfigChanges(
-                activity.getComponentName(),
-                activity.getResources().getConfiguration().diff(newConfig))) {
+                container.getComponentName(),
+                container.asContext().getResources().getConfiguration().diff(newConfig))) {
             // Since navBar gestural height are different between portrait and landscape,
             // can handle orientation changes and refresh navigation gestural region through
             // onOneHandedModeChanged()
@@ -1649,11 +1664,11 @@ public class TouchInteractionService extends Service {
         pw.println("\tmInputEventReceiver=" + mInputEventReceiver);
         DisplayController.INSTANCE.get(this).dump(pw);
         pw.println("TouchState:");
-        BaseDraggingActivity createdOverviewActivity = mOverviewComponentObserver == null ? null
-                : mOverviewComponentObserver.getActivityInterface().getCreatedContainer();
+        RecentsViewContainer createdOverviewContainer = mOverviewComponentObserver == null ? null
+                : mOverviewComponentObserver.getContainerInterface().getCreatedContainer();
         boolean resumed = mOverviewComponentObserver != null
-                && mOverviewComponentObserver.getActivityInterface().isResumed();
-        pw.println("\tcreatedOverviewActivity=" + createdOverviewActivity);
+                && mOverviewComponentObserver.getContainerInterface().isResumed();
+        pw.println("\tcreatedOverviewActivity=" + createdOverviewContainer);
         pw.println("\tresumed=" + resumed);
         pw.println("\tmConsumer=" + mConsumer.getName());
         ActiveGestureLog.INSTANCE.dump("", pw);
@@ -1661,8 +1676,8 @@ public class TouchInteractionService extends Service {
         if (mTaskAnimationManager != null) {
             mTaskAnimationManager.dump("", pw);
         }
-        if (createdOverviewActivity != null) {
-            createdOverviewActivity.getDeviceProfile().dump(this, "", pw);
+        if (createdOverviewContainer != null) {
+            createdOverviewContainer.getDeviceProfile().dump(this, "", pw);
         }
         mTaskbarManager.dumpLogs("", pw);
         mDesktopVisibilityController.dumpLogs("", pw);
@@ -1684,5 +1699,12 @@ public class TouchInteractionService extends Service {
         return new FallbackSwipeHandler(this, mDeviceState, mTaskAnimationManager,
                 gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
                 mInputConsumer);
+    }
+
+    private AbsSwipeUpHandler createRecentsWindowSwipeHandler(
+            GestureState gestureState, long touchTimeMs) {
+        return new RecentsWindowSwipeHandler(this, mDeviceState, mTaskAnimationManager,
+                gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
+                mInputConsumer, mRecentsWindowManager);
     }
 }
