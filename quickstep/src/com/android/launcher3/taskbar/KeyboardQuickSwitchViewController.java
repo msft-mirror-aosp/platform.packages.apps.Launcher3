@@ -21,6 +21,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.animation.AnimationUtils;
 import android.window.RemoteTransition;
 
@@ -31,6 +32,7 @@ import com.android.internal.jank.Cuj;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
+import com.android.launcher3.taskbar.overlay.TaskbarOverlayDragLayer;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.GroupTask;
@@ -234,6 +236,13 @@ public class KeyboardQuickSwitchViewController {
         pw.println(prefix + "\tmCurrentFocusIndex=" + mCurrentFocusIndex);
         pw.println(prefix + "\tmOnDesktop=" + mOnDesktop);
         pw.println(prefix + "\tmWasDesktopTaskFilteredOut=" + mWasDesktopTaskFilteredOut);
+    }
+
+    /**
+     * @return True if the MotionEvent is over the {@link KeyboardQuickSwitchView}.
+     */
+    protected boolean isEventOverKeyboardQuickSwitch(TaskbarOverlayDragLayer dl, MotionEvent ev) {
+        return dl.isEventOverView(mKeyboardQuickSwitchView, ev);
     }
 
     class ViewCallbacks {
