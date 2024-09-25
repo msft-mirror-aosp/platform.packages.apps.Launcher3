@@ -27,8 +27,8 @@ import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.shortcuts.ShortcutRequest;
+import com.android.launcher3.util.ApplicationInfoWrapper;
 import com.android.launcher3.util.ItemInfoMatcher;
-import com.android.launcher3.util.PackageManagerHelper;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -80,11 +80,10 @@ public class ShortcutsChangedTask implements ModelUpdateTask {
 
         if (!matchingWorkspaceItems.isEmpty()) {
             if (mShortcuts.isEmpty()) {
-                PackageManagerHelper packageManagerHelper =
-                        PackageManagerHelper.INSTANCE.get(context);
+                ApplicationInfoWrapper infoWrapper =
+                        new ApplicationInfoWrapper(context, mPackageName, mUser);
                 // Verify that the app is indeed installed.
-                if (!packageManagerHelper.isAppInstalled(mPackageName, mUser)
-                        && !packageManagerHelper.isAppArchivedForUser(mPackageName, mUser)) {
+                if (!infoWrapper.isInstalled() && !infoWrapper.isArchived()) {
                     // App is not installed or archived, ignoring package events
                     return;
                 }
