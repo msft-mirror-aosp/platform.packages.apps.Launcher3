@@ -38,6 +38,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.statemanager.BaseState;
+import com.android.launcher3.statemanager.StatefulContainer;
 import com.android.quickstep.TopTaskTracker.CachedTaskInfo;
 import com.android.quickstep.util.ActiveGestureErrorDetector;
 import com.android.quickstep.util.ActiveGestureLog;
@@ -190,7 +191,7 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     public GestureState(OverviewComponentObserver componentObserver, int gestureId) {
         mHomeIntent = componentObserver.getHomeIntent();
         mOverviewIntent = componentObserver.getOverviewIntent();
-        mContainerInterface = componentObserver.getActivityInterface();
+        mContainerInterface = componentObserver.getContainerInterface();
         mStateCallback = new MultiStateCallback(
                 STATE_NAMES.toArray(new String[0]), GestureState::getTrackedEventForState);
         mGestureId = gestureId;
@@ -269,8 +270,8 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     /**
      * @return the interface to the activity handing the UI updates for this gesture.
      */
-    public <S extends BaseState<S>, T extends RecentsViewContainer>
-            BaseContainerInterface<S, T> getContainerInterface() {
+    public <S extends BaseState<S>, T extends RecentsViewContainer & StatefulContainer<S>>
+    BaseContainerInterface getContainerInterface() {
         return mContainerInterface;
     }
 

@@ -45,6 +45,7 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SystemUiController.UI_STATE_FULLSCREEN_TASK;
 import static com.android.launcher3.util.VibratorWrapper.OVERVIEW_HAPTIC;
 import static com.android.launcher3.util.window.RefreshRateTracker.getSingleFrameMs;
+import static com.android.quickstep.BaseContainerInterface.AnimationFactory;
 import static com.android.quickstep.GestureState.GestureEndTarget.HOME;
 import static com.android.quickstep.GestureState.GestureEndTarget.LAST_TASK;
 import static com.android.quickstep.GestureState.GestureEndTarget.NEW_TASK;
@@ -103,6 +104,7 @@ import com.android.internal.jank.Cuj;
 import com.android.internal.util.LatencyTracker;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Flags;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimationSuccessListener;
@@ -112,6 +114,7 @@ import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.logging.StatsLogManager.StatsLogger;
 import com.android.launcher3.statemanager.BaseState;
+import com.android.launcher3.statemanager.StatefulContainer;
 import com.android.launcher3.taskbar.TaskbarThresholdUtils;
 import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
@@ -120,9 +123,9 @@ import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.VibratorWrapper;
 import com.android.launcher3.util.WindowBounds;
-import com.android.quickstep.BaseActivityInterface.AnimationFactory;
 import com.android.quickstep.GestureState.GestureEndTarget;
 import com.android.quickstep.RemoteTargetGluer.RemoteTargetHandle;
+import com.android.quickstep.fallback.window.RecentsWindowManager;
 import com.android.quickstep.util.ActiveGestureErrorDetector;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.ActivityInitListener;
@@ -156,8 +159,6 @@ import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.startingsurface.SplashScreenExitAnimationUtils;
 
-import kotlin.Unit;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -167,15 +168,16 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
 
+import kotlin.Unit;
+
 /**
  * Handles the navigation gestures when Launcher is the default home activity.
  */
 public abstract class AbsSwipeUpHandler<
-        RECENTS_CONTAINER extends Context & RecentsViewContainer,
-        RECENTS_VIEW extends RecentsView<RECENTS_CONTAINER, STATE>,
-        STATE extends BaseState<STATE>>
-        extends SwipeUpAnimationLogic
-        implements OnApplyWindowInsetsListener, RecentsAnimationCallbacks.RecentsAnimationListener {
+        RECENTS_CONTAINER extends Context & RecentsViewContainer & StatefulContainer<STATE>,
+        RECENTS_VIEW extends RecentsView<RECENTS_CONTAINER, STATE>, STATE extends BaseState<STATE>>
+        extends SwipeUpAnimationLogic implements OnApplyWindowInsetsListener,
+        RecentsAnimationCallbacks.RecentsAnimationListener {
     private static final String TAG = "AbsSwipeUpHandler";
 
     private static final ArrayList<String> STATE_NAMES = new ArrayList<>();
@@ -292,7 +294,7 @@ public abstract class AbsSwipeUpHandler<
     private static final int LOG_NO_OP_PAGE_INDEX = -1;
 
     protected final TaskAnimationManager mTaskAnimationManager;
-
+    protected final RecentsWindowManager mRecentsWindowManager;
     // Either RectFSpringAnim (if animating home) or ObjectAnimator (from mCurrentShift) otherwise
     private RunningWindowAnim[] mRunningWindowAnim;
     // Possible second animation running at the same time as mRunningWindowAnim
@@ -353,9 +355,12 @@ public abstract class AbsSwipeUpHandler<
     public AbsSwipeUpHandler(Context context, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState,
             long touchTimeMs, boolean continuingLastGesture,
-            InputConsumerController inputConsumer) {
+            InputConsumerController inputConsumer, RecentsWindowManager recentsWindowManager) {
         super(context, deviceState, gestureState);
         mContainerInterface = gestureState.getContainerInterface();
+        if (recentsWindowManager != null && Flags.enableFallbackOverviewInWindow()) {
+            recentsWindowManager.registerInitListener(this::onActivityInit);
+        }
         mActivityInitListener =
                 mContainerInterface.createActivityInitListener(this::onActivityInit);
         mInputConsumerProxy =
@@ -369,6 +374,7 @@ public abstract class AbsSwipeUpHandler<
                     endLauncherTransitionController();
                 }, new InputProxyHandlerFactory(mContainerInterface, mGestureState));
         mTaskAnimationManager = taskAnimationManager;
+        mRecentsWindowManager = recentsWindowManager;
         mTouchTimeMs = touchTimeMs;
         mContinuingLastGesture = continuingLastGesture;
 
@@ -819,7 +825,7 @@ public abstract class AbsSwipeUpHandler<
             return;
         }
         initTransitionEndpoints(mContainer.getDeviceProfile());
-        mAnimationFactory.createActivityInterface(mTransitionDragLength);
+        mAnimationFactory.createContainerInterface(mTransitionDragLength);
     }
 
     /**
@@ -863,10 +869,13 @@ public abstract class AbsSwipeUpHandler<
         }
     }
 
+    public Intent getHomeIntent() {
+        return mGestureState.getHomeIntent();
+    }
+
     public Intent getLaunchIntent() {
         return mGestureState.getOverviewIntent();
     }
-
     /**
      * Called when the value of {@link #mCurrentShift} changes
      */
