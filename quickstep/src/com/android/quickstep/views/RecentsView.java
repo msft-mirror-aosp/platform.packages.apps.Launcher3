@@ -236,8 +236,6 @@ import com.android.wm.shell.common.pip.IPipAnimationListener;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 
-import kotlin.Unit;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -251,6 +249,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import kotlin.Unit;
+
 /**
  * A list of recent tasks.
  *
@@ -258,7 +258,7 @@ import java.util.stream.Collectors;
  * @param <STATE_TYPE>     : the type of base state that will be used
  */
 public abstract class RecentsView<
-        CONTAINER_TYPE extends Context & RecentsViewContainer,
+        CONTAINER_TYPE extends Context & RecentsViewContainer & StatefulContainer<STATE_TYPE>,
         STATE_TYPE extends BaseState<STATE_TYPE>> extends PagedView implements Insettable,
         TaskThumbnailCache.HighResLoadingState.HighResLoadingStateChangedCallback,
         TaskVisualsChangeListener {
@@ -1209,6 +1209,7 @@ public abstract class RecentsView<
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+
         updateTaskStackListenerState();
         mModel.getThumbnailCache().getHighResLoadingState().removeCallback(this);
         mContainer.removeMultiWindowModeChangedListener(mMultiWindowModeChangedListener);
@@ -4994,7 +4995,8 @@ public abstract class RecentsView<
             mSplitSelectStateController.getSplitAnimationController()
                     .addInitialSplitFromPair(taskContainer, builder,
                             mContainer.getDeviceProfile(),
-                            mSplitHiddenTaskView.getWidth(), mSplitHiddenTaskView.getHeight(),
+                            mSplitHiddenTaskView.getLayoutParams().width,
+                            mSplitHiddenTaskView.getLayoutParams().height,
                             primaryTaskSelected);
             builder.addOnFrameCallback(() -> {
                 if (!enableRefactorTaskThumbnail()) {
