@@ -283,11 +283,11 @@ public class LauncherModelHelper {
         }
 
         @Override
-        public void onDestroy() {
+        protected void cleanUpObjects() {
             if (deleteContents(mDbDir)) {
                 mDbDir.delete();
             }
-            super.onDestroy();
+            super.cleanUpObjects();
         }
 
         @Override
