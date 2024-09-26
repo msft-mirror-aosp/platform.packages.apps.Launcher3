@@ -226,7 +226,7 @@ public class IconCache extends BaseIconCache {
     public synchronized void updateTitleAndIcon(AppInfo application) {
         CacheEntry entry = cacheLocked(application.componentName,
                 application.user, () -> null, mLauncherActivityInfoCachingLogic,
-                false, application.usingLowResIcon());
+                application.usingLowResIcon() ? LookupFlag.USE_LOW_RES : LookupFlag.DEFAULT);
         if (entry.bitmap != null || !isDefaultIcon(entry.bitmap, application.user)) {
             applyCacheEntry(entry, application);
         }
@@ -258,7 +258,7 @@ public class IconCache extends BaseIconCache {
     public <T extends ItemInfoWithIcon> void getShortcutIcon(T info, ShortcutInfo si,
             @NonNull Predicate<T> fallbackIconCheck) {
         BitmapInfo bitmapInfo = cacheLocked(ShortcutKey.fromInfo(si).componentName,
-                si.getUserHandle(), () -> si, mShortcutCachingLogic, false, false).bitmap;
+                si.getUserHandle(), () -> si, mShortcutCachingLogic, LookupFlag.DEFAULT).bitmap;
         if (bitmapInfo.isNullOrLowRes()) {
             bitmapInfo = getDefaultIcon(si.getUserHandle());
         }
@@ -329,8 +329,7 @@ public class IconCache extends BaseIconCache {
      */
     public synchronized String getTitleNoCache(ComponentWithLabel info) {
         CacheEntry entry = cacheLocked(info.getComponent(), info.getUser(), () -> info,
-                mComponentWithLabelCachingLogic, false /* usePackageIcon */,
-                true /* useLowResIcon */);
+                mComponentWithLabelCachingLogic, LookupFlag.USE_LOW_RES);
         return Utilities.trim(entry.title);
     }
 
@@ -341,9 +340,11 @@ public class IconCache extends BaseIconCache {
             @NonNull ItemInfoWithIcon infoInOut,
             @NonNull Supplier<LauncherActivityInfo> activityInfoProvider,
             boolean usePkgIcon, boolean useLowResIcon) {
+        int lookupFlags = LookupFlag.DEFAULT;
+        if (usePkgIcon) lookupFlags |= LookupFlag.USE_PACKAGE_ICON;
+        if (useLowResIcon) lookupFlags |= LookupFlag.USE_LOW_RES;
         CacheEntry entry = cacheLocked(infoInOut.getTargetComponent(), infoInOut.user,
-                activityInfoProvider, mLauncherActivityInfoCachingLogic, usePkgIcon,
-                useLowResIcon);
+                activityInfoProvider, mLauncherActivityInfoCachingLogic, lookupFlags);
         applyCacheEntry(entry, infoInOut);
     }
 
@@ -445,9 +446,8 @@ public class IconCache extends BaseIconCache {
                                 /* user = */ sectionKey.first,
                                 () -> duplicateIconRequests.get(0).launcherActivityInfo,
                                 mLauncherActivityInfoCachingLogic,
-                                c,
-                                /* usePackageIcon= */ false,
-                                /* useLowResIcons = */ sectionKey.second);
+                                sectionKey.second ? LookupFlag.USE_LOW_RES : LookupFlag.DEFAULT,
+                                c);
 
                         for (IconRequestInfo<T> iconRequest : duplicateIconRequests) {
                             applyCacheEntry(entry, iconRequest.itemInfo);
