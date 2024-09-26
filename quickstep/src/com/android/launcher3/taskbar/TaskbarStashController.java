@@ -81,6 +81,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     private static final String TAG = "TaskbarStashController";
     private static final boolean DEBUG = false;
 
+    private static boolean sEnableSoftwareImeForTests = false;
+
     /**
      * Def. value for @param shouldBubblesFollow in
      * {@link #updateAndAnimateTransientTaskbar(boolean)} */
@@ -130,19 +132,22 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      *
      * Use {@link #getStashDuration()} to query duration
      */
-    private static final long TASKBAR_STASH_DURATION = InsetsController.ANIMATION_DURATION_RESIZE;
+    @VisibleForTesting
+    static final long TASKBAR_STASH_DURATION = InsetsController.ANIMATION_DURATION_RESIZE;
 
     /**
      * How long to stash/unstash transient taskbar.
      *
      * Use {@link #getStashDuration()} to query duration.
      */
-    private static final long TRANSIENT_TASKBAR_STASH_DURATION = 417;
+    @VisibleForTesting
+    static final long TRANSIENT_TASKBAR_STASH_DURATION = 417;
 
     /**
      * How long to stash/unstash when keyboard is appearing/disappearing.
      */
-    private static final long TASKBAR_STASH_DURATION_FOR_IME = 80;
+    @VisibleForTesting
+    static final long TASKBAR_STASH_DURATION_FOR_IME = 80;
 
     /**
      * The scale TaskbarView animates to when being stashed.
@@ -163,7 +168,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * How long the icon/stash handle alpha animation plays.
      */
-    public static final long TASKBAR_STASH_ALPHA_DURATION = 50;
+    public static final long TRANSIENT_TASKBAR_STASH_ALPHA_DURATION = 50;
 
     /**
      * How long to delay the icon/stash handle alpha for the home to app taskbar animation.
@@ -252,7 +257,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     private boolean mEnableBlockingTimeoutDuringTests = false;
 
     private Animator mTaskbarBackgroundAlphaAnimator;
-    private long mTaskbarBackgroundDuration;
+    private final long mTaskbarBackgroundDuration;
     private boolean mUserIsNotGoingHome = false;
 
     // Evaluate whether the handle should be stashed
@@ -799,14 +804,14 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             if (animationType == TRANSITION_HANDLE_FADE) {
                 // When fading, the handle fades in/out at the beginning of the transition with
                 // TASKBAR_STASH_ALPHA_DURATION.
-                backgroundAndHandleAlphaDuration = TASKBAR_STASH_ALPHA_DURATION;
+                backgroundAndHandleAlphaDuration = TRANSIENT_TASKBAR_STASH_ALPHA_DURATION;
                 // The iconAlphaDuration must be set to duration for the skippable interpolators
                 // below to work.
                 iconAlphaDuration = duration;
             } else {
                 iconAlphaStartDelay = TASKBAR_STASH_ALPHA_START_DELAY;
-                iconAlphaDuration = TASKBAR_STASH_ALPHA_DURATION;
-                backgroundAndHandleAlphaDuration = TASKBAR_STASH_ALPHA_DURATION;
+                iconAlphaDuration = TRANSIENT_TASKBAR_STASH_ALPHA_DURATION;
+                backgroundAndHandleAlphaDuration = TRANSIENT_TASKBAR_STASH_ALPHA_DURATION;
 
                 if (isStashed) {
                     if (animationType == TRANSITION_HOME_TO_APP) {
@@ -1070,7 +1075,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * When hiding the IME, delay the unstash animation to align with the end of the transition.
      */
-    private long getTaskbarStashStartDelayForIme() {
+    @VisibleForTesting
+    long getTaskbarStashStartDelayForIme() {
         if (mIsImeShowing) {
             // Only delay when IME is exiting, not entering.
             return 0;
@@ -1126,13 +1132,13 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
 
         // Do not stash if pinned taskbar, hardware keyboard is attached and no IME is docked
-        if (mActivity.isHardwareKeyboard() && DisplayController.isPinnedTaskbar(mActivity)
+        if (isHardwareKeyboard() && DisplayController.isPinnedTaskbar(mActivity)
                 && !mActivity.isImeDocked()) {
             return false;
         }
 
         // Do not stash if hardware keyboard is attached, in 3 button nav and desktop windowing mode
-        if (mActivity.isHardwareKeyboard()
+        if (isHardwareKeyboard()
                 && mActivity.isThreeButtonNav()
                 && mControllers.taskbarDesktopModeController.getAreDesktopTasksVisible()) {
             return false;
@@ -1144,6 +1150,21 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
 
         return mIsImeShowing || mIsImeSwitcherShowing;
+    }
+
+    private boolean isHardwareKeyboard() {
+        return mActivity.isHardwareKeyboard() && !sEnableSoftwareImeForTests;
+    }
+
+    /**
+     * Overrides {@link #isHardwareKeyboard()} to {@code false} for testing, if enabled.
+     * <p>
+     * Virtual devices are sometimes in hardware keyboard mode, leading to an inconsistent
+     * testing environment.
+     */
+    @VisibleForTesting
+    static void enableSoftwareImeForTests(boolean enable) {
+        sEnableSoftwareImeForTests = enable;
     }
 
     /**
@@ -1271,7 +1292,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     /**
      * Attempts to start timer to auto hide the taskbar based on time.
      */
-    public void tryStartTaskbarTimeout() {
+    private void tryStartTaskbarTimeout() {
         if (!DisplayController.isTransientTaskbar(mActivity)
                 || mIsStashed
                 || mEnableBlockingTimeoutDuringTests) {
@@ -1297,6 +1318,11 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             return;
         }
         updateAndAnimateTransientTaskbarForTimeout();
+    }
+
+    @VisibleForTesting
+    Alarm getTimeoutAlarm() {
+        return mTimeoutAlarm;
     }
 
     @Override
