@@ -20,13 +20,18 @@ import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.RectF
 import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewOutlineProvider
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.animation.ArgbEvaluator
 import com.android.launcher3.R
 import com.android.launcher3.popup.RoundedArrowDrawable
 
@@ -37,6 +42,8 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
     private companion object {
         // the minimum progress of the expansion animation before the triangle is made visible.
         const val MIN_EXPANSION_PROGRESS_FOR_TRIANGLE = 0.1f
+        // the minimum progress of the expansion animation before the content starts fading in.
+        const val MIN_EXPANSION_PROGRESS_FOR_CONTENT_ALPHA = 0.75f
     }
 
     private val sender: TextView by
@@ -85,8 +92,11 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
             context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_max_width)
         }
 
+    /** The bounds of the background rect. */
+    private val backgroundRect = RectF()
     private val cornerRadius: Float
     private val triangle: Path = Path()
+    private val triangleOutline = Outline()
     private var backgroundColor = Color.BLACK
     /** Represents the progress of the expansion animation. 0 when collapsed. 1 when expanded. */
     private var expansionProgress = 0f
@@ -96,6 +106,20 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
     private var collapsedSize = 0f
     /** The corner radius of the flyout when it's collapsed. */
     private var collapsedCornerRadius = 0f
+    /** The color of the flyout when collapsed. */
+    private var collapsedColor = 0
+
+    /** The corner radius of the background according to the progress of the animation. */
+    private val currentCornerRadius
+        get() = collapsedCornerRadius + (cornerRadius - collapsedCornerRadius) * expansionProgress
+
+    /** Translation X of the background. */
+    private val backgroundRectTx
+        get() = translationToCollapsedPosition.x * (1 - expansionProgress)
+
+    /** Translation Y of the background. */
+    private val backgroundRectTy
+        get() = translationToCollapsedPosition.y * (1 - expansionProgress)
 
     /**
      * The paint used to draw the background, whose color changes as the flyout transitions to the
@@ -111,7 +135,7 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
         ta.recycle()
 
         setWillNotDraw(false)
-        clipChildren = false
+        clipChildren = true
         clipToPadding = false
 
         val padding = context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_padding)
@@ -126,12 +150,24 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
             triangleRadius.toFloat(),
             triangle,
         )
+        triangleOutline.setPath(triangle)
+
+        outlineProvider =
+            object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    this@BubbleBarFlyoutView.getOutline(outline)
+                }
+            }
+        clipToOutline = true
 
         applyConfigurationColors(resources.configuration)
     }
 
     /** Sets the data for the flyout and starts playing the expand animation. */
     fun showFromCollapsed(flyoutMessage: BubbleBarFlyoutMessage, expandAnimation: () -> Unit) {
+        avatar.alpha = 0f
+        sender.alpha = 0f
+        message.alpha = 0f
         setData(flyoutMessage)
         val txToCollapsedPosition =
             if (positioner.isOnLeft) {
@@ -145,6 +181,7 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
 
         collapsedSize = positioner.collapsedSize
         collapsedCornerRadius = collapsedSize / 2
+        collapsedColor = positioner.collapsedColor
 
         // post the request to start the expand animation to the looper so the view can measure
         // itself
@@ -189,42 +226,64 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
     /** Updates the flyout view with the progress of the animation. */
     fun updateExpansionProgress(fraction: Float) {
         expansionProgress = fraction
+
+        updateTranslationForAnimation(message)
+        updateTranslationForAnimation(sender)
+        updateTranslationForAnimation(avatar)
+
+        // start fading in the content only after we're past the threshold
+        val alpha =
+            ((expansionProgress - MIN_EXPANSION_PROGRESS_FOR_CONTENT_ALPHA) /
+                    (1f - MIN_EXPANSION_PROGRESS_FOR_CONTENT_ALPHA))
+                .coerceIn(0f, 1f)
+        sender.alpha = alpha
+        message.alpha = alpha
+        avatar.alpha = alpha
+
         invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
         // interpolate the width, height, corner radius and translation based on the progress of the
-        // animation
+        // animation.
+        // the background is drawn from the bottom left corner to the top right corner if we're
+        // positioned on the left, and from the bottom right corner to the top left if we're
+        // positioned on the right.
 
+        // the current width of the background rect according to the progress of the animation
         val currentWidth = collapsedSize + (width - collapsedSize) * expansionProgress
         val rectBottom = height - triangleHeight + triangleOverlap
         val currentHeight = collapsedSize + (rectBottom - collapsedSize) * expansionProgress
-        val currentCornerRadius =
-            collapsedCornerRadius + (cornerRadius - collapsedCornerRadius) * expansionProgress
-        val tx = translationToCollapsedPosition.x * (1 - expansionProgress)
-        val ty = translationToCollapsedPosition.y * (1 - expansionProgress)
 
-        canvas.save()
-        canvas.translate(tx, ty)
-        // draw the background starting from the bottom left if we're positioned left, or the bottom
-        // right if we're positioned right.
-        canvas.drawRoundRect(
+        backgroundRect.set(
             if (positioner.isOnLeft) 0f else width.toFloat() - currentWidth,
             height.toFloat() - triangleHeight + triangleOverlap - currentHeight,
             if (positioner.isOnLeft) currentWidth else width.toFloat(),
             height.toFloat() - triangleHeight + triangleOverlap,
+        )
+
+        backgroundPaint.color =
+            ArgbEvaluator.getInstance().evaluate(expansionProgress, collapsedColor, backgroundColor)
+
+        canvas.save()
+        canvas.translate(backgroundRectTx, backgroundRectTy)
+        // draw the background starting from the bottom left if we're positioned left, or the bottom
+        // right if we're positioned right.
+        canvas.drawRoundRect(
+            backgroundRect,
             currentCornerRadius,
             currentCornerRadius,
             backgroundPaint,
         )
         if (expansionProgress >= MIN_EXPANSION_PROGRESS_FOR_TRIANGLE) {
-            drawTriangle(canvas, currentCornerRadius)
+            drawTriangle(canvas)
         }
         canvas.restore()
+        invalidateOutline()
         super.onDraw(canvas)
     }
 
-    private fun drawTriangle(canvas: Canvas, currentCornerRadius: Float) {
+    private fun drawTriangle(canvas: Canvas) {
         canvas.save()
         val triangleX =
             if (positioner.isOnLeft) {
@@ -237,7 +296,36 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
         val triangleY = height - triangleHeight - 0.5f * triangleHeight * (1 - expansionProgress)
         canvas.translate(triangleX, triangleY)
         canvas.drawPath(triangle, backgroundPaint)
+        triangleOutline.setPath(triangle)
+        triangleOutline.offset(triangleX.toInt(), triangleY.toInt())
         canvas.restore()
+    }
+
+    private fun getOutline(outline: Outline) {
+        val path = Path()
+        path.addRoundRect(
+            backgroundRect,
+            currentCornerRadius,
+            currentCornerRadius,
+            Path.Direction.CW,
+        )
+        if (expansionProgress >= MIN_EXPANSION_PROGRESS_FOR_TRIANGLE) {
+            path.addPath(triangleOutline.mPath)
+        }
+        outline.setPath(path)
+        outline.offset(backgroundRectTx.toInt(), backgroundRectTy.toInt())
+    }
+
+    private fun updateTranslationForAnimation(view: View) {
+        val tx =
+            if (positioner.isOnLeft) {
+                translationToCollapsedPosition.x - view.left
+            } else {
+                width - view.left - translationToCollapsedPosition.x
+            }
+        val ty = height - view.top + translationToCollapsedPosition.y
+        view.translationX = tx * (1f - expansionProgress)
+        view.translationY = ty * (1f - expansionProgress)
     }
 
     private fun applyConfigurationColors(configuration: Configuration) {
