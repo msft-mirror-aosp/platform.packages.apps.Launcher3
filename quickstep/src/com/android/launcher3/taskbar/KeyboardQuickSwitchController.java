@@ -17,6 +17,7 @@ package com.android.launcher3.taskbar;
 
 import android.content.ComponentName;
 import android.content.pm.ActivityInfo;
+import android.view.MotionEvent;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -25,6 +26,8 @@ import androidx.annotation.VisibleForTesting;
 import com.android.launcher3.Flags;
 import com.android.launcher3.R;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
+import com.android.launcher3.taskbar.overlay.TaskbarOverlayDragLayer;
+import com.android.launcher3.util.TouchController;
 import com.android.quickstep.RecentsModel;
 import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
@@ -45,7 +48,7 @@ import java.util.stream.Collectors;
  * Handles initialization of the {@link KeyboardQuickSwitchViewController}.
  */
 public final class KeyboardQuickSwitchController implements
-        TaskbarControllers.LoggableTaskbarController {
+        TaskbarControllers.LoggableTaskbarController, TouchController {
 
     @VisibleForTesting
     public static final int MAX_TASKS = 6;
@@ -66,6 +69,7 @@ public final class KeyboardQuickSwitchController implements
     private TaskbarControllers mControllers;
 
     @Nullable private KeyboardQuickSwitchViewController mQuickSwitchViewController;
+    @Nullable private TaskbarOverlayContext mOverlayContext;
 
     private boolean mHasDesktopTask = false;
     private boolean mWasDesktopTaskFilteredOut = false;
@@ -119,16 +123,18 @@ public final class KeyboardQuickSwitchController implements
             // Allow the KQS to be reopened during the close animation to make it more responsive
             closeQuickSwitchView(false);
         }
-        TaskbarOverlayContext overlayContext =
-                mControllers.taskbarOverlayController.requestWindow();
+        mOverlayContext = mControllers.taskbarOverlayController.requestWindow();
+        if (Flags.taskbarOverflow()) {
+            mOverlayContext.getDragLayer().addTouchController(this);
+        }
         KeyboardQuickSwitchView keyboardQuickSwitchView =
-                (KeyboardQuickSwitchView) overlayContext.getLayoutInflater()
+                (KeyboardQuickSwitchView) mOverlayContext.getLayoutInflater()
                         .inflate(
                                 R.layout.keyboard_quick_switch_view,
-                                overlayContext.getDragLayer(),
+                                mOverlayContext.getDragLayer(),
                                 /* attachToRoot= */ false);
         mQuickSwitchViewController = new KeyboardQuickSwitchViewController(
-                mControllers, overlayContext, keyboardQuickSwitchView, mControllerCallbacks);
+                mControllers, mOverlayContext, keyboardQuickSwitchView, mControllerCallbacks);
 
         final boolean onDesktop =
                 mControllers.taskbarDesktopModeController.getAreDesktopTasksVisible();
@@ -248,6 +254,27 @@ public final class KeyboardQuickSwitchController implements
                 ? -1 : mQuickSwitchViewController.launchFocusedTask();
     }
 
+    @Override
+    public boolean onControllerTouchEvent(MotionEvent ev) {
+        return false;
+    }
+
+    @Override
+    public boolean onControllerInterceptTouchEvent(MotionEvent ev) {
+        if (mQuickSwitchViewController == null
+                || mOverlayContext == null
+                || !Flags.taskbarOverflow()) {
+            return false;
+        }
+
+        TaskbarOverlayDragLayer dragLayer = mOverlayContext.getDragLayer();
+        if (ev.getAction() == MotionEvent.ACTION_DOWN
+                && !mQuickSwitchViewController.isEventOverKeyboardQuickSwitch(dragLayer, ev)) {
+            closeQuickSwitchView(true);
+        }
+        return false;
+    }
+
     void onDestroy() {
         if (mQuickSwitchViewController != null) {
             mQuickSwitchViewController.onDestroy();
@@ -307,6 +334,11 @@ public final class KeyboardQuickSwitchController implements
         }
 
         void onCloseComplete() {
+            if (Flags.taskbarOverflow() && mOverlayContext != null) {
+                mOverlayContext.getDragLayer()
+                        .removeTouchController(KeyboardQuickSwitchController.this);
+            }
+            mOverlayContext = null;
             mQuickSwitchViewController = null;
         }
 
