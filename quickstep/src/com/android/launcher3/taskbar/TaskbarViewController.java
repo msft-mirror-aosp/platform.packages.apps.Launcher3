@@ -18,6 +18,7 @@ package com.android.launcher3.taskbar;
 import static com.android.app.animation.Interpolators.FINAL_FRAME;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
+import static com.android.launcher3.Flags.taskbarOverflow;
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
@@ -81,6 +82,9 @@ import com.android.wm.shell.Flags;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.io.PrintWriter;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -627,6 +631,24 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                         getRunningAppState(btv, runningTaskIds, minimizedTaskIds));
             }
         }
+    }
+
+    /**
+     * @return A set of Task ids of running apps that are pinned in the taskbar.
+     */
+    protected Set<Integer> getTaskIdsForPinnedApps() {
+        if (!taskbarOverflow()) {
+            return Collections.emptySet();
+        }
+
+        Set<Integer> pinnedAppsWithTasks = new HashSet<>();
+        for (View iconView : getIconViews()) {
+            if (iconView instanceof BubbleTextView btv
+                    && btv.getTag() instanceof TaskItemInfo itemInfo) {
+                pinnedAppsWithTasks.add(itemInfo.getTaskId());
+            }
+        }
+        return pinnedAppsWithTasks;
     }
 
     private BubbleTextView.RunningAppState getRunningAppState(
