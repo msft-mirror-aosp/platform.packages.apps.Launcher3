@@ -651,6 +651,8 @@ public class TouchInteractionService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.d(TAG, "onCreate: user=" + getUserId()
+                + " instance=" + System.identityHashCode(this));
         // Initialize anything here that is needed in direct boot mode.
         // Everything else should be initialized in onUserUnlocked() below.
         mMainChoreographer = Choreographer.getInstance();
@@ -684,7 +686,8 @@ public class TouchInteractionService extends Service {
     }
 
     private void disposeEventHandlers(String reason) {
-        Log.d(TAG, "disposeEventHandlers: Reason: " + reason);
+        Log.d(TAG, "disposeEventHandlers: Reason: " + reason
+                + " instance=" + System.identityHashCode(this));
         if (mInputEventReceiver != null) {
             mInputEventReceiver.dispose();
             mInputEventReceiver = null;
@@ -721,7 +724,8 @@ public class TouchInteractionService extends Service {
 
     @UiThread
     public void onUserUnlocked() {
-        Log.d(TAG, "onUserUnlocked: userId=" + getUserId());
+        Log.d(TAG, "onUserUnlocked: userId=" + getUserId()
+                + " instance=" + System.identityHashCode(this));
         mTaskAnimationManager = new TaskAnimationManager(this, mRecentsWindowManager);
         mOverviewComponentObserver = new OverviewComponentObserver(this, mDeviceState);
         mOverviewCommandHelper = new OverviewCommandHelper(this,
@@ -807,7 +811,8 @@ public class TouchInteractionService extends Service {
 
     @Override
     public void onDestroy() {
-        Log.d(TAG, "Touch service destroyed: user=" + getUserId());
+        Log.d(TAG, "onDestroy: user=" + getUserId()
+                + " instance=" + System.identityHashCode(this));
         sIsInitialized = false;
         if (LockedUserState.get(this).isUserUnlocked()) {
             mInputConsumer.unregisterInputConsumer();
@@ -836,7 +841,8 @@ public class TouchInteractionService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        Log.d(TAG, "Touch service connected: user=" + getUserId());
+        Log.d(TAG, "onBind: user=" + getUserId()
+                + " instance=" + System.identityHashCode(this));
         return mTISBinder;
     }
 
