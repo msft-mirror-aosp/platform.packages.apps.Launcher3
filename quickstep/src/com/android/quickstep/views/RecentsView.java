@@ -235,6 +235,8 @@ import com.android.wm.shell.common.pip.IPipAnimationListener;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 
+import kotlin.Unit;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -247,8 +249,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
-import kotlin.Unit;
 
 /**
  * A list of recent tasks.
@@ -324,20 +324,13 @@ public abstract class RecentsView<
             new FloatProperty<RecentsView>("runningTaskAttachAlpha") {
                 @Override
                 public void setValue(RecentsView recentsView, float v) {
-                    TaskView runningTask = recentsView.getRunningTaskView();
-                    if (runningTask == null) {
-                        return;
-                    }
-                    runningTask.setAttachAlpha(v);
+                    recentsView.mRunningTaskAttachAlpha = v;
+                    recentsView.applyAttachAlpha();
                 }
 
                 @Override
                 public Float get(RecentsView recentsView) {
-                    TaskView runningTask = recentsView.getRunningTaskView();
-                    if (runningTask == null) {
-                        return null;
-                    }
-                    return runningTask.getAttachAlpha();
+                    return recentsView.mRunningTaskAttachAlpha;
                 }
             };
 
@@ -463,6 +456,21 @@ public abstract class RecentsView<
                 }
             };
 
+    public static final FloatProperty<RecentsView> DESKTOP_CAROUSEL_DETACH_PROGRESS =
+            new FloatProperty<>("desktopCarouselDetachProgress") {
+                @Override
+                public void setValue(RecentsView view, float offset) {
+                    view.mDesktopCarouselDetachProgress = offset;
+                    view.applyAttachAlpha();
+                    view.updatePageOffsets();
+                }
+
+                @Override
+                public Float get(RecentsView view) {
+                    return view.mDesktopCarouselDetachProgress;
+                }
+            };
+
     /**
      * Alpha of the task thumbnail splash, where being in BackgroundAppState has a value of 1, and
      * being in any other state has a value of 0.
@@ -574,6 +582,7 @@ public abstract class RecentsView<
     private int mClampedScrollOffsetBound;
 
     private float mAdjacentPageHorizontalOffset = 0;
+    private float mDesktopCarouselDetachProgress = 0;
     protected float mTaskViewsSecondaryTranslation = 0;
     protected float mTaskViewsPrimarySplitTranslation = 0;
     protected float mTaskViewsSecondarySplitTranslation = 0;
@@ -680,13 +689,13 @@ public abstract class RecentsView<
     protected int mRunningTaskViewId = -1;
     private int mTaskViewIdCount;
     protected boolean mRunningTaskTileHidden;
-    private boolean mNonRunningTaskCategoryHidden;
     @Nullable
     private Task[] mTmpRunningTasks;
     protected int mFocusedTaskViewId = INVALID_TASK_ID;
 
     private boolean mTaskIconScaledDown = false;
     private boolean mRunningTaskShowScreenshot = false;
+    private float mRunningTaskAttachAlpha;
 
     private boolean mOverviewStateEnabled;
     private boolean mHandleTaskStackChanges;
@@ -2741,9 +2750,6 @@ public abstract class RecentsView<
         setEnableFreeScroll(false);
         setEnableDrawingLiveTile(false);
         setRunningTaskHidden(true);
-        if (enableLargeDesktopWindowingTile()) {
-            setNonRunningTaskCategoryHidden(true);
-        }
         setTaskIconScaledDown(true);
     }
 
@@ -2867,6 +2873,14 @@ public abstract class RecentsView<
             animatorSet.play(
                     ObjectAnimator.ofFloat(this, TASK_THUMBNAIL_SPLASH_ALPHA, splashAlpha));
         }
+        if (enableLargeDesktopWindowingTile()) {
+            if (animatorSet != null) {
+                animatorSet.play(
+                        ObjectAnimator.ofFloat(this, DESKTOP_CAROUSEL_DETACH_PROGRESS, 0f));
+            } else {
+                DESKTOP_CAROUSEL_DETACH_PROGRESS.set(this, 0f);
+            }
+        }
     }
 
     /**
@@ -2882,9 +2896,6 @@ public abstract class RecentsView<
         setEnableDrawingLiveTile(mCurrentGestureEndTarget == GestureState.GestureEndTarget.RECENTS);
         Log.d(TAG, "onGestureAnimationEnd - mEnableDrawingLiveTile: " + mEnableDrawingLiveTile);
         setRunningTaskHidden(false);
-        if (enableLargeDesktopWindowingTile()) {
-            setNonRunningTaskCategoryHidden(false);
-        }
         animateUpTaskIconScale();
         animateActionsViewIn();
 
@@ -3036,6 +3047,9 @@ public abstract class RecentsView<
      */
     public void setRunningTaskHidden(boolean isHidden) {
         mRunningTaskTileHidden = isHidden;
+        // mRunningTaskAttachAlpha can be changed by RUNNING_TASK_ATTACH_ALPHA animation without
+        // changing mRunningTaskTileHidden.
+        mRunningTaskAttachAlpha = isHidden ? 0f : 1f;
         TaskView runningTask = getRunningTaskView();
         if (runningTask == null) {
             return;
@@ -3047,18 +3061,11 @@ public abstract class RecentsView<
         }
     }
 
-    /**
-     * Hides the tasks that has a different category (Fullscreen/Desktop) from the running task.
-     */
-    public void setNonRunningTaskCategoryHidden(boolean isHidden) {
-        mNonRunningTaskCategoryHidden = isHidden;
-        updateMinAndMaxScrollX();
-        applyAttachAlpha();
-    }
-
     private void applyAttachAlpha() {
-        mUtils.applyAttachAlpha(getTaskViews(), getRunningTaskView(), mRunningTaskTileHidden,
-                mNonRunningTaskCategoryHidden);
+        // Only hide non running task carousel when it's fully off screen, otherwise it needs to
+        // be visible to move to on screen.
+        mUtils.applyAttachAlpha(getTaskViews(), getRunningTaskView(), mRunningTaskAttachAlpha,
+                /*nonRunningTaskCarouselHidden=*/mDesktopCarouselDetachProgress == 1f);
     }
 
     private void setRunningTaskViewShowScreenshot(boolean showScreenshot) {
@@ -4679,6 +4686,10 @@ public abstract class RecentsView<
                 ? (runningTask == null ? INVALID_PAGE : indexOfChild(runningTask))
                 : mOffsetMidpointIndexOverride;
         int modalMidpoint = getCurrentPage();
+        TaskView carouselHiddenMidpointTask = runningTask != null ? runningTask
+                : mUtils.getFirstTaskViewInCarousel(/*nonRunningTaskCarouselHidden=*/true,
+                        getTaskViews(), null);
+        int carouselHiddenMidpoint = indexOfChild(carouselHiddenMidpointTask);
         boolean shouldCalculateOffsetForAllTasks = showAsGrid
                 && (enableGridOnlyOverview() || enableLargeDesktopWindowingTile())
                 && mTaskModalness > 0;
@@ -4698,6 +4709,7 @@ public abstract class RecentsView<
         float modalLeftOffsetSize = 0;
         float modalRightOffsetSize = 0;
         float gridOffsetSize = 0;
+        float carouselHiddenOffsetSize = 0;
 
         if (showAsGrid) {
             // In grid, we only focus the task on the side. The reference index used for offset
@@ -4715,7 +4727,10 @@ public abstract class RecentsView<
                     : 0;
         }
 
+        int primarySize = getPagedOrientationHandler().getPrimaryValue(getWidth(), getHeight());
+        float maxOverscroll = primarySize * OverScroll.OVERSCROLL_DAMP_FACTOR;
         for (int i = 0; i < count; i++) {
+            View child = getChildAt(i);
             float translation = i == midpoint
                     ? midpointOffsetSize
                     : i < midpoint
@@ -4725,16 +4740,31 @@ public abstract class RecentsView<
                 gridOffsetSize = getHorizontalOffsetSize(i, modalMidpoint, modalOffset);
                 gridOffsetSize = Math.abs(gridOffsetSize) * (i <= modalMidpoint ? 1 : -1);
             }
+            if (enableLargeDesktopWindowingTile()) {
+                if (child instanceof TaskView
+                        && !mUtils.isVisibleInCarousel((TaskView) child,
+                        runningTask, /*nonRunningTaskCarouselHidden=*/true)) {
+                    // Increment carouselHiddenOffsetSize by maxOverscroll so it won't be on screen
+                    // even when user overscroll.
+                    carouselHiddenOffsetSize = (Math.abs(getMaxHorizontalOffsetSize(i,
+                            carouselHiddenMidpoint)) + maxOverscroll)
+                            * mDesktopCarouselDetachProgress;
+                    carouselHiddenOffsetSize = carouselHiddenOffsetSize * (
+                            i <= carouselHiddenMidpoint ? 1 : -1);
+                } else {
+                    carouselHiddenOffsetSize = 0;
+                }
+            }
             float modalTranslation = i == modalMidpoint
                     ? modalMidpointOffsetSize
                     : showAsGrid
                             ? gridOffsetSize
                             : i < modalMidpoint ? modalLeftOffsetSize : modalRightOffsetSize;
-            View child = getChildAt(i);
             boolean skipTranslationOffset = enableDesktopTaskAlphaAnimation()
                     && i == getRunningTaskIndex()
                     && child instanceof DesktopTaskView;
-            float totalTranslationX = (skipTranslationOffset ? 0f : translation) + modalTranslation;
+            float totalTranslationX = (skipTranslationOffset ? 0f : translation) + modalTranslation
+                    + carouselHiddenOffsetSize;
             FloatProperty translationPropertyX = child instanceof TaskView
                     ? ((TaskView) child).getPrimaryTaskOffsetTranslationProperty()
                     : getPagedOrientationHandler().getPrimaryViewTranslate();
@@ -4791,6 +4821,14 @@ public abstract class RecentsView<
             return 0;
         }
 
+        return getMaxHorizontalOffsetSize(childIndex, midpointIndex) * offsetProgress;
+    }
+
+    /**
+     * Computes the distance to offset the given child such that it is completely offscreen when
+     * translating away from the given midpoint.
+     */
+    private float getMaxHorizontalOffsetSize(int childIndex, int midpointIndex) {
         // First, get the position of the task relative to the midpoint. If there is no midpoint
         // then we just use the normal (centered) task position.
         RectF taskPosition = mTempRectF;
@@ -4850,7 +4888,7 @@ public abstract class RecentsView<
             }
             distanceToOffscreen -= mLastComputedTaskEndPushOutDistance;
         }
-        return distanceToOffscreen * offsetProgress;
+        return distanceToOffscreen;
     }
 
     /**
@@ -5812,7 +5850,7 @@ public abstract class RecentsView<
     private int getFirstViewIndex() {
         final TaskView firstView;
         if (mShowAsGridLastOnLayout) {
-            // For grid Overivew, it always start if a large tile (focused task or desktop task) if
+            // For grid Overview, it always start if a large tile (focused task or desktop task) if
             // they exist, otherwise it start with the first task.
             TaskView firstLargeTaskView = mUtils.getFirstLargeTaskView(getTaskViews());
             if (firstLargeTaskView != null) {
@@ -5821,7 +5859,8 @@ public abstract class RecentsView<
                 firstView = getTaskViewAt(0);
             }
         } else {
-            firstView = mUtils.getFirstTaskViewInCarousel(mNonRunningTaskCategoryHidden,
+            firstView = mUtils.getFirstTaskViewInCarousel(
+                    /*nonRunningTaskCarouselHidden=*/mDesktopCarouselDetachProgress > 0,
                     getTaskViews(), getRunningTaskView());
         }
         return indexOfChild(firstView);
@@ -5842,7 +5881,8 @@ public abstract class RecentsView<
                 lastView = mUtils.getLastLargeTaskView(getTaskViews());
             }
         } else {
-            lastView = mUtils.getLastTaskViewInCarousel(mNonRunningTaskCategoryHidden,
+            lastView = mUtils.getLastTaskViewInCarousel(
+                    /*nonRunningTaskCarouselHidden=*/mDesktopCarouselDetachProgress > 0,
                     getTaskViews(), getRunningTaskView());
         }
         return indexOfChild(lastView);
