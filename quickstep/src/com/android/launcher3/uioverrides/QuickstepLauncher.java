@@ -37,6 +37,7 @@ import static com.android.launcher3.LauncherState.NO_OFFSET;
 import static com.android.launcher3.LauncherState.OVERVIEW;
 import static com.android.launcher3.LauncherState.OVERVIEW_MODAL_TASK;
 import static com.android.launcher3.LauncherState.OVERVIEW_SPLIT_SELECT;
+import static com.android.launcher3.Utilities.isRtl;
 import static com.android.launcher3.compat.AccessibilityManagerCompat.sendCustomAccessibilityEvent;
 import static com.android.launcher3.config.FeatureFlags.enableSplitContextually;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_APP_LAUNCH_TAP;
@@ -63,6 +64,8 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.util.AnimUtils.completeRunnableListCallback;
 import static com.android.quickstep.util.SplitAnimationTimings.TABLET_HOME_TO_SPLIT;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
+import static com.android.wm.shell.Flags.enableBubbleAnything;
+import static com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_50_50;
 
 import android.animation.Animator;
@@ -196,6 +199,7 @@ import com.android.systemui.unfold.config.UnfoldTransitionConfig;
 import com.android.systemui.unfold.dagger.UnfoldMain;
 import com.android.systemui.unfold.progress.RemoteUnfoldTransitionReceiver;
 import com.android.systemui.unfold.updates.RotationChangeProvider;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
 import java.io.FileDescriptor;
@@ -237,6 +241,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     private SplitSelectStateController mSplitSelectStateController;
     private SplitWithKeyboardShortcutController mSplitWithKeyboardShortcutController;
     private SplitToWorkspaceController mSplitToWorkspaceController;
+    private BubbleBarLocation mBubbleBarLocation;
 
     /**
      * If Launcher restarted while in the middle of an Overview split select, it needs this data to
@@ -461,7 +466,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         if (Flags.enablePrivateSpace()) {
             shortcuts.add(UNINSTALL_APP);
         }
-        if (com.android.wm.shell.Flags.enableBubbleAnything()) {
+        if (enableBubbleAnything()) {
             shortcuts.add(BUBBLE_SHORTCUT);
         }
         return shortcuts.stream();
@@ -1092,6 +1097,29 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         return mTaskbarUIController;
     }
 
+    /** Provides the translation X for the hotseat item. */
+    public int getHotseatItemTranslationX(ItemInfo itemInfo) {
+        int translationX = 0;
+        if (isBubbleBarEnabled()
+                && enableBubbleBarInPersistentTaskBar()
+                && mBubbleBarLocation != null) {
+            boolean isBubblesOnLeft = mBubbleBarLocation.isOnLeft(isRtl(getResources()));
+            translationX += mDeviceProfile
+                    .getHotseatTranslationXForBubbleBar(/* isNavbarOnRight = */ isBubblesOnLeft);
+        }
+        if (isBubbleBarEnabled() && hasBubbles()) {
+            // TODO(368379159) : create a class to reuse computation logic
+            float adjustedBorderSpace =
+                    mDeviceProfile.getHotseatAdjustedBorderSpaceForBubbleBar(this);
+            if (Float.compare(adjustedBorderSpace, 0f) != 0) {
+                float borderSpaceDelta = adjustedBorderSpace - mDeviceProfile.hotseatBorderSpace;
+                translationX +=
+                        (int) (mDeviceProfile.iconSizePx + itemInfo.cellX * borderSpaceDelta);
+            }
+        }
+        return translationX;
+    }
+
     public SplitToWorkspaceController getSplitToWorkspaceController() {
         return mSplitToWorkspaceController;
     }
@@ -1395,6 +1423,11 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     public void showAppBubble(Intent intent) {
         if (intent == null || intent.getPackage() == null) return;
         SystemUiProxy.INSTANCE.get(this).showAppBubble(intent);
+    }
+
+    /** Sets the location of the bubble bar */
+    public void setBubbleBarLocation(BubbleBarLocation bubbleBarLocation) {
+        mBubbleBarLocation = bubbleBarLocation;
     }
 
     private static final class LauncherTaskViewController extends
