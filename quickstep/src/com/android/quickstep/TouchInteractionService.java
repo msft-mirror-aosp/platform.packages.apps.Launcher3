@@ -36,11 +36,6 @@ import static com.android.quickstep.GestureState.DEFAULT_STATE;
 import static com.android.quickstep.GestureState.TrackpadGestureType.getTrackpadGestureType;
 import static com.android.quickstep.InputConsumer.TYPE_CURSOR_HOVER;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.FLAG_USING_OTHER_ACTIVITY_INPUT_CONSUMER;
-import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_DOWN;
-import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_MOVE;
-import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.MOTION_UP;
-import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.NAVIGATION_MODE_SWITCHED;
-import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.RECENTS_ANIMATION_START_PENDING;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
 import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNFOLD_ANIMATION_FORWARDER;
@@ -126,6 +121,7 @@ import com.android.quickstep.inputconsumers.TaskbarUnstashInputConsumer;
 import com.android.quickstep.inputconsumers.TrackpadStatusBarInputConsumer;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.ActiveGestureLog.CompoundString;
+import com.android.quickstep.util.ActiveGestureProtoLogProxy;
 import com.android.quickstep.util.AssistStateManager;
 import com.android.quickstep.util.AssistUtils;
 import com.android.quickstep.views.RecentsViewContainer;
@@ -857,9 +853,7 @@ public class TouchInteractionService extends Service {
 
     private void onInputEvent(InputEvent ev) {
         if (!(ev instanceof MotionEvent)) {
-            ActiveGestureLog.INSTANCE.addLog(new CompoundString("TIS.onInputEvent: ")
-                    .append("Cannot process input event: received unknown event ")
-                    .append(ev.toString()));
+            ActiveGestureProtoLogProxy.logUnknownInputEvent(ev.toString());
             return;
         }
         MotionEvent event = (MotionEvent) ev;
@@ -868,27 +862,19 @@ public class TouchInteractionService extends Service {
                 TestProtocol.SEQUENCE_TIS, "TouchInteractionService.onInputEvent", event);
 
         if (!LockedUserState.get(this).isUserUnlocked()) {
-            ActiveGestureLog.INSTANCE.addLog(new CompoundString("TIS.onInputEvent: ")
-                    .append("Cannot process input event: user is locked"));
+            ActiveGestureProtoLogProxy.logOnInputEventUserLocked();
             return;
         }
 
         NavigationMode currentNavMode = mDeviceState.getMode();
         if (mGestureStartNavMode != null && mGestureStartNavMode != currentNavMode) {
-            ActiveGestureLog.INSTANCE.addLog(new CompoundString("TIS.onInputEvent: ")
-                            .append("Navigation mode switched mid-gesture (")
-                            .append(mGestureStartNavMode.name())
-                            .append(" -> ")
-                            .append(currentNavMode.name())
-                            .append("); cancelling gesture."),
-                    NAVIGATION_MODE_SWITCHED);
+            ActiveGestureProtoLogProxy.logOnInputEventNavModeSwitched(
+                    mGestureStartNavMode.name(), currentNavMode.name());
             event.setAction(ACTION_CANCEL);
         } else if (mDeviceState.isButtonNavMode()
                 && !mDeviceState.supportsAssistantGestureInButtonNav()
                 && !isTrackpadMotionEvent(event)) {
-            ActiveGestureLog.INSTANCE.addLog(new CompoundString("TIS.onInputEvent: ")
-                    .append("Cannot process input event: ")
-                    .append("using 3-button nav and event is not a trackpad event"));
+            ActiveGestureProtoLogProxy.logOnInputEventThreeButtonNav();
             return;
         }
 
@@ -904,12 +890,7 @@ public class TouchInteractionService extends Service {
             }
             if (mTaskAnimationManager.shouldIgnoreMotionEvents()) {
                 if (action == ACTION_DOWN || isHoverActionWithoutConsumer) {
-                    ActiveGestureLog.INSTANCE.addLog(
-                            new CompoundString("TIS.onMotionEvent: A new gesture has been ")
-                                    .append("started, but a previously-requested recents ")
-                                    .append("animation hasn't started. Ignoring all following ")
-                                    .append("motion events."),
-                            RECENTS_ANIMATION_START_PENDING);
+                    ActiveGestureProtoLogProxy.logOnInputIgnoringFollowingEvents();
                 }
                 return;
             }
@@ -999,41 +980,25 @@ public class TouchInteractionService extends Service {
         if (mUncheckedConsumer != InputConsumer.NO_OP) {
             switch (action) {
                 case ACTION_DOWN:
-                    ActiveGestureLog.INSTANCE.addLog(reasonString);
+                    ActiveGestureProtoLogProxy.logDynamicString(reasonString.toString());
                     // fall through
                 case ACTION_UP:
-                    ActiveGestureLog.INSTANCE.addLog(
-                            new CompoundString("onMotionEvent(")
-                                    .append((int) event.getRawX())
-                                    .append(", ")
-                                    .append((int) event.getRawY())
-                                    .append("): ")
-                                    .append(MotionEvent.actionToString(action))
-                                    .append(", ")
-                                    .append(MotionEvent.classificationToString(
-                                            event.getClassification())),
-                            /* gestureEvent= */ action == ACTION_DOWN
-                                    ? MOTION_DOWN
-                                    : MOTION_UP);
+                    ActiveGestureProtoLogProxy.logOnInputEventActionUp(
+                            (int) event.getRawX(),
+                            (int) event.getRawY(),
+                            action,
+                            MotionEvent.classificationToString(event.getClassification()));
                     break;
                 case ACTION_MOVE:
-                    ActiveGestureLog.INSTANCE.addLog(
-                            new CompoundString("onMotionEvent: ")
-                                    .append(MotionEvent.actionToString(action))
-                                    .append(",")
-                                    .append(MotionEvent.classificationToString(
-                                            event.getClassification()))
-                                    .append(", pointerCount: ")
-                                    .append(event.getPointerCount()),
-                            MOTION_MOVE);
+                    ActiveGestureProtoLogProxy.logOnInputEventActionMove(
+                            MotionEvent.actionToString(action),
+                            MotionEvent.classificationToString(event.getClassification()),
+                            event.getPointerCount());
                     break;
                 default: {
-                    ActiveGestureLog.INSTANCE.addLog(
-                            new CompoundString("onMotionEvent: ")
-                                    .append(MotionEvent.actionToString(action))
-                                    .append(",")
-                                    .append(MotionEvent.classificationToString(
-                                            event.getClassification())));
+                    ActiveGestureProtoLogProxy.logOnInputEventGenericAction(
+                            MotionEvent.actionToString(action),
+                            MotionEvent.classificationToString(event.getClassification()));
                 }
             }
         }
@@ -1123,10 +1088,8 @@ public class TouchInteractionService extends Service {
         gestureState.setTrackpadGestureType(trackpadGestureType);
 
         // Log initial state for the gesture.
-        ActiveGestureLog.INSTANCE.addLog(new CompoundString("Current running task package name=")
-                .append(taskInfo.getPackageName()));
-        ActiveGestureLog.INSTANCE.addLog(new CompoundString("Current SystemUi state flags=")
-                .append(mDeviceState.getSystemUiStateString()));
+        ActiveGestureProtoLogProxy.logRunningTaskPackage(taskInfo.getPackageName());
+        ActiveGestureProtoLogProxy.logSysuiStateFlags(mDeviceState.getSystemUiStateString());
         return gestureState;
     }
 
@@ -1339,10 +1302,7 @@ public class TouchInteractionService extends Service {
 
     private void logInputConsumerSelectionReason(
             InputConsumer consumer, CompoundString reasonString) {
-        ActiveGestureLog.INSTANCE.addLog(new CompoundString("setInputConsumer: ")
-                .append(consumer.getName())
-                .append(". reason(s):")
-                .append(reasonString));
+        ActiveGestureProtoLogProxy.logSetInputConsumer(consumer.getName(), reasonString.toString());
         if ((consumer.getType() & InputConsumer.TYPE_OTHER_ACTIVITY) != 0) {
             ActiveGestureLog.INSTANCE.trackEvent(FLAG_USING_OTHER_ACTIVITY_INPUT_CONSUMER);
         }
@@ -1380,11 +1340,8 @@ public class TouchInteractionService extends Service {
                 ? null
                 : runningTask.getVisibleNonExcludedTask();
         if (otherVisibleTask != null) {
-            ActiveGestureLog.INSTANCE.addLog(new CompoundString("Changing active task to ")
-                    .append(otherVisibleTask.getPackageName())
-                    .append(" because the previous task running on top of this one (")
-                    .append(runningTask.getPackageName())
-                    .append(") was excluded from recents"));
+            ActiveGestureProtoLogProxy.logUpdateGestureStateRunningTask(
+                    otherVisibleTask.getPackageName(), runningTask.getPackageName());
             gestureState.updateRunningTask(otherVisibleTask);
         }
 
@@ -1604,8 +1561,7 @@ public class TouchInteractionService extends Service {
         // TODO(b/258022658): Remove temporary logging.
         Log.i(TAG, "preloadOverview: forSUWAllSet=" + forSUWAllSet
                 + ", isHomeAndOverviewSame=" + mOverviewComponentObserver.isHomeAndOverviewSame());
-
-        ActiveGestureLog.INSTANCE.addLog("preloadRecentsAnimation");
+        ActiveGestureProtoLogProxy.logPreloadRecentsAnimation();
         mTaskAnimationManager.preloadRecentsAnimation(overviewIntent);
     }
 
