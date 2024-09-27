@@ -36,7 +36,6 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ShortcutInfo;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
-import android.graphics.drawable.Drawable;
 import android.os.Looper;
 import android.os.Process;
 import android.os.Trace;
@@ -587,10 +586,6 @@ public class IconCache extends BaseIconCache {
         info.title = Utilities.trim(packageEntry.title);
         info.contentDescription = packageEntry.contentDescription;
         info.bitmap = packageEntry.bitmap;
-    }
-
-    public Drawable getFullResIcon(LauncherActivityInfo info) {
-        return mIconProvider.getIcon(info, mIconDpi);
     }
 
     public void updateSessionCache(PackageUserKey key, PackageInstaller.SessionInfo info) {
