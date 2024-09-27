@@ -235,6 +235,8 @@ import com.android.wm.shell.common.pip.IPipAnimationListener;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 
+import kotlin.Unit;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -247,8 +249,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
-import kotlin.Unit;
 
 /**
  * A list of recent tasks.
@@ -798,12 +798,6 @@ public abstract class RecentsView<
     @Nullable
     private DesktopRecentsTransitionController mDesktopRecentsTransitionController;
 
-    /**
-     * Keeps track of the desktop task. Optional and only present when the feature flag is enabled.
-     */
-    @Nullable
-    private DesktopTaskView mDesktopTaskView;
-
     private MultiWindowModeChangedListener mMultiWindowModeChangedListener =
             new MultiWindowModeChangedListener() {
                 @Override
@@ -1177,7 +1171,7 @@ public abstract class RecentsView<
      *
      * @return {@code true} if child TaskViews can be launched when user taps on them
      */
-    protected boolean canLaunchFullscreenTask() {
+    public boolean canLaunchFullscreenTask() {
         return true;
     }
 
@@ -1870,7 +1864,6 @@ public abstract class RecentsView<
         mFilterState.updateInstanceCountMap(taskGroups);
 
         // Clear out desktop view if it is set
-        mDesktopTaskView = null;
 
         // Move Desktop Tasks to the end of the list
         if (enableLargeDesktopWindowingTile()) {
@@ -1909,7 +1902,6 @@ public abstract class RecentsView<
                                 .toList();
                 ((DesktopTaskView) taskView).bind(nonMinimizedTasks, mOrientationState,
                         mTaskOverlayFactory);
-                mDesktopTaskView = (DesktopTaskView) taskView;
             } else {
                 Task task = groupTask.task1.key.id == stagedTaskIdToBeRemoved ? groupTask.task2
                         : groupTask.task1;
@@ -4970,7 +4962,6 @@ public abstract class RecentsView<
         mSplitSelectStateController.setAnimateCurrentTaskDismissal(
                 true /*animateCurrentTaskDismissal*/);
         mSplitHiddenTaskViewIndex = indexOfChild(taskView);
-        updateDesktopTaskVisibility(false /* visible */);
     }
 
     /**
@@ -4992,13 +4983,6 @@ public abstract class RecentsView<
         mSplitSelectStateController.setInitialTaskSelect(splitSelectSource.intent,
                 splitSelectSource.position.stagePosition, splitSelectSource.getItemInfo(),
                 splitSelectSource.splitEvent, splitSelectSource.alreadyRunningTaskId);
-        updateDesktopTaskVisibility(false /* visible */);
-    }
-
-    private void updateDesktopTaskVisibility(boolean visible) {
-        if (mDesktopTaskView != null) {
-            mDesktopTaskView.setVisibility(visible ? VISIBLE : GONE);
-        }
     }
 
     /**
@@ -5208,7 +5192,6 @@ public abstract class RecentsView<
             mSplitHiddenTaskView.setThumbnailVisibility(VISIBLE, INVALID_TASK_ID);
             mSplitHiddenTaskView = null;
         }
-        updateDesktopTaskVisibility(true /* visible */);
     }
 
     private void safeRemoveDragLayerView(@Nullable View viewToRemove) {
