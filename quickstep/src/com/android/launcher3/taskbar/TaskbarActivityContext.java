@@ -981,8 +981,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     public void onNavButtonsDarkIntensityChanged(float darkIntensity) {
-        mControllers.navbarButtonsViewController.getTaskbarNavButtonDarkIntensity()
-                .updateValue(darkIntensity);
+        mControllers.navbarButtonsViewController.getTaskbarNavButtonDarkIntensity().updateValue(
+                darkIntensity);
     }
 
     public void onNavigationBarLumaSamplingEnabled(int displayId, boolean enable) {
