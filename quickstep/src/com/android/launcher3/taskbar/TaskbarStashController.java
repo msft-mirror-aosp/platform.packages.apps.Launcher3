@@ -61,6 +61,7 @@ import com.android.launcher3.Alarm;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatedFloat;
+import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
@@ -956,7 +957,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
         int action = expanding ? InteractionJankMonitor.CUJ_TASKBAR_EXPAND :
                 InteractionJankMonitor.CUJ_TASKBAR_COLLAPSE;
-        animator.addListener(new AnimatorListenerAdapter() {
+        animator.addListener(new AnimationSuccessListener() {
             @Override
             public void onAnimationStart(@NonNull Animator animation) {
                 final Configuration.Builder builder =
@@ -968,8 +969,15 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             }
 
             @Override
-            public void onAnimationEnd(@NonNull Animator animation) {
+            public void onAnimationSuccess(@NonNull Animator animator) {
                 InteractionJankMonitor.getInstance().end(action);
+            }
+
+            @Override
+            public void onAnimationCancel(@NonNull Animator animation) {
+                super.onAnimationCancel(animation);
+
+                InteractionJankMonitor.getInstance().cancel(action);
             }
         });
     }
