@@ -164,7 +164,7 @@ class RecentsWindowManager(context: Context) :
                 anim,
                 this@RecentsWindowManager,
                 {
-                    getStateManager().goToState(HOME, false)
+                    getStateManager().goToState(BG_LAUNCHER, false)
                     cleanup()
                 },
                 true, /* skipFirstFrame */
