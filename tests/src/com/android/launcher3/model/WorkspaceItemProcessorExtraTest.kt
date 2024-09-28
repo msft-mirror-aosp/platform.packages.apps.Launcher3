@@ -35,6 +35,7 @@ import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPWIDGET
+import com.android.launcher3.icons.CacheableShortcutInfo
 import com.android.launcher3.model.data.IconRequestInfo
 import com.android.launcher3.model.data.LauncherAppWidgetInfo
 import com.android.launcher3.model.data.LauncherAppWidgetInfo.FLAG_RESTORE_STARTED
@@ -84,7 +85,7 @@ class WorkspaceItemProcessorExtraTest {
     private var mUnlockedUsersArray: LongSparseArray<Boolean> = LongSparseArray()
     private var mKeyToPinnedShortcutsMap: MutableMap<ShortcutKey, ShortcutInfo> = mutableMapOf()
     private var mInstallingPkgs: HashMap<PackageUserKey, PackageInstaller.SessionInfo> = hashMapOf()
-    private var mAllDeepShortcuts: MutableList<ShortcutInfo> = mutableListOf()
+    private var mAllDeepShortcuts: MutableList<CacheableShortcutInfo> = mutableListOf()
     private var mWidgetProvidersMap: MutableMap<ComponentKey, AppWidgetProviderInfo?> =
         mutableMapOf()
     private var mPendingPackages: MutableSet<PackageUserKey> = mutableSetOf()
@@ -290,7 +291,7 @@ class WorkspaceItemProcessorExtraTest {
         pendingPackages: MutableSet<PackageUserKey> = mPendingPackages,
         unlockedUsers: LongSparseArray<Boolean> = mUnlockedUsersArray,
         installingPkgs: HashMap<PackageUserKey, PackageInstaller.SessionInfo> = mInstallingPkgs,
-        allDeepShortcuts: MutableList<ShortcutInfo> = mAllDeepShortcuts,
+        allDeepShortcuts: MutableList<CacheableShortcutInfo> = mAllDeepShortcuts,
     ) =
         WorkspaceItemProcessor(
             c = cursor,

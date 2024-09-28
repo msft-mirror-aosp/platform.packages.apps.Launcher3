@@ -201,6 +201,8 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
 
     private final Rect mFloatingRotationButtonBounds = new Rect();
 
+    private @Nullable BubbleBarLocation mBubbleBarLocation;
+
     // Initialized in init.
     private TaskbarControllers mControllers;
     private boolean mIsImeRenderingNavButtons;
@@ -1174,6 +1176,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     /** Adjusts navigation buttons layout accordingly to the bubble bar position. */
     @Override
     public void onBubbleBarLocationUpdated(BubbleBarLocation location) {
+        mBubbleBarLocation = location;
         mNavButtonContainer.setTranslationX(getNavBarTranslationX(location));
     }
 
@@ -1181,6 +1184,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     @Override
     public void onBubbleBarLocationAnimated(BubbleBarLocation location) {
         // TODO(b/346381754) add the teleport animation similarly to the bubble bar
+        mBubbleBarLocation = location;
         mNavButtonContainer.setTranslationX(getNavBarTranslationX(location));
     }
 
@@ -1221,9 +1225,12 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     public void onTaskbarLayoutChange() {
         if (com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar()
                 && mControllers.bubbleControllers.isPresent()) {
-            BubbleBarLocation bubblesLocation = mControllers.bubbleControllers.get()
-                    .bubbleBarViewController.getBubbleBarLocation();
-            onBubbleBarLocationUpdated(bubblesLocation);
+            if (mBubbleBarLocation == null) {
+                // only set bubble bar location if it was not set before, e.g. at device boot
+                mBubbleBarLocation = mControllers.bubbleControllers.get()
+                        .bubbleBarViewController.getBubbleBarLocation();
+            }
+            onBubbleBarLocationUpdated(mBubbleBarLocation);
         }
     }
 
