@@ -131,7 +131,7 @@ public abstract class ShortcutConfigActivityInfo implements ComponentWithLabelAn
 
         @Override
         public Drawable getFullResIcon(IconCache cache) {
-            return cache.getFullResIcon(mInfo);
+            return cache.getFullResIcon(mInfo.getActivityInfo());
         }
 
         @Override
