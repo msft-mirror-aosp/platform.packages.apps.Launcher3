@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright (C) 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ package com.android.quickstep.util;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
-import com.android.launcher3.util.Preconditions;
 
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
@@ -338,8 +336,6 @@ public class ActiveGestureLog {
         }
 
         private Object[] getArgs() {
-            Preconditions.assertTrue(!mIsNoOp);
-
             return mArgs.toArray();
         }
 
@@ -349,8 +345,6 @@ public class ActiveGestureLog {
         }
 
         private String toUnformattedString() {
-            Preconditions.assertTrue(!mIsNoOp);
-
             StringBuilder sb = new StringBuilder();
             for (String substring : mSubstrings) {
                 sb.append(substring);

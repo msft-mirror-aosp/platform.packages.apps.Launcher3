@@ -18,6 +18,7 @@ package com.android.launcher3.taskbar;
 import static com.android.app.animation.Interpolators.FINAL_FRAME;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
+import static com.android.launcher3.Flags.taskbarOverflow;
 import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
@@ -81,6 +82,8 @@ import com.android.wm.shell.Flags;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.io.PrintWriter;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -156,7 +159,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     private final View.OnLayoutChangeListener mTaskbarViewLayoutChangeListener =
             (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
                 updateTaskbarIconTranslationXForPinning();
-                mControllers.navbarButtonsViewController.onTaskbarLayoutChange();
+                mControllers.navbarButtonsViewController.onTaskbarLayoutChanged();
             };
 
     // Animation to align icons with Launcher, created lazily. This allows the controller to be
@@ -629,6 +632,24 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         }
     }
 
+    /**
+     * @return A set of Task ids of running apps that are pinned in the taskbar.
+     */
+    protected Set<Integer> getTaskIdsForPinnedApps() {
+        if (!taskbarOverflow()) {
+            return Collections.emptySet();
+        }
+
+        Set<Integer> pinnedAppsWithTasks = new HashSet<>();
+        for (View iconView : getIconViews()) {
+            if (iconView instanceof BubbleTextView btv
+                    && btv.getTag() instanceof TaskItemInfo itemInfo) {
+                pinnedAppsWithTasks.add(itemInfo.getTaskId());
+            }
+        }
+        return pinnedAppsWithTasks;
+    }
+
     private BubbleTextView.RunningAppState getRunningAppState(
             BubbleTextView btv,
             Set<Integer> runningTaskIds,
@@ -812,6 +833,14 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 : mPersistentTaskbarDp.taskbarBottomMargin;
 
         int firstRecentTaskIndex = -1;
+        int hotseatNavBarTranslationX = 0;
+        if (mCurrentBubbleBarLocation != null
+                && taskbarDp.shouldAdjustHotseatOnBubblesLocationUpdate(mActivity)) {
+            boolean isBubblesOnLeft = mCurrentBubbleBarLocation.isOnLeft(
+                    mTaskbarView.isLayoutRtl());
+            hotseatNavBarTranslationX = taskbarDp
+                    .getHotseatTranslationXForBubbleBar(/* isNavbarOnRight = */ isBubblesOnLeft);
+        }
         for (int i = 0; i < mTaskbarView.getChildCount(); i++) {
             View child = mTaskbarView.getChildAt(i);
             boolean isAllAppsButton = child == mTaskbarView.getAllAppsButtonContainer();
@@ -847,16 +876,20 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                                     : Interpolators.clampToProgress(LINEAR, 0.72f, 0.84f));
                 }
             }
-
             if (child == mTaskbarView.getQsb()) {
                 boolean isRtl = Utilities.isRtl(child.getResources());
                 float hotseatIconCenter = isRtl
                         ? launcherDp.widthPx - hotseatPadding.right + borderSpacing
                         + launcherDp.hotseatQsbWidth / 2f
                         : hotseatPadding.left - borderSpacing - launcherDp.hotseatQsbWidth / 2f;
+                if (taskbarDp.isQsbInline) {
+                    hotseatIconCenter += hotseatNavBarTranslationX;
+                }
                 float childCenter = (child.getLeft() + child.getRight()) / 2f;
-                childCenter += ((Reorderable) child).getTranslateDelegate().getTranslationX(
-                        INDEX_TASKBAR_PINNING_ANIM).getValue();
+                if (child instanceof Reorderable reorderableChild) {
+                    childCenter += reorderableChild.getTranslateDelegate().getTranslationX(
+                            INDEX_TASKBAR_PINNING_ANIM).getValue();
+                }
                 float halfQsbIconWidthDiff =
                         (launcherDp.hotseatQsbWidth - taskbarDp.taskbarIconSize) / 2f;
                 float scale = ((float) taskbarDp.taskbarIconSize)
@@ -865,8 +898,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
 
                 float fromX = isRtl ? -halfQsbIconWidthDiff : halfQsbIconWidthDiff;
                 float toX = hotseatIconCenter - childCenter;
-                if (child instanceof Reorderable) {
-                    MultiTranslateDelegate mtd = ((Reorderable) child).getTranslateDelegate();
+                if (child instanceof Reorderable reorderableChild) {
+                    MultiTranslateDelegate mtd = reorderableChild.getTranslateDelegate();
 
                     setter.addFloat(mtd.getTranslationX(INDEX_TASKBAR_ALIGNMENT_ANIM),
                             MULTI_PROPERTY_VALUE, fromX, toX, interpolator);
@@ -913,6 +946,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                         + (hotseatCellSize + borderSpacing) * positionInHotseat
                         + hotseatCellSize / 2f;
             }
+            hotseatIconCenter += hotseatNavBarTranslationX;
             float childCenter = (child.getLeft() + child.getRight()) / 2f;
             childCenter += ((Reorderable) child).getTranslateDelegate().getTranslationX(
                     INDEX_TASKBAR_PINNING_ANIM).getValue();
