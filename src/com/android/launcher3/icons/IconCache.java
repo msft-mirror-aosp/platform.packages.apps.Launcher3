@@ -36,7 +36,6 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ShortcutInfo;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
-import android.graphics.drawable.Drawable;
 import android.os.Looper;
 import android.os.Process;
 import android.os.Trace;
@@ -66,7 +65,6 @@ import com.android.launcher3.model.data.PackageItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.pm.UserCache;
-import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.util.CancellableTask;
 import com.android.launcher3.util.InstantAppResolver;
 import com.android.launcher3.util.PackageUserKey;
@@ -98,7 +96,6 @@ public class IconCache extends BaseIconCache {
 
     private final CachingLogic<ComponentWithLabel> mComponentWithLabelCachingLogic;
     private final CachingLogic<LauncherActivityInfo> mLauncherActivityInfoCachingLogic;
-    private final CachingLogic<ShortcutInfo> mShortcutCachingLogic;
 
     private final LauncherApps mLauncherApps;
     private final UserCache mUserManager;
@@ -116,7 +113,6 @@ public class IconCache extends BaseIconCache {
         mComponentWithLabelCachingLogic = new CachedObjectCachingLogic(
                 context, false /* loadIcons */, false /* addToMemCache */);
         mLauncherActivityInfoCachingLogic = LauncherActivityCachingLogic.INSTANCE;
-        mShortcutCachingLogic = new ShortcutCachingLogic();
         mLauncherApps = mContext.getSystemService(LauncherApps.class);
         mUserManager = UserCache.INSTANCE.get(mContext);
         mInstantAppResolver = InstantAppResolver.newInstance(mContext);
@@ -233,7 +229,7 @@ public class IconCache extends BaseIconCache {
     }
 
     /**
-     * Fill in {@param info} with the icon and label for {@param activityInfo}
+     * Fill in {@code info} with the icon and label for {@code activityInfo}
      */
     @SuppressWarnings("NewApi")
     public synchronized void getTitleAndIcon(ItemInfoWithIcon info,
@@ -245,28 +241,40 @@ public class IconCache extends BaseIconCache {
     }
 
     /**
-     * Fill in {@param info} with the icon for {@param si}
+     * Fill in {@code info} with the icon for {@code si}
      */
     public void getShortcutIcon(ItemInfoWithIcon info, ShortcutInfo si) {
+        getShortcutIcon(info, new CacheableShortcutInfo(si, mContext));
+    }
+
+    /**
+     * Fill in {@code info} with the icon for {@code si}
+     */
+    public void getShortcutIcon(ItemInfoWithIcon info, CacheableShortcutInfo si) {
         getShortcutIcon(info, si, mIsUsingFallbackOrNonDefaultIconCheck);
     }
 
     /**
-     * Fill in {@param info} with the icon and label for {@param si}. If the icon is not
+     * Fill in {@code info} with the icon and label for {@code si}. If the icon is not
      * available, and fallback check returns true, it keeps the old icon.
      */
-    public <T extends ItemInfoWithIcon> void getShortcutIcon(T info, ShortcutInfo si,
+    public <T extends ItemInfoWithIcon> void getShortcutIcon(T info, CacheableShortcutInfo si,
             @NonNull Predicate<T> fallbackIconCheck) {
-        BitmapInfo bitmapInfo = cacheLocked(ShortcutKey.fromInfo(si).componentName,
-                si.getUserHandle(), () -> si, mShortcutCachingLogic, LookupFlag.DEFAULT).bitmap;
+        UserHandle user = CacheableShortcutCachingLogic.INSTANCE.getUser(si);
+        BitmapInfo bitmapInfo = cacheLocked(
+                CacheableShortcutCachingLogic.INSTANCE.getComponent(si),
+                user,
+                () -> si,
+                CacheableShortcutCachingLogic.INSTANCE,
+                LookupFlag.DEFAULT).bitmap;
         if (bitmapInfo.isNullOrLowRes()) {
-            bitmapInfo = getDefaultIcon(si.getUserHandle());
+            bitmapInfo = getDefaultIcon(user);
         }
 
-        if (isDefaultIcon(bitmapInfo, si.getUserHandle()) && fallbackIconCheck.test(info)) {
+        if (isDefaultIcon(bitmapInfo, user) && fallbackIconCheck.test(info)) {
             return;
         }
-        info.bitmap = bitmapInfo.withBadgeInfo(getShortcutInfoBadge(si));
+        info.bitmap = bitmapInfo.withBadgeInfo(getShortcutInfoBadge(si.getShortcutInfo()));
     }
 
     /**
@@ -587,10 +595,6 @@ public class IconCache extends BaseIconCache {
         info.title = Utilities.trim(packageEntry.title);
         info.contentDescription = packageEntry.contentDescription;
         info.bitmap = packageEntry.bitmap;
-    }
-
-    public Drawable getFullResIcon(LauncherActivityInfo info) {
-        return mIconProvider.getIcon(info, mIconDpi);
     }
 
     public void updateSessionCache(PackageUserKey key, PackageInstaller.SessionInfo info) {

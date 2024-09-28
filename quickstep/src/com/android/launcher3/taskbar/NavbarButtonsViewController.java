@@ -23,6 +23,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 import static com.android.launcher3.LauncherAnimUtils.ROTATION_DRAWABLE_PERCENT;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
+import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
 import static com.android.launcher3.taskbar.LauncherTaskbarUIController.SYSUI_SURFACE_PROGRESS_INDEX;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_A11Y;
@@ -48,7 +49,9 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_Q
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SHORTCUT_HELPER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING;
+import static com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar;
 
+import android.animation.Animator;
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
 import android.annotation.DrawableRes;
@@ -175,6 +178,9 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     /** Color to use for navigation bar buttons, if they are on on a Taskbar surface background. */
     private final int mOnBackgroundIconColor;
 
+    private @Nullable Animator mNavBarLocationAnimator;
+    private @Nullable BubbleBarLocation mBubbleBarTargetLocation;
+
     private final AnimatedFloat mTaskbarNavButtonTranslationY = new AnimatedFloat(
             this::updateNavButtonTranslationY);
     private final AnimatedFloat mTaskbarNavButtonTranslationYForInAppDisplay = new AnimatedFloat(
@@ -200,8 +206,6 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     private final RotationButtonListener mRotationButtonListener = new RotationButtonListener();
 
     private final Rect mFloatingRotationButtonBounds = new Rect();
-
-    private @Nullable BubbleBarLocation mBubbleBarLocation;
 
     // Initialized in init.
     private TaskbarControllers mControllers;
@@ -1176,16 +1180,30 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     /** Adjusts navigation buttons layout accordingly to the bubble bar position. */
     @Override
     public void onBubbleBarLocationUpdated(BubbleBarLocation location) {
-        mBubbleBarLocation = location;
+        cancelExistingNavBarAnimation();
+        mBubbleBarTargetLocation = location;
         mNavButtonContainer.setTranslationX(getNavBarTranslationX(location));
+        mNavButtonContainer.setAlpha(1);
     }
 
     /** Animates navigation buttons accordingly to the bubble bar position. */
     @Override
     public void onBubbleBarLocationAnimated(BubbleBarLocation location) {
-        // TODO(b/346381754) add the teleport animation similarly to the bubble bar
-        mBubbleBarLocation = location;
-        mNavButtonContainer.setTranslationX(getNavBarTranslationX(location));
+        cancelExistingNavBarAnimation();
+        mBubbleBarTargetLocation = location;
+        int finalX = getNavBarTranslationX(location);
+        Animator teleportAnimator = BarsLocationAnimatorHelper
+                .getTeleportAnimatorForNavButtons(location, mNavButtonContainer, finalX);
+        teleportAnimator.addListener(forEndCallback(() -> mNavBarLocationAnimator = null));
+        mNavBarLocationAnimator = teleportAnimator;
+        mNavBarLocationAnimator.start();
+    }
+
+    private void cancelExistingNavBarAnimation() {
+        if (mNavBarLocationAnimator != null) {
+            mNavBarLocationAnimator.cancel();
+            mNavBarLocationAnimator = null;
+        }
     }
 
     private int getNavBarTranslationX(BubbleBarLocation location) {
@@ -1222,15 +1240,16 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     }
 
     /** Adjusts the navigation buttons layout position according to the bubble bar location. */
-    public void onTaskbarLayoutChange() {
-        if (com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar()
+    public void onTaskbarLayoutChanged() {
+        if (mControllers.taskbarViewController.getIconLayoutBounds().isEmpty()) return;
+        if (enableBubbleBarInPersistentTaskBar()
                 && mControllers.bubbleControllers.isPresent()) {
-            if (mBubbleBarLocation == null) {
+            if (mBubbleBarTargetLocation == null) {
                 // only set bubble bar location if it was not set before, e.g. at device boot
-                mBubbleBarLocation = mControllers.bubbleControllers.get()
+                mBubbleBarTargetLocation = mControllers.bubbleControllers.get()
                         .bubbleBarViewController.getBubbleBarLocation();
             }
-            onBubbleBarLocationUpdated(mBubbleBarLocation);
+            onBubbleBarLocationUpdated(mBubbleBarTargetLocation);
         }
     }
 

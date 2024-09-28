@@ -911,7 +911,7 @@ public class TouchInteractionService extends Service {
         SafeCloseable traceToken = TraceHelper.INSTANCE.allowIpcs("TIS.onInputEvent");
 
         CompoundString reasonString = action == ACTION_DOWN
-                ? new CompoundString("TIS.onMotionEvent: ") : CompoundString.NO_OP;
+                ? CompoundString.newEmptyString() : CompoundString.NO_OP;
         if (action == ACTION_DOWN || isHoverActionWithoutConsumer) {
             mRotationTouchHelper.setOrientationTransformIfNeeded(event);
 
@@ -929,22 +929,22 @@ public class TouchInteractionService extends Service {
                 reasonString.append("in three button mode which supports Assistant gesture");
                 // Consume gesture event for Assistant (all other gestures should do nothing).
                 if (mDeviceState.canTriggerAssistantAction(event)) {
-                    reasonString.append(" and event can trigger assistant action")
-                            .append(", consuming gesture for assistant action");
+                    reasonString.append(" and event can trigger assistant action, "
+                            + "consuming gesture for assistant action");
                     mGestureState =
                             createGestureState(mGestureState, getTrackpadGestureType(event));
                     mUncheckedConsumer = tryCreateAssistantInputConsumer(mGestureState, event);
                 } else {
-                    reasonString.append(" but event cannot trigger Assistant")
-                            .append(", consuming gesture as no-op");
+                    reasonString.append(" but event cannot trigger Assistant, "
+                            + "consuming gesture as no-op");
                     mUncheckedConsumer = InputConsumer.NO_OP;
                 }
             } else if ((!isOneHandedModeActive && isInSwipeUpTouchRegion)
                     || isHoverActionWithoutConsumer || isOnBubbles) {
                 reasonString.append(!isOneHandedModeActive && isInSwipeUpTouchRegion
-                                ? "one handed mode is not active and event is in swipe up region"
-                                : "isHoverActionWithoutConsumer == true")
-                        .append(", creating new input consumer");
+                        ? "one handed mode is not active and event is in swipe up region, "
+                                + "creating new input consumer"
+                        : "isHoverActionWithoutConsumer == true, creating new input consumer");
                 // Clone the previous gesture state since onConsumerAboutToBeSwitched might trigger
                 // onConsumerInactive and wipe the previous gesture state
                 GestureState prevGestureState = new GestureState(mGestureState);
@@ -957,18 +957,18 @@ public class TouchInteractionService extends Service {
             } else if ((mDeviceState.isFullyGesturalNavMode() || isTrackpadMultiFingerSwipe(event))
                     && mDeviceState.canTriggerAssistantAction(event)) {
                 reasonString.append(mDeviceState.isFullyGesturalNavMode()
-                                ? "using fully gestural nav"
-                                : "event is a trackpad multi-finger swipe")
-                        .append(" and event can trigger assistant action")
-                        .append(", consuming gesture for assistant action");
+                        ? "using fully gestural nav and event can trigger assistant action, "
+                                + "consuming gesture for assistant action"
+                        : "event is a trackpad multi-finger swipe and event can trigger assistant "
+                                + "action, consuming gesture for assistant action");
                 mGestureState = createGestureState(mGestureState, getTrackpadGestureType(event));
                 // Do not change mConsumer as if there is an ongoing QuickSwitch gesture, we
                 // should not interrupt it. QuickSwitch assumes that interruption can only
                 // happen if the next gesture is also quick switch.
                 mUncheckedConsumer = tryCreateAssistantInputConsumer(mGestureState, event);
             } else if (mDeviceState.canTriggerOneHandedAction(event)) {
-                reasonString.append("event can trigger one-handed action")
-                                .append(", consuming gesture for one-handed action");
+                reasonString.append("event can trigger one-handed action, "
+                        + "consuming gesture for one-handed action");
                 // Consume gesture event for triggering one handed feature.
                 mUncheckedConsumer = new OneHandedModeInputConsumer(this, mDeviceState,
                         InputConsumer.NO_OP, mInputMonitorCompat);
@@ -986,7 +986,7 @@ public class TouchInteractionService extends Service {
         if (mUncheckedConsumer != InputConsumer.NO_OP) {
             switch (action) {
                 case ACTION_DOWN:
-                    ActiveGestureProtoLogProxy.logDynamicString(reasonString.toString());
+                    ActiveGestureProtoLogProxy.logOnInputEventActionDown(reasonString);
                     // fall through
                 case ACTION_UP:
                     ActiveGestureProtoLogProxy.logOnInputEventActionUp(
@@ -1059,11 +1059,11 @@ public class TouchInteractionService extends Service {
             MotionEvent motionEvent,
             CompoundString reasonString) {
         if (mDeviceState.isGestureBlockedTask(gestureState.getRunningTask())) {
-            reasonString.append(SUBSTRING_PREFIX)
-                    .append("is gesture-blocked task, using base input consumer");
+            reasonString.append(
+                    "%sis gesture-blocked task, using base input consumer", SUBSTRING_PREFIX);
             return base;
         } else {
-            reasonString.append(SUBSTRING_PREFIX).append("using AssistantInputConsumer");
+            reasonString.append("%susing AssistantInputConsumer", SUBSTRING_PREFIX);
             return new AssistantInputConsumer(
                     this, gestureState, base, mInputMonitorCompat, mDeviceState, motionEvent);
         }
@@ -1132,12 +1132,11 @@ public class TouchInteractionService extends Service {
                 // This handles apps launched in direct boot mode (e.g. dialer) as well as apps
                 // launched while device is locked even after exiting direct boot mode (e.g. camera).
                 consumer = createDeviceLockedInputConsumer(
-                        newGestureState, reasonString.append(SUBSTRING_PREFIX)
-                                .append("can start system gesture"));
+                        newGestureState,
+                        reasonString.append("%scan start system gesture", SUBSTRING_PREFIX));
             } else {
                 consumer = getDefaultInputConsumer(
-                        reasonString.append(SUBSTRING_PREFIX)
-                                .append("cannot start system gesture"));
+                        reasonString.append("%scannot start system gesture", SUBSTRING_PREFIX));
             }
             logInputConsumerSelectionReason(consumer, reasonString);
             return consumer;
@@ -1149,13 +1148,12 @@ public class TouchInteractionService extends Service {
         // a followup gesture and the first gesture started in a valid system state.
         if (canStartSystemGesture || previousGestureState.isRecentsAnimationRunning()) {
             reasonString = newCompoundString(canStartSystemGesture
-                    ? "can start system gesture" : "recents animation was running")
-                    .append(", trying to use base consumer");
+                    ? "can start system gesture, trying to use base consumer"
+                    : "recents animation was running, trying to use base consumer");
             base = newBaseConsumer(previousGestureState, newGestureState, event, reasonString);
         } else {
-            reasonString = newCompoundString(
-                    "cannot start system gesture and recents animation was not running")
-                    .append(", trying to use default input consumer");
+            reasonString = newCompoundString("cannot start system gesture and recents "
+                    + "animation was not running, trying to use default input consumer");
             base = getDefaultInputConsumer(reasonString);
         }
         if (mDeviceState.isGesturalNavMode() || newGestureState.isTrackpadGesture()) {
@@ -1165,11 +1163,11 @@ public class TouchInteractionService extends Service {
             String reasonPrefix =
                     "device is in gesture navigation mode or 3-button mode with a trackpad gesture";
             if (mDeviceState.canTriggerAssistantAction(event)) {
-                reasonString.append(NEWLINE_PREFIX)
-                        .append(reasonPrefix)
-                        .append(SUBSTRING_PREFIX)
-                        .append("gesture can trigger the assistant")
-                        .append(", trying to use assistant input consumer");
+                reasonString.append("%s%s%sgesture can trigger the assistant, "
+                                + "trying to use assistant input consumer",
+                        NEWLINE_PREFIX,
+                        reasonPrefix,
+                        SUBSTRING_PREFIX);
                 base = tryCreateAssistantInputConsumer(base, newGestureState, event, reasonString);
             }
 
@@ -1180,11 +1178,11 @@ public class TouchInteractionService extends Service {
                         && !tac.isPhoneMode()
                         && !tac.isInStashedLauncherState();
                 if (canStartSystemGesture && useTaskbarConsumer) {
-                    reasonString.append(NEWLINE_PREFIX)
-                            .append(reasonPrefix)
-                            .append(SUBSTRING_PREFIX)
-                            .append("TaskbarActivityContext != null, ")
-                            .append("using TaskbarUnstashInputConsumer");
+                    reasonString.append("%s%s%sTaskbarActivityContext != null, "
+                                    + "using TaskbarUnstashInputConsumer",
+                            NEWLINE_PREFIX,
+                            reasonPrefix,
+                            SUBSTRING_PREFIX);
                     base = new TaskbarUnstashInputConsumer(this, base, mInputMonitorCompat, tac,
                             mOverviewCommandHelper, mGestureState);
                 }
@@ -1193,9 +1191,9 @@ public class TouchInteractionService extends Service {
                 // Create bubbles input consumer before NavHandleLongPressInputConsumer.
                 // This allows for nav handle to fall back to bubbles.
                 if (mDeviceState.isBubblesExpanded()) {
-                    reasonString = newCompoundString(reasonPrefix)
-                            .append(SUBSTRING_PREFIX)
-                            .append("bubbles expanded, trying to use default input consumer");
+                    reasonString = newCompoundString(reasonPrefix).append(
+                            "%sbubbles expanded, trying to use default input consumer",
+                            SUBSTRING_PREFIX);
                     // Bubbles can handle home gesture itself.
                     base = getDefaultInputConsumer(reasonString);
                 }
@@ -1206,10 +1204,10 @@ public class TouchInteractionService extends Service {
             if (canStartSystemGesture && !previousGestureState.isRecentsAnimationRunning()
                     && navHandle.canNavHandleBeLongPressed()
                     && !ignoreThreeFingerTrackpadForNavHandleLongPress(mGestureState)) {
-                reasonString.append(NEWLINE_PREFIX)
-                        .append(reasonPrefix)
-                        .append(SUBSTRING_PREFIX)
-                        .append("Not running recents animation, ");
+                reasonString.append("%s%s%sNot running recents animation, ",
+                                NEWLINE_PREFIX,
+                                reasonPrefix,
+                                SUBSTRING_PREFIX);
                 if (tac != null && tac.getNavHandle().canNavHandleBeLongPressed()) {
                     reasonString.append("stashed handle is long-pressable, ");
                 }
@@ -1221,74 +1219,74 @@ public class TouchInteractionService extends Service {
             if (!enableBubblesLongPressNavHandle()) {
                 // Continue overriding nav handle input consumer with bubbles
                 if (mDeviceState.isBubblesExpanded()) {
-                    reasonString = newCompoundString(reasonPrefix)
-                            .append(SUBSTRING_PREFIX)
-                            .append("bubbles expanded, trying to use default input consumer");
+                    reasonString = newCompoundString(reasonPrefix).append(
+                            "%sbubbles expanded, trying to use default input consumer",
+                            SUBSTRING_PREFIX);
                     // Bubbles can handle home gesture itself.
                     base = getDefaultInputConsumer(reasonString);
                 }
             }
 
             if (mDeviceState.isSystemUiDialogShowing()) {
-                reasonString = newCompoundString(reasonPrefix)
-                        .append(SUBSTRING_PREFIX)
-                        .append("system dialog is showing, using SysUiOverlayInputConsumer");
+                reasonString = newCompoundString(reasonPrefix).append(
+                        "%ssystem dialog is showing, using SysUiOverlayInputConsumer",
+                        SUBSTRING_PREFIX);
                 base = new SysUiOverlayInputConsumer(
                         getBaseContext(), mDeviceState, mInputMonitorCompat);
             }
 
             if (mGestureState.isTrackpadGesture()
                     && canStartSystemGesture && !previousGestureState.isRecentsAnimationRunning()) {
-                reasonString = newCompoundString(reasonPrefix)
-                        .append(SUBSTRING_PREFIX)
-                        .append("Trackpad 3-finger gesture, using TrackpadStatusBarInputConsumer");
+                reasonString = newCompoundString(reasonPrefix).append(
+                        "%sTrackpad 3-finger gesture, using TrackpadStatusBarInputConsumer",
+                        SUBSTRING_PREFIX);
                 base = new TrackpadStatusBarInputConsumer(getBaseContext(), base,
                         mInputMonitorCompat);
             }
 
             if (mDeviceState.isScreenPinningActive()) {
-                reasonString = newCompoundString(reasonPrefix)
-                        .append(SUBSTRING_PREFIX)
-                        .append("screen pinning is active, using ScreenPinnedInputConsumer");
+                reasonString = newCompoundString(reasonPrefix).append(
+                        "%sscreen pinning is active, using ScreenPinnedInputConsumer",
+                        SUBSTRING_PREFIX);
                 // Note: we only allow accessibility to wrap this, and it replaces the previous
                 // base input consumer (which should be NO_OP anyway since topTaskLocked == true).
                 base = new ScreenPinnedInputConsumer(this, newGestureState);
             }
 
             if (mDeviceState.canTriggerOneHandedAction(event)) {
-                reasonString.append(NEWLINE_PREFIX)
-                        .append(reasonPrefix)
-                        .append(SUBSTRING_PREFIX)
-                        .append("gesture can trigger one handed mode")
-                        .append(", using OneHandedModeInputConsumer");
+                reasonString.append("%s%s%sgesture can trigger one handed mode, "
+                                + "using OneHandedModeInputConsumer",
+                        NEWLINE_PREFIX,
+                        reasonPrefix,
+                        SUBSTRING_PREFIX);
                 base = new OneHandedModeInputConsumer(
                         this, mDeviceState, base, mInputMonitorCompat);
             }
 
             if (mDeviceState.isAccessibilityMenuAvailable()) {
-                reasonString.append(NEWLINE_PREFIX)
-                        .append(reasonPrefix)
-                        .append(SUBSTRING_PREFIX)
-                        .append("accessibility menu is available")
-                        .append(", using AccessibilityInputConsumer");
+                reasonString.append(
+                        "%s%s%saccessibility menu is available, using AccessibilityInputConsumer",
+                        NEWLINE_PREFIX,
+                        reasonPrefix,
+                        SUBSTRING_PREFIX);
                 base = new AccessibilityInputConsumer(
                         this, mDeviceState, mGestureState, base, mInputMonitorCompat);
             }
         } else {
             String reasonPrefix = "device is not in gesture navigation mode";
             if (mDeviceState.isScreenPinningActive()) {
-                reasonString = newCompoundString(reasonPrefix)
-                        .append(SUBSTRING_PREFIX)
-                        .append("screen pinning is active, trying to use default input consumer");
+                reasonString = newCompoundString(reasonPrefix).append(
+                        "%sscreen pinning is active, trying to use default input consumer",
+                        SUBSTRING_PREFIX);
                 base = getDefaultInputConsumer(reasonString);
             }
 
             if (mDeviceState.canTriggerOneHandedAction(event)) {
-                reasonString.append(NEWLINE_PREFIX)
-                        .append(reasonPrefix)
-                        .append(SUBSTRING_PREFIX)
-                        .append("gesture can trigger one handed mode")
-                        .append(", using OneHandedModeInputConsumer");
+                reasonString.append("%s%s%sgesture can trigger one handed mode, "
+                                + "using OneHandedModeInputConsumer",
+                        NEWLINE_PREFIX,
+                        reasonPrefix,
+                        SUBSTRING_PREFIX);
                 base = new OneHandedModeInputConsumer(
                         this, mDeviceState, base, mInputMonitorCompat);
             }
@@ -1298,7 +1296,7 @@ public class TouchInteractionService extends Service {
     }
 
     private CompoundString newCompoundString(String substring) {
-        return new CompoundString(NEWLINE_PREFIX).append(substring);
+        return new CompoundString("%s%s", NEWLINE_PREFIX, substring);
     }
 
     private boolean ignoreThreeFingerTrackpadForNavHandleLongPress(GestureState gestureState) {
@@ -1325,14 +1323,12 @@ public class TouchInteractionService extends Service {
             CompoundString reasonString) {
         if (mDeviceState.isKeyguardShowingOccluded()) {
             // This handles apps showing over the lockscreen (e.g. camera)
-            return createDeviceLockedInputConsumer(
-                    gestureState,
-                    reasonString.append(SUBSTRING_PREFIX)
-                            .append("keyguard is showing occluded")
-                            .append(", trying to use device locked input consumer"));
+            return createDeviceLockedInputConsumer(gestureState, reasonString.append(
+                    "%skeyguard is showing occluded, trying to use device locked input consumer",
+                    SUBSTRING_PREFIX));
         }
 
-        reasonString.append(SUBSTRING_PREFIX).append("keyguard is not showing occluded");
+        reasonString.append("%skeyguard is not showing occluded", SUBSTRING_PREFIX);
 
         TopTaskTracker.CachedTaskInfo runningTask = gestureState.getRunningTask();
         // Use overview input consumer for sharesheets on top of home.
@@ -1373,11 +1369,12 @@ public class TouchInteractionService extends Service {
                     gestureState,
                     event,
                     forceOverviewInputConsumer,
-                    reasonString.append(SUBSTRING_PREFIX)
-                            .append("is in live tile mode, trying to use overview input consumer"));
+                    reasonString.append(
+                            "%sis in live tile mode, trying to use overview input consumer",
+                            SUBSTRING_PREFIX));
         } else if (runningTask == null) {
-            return getDefaultInputConsumer(reasonString.append(SUBSTRING_PREFIX)
-                    .append("running task == null"));
+            return getDefaultInputConsumer(reasonString.append(
+                    "%srunning task == null", SUBSTRING_PREFIX));
         } else if (previousGestureAnimatedToLauncher
                 || launcherResumedThroughShellTransition
                 || forceOverviewInputConsumer) {
@@ -1386,21 +1383,22 @@ public class TouchInteractionService extends Service {
                     gestureState,
                     event,
                     forceOverviewInputConsumer,
-                    reasonString.append(SUBSTRING_PREFIX)
-                            .append(previousGestureAnimatedToLauncher
-                                    ? "previous gesture animated to launcher"
+                    reasonString.append(previousGestureAnimatedToLauncher
+                                    ? "%sprevious gesture animated to launcher, "
+                                            + "trying to use overview input consumer"
                                     : (launcherResumedThroughShellTransition
-                                            ? "launcher resumed through a shell transition"
-                                            : "forceOverviewInputConsumer == true"))
-                            .append(", trying to use overview input consumer"));
+                                            ? "%slauncher resumed through a shell transition, "
+                                                    + "trying to use overview input consumer"
+                                            : "%sforceOverviewInputConsumer == true, "
+                                                    + "trying to use overview input consumer"),
+                            SUBSTRING_PREFIX));
         } else if (mDeviceState.isGestureBlockedTask(runningTask) || launcherChildActivityResumed) {
-            return getDefaultInputConsumer(reasonString.append(SUBSTRING_PREFIX)
-                    .append(launcherChildActivityResumed
-                            ? "is launcher child-task, trying to use default input consumer"
-                            : "is gesture-blocked task, trying to use default input consumer"));
+            return getDefaultInputConsumer(reasonString.append(launcherChildActivityResumed
+                    ? "%sis launcher child-task, trying to use default input consumer"
+                    : "%sis gesture-blocked task, trying to use default input consumer",
+                    SUBSTRING_PREFIX));
         } else {
-            reasonString.append(SUBSTRING_PREFIX)
-                    .append("using OtherActivityInputConsumer");
+            reasonString.append("%susing OtherActivityInputConsumer", SUBSTRING_PREFIX);
             return createOtherActivityInputConsumer(gestureState, event);
         }
     }
@@ -1427,20 +1425,18 @@ public class TouchInteractionService extends Service {
             GestureState gestureState, CompoundString reasonString) {
         if ((mDeviceState.isFullyGesturalNavMode() || gestureState.isTrackpadGesture())
                 && gestureState.getRunningTask() != null) {
-            reasonString.append(SUBSTRING_PREFIX)
-                    .append("device is in gesture nav mode or 3-button mode with a trackpad")
-                    .append(" gesture and running task != null")
-                    .append(", using DeviceLockedInputConsumer");
+            reasonString.append("%sdevice is in gesture nav mode or 3-button mode with a trackpad "
+                    + "gesture and running task != null, using DeviceLockedInputConsumer",
+                    SUBSTRING_PREFIX);
             return new DeviceLockedInputConsumer(
                     this, mDeviceState, mTaskAnimationManager, gestureState, mInputMonitorCompat);
         } else {
-            return getDefaultInputConsumer(reasonString
-                    .append(SUBSTRING_PREFIX)
-                    .append((mDeviceState.isFullyGesturalNavMode()
-                                    || gestureState.isTrackpadGesture())
-                            ? "running task == null"
-                            : "device is not in gesture nav mode and it's not a trackpad gesture")
-                    .append(", trying to use default input consumer"));
+            return getDefaultInputConsumer(reasonString.append(
+                    mDeviceState.isFullyGesturalNavMode() || gestureState.isTrackpadGesture()
+                            ? "%srunning task == null, trying to use default input consumer"
+                            : "%sdevice is not in gesture nav mode and it's not a trackpad gesture,"
+                                    + " trying to use default input consumer",
+                    SUBSTRING_PREFIX));
         }
     }
 
@@ -1452,9 +1448,8 @@ public class TouchInteractionService extends Service {
             CompoundString reasonString) {
         RecentsViewContainer container = gestureState.getContainerInterface().getCreatedContainer();
         if (container == null) {
-            return getDefaultInputConsumer(
-                    reasonString.append(SUBSTRING_PREFIX)
-                            .append("activity == null, trying to use default input consumer"));
+            return getDefaultInputConsumer(reasonString.append(
+                    "%sactivity == null, trying to use default input consumer", SUBSTRING_PREFIX));
         }
 
         View rootview = container.getRootView();
@@ -1464,24 +1459,24 @@ public class TouchInteractionService extends Service {
                         || mDeviceState.isPredictiveBackToHomeInProgress();
         boolean isInLiveTileMode = gestureState.getContainerInterface().isInLiveTileMode();
 
-        reasonString.append(SUBSTRING_PREFIX)
-                .append(hasWindowFocus
-                        ? "activity has window focus"
-                        : (isPreviousGestureAnimatingToLauncher
-                                ? "previous gesture is still animating to launcher"
-                                : isInLiveTileMode
-                                        ? "device is in live mode"
-                                        : "all overview focus conditions failed"));
+        reasonString.append(hasWindowFocus
+                ? "%sactivity has window focus"
+                : (isPreviousGestureAnimatingToLauncher
+                        ? "%sprevious gesture is still animating to launcher"
+                        : isInLiveTileMode
+                                ? "%sdevice is in live mode"
+                                : "%sall overview focus conditions failed"), SUBSTRING_PREFIX);
         if (hasWindowFocus
                 || isPreviousGestureAnimatingToLauncher
                 || isInLiveTileMode) {
-            reasonString.append(SUBSTRING_PREFIX)
-                    .append("overview should have focus, using OverviewInputConsumer");
+            reasonString.append(
+                    "%soverview should have focus, using OverviewInputConsumer", SUBSTRING_PREFIX);
             return new OverviewInputConsumer(gestureState, container, mInputMonitorCompat,
                     false /* startingInActivityBounds */);
         } else {
-            reasonString.append(SUBSTRING_PREFIX).append(
-                    "overview shouldn't have focus, using OverviewWithoutFocusInputConsumer");
+            reasonString.append(
+                    "%soverview shouldn't have focus, using OverviewWithoutFocusInputConsumer",
+                    SUBSTRING_PREFIX);
             final boolean disableHorizontalSwipe = mDeviceState.isInExclusionRegion(event);
             return new OverviewWithoutFocusInputConsumer(container.asContext(), mDeviceState,
                     gestureState, mInputMonitorCompat, disableHorizontalSwipe);
@@ -1518,12 +1513,14 @@ public class TouchInteractionService extends Service {
      */
     private @NonNull InputConsumer getDefaultInputConsumer(@NonNull CompoundString reasonString) {
         if (mResetGestureInputConsumer != null) {
-            reasonString.append(SUBSTRING_PREFIX).append(
-                    "mResetGestureInputConsumer initialized, using ResetGestureInputConsumer");
+            reasonString.append(
+                    "%smResetGestureInputConsumer initialized, using ResetGestureInputConsumer",
+                    SUBSTRING_PREFIX);
             return mResetGestureInputConsumer;
         } else {
-            reasonString.append(SUBSTRING_PREFIX).append(
-                    "mResetGestureInputConsumer not initialized, using no-op input consumer");
+            reasonString.append(
+                    "%smResetGestureInputConsumer not initialized, using no-op input consumer",
+                    SUBSTRING_PREFIX);
             // mResetGestureInputConsumer isn't initialized until onUserUnlocked(), so reset to
             // NO_OP until then (we never want these to be null).
             return InputConsumer.NO_OP;
