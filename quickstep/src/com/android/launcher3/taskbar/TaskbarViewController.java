@@ -84,7 +84,6 @@ import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -160,7 +159,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     private final View.OnLayoutChangeListener mTaskbarViewLayoutChangeListener =
             (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
                 updateTaskbarIconTranslationXForPinning();
-                mControllers.navbarButtonsViewController.onTaskbarLayoutChange();
+                mControllers.navbarButtonsViewController.onTaskbarLayoutChanged();
             };
 
     // Animation to align icons with Launcher, created lazily. This allows the controller to be
