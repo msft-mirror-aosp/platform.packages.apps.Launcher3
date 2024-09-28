@@ -35,7 +35,7 @@ import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_TASK_PENDIN
 import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_TASK_SHORTCUT;
 import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_TASK_TASK;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.KEY_EXTRA_WIDGET_INTENT;
-import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_50_50;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_2_50_50;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -363,7 +363,7 @@ public class SplitSelectStateController {
      * A version of {@link #launchSplitTasks(int, Consumer)} that launches with default split ratio.
      */
     public void launchSplitTasks(@Nullable Consumer<Boolean> callback) {
-        launchSplitTasks(SNAP_TO_50_50, callback);
+        launchSplitTasks(SNAP_TO_2_50_50, callback);
     }
 
     /**
@@ -371,7 +371,7 @@ public class SplitSelectStateController {
      * ratio and no callback.
      */
     public void launchSplitTasks() {
-        launchSplitTasks(SNAP_TO_50_50, null);
+        launchSplitTasks(SNAP_TO_2_50_50, null);
     }
 
     /**
@@ -565,13 +565,13 @@ public class SplitSelectStateController {
         switch (launchData.getSplitLaunchType()) {
             case SPLIT_SINGLE_TASK_FULLSCREEN -> mSystemUiProxy.startTasks(firstTaskId,
                     optionsBundle, secondTaskId, null /* options2 */, initialStagePosition,
-                    SNAP_TO_50_50, remoteTransition, instanceId);
+                    SNAP_TO_2_50_50, remoteTransition, instanceId);
             case SPLIT_SINGLE_INTENT_FULLSCREEN -> mSystemUiProxy.startIntentAndTask(firstPI,
                     firstUserId, optionsBundle, secondTaskId, null /*options2*/,
-                    initialStagePosition, SNAP_TO_50_50, remoteTransition, instanceId);
+                    initialStagePosition, SNAP_TO_2_50_50, remoteTransition, instanceId);
             case SPLIT_SINGLE_SHORTCUT_FULLSCREEN -> mSystemUiProxy.startShortcutAndTask(
                     initialShortcut, optionsBundle, firstTaskId, null /* options2 */,
-                    initialStagePosition, SNAP_TO_50_50, remoteTransition, instanceId);
+                    initialStagePosition, SNAP_TO_2_50_50, remoteTransition, instanceId);
         }
     }
 
