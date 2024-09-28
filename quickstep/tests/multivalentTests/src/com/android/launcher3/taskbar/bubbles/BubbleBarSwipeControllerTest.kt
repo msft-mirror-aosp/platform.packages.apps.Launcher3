@@ -25,6 +25,7 @@ import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController
 import com.android.launcher3.touch.OverScroll
 import com.google.common.truth.Truth.assertThat
 import java.util.Optional
+import kotlin.math.abs
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -46,11 +47,13 @@ class BubbleBarSwipeControllerTest {
         const val UNSTASH_THRESHOLD = 100
         const val EXPAND_THRESHOLD = 200
         const val MAX_OVERSCROLL = 300
+        const val STASH_THRESHOLD = 50
 
         const val UP_BELOW_UNSTASH = -UNSTASH_THRESHOLD + 10f
         const val UP_ABOVE_UNSTASH = -UNSTASH_THRESHOLD - 10f
         const val UP_ABOVE_EXPAND = -EXPAND_THRESHOLD - 10f
-        const val DOWN_BELOW_UNSTASH = UNSTASH_THRESHOLD + 10f
+        const val DOWN_UNDER_STASH = STASH_THRESHOLD - 10f
+        const val DOWN_OVER_STASH = STASH_THRESHOLD + 10f
     }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
@@ -82,6 +85,9 @@ class BubbleBarSwipeControllerTest {
 
                 override val maxOverscroll: Int
                     get() = MAX_OVERSCROLL
+
+                override val stashThreshold: Int
+                    get() = STASH_THRESHOLD
             }
         bubbleBarSwipeController = BubbleBarSwipeController(context, dimensionProvider)
 
@@ -102,8 +108,12 @@ class BubbleBarSwipeControllerTest {
         bubbleBarSwipeController.init(bubbleControllers)
     }
 
+    // region Test that views have damped translation on swipe
+
     private fun testViewsHaveDampedTranslationOnSwipe(swipe: Float) {
-        val dampedTranslation = -OverScroll.dampedScroll(-swipe, MAX_OVERSCROLL).toFloat()
+        val isUp = swipe < 0
+        val damped = OverScroll.dampedScroll(abs(swipe), MAX_OVERSCROLL).toFloat()
+        val dampedTranslation = if (isUp) -damped else damped
         getInstrumentation().runOnMainSync {
             bubbleBarSwipeController.start()
             bubbleBarSwipeController.swipeTo(swipe)
@@ -141,6 +151,22 @@ class BubbleBarSwipeControllerTest {
         setUpCollapsedBar()
         testViewsHaveDampedTranslationOnSwipe(UP_ABOVE_EXPAND)
     }
+
+    @Test
+    fun swipeDown_collapsedBar_belowStashThreshold_viewsHaveDampedTranslation() {
+        setUpCollapsedBar()
+        testViewsHaveDampedTranslationOnSwipe(DOWN_UNDER_STASH)
+    }
+
+    @Test
+    fun swipeDown_collapsedBar_overStashThreshold_viewsHaveDampedTranslation() {
+        setUpCollapsedBar()
+        testViewsHaveDampedTranslationOnSwipe(DOWN_OVER_STASH)
+    }
+
+    // endregion
+
+    // region Test that translation on views is reset on finish
 
     private fun testViewsTranslationResetOnFinish(swipe: Float) {
         getInstrumentation().runOnMainSync {
@@ -193,6 +219,16 @@ class BubbleBarSwipeControllerTest {
         setUpCollapsedBar()
         testViewsTranslationResetOnFinish(UP_ABOVE_EXPAND)
     }
+
+    @Test
+    fun swipeDown_collapsedBar_aboveStashThreshold_animateTranslationToZeroOnFinish() {
+        setUpCollapsedBar()
+        testViewsTranslationResetOnFinish(DOWN_OVER_STASH)
+    }
+
+    // endregion
+
+    // region Test swipe interactions on stashed bar
 
     @Test
     fun swipeUp_stashedBar_belowUnstashThreshold_doesNotShowBar() {
@@ -282,12 +318,28 @@ class BubbleBarSwipeControllerTest {
     }
 
     @Test
-    fun swipeUp_expandedBar_swipeIgnored() {
+    fun swipeDown_stashedBar_swipeIgnored() {
+        setUpStashedBar()
+        getInstrumentation().runOnMainSync {
+            bubbleBarSwipeController.start()
+            bubbleBarSwipeController.swipeTo(DOWN_OVER_STASH)
+        }
+        verify(bubbleStashedHandleViewController, never()).setTranslationYForSwipe(any())
+        verify(bubbleBarViewController, never()).setTranslationYForSwipe(any())
+        verify(bubbleStashController, never()).showBubbleBar(any())
+    }
+
+    // endregion
+
+    // region Test swipe interactions on expanded bar
+
+    @Test
+    fun swipe_expandedBar_swipeIgnored() {
         setUpExpandedBar()
         getInstrumentation().runOnMainSync {
             bubbleBarSwipeController.start()
             bubbleBarSwipeController.swipeTo(UP_ABOVE_EXPAND)
-            bubbleBarSwipeController.swipeTo(DOWN_BELOW_UNSTASH)
+            bubbleBarSwipeController.swipeTo(DOWN_OVER_STASH)
             bubbleBarSwipeController.finish()
         }
         verify(bubbleStashedHandleViewController, never()).setTranslationYForSwipe(any())
@@ -295,17 +347,54 @@ class BubbleBarSwipeControllerTest {
         verify(bubbleStashController, never()).showBubbleBar(any())
     }
 
+    // endregion
+
+    // region Test swipe interactions on collapsed bar
+
     @Test
-    fun swipeDown_stashedBar_swipeIgnored() {
-        setUpStashedBar()
+    fun swipeDown_collapsedBar_underStashThreshold_doesNotHideBar() {
+        setUpCollapsedBar()
         getInstrumentation().runOnMainSync {
             bubbleBarSwipeController.start()
-            bubbleBarSwipeController.swipeTo(DOWN_BELOW_UNSTASH)
+            bubbleBarSwipeController.swipeTo(DOWN_UNDER_STASH)
+            bubbleBarSwipeController.finish()
         }
-        verify(bubbleStashedHandleViewController, never()).setTranslationYForSwipe(any())
-        verify(bubbleBarViewController, never()).setTranslationYForSwipe(any())
-        verify(bubbleStashController, never()).showBubbleBar(any())
+        verify(bubbleStashController, never()).stashBubbleBar()
     }
+
+    @Test
+    fun swipeDown_collapsedBar_overStashThreshold_doesNotHideBarBeforeFinish() {
+        setUpCollapsedBar()
+        getInstrumentation().runOnMainSync {
+            bubbleBarSwipeController.start()
+            bubbleBarSwipeController.swipeTo(DOWN_OVER_STASH)
+        }
+        verify(bubbleStashController, never()).stashBubbleBar()
+        getInstrumentation().runOnMainSync { bubbleBarSwipeController.finish() }
+        verify(bubbleStashController).stashBubbleBar()
+    }
+
+    @Test
+    fun swipeDown_collapsedBar_underStashThreshold_isSwipeGestureFalse() {
+        setUpCollapsedBar()
+        getInstrumentation().runOnMainSync {
+            bubbleBarSwipeController.start()
+            bubbleBarSwipeController.swipeTo(DOWN_UNDER_STASH)
+        }
+        assertThat(bubbleBarSwipeController.isSwipeGesture()).isFalse()
+    }
+
+    @Test
+    fun swipeDown_collapsedBar_overStashThreshold_isSwipeGestureTrue() {
+        setUpCollapsedBar()
+        getInstrumentation().runOnMainSync {
+            bubbleBarSwipeController.start()
+            bubbleBarSwipeController.swipeTo(DOWN_OVER_STASH)
+        }
+        assertThat(bubbleBarSwipeController.isSwipeGesture()).isTrue()
+    }
+
+    // endregion
 
     private fun setUpStashedBar() {
         whenever(bubbleStashController.isStashed).thenReturn(true)
