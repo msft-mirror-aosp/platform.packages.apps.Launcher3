@@ -1201,11 +1201,9 @@ public abstract class AbsSwipeUpHandler<
                 failureReason.append("STATE_START_NEW_TASK was never set");
             } else {
                 TaskInfo taskInfo = appearedTaskTargets[0].taskInfo;
-                failureReason.append("Unexpected task appeared")
-                                .append(" id=")
-                                .append(taskInfo.taskId)
-                                .append(" pkg=")
-                                .append(taskInfo.baseIntent.getComponent().getPackageName());
+                failureReason.append("Unexpected task appeared id=%d, pkg=%s",
+                        taskInfo.taskId,
+                        taskInfo.baseIntent.getComponent().getPackageName());
             }
             return false;
         }
@@ -2274,18 +2272,15 @@ public abstract class AbsSwipeUpHandler<
             TaskView nextTask = mRecentsView == null ? null : mRecentsView.getNextPageTaskView();
             if (nextTask != null) {
                 int[] taskIds = nextTask.getTaskIds();
-                ActiveGestureLog.CompoundString nextTaskLog = new ActiveGestureLog.CompoundString(
-                        "Launching task: ");
+                ActiveGestureLog.CompoundString nextTaskLog =
+                        ActiveGestureLog.CompoundString.newEmptyString();
                 for (TaskContainer container : nextTask.getTaskContainers()) {
                     if (container == null) {
                         continue;
                     }
-                    nextTaskLog
-                            .append("[id: ")
-                            .append(container.getTask().key.id)
-                            .append(", pkg: ")
-                            .append(container.getTask().key.getPackageName())
-                            .append("] | ");
+                    nextTaskLog.append("[id: %d, pkg: %s] | ",
+                            container.getTask().key.id,
+                            container.getTask().key.getPackageName());
                 }
                 mGestureState.updateLastStartedTaskIds(taskIds);
                 boolean hasTaskPreviouslyAppeared = Arrays.stream(taskIds).anyMatch(
@@ -2294,7 +2289,7 @@ public abstract class AbsSwipeUpHandler<
                 if (!hasTaskPreviouslyAppeared) {
                     ActiveGestureLog.INSTANCE.trackEvent(EXPECTING_TASK_APPEARED);
                 }
-                ActiveGestureProtoLogProxy.logDynamicString(nextTaskLog.toString());
+                ActiveGestureProtoLogProxy.logStartNewTask(nextTaskLog);
                 nextTask.launchWithoutAnimation(true, success -> {
                     resultCallback.accept(success);
                     if (success) {
@@ -2375,8 +2370,8 @@ public abstract class AbsSwipeUpHandler<
             ActiveGestureProtoLogProxy.logAbsSwipeUpHandlerOnTasksAppeared();
             mStateCallback.setStateOnUiThread(STATE_GESTURE_CANCELLED | STATE_HANDLER_INVALIDATED);
         };
-        ActiveGestureLog.CompoundString forceFinishReason = new ActiveGestureLog.CompoundString(
-                "Forcefully finishing recents animation: ");
+        ActiveGestureLog.CompoundString forceFinishReason =
+                ActiveGestureLog.CompoundString.newEmptyString();
         if (!mStateCallback.hasStates(STATE_GESTURE_COMPLETED)
                 && !hasStartedTaskBefore(appearedTaskTargets)) {
             // This is a special case, if a task is started mid-gesture that wasn't a part of a
@@ -2390,10 +2385,10 @@ public abstract class AbsSwipeUpHandler<
             return;
         }
         ActiveGestureLog.CompoundString handleTaskFailureReason =
-                new ActiveGestureLog.CompoundString("handleTaskAppeared check failed: ");
+                ActiveGestureLog.CompoundString.newEmptyString();
         if (!handleTaskAppeared(appearedTaskTargets, handleTaskFailureReason)) {
             forceFinishReason.append(handleTaskFailureReason);
-            ActiveGestureProtoLogProxy.logDynamicString(forceFinishReason.toString());
+            ActiveGestureProtoLogProxy.logHandleTaskAppearedFailed(forceFinishReason);
             finishRecentsAnimationOnTasksAppeared(onFinishComplete);
             return;
         }
@@ -2402,7 +2397,7 @@ public abstract class AbsSwipeUpHandler<
                 .toArray(RemoteAnimationTarget[]::new);
         if (taskTargets.length == 0) {
             forceFinishReason.append("No appeared task matching started task id");
-            ActiveGestureProtoLogProxy.logDynamicString(forceFinishReason.toString());
+            ActiveGestureProtoLogProxy.logHandleTaskAppearedFailed(forceFinishReason);
             finishRecentsAnimationOnTasksAppeared(onFinishComplete);
             return;
         }
@@ -2412,13 +2407,13 @@ public abstract class AbsSwipeUpHandler<
         if (taskView == null || taskView.getTaskContainers().stream().noneMatch(
                 TaskContainer::getShouldShowSplashView)) {
             forceFinishReason.append("Splash not needed");
-            ActiveGestureProtoLogProxy.logDynamicString(forceFinishReason.toString());
+            ActiveGestureProtoLogProxy.logHandleTaskAppearedFailed(forceFinishReason);
             finishRecentsAnimationOnTasksAppeared(onFinishComplete);
             return;
         }
         if (mContainer == null) {
             forceFinishReason.append("Activity destroyed");
-            ActiveGestureProtoLogProxy.logDynamicString(forceFinishReason.toString());
+            ActiveGestureProtoLogProxy.logHandleTaskAppearedFailed(forceFinishReason);
             finishRecentsAnimationOnTasksAppeared(onFinishComplete);
             return;
         }
