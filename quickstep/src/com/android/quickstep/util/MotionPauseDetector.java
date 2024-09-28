@@ -252,7 +252,7 @@ public class MotionPauseDetector {
         if (Utilities.isRunningInTestHarness()) {
             Log.d(TAG, logString.toString());
         }
-        ActiveGestureLog.INSTANCE.addLog(logString);
+        ActiveGestureProtoLogProxy.logMotionPauseDetectorEvent(logString.toString());
     }
 
     public void clear() {

@@ -45,6 +45,7 @@ import com.android.quickstep.OverviewCommandHelper.CommandType.KEYBOARD_INPUT
 import com.android.quickstep.OverviewCommandHelper.CommandType.SHOW
 import com.android.quickstep.OverviewCommandHelper.CommandType.TOGGLE
 import com.android.quickstep.util.ActiveGestureLog
+import com.android.quickstep.util.ActiveGestureProtoLogProxy
 import com.android.quickstep.views.RecentsView
 import com.android.quickstep.views.TaskView
 import com.android.systemui.shared.recents.model.ThumbnailData
@@ -280,7 +281,7 @@ constructor(
                     keyboardTaskFocusIndex = 0
                 }
             HOME -> {
-                ActiveGestureLog.INSTANCE.addLog("OverviewCommandHelper.executeCommand(HOME)")
+                ActiveGestureProtoLogProxy.logExecuteHomeCommand()
                 // Although IActivityTaskManager$Stub$Proxy.startActivity is a slow binder call,
                 // we should still call it on main thread because launcher is waiting for
                 // ActivityTaskManager to resume it. Also calling startActivity() on bg thread
