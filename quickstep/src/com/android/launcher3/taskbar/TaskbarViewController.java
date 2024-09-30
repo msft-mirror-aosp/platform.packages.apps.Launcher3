@@ -84,7 +84,6 @@ import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import java.io.PrintWriter;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -330,7 +329,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      */
     public void setRecentsButtonDisabled(boolean isDisabled) {
         // TODO: check TaskbarStashController#supportsStashing(), to stash instead of setting alpha.
-        mTaskbarIconAlpha.get(ALPHA_INDEX_RECENTS_DISABLED).setValue(isDisabled ? 0 : 1);
+        mTaskbarIconAlpha.get(ALPHA_INDEX_RECENTS_DISABLED).animateToValue(isDisabled ? 0 : 1)
+                .start();
     }
 
     /**
