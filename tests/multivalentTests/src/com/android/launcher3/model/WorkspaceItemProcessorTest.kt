@@ -40,6 +40,7 @@ import com.android.launcher3.backuprestore.LauncherRestoreEventLogger
 import com.android.launcher3.backuprestore.LauncherRestoreEventLogger.RestoreError.Companion.MISSING_INFO
 import com.android.launcher3.backuprestore.LauncherRestoreEventLogger.RestoreError.Companion.MISSING_WIDGET_PROVIDER
 import com.android.launcher3.backuprestore.LauncherRestoreEventLogger.RestoreError.Companion.PROFILE_DELETED
+import com.android.launcher3.icons.CacheableShortcutInfo
 import com.android.launcher3.model.data.FolderInfo
 import com.android.launcher3.model.data.IconRequestInfo
 import com.android.launcher3.model.data.ItemInfo
@@ -97,7 +98,7 @@ class WorkspaceItemProcessorTest {
     private var mUnlockedUsersArray: LongSparseArray<Boolean> = LongSparseArray()
     private var mKeyToPinnedShortcutsMap: MutableMap<ShortcutKey, ShortcutInfo> = mutableMapOf()
     private var mInstallingPkgs: HashMap<PackageUserKey, PackageInstaller.SessionInfo> = hashMapOf()
-    private var mAllDeepShortcuts: MutableList<ShortcutInfo> = mutableListOf()
+    private var mAllDeepShortcuts: MutableList<CacheableShortcutInfo> = mutableListOf()
     private var mWidgetProvidersMap: MutableMap<ComponentKey, AppWidgetProviderInfo?> =
         mutableMapOf()
     private var mPendingPackages: MutableSet<PackageUserKey> = mutableSetOf()
@@ -194,7 +195,7 @@ class WorkspaceItemProcessorTest {
         pendingPackages: MutableSet<PackageUserKey> = mPendingPackages,
         unlockedUsers: LongSparseArray<Boolean> = mUnlockedUsersArray,
         installingPkgs: HashMap<PackageUserKey, PackageInstaller.SessionInfo> = mInstallingPkgs,
-        allDeepShortcuts: MutableList<ShortcutInfo> = mAllDeepShortcuts,
+        allDeepShortcuts: MutableList<CacheableShortcutInfo> = mAllDeepShortcuts,
     ) =
         WorkspaceItemProcessor(
             c = cursor,
@@ -387,7 +388,8 @@ class WorkspaceItemProcessorTest {
             .that(mockCursor.restoreFlag)
             .isEqualTo(0)
         assertThat(mIconRequestInfos).isEmpty()
-        assertThat(mAllDeepShortcuts).containsExactly(expectedShortcutInfo)
+        assertThat(mAllDeepShortcuts.size).isEqualTo(1)
+        assertThat(mAllDeepShortcuts[0].shortcutInfo).isEqualTo(expectedShortcutInfo)
         verify(mockCursor).markRestored()
         verify(mockCursor).checkAndAddItem(any(), any(), anyOrNull())
     }
@@ -452,7 +454,8 @@ class WorkspaceItemProcessorTest {
             .that(mockCursor.restoreFlag)
             .isEqualTo(0)
         assertThat(mIconRequestInfos).isEmpty()
-        assertThat(mAllDeepShortcuts).containsExactly(expectedShortcutInfo)
+        assertThat(mAllDeepShortcuts.size).isEqualTo(1)
+        assertThat(mAllDeepShortcuts[0].shortcutInfo).isEqualTo(expectedShortcutInfo)
         verify(mockCursor).markRestored()
         verify(mockCursor).checkAndAddItem(any(), any(), anyOrNull())
     }
