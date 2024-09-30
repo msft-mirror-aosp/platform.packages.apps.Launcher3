@@ -36,4 +36,7 @@ interface BubbleBarFlyoutPositioner {
 
     /** The size of the flyout when collapsed. */
     val collapsedSize: Float
+
+    /** The color of the flyout when collapsed. */
+    val collapsedColor: Int
 }
