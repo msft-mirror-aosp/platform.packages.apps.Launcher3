@@ -3800,7 +3800,7 @@ public abstract class RecentsView<
                     translateTaskWhenDismissed(
                             child,
                             Math.abs(i - dismissedIndex),
-                            mIsRtl ? -scrollDiff : scrollDiff,
+                            scrollDiff,
                             anim,
                             splitTimings);
                     needsCurveUpdates = true;
