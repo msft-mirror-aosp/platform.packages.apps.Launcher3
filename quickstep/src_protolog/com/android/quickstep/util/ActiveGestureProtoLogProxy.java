@@ -86,25 +86,20 @@ public class ActiveGestureProtoLogProxy {
                 ActiveGestureErrorDetector.GestureEvent.CANCEL_CURRENT_ANIMATION);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "AbsSwipeUpHandler.cancelCurrentAnimation");
-
     }
 
     public static void logAbsSwipeUpHandlerOnTasksAppeared() {
-        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
-                "AbsSwipeUpHandler.onTasksAppeared: ")
-                .append("force finish recents animation complete; clearing state callback."));
+        ActiveGestureLog.INSTANCE.addLog("AbsSwipeUpHandler.onTasksAppeared: "
+                + "force finish recents animation complete; clearing state callback.");
         if (!enableActiveGestureProtoLog()) return;
-        ProtoLog.d(ACTIVE_GESTURE_LOG,
-                "AbsSwipeUpHandler.onTasksAppeared: force finish recents animation complete; "
-                        + "clearing state callback.");
-
+        ProtoLog.d(ACTIVE_GESTURE_LOG, "AbsSwipeUpHandler.onTasksAppeared: "
+                + "force finish recents animation complete; clearing state callback.");
     }
 
     public static void logFinishRecentsAnimationOnTasksAppeared() {
         ActiveGestureLog.INSTANCE.addLog("finishRecentsAnimationOnTasksAppeared");
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "finishRecentsAnimationOnTasksAppeared");
-
     }
 
     public static void logRecentsAnimationCallbacksOnAnimationCancelled() {
@@ -113,7 +108,6 @@ public class ActiveGestureProtoLogProxy {
                 /* gestureEvent= */ ON_CANCEL_RECENTS_ANIMATION);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "RecentsAnimationCallbacks.onAnimationCanceled");
-
     }
 
     public static void logRecentsAnimationCallbacksOnTasksAppeared() {
@@ -121,7 +115,6 @@ public class ActiveGestureProtoLogProxy {
                 ActiveGestureErrorDetector.GestureEvent.TASK_APPEARED);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "RecentsAnimationCallbacks.onTasksAppeared");
-
     }
 
     public static void logStartRecentsAnimation() {
@@ -130,21 +123,18 @@ public class ActiveGestureProtoLogProxy {
                 /* gestureEvent= */ START_RECENTS_ANIMATION);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "TaskAnimationManager.startRecentsAnimation");
-
     }
 
     public static void logLaunchingSideTaskFailed() {
         ActiveGestureLog.INSTANCE.addLog("Unable to launch side task (no recents)");
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "Unable to launch side task (no recents)");
-
     }
 
     public static void logContinueRecentsAnimation() {
         ActiveGestureLog.INSTANCE.addLog(/* event= */ "continueRecentsAnimation");
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "continueRecentsAnimation");
-
     }
 
     public static void logCleanUpRecentsAnimationSkipped() {
@@ -152,46 +142,39 @@ public class ActiveGestureProtoLogProxy {
                 /* event= */ "cleanUpRecentsAnimation skipped due to wrong callbacks");
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "cleanUpRecentsAnimation skipped due to wrong callbacks");
-
     }
 
     public static void logCleanUpRecentsAnimation() {
         ActiveGestureLog.INSTANCE.addLog(/* event= */ "cleanUpRecentsAnimation");
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "cleanUpRecentsAnimation");
-
     }
 
     public static void logOnInputEventUserLocked() {
-        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString("TIS.onInputEvent: ")
-                .append("Cannot process input event: user is locked"));
+        ActiveGestureLog.INSTANCE.addLog(
+                "TIS.onInputEvent: Cannot process input event: user is locked");
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
                 "TIS.onInputEvent: Cannot process input event: user is locked");
     }
 
     public static void logOnInputIgnoringFollowingEvents() {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("TIS.onMotionEvent: A new gesture has been ")
-                        .append("started, but a previously-requested recents ")
-                        .append("animation hasn't started. Ignoring all following ")
-                        .append("motion events."),
+        ActiveGestureLog.INSTANCE.addLog("TIS.onMotionEvent: A new gesture has been started, "
+                        + "but a previously-requested recents animation hasn't started. "
+                        + "Ignoring all following motion events.",
                 RECENTS_ANIMATION_START_PENDING);
         if (!enableActiveGestureProtoLog()) return;
-        ProtoLog.d(ACTIVE_GESTURE_LOG,
-                "TIS.onMotionEvent: A new gesture has been started, but a "
-                        + "previously-requested recents animation hasn't started. "
-                        + "Ignoring all following motion events.");
+        ProtoLog.d(ACTIVE_GESTURE_LOG, "TIS.onMotionEvent: A new gesture has been started, "
+                + "but a previously-requested recents animation hasn't started. "
+                + "Ignoring all following motion events.");
     }
 
     public static void logOnInputEventThreeButtonNav() {
-        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString("TIS.onInputEvent: ")
-                .append("Cannot process input event: ")
-                .append("using 3-button nav and event is not a trackpad event"));
+        ActiveGestureLog.INSTANCE.addLog("TIS.onInputEvent: Cannot process input event: "
+                + "using 3-button nav and event is not a trackpad event");
         if (!enableActiveGestureProtoLog()) return;
-        ProtoLog.d(ACTIVE_GESTURE_LOG,
-                "TIS.onInputEvent: Cannot process input event: using 3-button nav and "
-                        + "event is not a trackpad event");
+        ProtoLog.d(ACTIVE_GESTURE_LOG, "TIS.onInputEvent: Cannot process input event: "
+                + "using 3-button nav and event is not a trackpad event");
     }
 
     public static void logPreloadRecentsAnimation() {
@@ -226,31 +209,23 @@ public class ActiveGestureProtoLogProxy {
     }
 
     public static void logInputConsumerBecameActive(@NonNull String consumerName) {
-        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(consumerName)
-                .append(" became active"));
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "%s became active", consumerName));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "%s became active", consumerName);
     }
 
     public static void logTaskLaunchFailed(int launchedTaskId) {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("Launch failed, task (id=")
-                        .append(launchedTaskId)
-                        .append(") finished mid transition"));
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "Launch failed, task (id=%d) finished mid transition", launchedTaskId));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
                 "Launch failed, task (id=%d) finished mid transition", launchedTaskId);
     }
 
-    public static void logMotionPauseDetectorEvent(@NonNull String event) {
-        ActiveGestureLog.INSTANCE.addLog(event);
-        if (!enableActiveGestureProtoLog()) return;
-        ProtoLog.d(ACTIVE_GESTURE_LOG, "MotionPauseDetector: %s", event);
-    }
-
     public static void logOnPageEndTransition(int nextPageIndex) {
-        ActiveGestureLog.INSTANCE.addLog(
-                "onPageEndTransition: current page index updated", nextPageIndex);
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "onPageEndTransition: current page index updated: %d", nextPageIndex));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
                 "onPageEndTransition: current page index updated: %d", nextPageIndex);
@@ -258,9 +233,8 @@ public class ActiveGestureProtoLogProxy {
 
     public static void logQuickSwitchFromHomeFallback(int taskIndex) {
         ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
-                        "Quick switch from home fallback case: The TaskView at index ")
-                        .append(taskIndex)
-                        .append(" is missing."),
+                "Quick switch from home fallback case: The TaskView at index %d is missing.",
+                        taskIndex),
                 QUICK_SWITCH_FROM_HOME_FALLBACK);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
@@ -270,9 +244,8 @@ public class ActiveGestureProtoLogProxy {
 
     public static void logQuickSwitchFromHomeFailed(int taskIndex) {
         ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
-                        "Quick switch from home failed: TaskViews at indices ")
-                        .append(taskIndex)
-                        .append(" and 0 are missing."),
+                "Quick switch from home failed: TaskViews at indices %d and 0 are missing.",
+                        taskIndex),
                 QUICK_SWITCH_FROM_HOME_FAILED);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
@@ -281,50 +254,44 @@ public class ActiveGestureProtoLogProxy {
     }
 
     public static void logFinishRecentsAnimation(boolean toRecents) {
-        ActiveGestureLog.INSTANCE.addLog(
-                /* event= */ "finishRecentsAnimation",
-                /* extras= */ toRecents,
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "finishRecentsAnimation: %b", toRecents),
                 /* gestureEvent= */ FINISH_RECENTS_ANIMATION);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "finishRecentsAnimation: %b", toRecents);
     }
 
     public static void logSetEndTarget(@NonNull String target) {
-        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString("setEndTarget ")
-                        .append(target),
-                /* gestureEvent= */ SET_END_TARGET);
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "setEndTarget %s", target), /* gestureEvent= */ SET_END_TARGET);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "setEndTarget %s", target);
     }
 
     public static void logStartHomeIntent(@NonNull String reason) {
         ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
-                "OverviewComponentObserver.startHomeIntent: ").append(reason));
+                "OverviewComponentObserver.startHomeIntent: %s", reason));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "OverviewComponentObserver.startHomeIntent: %s", reason);
     }
 
     public static void logRunningTaskPackage(@NonNull String packageName) {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("Current running task package name=")
-                        .append(packageName));
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "Current running task package name=%s", packageName));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "Current running task package name=%s", packageName);
     }
 
     public static void logSysuiStateFlags(@NonNull String stateFlags) {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("Current SystemUi state flags=")
-                        .append(stateFlags));
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "Current SystemUi state flags=%s", stateFlags));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "Current SystemUi state flags=%s", stateFlags);
     }
 
     public static void logSetInputConsumer(@NonNull String consumerName, @NonNull String reason) {
-        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString("setInputConsumer: ")
-                .append(consumerName)
-                .append(". reason(s):")
-                .append(reason));
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "setInputConsumer: %s. reason(s):%s", consumerName, reason));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
                 "setInputConsumer: %s. reason(s):%s", consumerName, reason);
@@ -332,12 +299,11 @@ public class ActiveGestureProtoLogProxy {
 
     public static void logUpdateGestureStateRunningTask(
             @NonNull String otherTaskPackage, @NonNull String runningTaskPackage) {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("Changing active task to ")
-                        .append(otherTaskPackage)
-                        .append(" because the previous task running on top of this one (")
-                        .append(runningTaskPackage)
-                        .append(") was excluded from recents"));
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "Changing active task to %s because the previous task running on top of this "
+                        + "one (%s) was excluded from recents",
+                otherTaskPackage,
+                runningTaskPackage));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
                 "Changing active task to %s because the previous task running on top of this "
@@ -349,15 +315,8 @@ public class ActiveGestureProtoLogProxy {
     public static void logOnInputEventActionUp(
             int x, int y, int action, @NonNull String classification) {
         String actionString = MotionEvent.actionToString(action);
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("onMotionEvent(")
-                        .append(x)
-                        .append(", ")
-                        .append(y)
-                        .append("): ")
-                        .append(actionString)
-                        .append(", ")
-                        .append(classification),
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "onMotionEvent(%d, %d): %s, %s", x, y, actionString, classification),
                 /* gestureEvent= */ action == ACTION_DOWN
                         ? MOTION_DOWN
                         : MOTION_UP);
@@ -368,13 +327,11 @@ public class ActiveGestureProtoLogProxy {
 
     public static void logOnInputEventActionMove(
             @NonNull String action, @NonNull String classification, int pointerCount) {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("onMotionEvent: ")
-                        .append(action)
-                        .append(",")
-                        .append(classification)
-                        .append(", pointerCount: ")
-                        .append(pointerCount),
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                        "onMotionEvent: %s, %s, pointerCount: %d",
+                        action,
+                        classification,
+                        pointerCount),
                 MOTION_MOVE);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
@@ -383,23 +340,19 @@ public class ActiveGestureProtoLogProxy {
 
     public static void logOnInputEventGenericAction(
             @NonNull String action, @NonNull String classification) {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("onMotionEvent: ")
-                        .append(action)
-                        .append(",")
-                        .append(classification));
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "onMotionEvent: %s, %s", action, classification));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "onMotionEvent: %s, %s", action, classification);
     }
 
     public static void logOnInputEventNavModeSwitched(
             @NonNull String startNavMode, @NonNull String currentNavMode) {
-        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString("TIS.onInputEvent: ")
-                        .append("Navigation mode switched mid-gesture (")
-                        .append(startNavMode)
-                        .append(" -> ")
-                        .append(currentNavMode)
-                        .append("); cancelling gesture."),
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "TIS.onInputEvent: Navigation mode switched mid-gesture (%s -> %s); "
+                        + "cancelling gesture.",
+                        startNavMode,
+                        currentNavMode),
                 NAVIGATION_MODE_SWITCHED);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
@@ -410,84 +363,100 @@ public class ActiveGestureProtoLogProxy {
     }
 
     public static void logUnknownInputEvent(@NonNull String event) {
-        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString("TIS.onInputEvent: ")
-                .append("Cannot process input event: received unknown event ")
-                .append(event));
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "TIS.onInputEvent: Cannot process input event: received unknown event %s", event));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
                 "TIS.onInputEvent: Cannot process input event: received unknown event %s", event);
-
     }
 
     public static void logFinishRunningRecentsAnimation(boolean toHome) {
-        ActiveGestureLog.INSTANCE.addLog(
-                /* event= */ "finishRunningRecentsAnimation", toHome);
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "finishRunningRecentsAnimation: %b", toHome));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "finishRunningRecentsAnimation: %b", toHome);
-
     }
 
     public static void logOnRecentsAnimationStartCancelled() {
-        ActiveGestureLog.INSTANCE.addLog(
-                /* event= */ "RecentsAnimationCallbacks.onAnimationStart (canceled)",
-                /* extras= */ 0,
+        ActiveGestureLog.INSTANCE.addLog("RecentsAnimationCallbacks.onAnimationStart (canceled): 0",
                 /* gestureEvent= */ ON_START_RECENTS_ANIMATION);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "RecentsAnimationCallbacks.onAnimationStart (canceled): 0");
-
     }
 
     public static void logOnRecentsAnimationStart(int appCount) {
-        ActiveGestureLog.INSTANCE.addLog(
-                /* event= */ "RecentsAnimationCallbacks.onAnimationStart",
-                /* extras= */ appCount,
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "RecentsAnimationCallbacks.onAnimationStart (canceled): %d", appCount),
                 /* gestureEvent= */ ON_START_RECENTS_ANIMATION);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
                 "RecentsAnimationCallbacks.onAnimationStart (canceled): %d", appCount);
-
     }
 
     public static void logStartRecentsAnimationCallback(@NonNull String callback) {
         ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
-                "TaskAnimationManager.startRecentsAnimation(")
-                .append(callback)
-                .append("): ")
-                .append("Setting mRecentsAnimationStartPending = false"));
+                "TaskAnimationManager.startRecentsAnimation(%s): "
+                        + "Setting mRecentsAnimationStartPending = false",
+                callback));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
                 "TaskAnimationManager.startRecentsAnimation(%s): "
                         + "Setting mRecentsAnimationStartPending = false",
                 callback);
-
     }
 
     public static void logSettingRecentsAnimationStartPending(boolean value) {
         ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
-                "TaskAnimationManager.startRecentsAnimation: ")
-                .append("Setting mRecentsAnimationStartPending = ")
-                .append(value));
+                "TaskAnimationManager.startRecentsAnimation: "
+                        + "Setting mRecentsAnimationStartPending = %b",
+                value));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
                 "TaskAnimationManager.startRecentsAnimation: "
                         + "Setting mRecentsAnimationStartPending = %b",
                 value);
-
     }
 
     public static void logLaunchingSideTask(int taskId) {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("Launching side task id=")
-                        .append(taskId));
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "Launching side task id=%d", taskId));
         if (!enableActiveGestureProtoLog()) return;
-        ProtoLog.d(ACTIVE_GESTURE_LOG, "Launching side task id=", taskId);
-
+        ProtoLog.d(ACTIVE_GESTURE_LOG, "Launching side task id=%d", taskId);
     }
 
-    public static void logDynamicString(@NonNull String string) {
-        logDynamicString(string, null);
+    public static void logOnInputEventActionDown(@NonNull ActiveGestureLog.CompoundString reason) {
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "TIS.onMotionEvent: ").append(reason));
+        if (!enableActiveGestureProtoLog()) return;
+        ProtoLog.d(ACTIVE_GESTURE_LOG, "TIS.onMotionEvent: %s", reason.toString());
     }
 
+    public static void logStartNewTask(@NonNull ActiveGestureLog.CompoundString tasks) {
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "Launching task: ").append(tasks));
+        if (!enableActiveGestureProtoLog()) return;
+        ProtoLog.d(ACTIVE_GESTURE_LOG, "TIS.onMotionEvent: %s", tasks.toString());
+    }
+
+    public static void logMotionPauseDetectorEvent(@NonNull ActiveGestureLog.CompoundString event) {
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "MotionPauseDetector: ").append(event));
+        if (!enableActiveGestureProtoLog()) return;
+        ProtoLog.d(ACTIVE_GESTURE_LOG, "MotionPauseDetector: %s", event.toString());
+    }
+
+    public static void logHandleTaskAppearedFailed(
+            @NonNull ActiveGestureLog.CompoundString reason) {
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "handleTaskAppeared check failed: ").append(reason));
+        if (!enableActiveGestureProtoLog()) return;
+        ProtoLog.d(ACTIVE_GESTURE_LOG, "handleTaskAppeared check failed: %s", reason.toString());
+    }
+
+    /**
+     * This is for special cases where the string is purely dynamic and therefore has no format that
+     * can be extracted. Do not use in any other case.
+     */
     public static void logDynamicString(
             @NonNull String string,
             @Nullable ActiveGestureErrorDetector.GestureEvent gestureEvent) {
@@ -497,22 +466,19 @@ public class ActiveGestureProtoLogProxy {
     }
 
     public static void logOnSettledOnEndTarget(@NonNull String endTarget) {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("onSettledOnEndTarget ")
-                        .append(endTarget),
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "onSettledOnEndTarget %s", endTarget),
                 /* gestureEvent= */ ON_SETTLED_ON_END_TARGET);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG, "onSettledOnEndTarget %s", endTarget);
     }
 
     public static void logOnCalculateEndTarget(float velocityX, float velocityY, double angle) {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("calculateEndTarget: velocities=(x=")
-                        .append(velocityX)
-                        .append("dp/ms, y=")
-                        .append(velocityY)
-                        .append("dp/ms), angle=")
-                        .append(angle),
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "calculateEndTarget: velocities=(x=%fdp/ms, y=%fdp/ms), angle=%f",
+                        velocityX,
+                        velocityY,
+                        angle),
                 velocityX == 0 && velocityY == 0 ? INVALID_VELOCITY_ON_SWIPE_UP : null);
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
@@ -523,12 +489,10 @@ public class ActiveGestureProtoLogProxy {
     }
 
     public static void logUnexpectedTaskAppeared(int taskId, @NonNull String packageName) {
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("Forcefully finishing recents animation: ")
-                        .append("Unexpected task appeared id=")
-                        .append(taskId)
-                        .append(" pkg=")
-                        .append(packageName));
+        ActiveGestureLog.INSTANCE.addLog(new ActiveGestureLog.CompoundString(
+                "Forcefully finishing recents animation: Unexpected task appeared id=%d, pkg=%s",
+                taskId,
+                packageName));
         if (!enableActiveGestureProtoLog()) return;
         ProtoLog.d(ACTIVE_GESTURE_LOG,
                 "Forcefully finishing recents animation: Unexpected task appeared id=%d, pkg=%s",
