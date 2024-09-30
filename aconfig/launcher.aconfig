@@ -434,6 +434,13 @@ flag {
     bug: "293182501"
 }
 
+flag {
+    name: "enable_recents_window_proto_log"
+    namespace: "launcher"
+    description: "Enables tracking recents window logs in ProtoLog"
+    bug: "292269949"
+}
+
 
 flag {
     name: "coordinate_workspace_scale"
