@@ -240,7 +240,7 @@ class TransientBubbleStashControllerTest {
         mTransientBubbleStashController.isStashed = false
         whenever(bubbleBarViewController.isHiddenForNoBubbles).thenReturn(false)
 
-        // When unstash
+        // When stash
         getInstrumentation().runOnMainSync {
             mTransientBubbleStashController.updateStashedAndExpandedState(
                 stash = true,
