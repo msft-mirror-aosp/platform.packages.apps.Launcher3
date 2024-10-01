@@ -743,6 +743,7 @@ public class SplitSelectStateController {
      */
     public void resetState() {
         mSplitSelectDataHolder.resetState();
+        mContainer.<RecentsView>getOverviewPanel().resetDesktopTaskFromSplitSelectState();
         dispatchOnSplitSelectionExit();
         mRecentsAnimationRunning = false;
         mLaunchingTaskView = null;
