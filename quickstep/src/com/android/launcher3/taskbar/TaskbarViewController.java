@@ -159,7 +159,9 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     private final View.OnLayoutChangeListener mTaskbarViewLayoutChangeListener =
             (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
                 updateTaskbarIconTranslationXForPinning();
-                mControllers.navbarButtonsViewController.onTaskbarLayoutChanged();
+                if (BubbleBarController.isBubbleBarEnabled()) {
+                    mControllers.navbarButtonsViewController.onLayoutsUpdated();
+                }
             };
 
     // Animation to align icons with Launcher, created lazily. This allows the controller to be

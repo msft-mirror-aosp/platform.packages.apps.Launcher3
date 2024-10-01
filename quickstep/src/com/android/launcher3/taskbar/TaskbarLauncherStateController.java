@@ -845,43 +845,49 @@ public class TaskbarLauncherStateController {
     }
 
     /** Updates launcher home screen appearance accordingly to the bubble bar location. */
-    public void onBubbleBarLocationChanged(BubbleBarLocation location, boolean animate) {
-        DeviceProfile deviceProfile = mLauncher.getDeviceProfile();
-        if (mBubbleBarLocation == location) return;
+    public void onBubbleBarLocationChanged(@Nullable BubbleBarLocation location, boolean animate) {
         mBubbleBarLocation = location;
+        if (location == null) {
+            // bubble bar is not present, hence no location, resetting the hotseat
+            updateHotseatAndQsbTranslationX(0, animate);
+            mBubbleBarLocation = null;
+            return;
+        }
+        DeviceProfile deviceProfile = mLauncher.getDeviceProfile();
         if (!deviceProfile.shouldAdjustHotseatOnBubblesLocationUpdate(
                 mControllers.taskbarActivityContext)) {
             return;
         }
-        int targetX = 0;
-        if (mBubbleBarLocation != null) {
-            boolean isBubblesOnLeft = location.isOnLeft(isRtl(mLauncher.getResources()));
-            targetX = deviceProfile.getHotseatTranslationXForBubbleBar(/* isNavbarOnRight= */
-                    isBubblesOnLeft);
-        }
+        boolean isBubblesOnLeft = location.isOnLeft(isRtl(mLauncher.getResources()));
+        int targetX = deviceProfile
+                .getHotseatTranslationXForBubbleBar(/* isNavbarOnRight= */ isBubblesOnLeft);
         updateHotseatAndQsbTranslationX(targetX, animate);
     }
 
+    /** Used to translate hotseat and QSB to make room for bubbles. */
     private void updateHotseatAndQsbTranslationX(float targetValue, boolean animate) {
         // cancel existing animation
         if (mHotseatTranslationXAnimation != null) {
             mHotseatTranslationXAnimation.cancel();
+            mHotseatTranslationXAnimation = null;
         }
-        Runnable alignTaskbar = new Runnable() {
+        Runnable postAnimationAction = new Runnable() {
             @Override
             public void run() {
+                mHotseatTranslationXAnimation = null;
                 // We only need to align the task bar when on launcher home screen
                 if (mControllers.taskbarStashController.isOnHome()) {
-                    DeviceProfile dp = mLauncher.getDeviceProfile();
-                    mControllers.taskbarViewController
-                            .setLauncherIconAlignment(/* alignmentRatio = */ 1, dp);
+                    mControllers.taskbarViewController.setLauncherIconAlignment(
+                            /* alignmentRatio = */ 1,
+                            mLauncher.getDeviceProfile()
+                    );
                 }
             }
         };
         Hotseat hotseat = mLauncher.getHotseat();
         AnimatorSet translationXAnimation = new AnimatorSet();
-        MultiProperty iconsTranslationX = hotseat.getIconsTranslationX(
-                Hotseat.ICONS_TRANSLATION_X_NAV_BAR_ALIGNMENT);
+        MultiProperty iconsTranslationX = mLauncher.getHotseat()
+                .getIconsTranslationX(Hotseat.ICONS_TRANSLATION_X_NAV_BAR_ALIGNMENT);
         if (animate) {
             translationXAnimation.playTogether(iconsTranslationX.animateToValue(targetValue));
         } else {
@@ -900,17 +906,16 @@ public class TaskbarLauncherStateController {
             }
         }
         if (!animate) {
-            alignTaskbar.run();
+            postAnimationAction.run();
             return;
         }
         mHotseatTranslationXAnimation = translationXAnimation;
         translationXAnimation.setStartDelay(FADE_OUT_ANIM_POSITION_DURATION_MS);
         translationXAnimation.setDuration(FADE_IN_ANIM_ALPHA_DURATION_MS);
         translationXAnimation.setInterpolator(Interpolators.EMPHASIZED);
-        translationXAnimation.addListener(AnimatorListeners.forEndCallback(alignTaskbar));
+        translationXAnimation.addListener(AnimatorListeners.forEndCallback(postAnimationAction));
         translationXAnimation.start();
     }
-
 
     private final class TaskBarRecentsAnimationListener implements
             RecentsAnimationCallbacks.RecentsAnimationListener {
