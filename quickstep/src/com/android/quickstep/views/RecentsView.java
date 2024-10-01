@@ -1706,10 +1706,11 @@ public abstract class RecentsView<
                     return;
                 }
                 TaskView taskView = getTaskViewAt(mNextPage);
-                // Snap to fully visible focused task and clear all button.
                 boolean shouldSnapToLargeTask = taskView != null && taskView.isLargeTile()
-                        && isTaskViewFullyVisible(taskView);
+                        && !mUtils.isAnySmallTaskFullyVisible(getTaskViews(),
+                        this::isTaskViewFullyVisible);
                 boolean shouldSnapToClearAll = mNextPage == indexOfChild(mClearAllButton);
+                // Snap to large tile when grid tasks aren't fully visible or the clear all button.
                 if (!shouldSnapToLargeTask && !shouldSnapToClearAll) {
                     return;
                 }

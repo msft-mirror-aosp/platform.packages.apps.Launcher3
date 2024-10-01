@@ -113,6 +113,12 @@ class RecentsViewUtils {
             it.isVisibleInCarousel(runningTaskView, nonRunningTaskCarouselHidden)
         }
 
+    /** Returns if any small tasks are fully visible */
+    fun isAnySmallTaskFullyVisible(
+        taskViews: Iterable<TaskView>,
+        isTaskViewFullyVisible: (TaskView) -> Boolean,
+    ): Boolean = taskViews.any { !it.isLargeTile && isTaskViewFullyVisible(it) }
+
     /** Returns the current list of [TaskView] children. */
     fun getTaskViews(taskViewCount: Int, requireTaskViewAt: (Int) -> TaskView): Iterable<TaskView> =
         (0 until taskViewCount).map(requireTaskViewAt)
