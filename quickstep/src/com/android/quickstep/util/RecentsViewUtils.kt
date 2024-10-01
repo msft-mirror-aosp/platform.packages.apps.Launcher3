@@ -83,22 +83,22 @@ class RecentsViewUtils {
 
     /** Returns the first [TaskView], with some tasks possibly hidden in the carousel. */
     fun getFirstTaskViewInCarousel(
-        nonRunningTaskCategoryHidden: Boolean,
+        nonRunningTaskCarouselHidden: Boolean,
         taskViews: Iterable<TaskView>,
         runningTaskView: TaskView?,
     ): TaskView? =
         taskViews.firstOrNull {
-            it.isVisibleInCarousel(runningTaskView, nonRunningTaskCategoryHidden)
+            it.isVisibleInCarousel(runningTaskView, nonRunningTaskCarouselHidden)
         }
 
     /** Returns the last [TaskView], with some tasks possibly hidden in the carousel. */
     fun getLastTaskViewInCarousel(
-        nonRunningTaskCategoryHidden: Boolean,
+        nonRunningTaskCarouselHidden: Boolean,
         taskViews: Iterable<TaskView>,
         runningTaskView: TaskView?,
     ): TaskView? =
         taskViews.lastOrNull {
-            it.isVisibleInCarousel(runningTaskView, nonRunningTaskCategoryHidden)
+            it.isVisibleInCarousel(runningTaskView, nonRunningTaskCarouselHidden)
         }
 
     /** Returns the current list of [TaskView] children. */
@@ -109,28 +109,33 @@ class RecentsViewUtils {
     fun applyAttachAlpha(
         taskViews: Iterable<TaskView>,
         runningTaskView: TaskView?,
-        runningTaskTileHidden: Boolean,
-        nonRunningTaskCategoryHidden: Boolean,
+        runningTaskAttachAlpha: Float,
+        nonRunningTaskCarouselHidden: Boolean,
     ) {
         taskViews.forEach { taskView ->
-            val isVisible =
-                if (taskView == runningTaskView) !runningTaskTileHidden
-                else taskView.isVisibleInCarousel(runningTaskView, nonRunningTaskCategoryHidden)
-            taskView.attachAlpha = if (isVisible) 1f else 0f
+            taskView.attachAlpha =
+                if (taskView == runningTaskView) {
+                    runningTaskAttachAlpha
+                } else {
+                    if (taskView.isVisibleInCarousel(runningTaskView, nonRunningTaskCarouselHidden))
+                        1f
+                    else 0f
+                }
         }
     }
 
-    private fun TaskView.isVisibleInCarousel(
+    fun TaskView.isVisibleInCarousel(
         runningTaskView: TaskView?,
-        nonRunningTaskCategoryHidden: Boolean,
+        nonRunningTaskCarouselHidden: Boolean,
     ): Boolean =
-        if (!nonRunningTaskCategoryHidden) true
-        else if (runningTaskView == null) true else getCategory() == runningTaskView.getCategory()
+        if (!nonRunningTaskCarouselHidden) true
+        else getCarouselType() == runningTaskView.getCarouselType()
 
-    private fun TaskView.getCategory(): TaskViewCategory =
-        if (this is DesktopTaskView) TaskViewCategory.DESKTOP else TaskViewCategory.FULL_SCREEN
+    /** Returns the carousel type of the TaskView, and default to fullscreen if it's null. */
+    private fun TaskView?.getCarouselType(): TaskViewCarousel =
+        if (this is DesktopTaskView) TaskViewCarousel.DESKTOP else TaskViewCarousel.FULL_SCREEN
 
-    private enum class TaskViewCategory {
+    private enum class TaskViewCarousel {
         FULL_SCREEN,
         DESKTOP,
     }
