@@ -40,8 +40,6 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
     ConstraintLayout(context) {
 
     private companion object {
-        // the minimum progress of the expansion animation before the triangle is made visible.
-        const val MIN_EXPANSION_PROGRESS_FOR_TRIANGLE = 0.1f
         // the minimum progress of the expansion animation before the content starts fading in.
         const val MIN_EXPANSION_PROGRESS_FOR_CONTENT_ALPHA = 0.75f
     }
@@ -92,6 +90,11 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
             context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_max_width)
         }
 
+    private val flyoutElevation by
+        lazy(LazyThreadSafetyMode.NONE) {
+            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_elevation).toFloat()
+        }
+
     /** The bounds of the background rect. */
     private val backgroundRect = RectF()
     private val cornerRadius: Float
@@ -108,6 +111,10 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
     private var collapsedCornerRadius = 0f
     /** The color of the flyout when collapsed. */
     private var collapsedColor = 0
+    /** The elevation of the flyout when collapsed. */
+    private var collapsedElevation = 0f
+    /** The minimum progress of the expansion animation before the triangle is made visible. */
+    private var minExpansionProgressForTriangle = 0f
 
     /** The corner radius of the background according to the progress of the animation. */
     private val currentCornerRadius
@@ -141,8 +148,7 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
         val padding = context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_padding)
         // add extra padding to the bottom of the view to include the triangle
         setPadding(padding, padding, padding, padding + triangleHeight - triangleOverlap)
-        translationZ =
-            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_elevation).toFloat()
+        translationZ = flyoutElevation
 
         RoundedArrowDrawable.addDownPointingRoundedTriangleToPath(
             triangleWidth.toFloat(),
@@ -182,6 +188,12 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
         collapsedSize = positioner.collapsedSize
         collapsedCornerRadius = collapsedSize / 2
         collapsedColor = positioner.collapsedColor
+        collapsedElevation = positioner.collapsedElevation
+
+        // calculate the expansion progress required before we start showing the triangle as part of
+        // the expansion animation
+        minExpansionProgressForTriangle =
+            positioner.distanceToRevealTriangle / tyToCollapsedPosition
 
         // post the request to start the expand animation to the looper so the view can measure
         // itself
@@ -240,6 +252,9 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
         message.alpha = alpha
         avatar.alpha = alpha
 
+        translationZ =
+            collapsedElevation + (flyoutElevation - collapsedElevation) * expansionProgress
+
         invalidate()
     }
 
@@ -275,7 +290,7 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
             currentCornerRadius,
             backgroundPaint,
         )
-        if (expansionProgress >= MIN_EXPANSION_PROGRESS_FOR_TRIANGLE) {
+        if (expansionProgress >= minExpansionProgressForTriangle) {
             drawTriangle(canvas)
         }
         canvas.restore()
@@ -291,9 +306,20 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
             } else {
                 width - currentCornerRadius - triangleWidth
             }
-        // instead of scaling the triangle, increasingly reveal it from the background, starting
-        // with half the size. this has the effect of the triangle scaling.
-        val triangleY = height - triangleHeight - 0.5f * triangleHeight * (1 - expansionProgress)
+        // instead of scaling the triangle, increasingly reveal it from the background. this has the
+        // effect of the triangle scaling.
+
+        // the translation y of the triangle before we start revealing it. align its bottom with the
+        // bottom of the rect
+        val triangleYCollapsed = height - triangleHeight - (triangleHeight - triangleOverlap)
+        // the translation y of the triangle when it's fully revealed
+        val triangleYExpanded = height - triangleHeight
+        val interpolatedExpansion =
+            ((expansionProgress - minExpansionProgressForTriangle) /
+                    (1 - minExpansionProgressForTriangle))
+                .coerceIn(0f, 1f)
+        val triangleY =
+            triangleYCollapsed + (triangleYExpanded - triangleYCollapsed) * interpolatedExpansion
         canvas.translate(triangleX, triangleY)
         canvas.drawPath(triangle, backgroundPaint)
         triangleOutline.setPath(triangle)
@@ -309,7 +335,7 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
             currentCornerRadius,
             Path.Direction.CW,
         )
-        if (expansionProgress >= MIN_EXPANSION_PROGRESS_FOR_TRIANGLE) {
+        if (expansionProgress >= minExpansionProgressForTriangle) {
             path.addPath(triangleOutline.mPath)
         }
         outline.setPath(path)
