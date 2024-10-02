@@ -73,9 +73,21 @@ class RecentsViewUtils {
      * Returns the first TaskView that should be displayed as a large tile.
      *
      * @param taskViews List of [TaskView]s
+     * @param splitSelectActive current split state
      */
-    fun getFirstLargeTaskView(taskViews: Iterable<TaskView>): TaskView? =
-        taskViews.firstOrNull { it.isLargeTile }
+    fun getFirstLargeTaskView(
+        taskViews: MutableIterable<TaskView>,
+        splitSelectActive: Boolean,
+    ): TaskView? =
+        taskViews.firstOrNull { it.isLargeTile && !(splitSelectActive && it is DesktopTaskView) }
+
+    /**
+     * Returns the first TaskView that is not large
+     *
+     * @param taskViews List of [TaskView]s
+     */
+    fun getFirstSmallTaskView(taskViews: MutableIterable<TaskView>): TaskView? =
+        taskViews.firstOrNull { !it.isLargeTile }
 
     /** Returns the last TaskView that should be displayed as a large tile. */
     fun getLastLargeTaskView(taskViews: Iterable<TaskView>): TaskView? =
@@ -100,6 +112,12 @@ class RecentsViewUtils {
         taskViews.lastOrNull {
             it.isVisibleInCarousel(runningTaskView, nonRunningTaskCarouselHidden)
         }
+
+    /** Returns if any small tasks are fully visible */
+    fun isAnySmallTaskFullyVisible(
+        taskViews: Iterable<TaskView>,
+        isTaskViewFullyVisible: (TaskView) -> Boolean,
+    ): Boolean = taskViews.any { !it.isLargeTile && isTaskViewFullyVisible(it) }
 
     /** Returns the current list of [TaskView] children. */
     fun getTaskViews(taskViewCount: Int, requireTaskViewAt: (Int) -> TaskView): Iterable<TaskView> =
