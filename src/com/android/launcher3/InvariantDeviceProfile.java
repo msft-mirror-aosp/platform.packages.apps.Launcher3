@@ -16,6 +16,7 @@
 
 package com.android.launcher3;
 
+import static com.android.launcher3.LauncherPrefs.FIXED_LANDSCAPE_MODE;
 import static com.android.launcher3.LauncherPrefs.GRID_NAME;
 import static com.android.launcher3.Utilities.dpiFromPx;
 import static com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE;
@@ -86,7 +87,8 @@ public class InvariantDeviceProfile implements SafeCloseable {
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({TYPE_PHONE, TYPE_MULTI_DISPLAY, TYPE_TABLET})
-    public @interface DeviceType {}
+    public @interface DeviceType {
+    }
 
     public static final int TYPE_PHONE = 0;
     public static final int TYPE_MULTI_DISPLAY = 1;
@@ -210,6 +212,13 @@ public class InvariantDeviceProfile implements SafeCloseable {
     @XmlRes
     public int allAppsCellSpecsTwoPanelId = INVALID_RESOURCE_HANDLE;
 
+
+    /**
+     * Fixed landscape mode is the landscape on the phones.
+     */
+    public boolean isFixedLandscapeMode = false;
+    private LauncherPrefChangeListener mLandscapeModePreferenceListener;
+
     public String dbFile;
     public int defaultLayoutId;
     public int demoModeLayoutId;
@@ -225,7 +234,8 @@ public class InvariantDeviceProfile implements SafeCloseable {
     private final ArrayList<OnIDPChangeListener> mChangeListeners = new ArrayList<>();
 
     @VisibleForTesting
-    public InvariantDeviceProfile() { }
+    public InvariantDeviceProfile() {
+    }
 
     @TargetApi(23)
     private InvariantDeviceProfile(Context context) {
@@ -243,6 +253,18 @@ public class InvariantDeviceProfile implements SafeCloseable {
                         onConfigChanged(displayContext);
                     }
                 });
+        if (Flags.oneGridSpecs()) {
+            mLandscapeModePreferenceListener = (String s) -> {
+                boolean newFixedLandscapeValue = FIXED_LANDSCAPE_MODE.get(context);
+                if (isFixedLandscapeMode != newFixedLandscapeValue) {
+                    setFixedLandscape(context, newFixedLandscapeValue);
+                }
+            };
+            LauncherPrefs.INSTANCE.get(context).addListener(
+                    mLandscapeModePreferenceListener,
+                    FIXED_LANDSCAPE_MODE
+            );
+        }
     }
 
     /**
@@ -268,8 +290,13 @@ public class InvariantDeviceProfile implements SafeCloseable {
         @DeviceType int defaultDeviceType = defaultInfo.getDeviceType();
         DisplayOption defaultDisplayOption = invDistWeightedInterpolate(
                 defaultInfo,
-                getPredefinedDeviceProfiles(context, gridName, defaultInfo,
-                        /*allowDisabledGrid=*/false),
+                getPredefinedDeviceProfiles(
+                        context,
+                        gridName,
+                        defaultInfo,
+                        /*allowDisabledGrid=*/false,
+                        isFixedLandscapeMode
+                ),
                 defaultDeviceType);
 
         Context displayContext = context.createDisplayContext(display);
@@ -277,8 +304,13 @@ public class InvariantDeviceProfile implements SafeCloseable {
         @DeviceType int deviceType = myInfo.getDeviceType();
         DisplayOption myDisplayOption = invDistWeightedInterpolate(
                 myInfo,
-                getPredefinedDeviceProfiles(context, gridName, myInfo,
-                        /*allowDisabledGrid=*/false),
+                getPredefinedDeviceProfiles(
+                        context,
+                        gridName,
+                        myInfo,
+                        /*allowDisabledGrid=*/false,
+                        isFixedLandscapeMode
+                ),
                 deviceType);
 
         DisplayOption result = new DisplayOption(defaultDisplayOption.grid)
@@ -301,6 +333,11 @@ public class InvariantDeviceProfile implements SafeCloseable {
     @Override
     public void close() {
         DisplayController.INSTANCE.executeIfCreated(dc -> dc.setPriorityListener(null));
+        if (mLandscapeModePreferenceListener != null) {
+            LauncherPrefs.INSTANCE.executeIfCreated(
+                    lp -> lp.removeListener(mLandscapeModePreferenceListener, FIXED_LANDSCAPE_MODE)
+            );
+        }
     }
 
     public static String getCurrentGridName(Context context) {
@@ -310,8 +347,13 @@ public class InvariantDeviceProfile implements SafeCloseable {
     private String initGrid(Context context, String gridName) {
         Info displayInfo = DisplayController.INSTANCE.get(context).getInfo();
 
-        List<DisplayOption> allOptions = getPredefinedDeviceProfiles(context, gridName,
-                displayInfo, RestoreDbTask.isPending(context));
+        List<DisplayOption> allOptions = getPredefinedDeviceProfiles(
+                context,
+                gridName,
+                displayInfo,
+                RestoreDbTask.isPending(context),
+                FIXED_LANDSCAPE_MODE.get(context)
+        );
 
         // Filter out options that don't have the same number of columns as the grid
         DeviceGridState deviceGridState = new DeviceGridState(context);
@@ -320,8 +362,8 @@ public class InvariantDeviceProfile implements SafeCloseable {
 
         DisplayOption displayOption =
                 invDistWeightedInterpolate(displayInfo, allOptionsFilteredByColCount.isEmpty()
-                        ? new ArrayList<>(allOptions)
-                        : new ArrayList<>(allOptionsFilteredByColCount),
+                                ? new ArrayList<>(allOptions)
+                                : new ArrayList<>(allOptionsFilteredByColCount),
                         displayInfo.getDeviceType());
         initGrid(context, displayInfo, displayOption);
         return displayOption.grid.name;
@@ -425,6 +467,9 @@ public class InvariantDeviceProfile implements SafeCloseable {
 
         startAlignTaskbar = displayOption.startAlignTaskbar;
 
+        // Fixed Landscape mode
+        isFixedLandscapeMode = FIXED_LANDSCAPE_MODE.get(context) && Flags.oneGridSpecs();
+
         // If the partner customization apk contains any grid overrides, apply them
         // Supported overrides: numRows, numColumns, iconSize
         applyPartnerDeviceProfileOverrides(context, metrics);
@@ -480,13 +525,35 @@ public class InvariantDeviceProfile implements SafeCloseable {
         mChangeListeners.remove(listener);
     }
 
-    public void setCurrentGrid(Context context, String gridName) {
-        LauncherPrefs.get(context).put(GRID_NAME, gridName);
+    /**
+     * Updates the current grid, this triggers a new IDP, reloads the database and triggers a grid
+     * migration.
+     */
+    public void setCurrentGrid(Context context, String newGridName) {
+        LauncherPrefs.get(context).put(GRID_NAME, newGridName);
         MAIN_EXECUTOR.execute(() -> {
             Trace.beginSection("InvariantDeviceProfile#setCurrentGrid");
             onConfigChanged(context.getApplicationContext());
             Trace.endSection();
         });
+    }
+
+    /**
+     * Updates the mounted mode, this triggers a new IDP, reloads the database and triggers a grid
+     * migration.
+     */
+    public void setFixedLandscape(Context context, boolean isFixedLandscape) {
+        this.isFixedLandscapeMode = isFixedLandscape;
+        if (isFixedLandscape) {
+            // When in isFixedLandscape there should only be one default grid to choose from
+            MAIN_EXECUTOR.execute(() -> {
+                Trace.beginSection("InvariantDeviceProfile#setFixedLandscape");
+                onConfigChanged(context.getApplicationContext());
+                Trace.endSection();
+            });
+        } else {
+            setCurrentGrid(context, LauncherPrefs.get(context).get(GRID_NAME));
+        }
     }
 
     private Object[] toModelState() {
@@ -510,8 +577,20 @@ public class InvariantDeviceProfile implements SafeCloseable {
         }
     }
 
-    private static List<DisplayOption> getPredefinedDeviceProfiles(Context context, String gridName,
-            Info displayInfo, boolean allowDisabledGrid) {
+    private static boolean firstGridFilter(GridOption gridOption, int deviceType,
+            boolean allowDisabledGrid, boolean isFixedLandscapeMode) {
+        return (gridOption.isEnabled(deviceType) || allowDisabledGrid)
+                && ((gridOption.mIsFixedLandscape == isFixedLandscapeMode)
+                && gridOption.filterByFlag(deviceType));
+    }
+
+    private static List<DisplayOption> getPredefinedDeviceProfiles(
+            Context context,
+            String gridName,
+            Info displayInfo,
+            boolean allowDisabledGrid,
+            boolean isFixedLandscapeMode
+    ) {
         ArrayList<DisplayOption> profiles = new ArrayList<>();
 
         try (XmlResourceParser parser = context.getResources().getXml(R.xml.device_profiles)) {
@@ -521,11 +600,10 @@ public class InvariantDeviceProfile implements SafeCloseable {
                     parser.getDepth() > depth) && type != XmlPullParser.END_DOCUMENT) {
                 if ((type == XmlPullParser.START_TAG)
                         && GridOption.TAG_NAME.equals(parser.getName())) {
-
                     GridOption gridOption = new GridOption(
                             context, Xml.asAttributeSet(parser), displayInfo);
-                    if ((gridOption.isEnabled(displayInfo.getDeviceType()) || allowDisabledGrid)
-                            && gridOption.filterByFlag(displayInfo.getDeviceType())) {
+                    if (firstGridFilter(gridOption, displayInfo.getDeviceType(), allowDisabledGrid,
+                            isFixedLandscapeMode)) {
                         final int displayDepth = parser.getDepth();
                         while (((type = parser.next()) != XmlPullParser.END_TAG
                                 || parser.getDepth() > displayDepth)
@@ -542,7 +620,6 @@ public class InvariantDeviceProfile implements SafeCloseable {
         } catch (IOException | XmlPullParserException e) {
             throw new RuntimeException(e);
         }
-
         ArrayList<DisplayOption> filteredProfiles = new ArrayList<>();
         if (!TextUtils.isEmpty(gridName)) {
             for (DisplayOption option : profiles) {
@@ -650,7 +727,6 @@ public class InvariantDeviceProfile implements SafeCloseable {
      * supported. Ej. 4x4 -> normal, 5x4 -> practical, etc.
      * (Note: the name of the grid can be different for the same grid size depending of
      * the values of the InvariantDeviceProfile)
-     *
      */
     public String getGridNameFromSize(Context context, Point size) {
         return parseAllGridOptions(context).stream()
@@ -679,6 +755,8 @@ public class InvariantDeviceProfile implements SafeCloseable {
         return parseAllDefinedGridOptions(context, displayInfo)
                 .stream()
                 .filter(go -> go.isEnabled(deviceType))
+                // if in fixedLandscape, then only show fixed landscape grids
+                .filter(go -> go.mIsFixedLandscape == isFixedLandscapeMode)
                 .filter(go -> go.filterByFlag(deviceType))
                 .collect(Collectors.toList());
     }
@@ -950,6 +1028,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         private final int mAllAppsCellSpecsId;
         private final int mAllAppsCellSpecsTwoPanelId;
         private final int mRowCountSpecsId;
+        private final boolean mIsFixedLandscape;
 
         public GridOption(Context context, AttributeSet attrs, Info displayInfo) {
             TypedArray a = context.obtainStyledAttributes(
@@ -1091,6 +1170,8 @@ public class InvariantDeviceProfile implements SafeCloseable {
                 mNumAllAppsRowsForCellHeightCalculation = numRows;
             }
 
+            mIsFixedLandscape = a.getBoolean(R.styleable.GridDisplayOption_isFixedLandscape, false);
+
             int inlineForRotation = a.getInt(R.styleable.GridDisplayOption_inlineQsb,
                     DONT_INLINE_QSB);
             inlineQsb[INDEX_DEFAULT] =
@@ -1122,7 +1203,8 @@ public class InvariantDeviceProfile implements SafeCloseable {
         }
 
         public boolean isNewGridOption() {
-            return mRowCountSpecsId != INVALID_RESOURCE_HANDLE;
+            Log.d("HHHH", "GRID = " + mIsFixedLandscape);
+            return mRowCountSpecsId != INVALID_RESOURCE_HANDLE || mIsFixedLandscape;
         }
 
         public boolean filterByFlag(int deviceType) {
