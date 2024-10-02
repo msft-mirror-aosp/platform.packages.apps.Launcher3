@@ -667,7 +667,7 @@ public abstract class AbsSwipeUpHandler<
         TopTaskTracker.CachedTaskInfo cachedTaskInfo = mGestureState.getRunningTask();
         if (mIsSwipeForSplit) {
             int[] splitTaskIds = TopTaskTracker.INSTANCE.get(mContext).getRunningSplitTaskIds();
-            runningTasks = cachedTaskInfo.getPlaceholderTasks(splitTaskIds);
+            runningTasks = cachedTaskInfo.getSplitPlaceholderTasks(splitTaskIds);
         } else {
             runningTasks = cachedTaskInfo.getPlaceholderTasks();
         }
