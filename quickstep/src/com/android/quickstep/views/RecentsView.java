@@ -1706,10 +1706,11 @@ public abstract class RecentsView<
                     return;
                 }
                 TaskView taskView = getTaskViewAt(mNextPage);
-                // Snap to fully visible focused task and clear all button.
                 boolean shouldSnapToLargeTask = taskView != null && taskView.isLargeTile()
-                        && isTaskViewFullyVisible(taskView);
+                        && !mUtils.isAnySmallTaskFullyVisible(getTaskViews(),
+                        this::isTaskViewFullyVisible);
                 boolean shouldSnapToClearAll = mNextPage == indexOfChild(mClearAllButton);
+                // Snap to large tile when grid tasks aren't fully visible or the clear all button.
                 if (!shouldSnapToLargeTask && !shouldSnapToClearAll) {
                     return;
                 }
@@ -3611,10 +3612,10 @@ public abstract class RecentsView<
         float dismissedTaskWidth = 0;
         float nextFocusedTaskWidth = 0;
 
-        // Non-grid specific properties.
         int[] oldScroll = new int[count];
         int[] newScroll = new int[count];
         int scrollDiffPerPage = 0;
+        // Non-grid specific properties.
         boolean needsCurveUpdates = false;
 
         if (showAsGrid) {
@@ -3644,13 +3645,13 @@ public abstract class RecentsView<
                     }
                 }
             }
-        } else {
-            getPageScrolls(oldScroll, false, SIMPLE_SCROLL_LOGIC);
-            getPageScrolls(newScroll, false,
-                    v -> v.getVisibility() != GONE && v != dismissedTaskView);
-            if (count > 1) {
-                scrollDiffPerPage = Math.abs(oldScroll[1] - oldScroll[0]);
-            }
+        }
+
+        getPageScrolls(oldScroll, false, SIMPLE_SCROLL_LOGIC);
+        getPageScrolls(newScroll, false,
+                v -> v.getVisibility() != GONE && v != dismissedTaskView);
+        if (count > 1) {
+            scrollDiffPerPage = Math.abs(oldScroll[1] - oldScroll[0]);
         }
 
         float dismissTranslationInterpolationEnd = 1;
@@ -3802,7 +3803,9 @@ public abstract class RecentsView<
                         addDismissedTaskAnimations(dismissedTaskView, duration, anim);
                     }
                 }
-            } else if (!showAsGrid) {
+            } else if (!showAsGrid || (enableLargeDesktopWindowingTile()
+                    && dismissedTaskView.isLargeTile()
+                    && nextFocusedTaskView == null)) {
                 int offset = getOffsetToDismissedTask(scrollDiffPerPage, dismissedIndex, taskCount);
                 int scrollDiff = newScroll[i] - oldScroll[i] + offset;
                 if (scrollDiff != 0) {
@@ -3814,18 +3817,16 @@ public abstract class RecentsView<
                             splitTimings);
                     needsCurveUpdates = true;
                 }
-            } else if (child instanceof TaskView) {
-                TaskView taskView = (TaskView) child;
+            } else if (child instanceof TaskView taskView) {
                 if (isFocusedTaskDismissed) {
                     if (nextFocusedTaskView != null &&
                             !isSameGridRow(taskView, nextFocusedTaskView)) {
                         continue;
                     }
-                } else {
-                    if (i < dismissedIndex || !isSameGridRow(taskView, dismissedTaskView)) {
-                        continue;
-                    }
+                } else if (i < dismissedIndex || !isSameGridRow(taskView, dismissedTaskView)) {
+                    continue;
                 }
+
                 // Animate task with index >= dismissed index and in the same row as the
                 // dismissed index or next focused index. Offset successive task dismissal
                 // durations for a staggered effect.
@@ -4136,15 +4137,18 @@ public abstract class RecentsView<
      * - Dragging an adjacent page on the left side (right side for RTL)
      */
     private int getOffsetToDismissedTask(int scrollDiffPerPage, int dismissedIndex, int taskCount) {
+        // When mCurrentPage is ClearAllButton, use the last TaskView instead to calculate
+        // offset.
+        int currentPage = mCurrentPage == taskCount ? taskCount - 1 : mCurrentPage;
         int offset = mIsRtl ? scrollDiffPerPage : 0;
-        if (mCurrentPage == dismissedIndex) {
+        if (currentPage == dismissedIndex) {
             int lastPage = taskCount - 1;
-            if (mCurrentPage == lastPage) {
+            if (currentPage == lastPage) {
                 offset += mIsRtl ? -scrollDiffPerPage : scrollDiffPerPage;
             }
         } else {
             // Dismissing an adjacent page.
-            int negativeAdjacent = mCurrentPage - 1; // (Right in RTL, left in LTR)
+            int negativeAdjacent = currentPage - 1; // (Right in RTL, left in LTR)
             if (dismissedIndex == negativeAdjacent) {
                 offset += mIsRtl ? -scrollDiffPerPage : scrollDiffPerPage;
             }
@@ -5418,6 +5422,13 @@ public abstract class RecentsView<
                             mTempPointF);
                     setPivotX(mTempPointF.x);
                     setPivotY(mTempPointF.y);
+                    runActionOnRemoteHandles(
+                            remoteTargetHandle -> {
+                                remoteTargetHandle.getTaskViewSimulator().setPivotOverride(
+                                        mTempPointF);
+                                remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(
+                                        false);
+                            });
                 }
             });
         } else if (!showAsGrid) {
