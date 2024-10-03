@@ -55,6 +55,8 @@ class BubbleBarFlyoutControllerTest {
                 override val distanceToCollapsedPosition = PointF(100f, 200f)
                 override val collapsedSize = 30f
                 override val collapsedColor = Color.BLUE
+                override val collapsedElevation = 1f
+                override val distanceToRevealTriangle = 50f
             }
         flyoutController = BubbleBarFlyoutController(flyoutContainer, positioner)
     }
