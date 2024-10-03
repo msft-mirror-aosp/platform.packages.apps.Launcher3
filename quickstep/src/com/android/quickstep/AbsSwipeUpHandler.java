@@ -237,6 +237,8 @@ public abstract class AbsSwipeUpHandler<
             getNextStateFlag("STATE_SCALED_CONTROLLER_HOME");
     private static final int STATE_SCALED_CONTROLLER_RECENTS =
             getNextStateFlag("STATE_SCALED_CONTROLLER_RECENTS");
+    private static final int STATE_PARALLEL_ANIM_FINISHED =
+            getNextStateFlag("STATE_PARALLEL_ANIM_FINISHED");
 
     protected static final int STATE_HANDLER_INVALIDATED =
             getNextStateFlag("STATE_HANDLER_INVALIDATED");
@@ -453,7 +455,8 @@ public abstract class AbsSwipeUpHandler<
         mStateCallback.runOnceAtState(STATE_SCREENSHOT_CAPTURED | STATE_GESTURE_COMPLETED
                         | STATE_SCALED_CONTROLLER_HOME,
                 this::finishCurrentTransitionToHome);
-        mStateCallback.runOnceAtState(STATE_SCALED_CONTROLLER_HOME | STATE_CURRENT_TASK_FINISHED,
+        mStateCallback.runOnceAtState(STATE_SCALED_CONTROLLER_HOME | STATE_CURRENT_TASK_FINISHED
+                        | STATE_PARALLEL_ANIM_FINISHED,
                 this::reset);
 
         mStateCallback.runOnceAtState(STATE_LAUNCHER_PRESENT | STATE_APP_CONTROLLER_RECEIVED
@@ -1540,9 +1543,12 @@ public abstract class AbsSwipeUpHandler<
                     @Override
                     public void onAnimationEnd(Animator animation) {
                         mParallelRunningAnim = null;
+                        mStateCallback.setStateOnUiThread(STATE_PARALLEL_ANIM_FINISHED);
                     }
                 });
                 mParallelRunningAnim.start();
+            } else {
+                mStateCallback.setStateOnUiThread(STATE_PARALLEL_ANIM_FINISHED);
             }
         }
 
