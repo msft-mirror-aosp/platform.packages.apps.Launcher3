@@ -3141,7 +3141,9 @@ public abstract class RecentsView<
         // Horizontal grid translation for each task
         float[] gridTranslations = new float[taskCount];
 
-        int lastLargeTaskIndex = Integer.MAX_VALUE;
+        TaskView lastLargeTaskView = mUtils.getLastLargeTaskView(getTaskViews());
+        int lastLargeTaskIndex =
+                (lastLargeTaskView == null) ? Integer.MAX_VALUE : indexOfChild(lastLargeTaskView);
         Set<Integer> largeTasksIndices = new HashSet<>();
         int focusedTaskShift = 0;
         int largeTaskWidthAndSpacing = 0;
@@ -3177,7 +3179,6 @@ public abstract class RecentsView<
                 taskView.setGridTranslationY((mLastComputedTaskSize.height() + taskTopMargin
                         - taskView.getLayoutParams().height) / 2f);
 
-                lastLargeTaskIndex = i;
                 largeTasksIndices.add(i);
                 largeTaskWidthAndSpacing = taskWidthAndSpacing;
 
