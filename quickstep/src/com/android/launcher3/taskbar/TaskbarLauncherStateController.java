@@ -58,6 +58,7 @@ import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.statemanager.StateManager;
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.BubbleLauncherState;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
@@ -479,8 +480,12 @@ public class TaskbarLauncherStateController {
             boolean onOverview = mLauncherState == LauncherState.OVERVIEW;
             boolean hotseatIconsVisible = isInLauncher && mLauncherState.areElementsVisible(
                     mLauncher, HOTSEAT_ICONS);
-            controllers.bubbleStashController.setBubblesShowingOnHome(hotseatIconsVisible);
-            controllers.bubbleStashController.setBubblesShowingOnOverview(onOverview);
+            BubbleLauncherState state = onOverview
+                    ? BubbleLauncherState.OVERVIEW
+                    : hotseatIconsVisible
+                            ? BubbleLauncherState.HOME
+                            : BubbleLauncherState.IN_APP;
+            controllers.bubbleStashController.setLauncherState(state);
         });
 
         TaskbarStashController stashController = mControllers.taskbarStashController;
