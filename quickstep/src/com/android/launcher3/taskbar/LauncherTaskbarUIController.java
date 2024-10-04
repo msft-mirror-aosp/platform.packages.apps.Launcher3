@@ -150,12 +150,6 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         }
     }
 
-    @Override
-    protected boolean isTaskbarTouchable() {
-        return !(mTaskbarLauncherStateController.isAnimatingToLauncher()
-                && mTaskbarLauncherStateController.isTaskbarAlignedWithHotseat());
-    }
-
     public void setShouldDelayLauncherStateAnim(boolean shouldDelayLauncherStateAnim) {
         mTaskbarLauncherStateController.setShouldDelayLauncherStateAnim(
                 shouldDelayLauncherStateAnim);
@@ -417,6 +411,16 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         return mTaskbarLauncherStateController.isInHotseatOnTopStates()
                 && mTaskbarInAppDisplayProgressMultiProp.get(MINUS_ONE_PAGE_PROGRESS_INDEX)
                     .getValue() == 0;
+    }
+
+    @Override
+    public boolean isHotseatVisibleForTaskBarAlignment() {
+        return mTaskbarLauncherStateController.isHotseatVisibleForTaskbarAlignment();
+    }
+
+    @Override
+    public boolean isAnimatingToLauncher() {
+        return mTaskbarLauncherStateController.isAnimatingToLauncher();
     }
 
     @Override

@@ -75,8 +75,14 @@ public class TaskbarUIController implements BubbleBarController.BubbleBarLocatio
         mControllers = null;
     }
 
-    protected boolean isTaskbarTouchable() {
-        return true;
+    /** Returns true if transition animation to launcher home is being played. */
+    public boolean isAnimatingToLauncher() {
+        return false;
+    }
+
+    /** Returns true if hotseat icons visible for the taskbar alignment. */
+    public boolean isHotseatVisibleForTaskBarAlignment() {
+        return false;
     }
 
     /**

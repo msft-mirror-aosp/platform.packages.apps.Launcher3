@@ -185,7 +185,6 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                     resources.getDrawable(R.drawable.taskbar_overflow_icon));
             mTaskbarOverflowView.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
         }
-        // TODO: Disable touch events on QSB otherwise it can crash.
         mQsb = LayoutInflater.from(context).inflate(R.layout.search_container_hotseat, this, false);
 
         mMaxNumIcons = calculateMaxNumIcons();

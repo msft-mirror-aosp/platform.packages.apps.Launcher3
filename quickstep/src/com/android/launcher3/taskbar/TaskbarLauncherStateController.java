@@ -192,6 +192,8 @@ public class TaskbarLauncherStateController {
 
     private boolean mIsQsbInline;
 
+    private boolean mIsHotseatVisibleForTaskbarAlignment;
+
     private final DeviceProfile.OnDeviceProfileChangeListener mOnDeviceProfileChangeListener =
             new DeviceProfile.OnDeviceProfileChangeListener() {
                 @Override
@@ -738,6 +740,7 @@ public class TaskbarLauncherStateController {
             boolean committed) {
         boolean isInStashedState = mLauncherState.isTaskbarStashed(mLauncher);
         TaskbarStashController stashController = mControllers.taskbarStashController;
+        TaskbarInsetsController insetsController = mControllers.taskbarInsetsController;
         stashController.updateStateForFlag(FLAG_IN_STASHED_LAUNCHER_STATE, isInStashedState);
         Animator stashAnimator = stashController.createApplyStateAnimator(duration);
         if (stashAnimator != null) {
@@ -746,7 +749,11 @@ public class TaskbarLauncherStateController {
                 public void onAnimationEnd(Animator animation) {
                     if (isInStashedState && committed) {
                         // Reset hotseat alpha to default
-                        mLauncher.getHotseat().setIconsAlpha(1, ALPHA_CHANNEL_TASKBAR_ALIGNMENT);
+                        updateIconAlphaForHome(
+                                /* taskbarAlpha = */ 0,
+                                ALPHA_CHANNEL_TASKBAR_ALIGNMENT,
+                                /* updateTaskbarAlpha = */ false
+                        );
                     }
                 }
 
@@ -871,6 +878,14 @@ public class TaskbarLauncherStateController {
         if (mIsQsbInline) {
             mLauncher.getHotseat().setQsbAlpha(targetAlpha, alphaChannel);
         }
+        if (alphaChannel == ALPHA_CHANNEL_TASKBAR_ALIGNMENT) {
+            boolean isHotseatVisibleForTaskbarAlignment = isHotseatVisibleForTaskbarAlignment();
+            if (mIsHotseatVisibleForTaskbarAlignment != isHotseatVisibleForTaskbarAlignment) {
+                mIsHotseatVisibleForTaskbarAlignment = isHotseatVisibleForTaskbarAlignment;
+                mControllers.taskbarInsetsController
+                        .onTaskbarOrBubblebarWindowHeightOrInsetsChanged();
+            }
+        }
     }
 
     /** Updates launcher home screen appearance accordingly to the bubble bar location. */
@@ -931,6 +946,13 @@ public class TaskbarLauncherStateController {
         translationXAnimation.setInterpolator(Interpolators.EMPHASIZED);
         translationXAnimation.start();
     }
+
+    /** Returns true if hotseat icons visible for the taskbar alignment */
+    public boolean isHotseatVisibleForTaskbarAlignment() {
+        return mLauncher.getHotseat()
+                .getIconsAlpha(ALPHA_CHANNEL_TASKBAR_ALIGNMENT).getValue() == 1;
+    }
+
 
     private final class TaskBarRecentsAnimationListener implements
             RecentsAnimationCallbacks.RecentsAnimationListener {
