@@ -64,8 +64,6 @@ class AsyncBindingTest {
 
     @get:Rule val setFlagsRule = SetFlagsRule()
 
-    @get:Rule val modelTestRule = ModelTestRule()
-
     @Spy private var callbacks = MyCallbacks()
     @Mock private lateinit var itemInflater: ItemInflater<*>
 
@@ -203,7 +201,7 @@ class AsyncBindingTest {
             pendingTasks: RunnableList,
             onCompleteSignal: RunnableList,
             workspaceItemCount: Int,
-            isBindSync: Boolean
+            isBindSync: Boolean,
         ) {
             this.pendingTasks = pendingTasks
             this.onCompleteSignal = onCompleteSignal
