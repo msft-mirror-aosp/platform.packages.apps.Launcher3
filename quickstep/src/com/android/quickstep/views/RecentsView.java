@@ -4572,6 +4572,20 @@ public abstract class RecentsView<
     }
 
     @Nullable
+    public TaskView getPreviousTaskView() {
+        return getTaskViewAt(getRunningTaskIndex() - 1);
+    }
+
+    @Nullable
+    public TaskView getLastLargeTaskView() {
+        return mUtils.getLastLargeTaskView(getTaskViews());
+    }
+
+    public int getLargeTilesCount() {
+        return mUtils.getLargeTileCount(getTaskViews());
+    }
+
+    @Nullable
     public TaskView getCurrentPageTaskView() {
         return getTaskViewAt(getCurrentPage());
     }
