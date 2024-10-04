@@ -5419,6 +5419,7 @@ public abstract class RecentsView<
 
         int taskIndex = indexOfChild(taskView);
         int centerTaskIndex = getCurrentPage();
+        boolean isRunningTask = taskView.isRunningTask();
 
         float toScale = getMaxScaleForFullScreen();
         boolean showAsGrid = showAsGrid();
@@ -5437,13 +5438,16 @@ public abstract class RecentsView<
                             mTempPointF);
                     setPivotX(mTempPointF.x);
                     setPivotY(mTempPointF.y);
-                    runActionOnRemoteHandles(
-                            remoteTargetHandle -> {
-                                remoteTargetHandle.getTaskViewSimulator().setPivotOverride(
-                                        mTempPointF);
-                                remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(
-                                        false);
-                            });
+
+                    if (!isRunningTask) {
+                        runActionOnRemoteHandles(
+                                remoteTargetHandle -> {
+                                    remoteTargetHandle.getTaskViewSimulator().setPivotOverride(
+                                            mTempPointF);
+                                    remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(
+                                            false);
+                                });
+                    }
                 }
             });
         } else if (!showAsGrid) {
