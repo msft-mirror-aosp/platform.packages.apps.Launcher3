@@ -16,46 +16,19 @@
 
 package com.android.launcher3.taskbar.rules
 
-import android.content.Context
 import android.content.ContextWrapper
-import android.os.Bundle
-import android.view.Display
-import com.android.launcher3.util.MainThreadInitializedObject
-import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext
+import com.android.launcher3.util.MainThreadInitializedObject.ObjectSandbox
+import com.android.launcher3.util.SandboxApplication
+import org.junit.rules.TestRule
 
-/**
- * Sandbox wrapper where [createWindowContext] provides contexts that are still sandboxed within
- * [application].
- *
- * Taskbar can create window contexts, which need to operate under the same sandbox application, but
- * [Context.getApplicationContext] by default returns the actual application. For this reason,
- * [SandboxContext] overrides [getApplicationContext] to return itself, which prevents leaving the
- * sandbox. [SandboxContext] and the real application have different sets of
- * [MainThreadInitializedObject] instances, so overriding the application prevents the latter set
- * from leaking into the sandbox. Similarly, this implementation overrides [getApplicationContext]
- * to return the original sandboxed [application], and it wraps created windowed contexts to
- * propagate this [application].
- */
-class TaskbarWindowSandboxContext
-private constructor(private val application: SandboxContext, base: Context) : ContextWrapper(base) {
-
-    override fun createWindowContext(type: Int, options: Bundle?): Context {
-        return TaskbarWindowSandboxContext(application, super.createWindowContext(type, options))
-    }
-
-    override fun createWindowContext(display: Display, type: Int, options: Bundle?): Context {
-        return TaskbarWindowSandboxContext(
-            application,
-            super.createWindowContext(display, type, options),
-        )
-    }
-
-    override fun getApplicationContext(): SandboxContext = application
+/** Sandbox Context for running Taskbar tests. */
+class TaskbarWindowSandboxContext private constructor(base: SandboxApplication) :
+    ContextWrapper(base), ObjectSandbox by base, TestRule by base {
 
     companion object {
-        /** Creates a [TaskbarWindowSandboxContext] to sandbox [base] for Taskbar tests. */
-        fun create(base: Context): TaskbarWindowSandboxContext {
-            return SandboxContext(base).let { TaskbarWindowSandboxContext(it, it) }
+        /** Creates a [SandboxApplication] for Taskbar tests. */
+        fun create(): TaskbarWindowSandboxContext {
+            return TaskbarWindowSandboxContext(SandboxApplication())
         }
     }
 }
