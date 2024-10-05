@@ -224,7 +224,7 @@ class BubbleBarFlyoutViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
                 BubbleBarFlyoutMessage(
                     senderAvatar = ColorDrawable(Color.RED),
                     senderName = "sender",
-                    message = "collapsed 90% on left",
+                    message = "expanded 90% on left",
                     isGroupChat = true,
                 )
             ) {}
@@ -249,7 +249,7 @@ class BubbleBarFlyoutViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
                 BubbleBarFlyoutMessage(
                     senderAvatar = ColorDrawable(Color.RED),
                     senderName = "sender",
-                    message = "collapsed 80% on right",
+                    message = "expanded 80% on right",
                     isGroupChat = true,
                 )
             ) {}
@@ -265,5 +265,7 @@ class BubbleBarFlyoutViewScreenshotTest(emulationSpec: DeviceEmulationSpec) {
         override val targetTy = 0f
         override val collapsedSize = 30f
         override val collapsedColor = Color.BLUE
+        override val collapsedElevation = 1f
+        override val distanceToRevealTriangle = 10f
     }
 }
