@@ -18,13 +18,13 @@ package com.android.launcher3.util;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
 import android.content.Context;
-import android.content.ContextWrapper;
 import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
 
+import com.android.launcher3.LauncherApplication;
 import com.android.launcher3.util.ResourceBasedOverride.Overrides;
 
 import java.util.ArrayList;
@@ -35,6 +35,9 @@ import java.util.function.Consumer;
 
 /**
  * Utility class for defining singletons which are initiated on main thread.
+ *
+ * TODO(b/361850561): Do not delete MainThreadInitializedObject until we find a way to
+ * unregister and understand how singleton objects are destroyed in dagger graph.
  */
 public class MainThreadInitializedObject<T extends SafeCloseable> {
 
@@ -105,6 +108,25 @@ public class MainThreadInitializedObject<T extends SafeCloseable> {
          */
         <T extends SafeCloseable> T getObject(MainThreadInitializedObject<T> object);
 
+
+        /**
+         * Put a value into cache, can be used to put mocked MainThreadInitializedObject
+         * instances.
+         */
+        <T extends SafeCloseable> void putObject(MainThreadInitializedObject<T> object, T value);
+
+        /**
+         * Returns whether this context should cleanup all objects when its destroyed or leave it
+         * to the GC.
+         * These objects can have listeners attached to the system server and mey not be able to get
+         * GCed themselves when running on a device.
+         * Some environments like Robolectric tear down the whole system at the end of the test,
+         * so manual cleanup may not be required.
+         */
+        default boolean shouldCleanUpOnDestroy() {
+            return true;
+        }
+
         @UiThread
         default <T extends SafeCloseable> T createObject(MainThreadInitializedObject<T> object) {
             return object.mProvider.get((Context) this);
@@ -115,7 +137,7 @@ public class MainThreadInitializedObject<T extends SafeCloseable> {
      * Abstract Context which allows custom implementations for
      * {@link MainThreadInitializedObject} providers
      */
-    public static class SandboxContext extends ContextWrapper implements SandboxApplication {
+    public static class SandboxContext extends LauncherApplication implements SandboxApplication {
 
         private static final String TAG = "SandboxContext";
 
@@ -126,7 +148,8 @@ public class MainThreadInitializedObject<T extends SafeCloseable> {
         private boolean mDestroyed = false;
 
         public SandboxContext(Context base) {
-            super(base);
+            attachBaseContext(base);
+            initDagger();
         }
 
         @Override
@@ -134,7 +157,20 @@ public class MainThreadInitializedObject<T extends SafeCloseable> {
             return this;
         }
 
+        @Override
+        public boolean shouldCleanUpOnDestroy() {
+            return (getBaseContext().getApplicationContext() instanceof SandboxApplication sa)
+                    ? sa.shouldCleanUpOnDestroy() : true;
+        }
+
         public void onDestroy() {
+            if (shouldCleanUpOnDestroy()) {
+                cleanUpObjects();
+            }
+        }
+
+        protected void cleanUpObjects() {
+            getAppComponent().getDaggerSingletonTracker().close();
             synchronized (mDestroyLock) {
                 // Destroy in reverse order
                 for (int i = mOrderedObjects.size() - 1; i >= 0; i--) {
@@ -169,10 +205,7 @@ public class MainThreadInitializedObject<T extends SafeCloseable> {
             }
         }
 
-        /**
-         * Put a value into mObjectMap, can be used to put mocked MainThreadInitializedObject
-         * instances into SandboxContext.
-         */
+        @Override
         public <T extends SafeCloseable> void putObject(
                 MainThreadInitializedObject<T> object, T value) {
             mObjectMap.put(object, value);

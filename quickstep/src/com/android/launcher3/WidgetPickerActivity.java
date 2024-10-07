@@ -20,7 +20,6 @@ import static android.content.ClipDescription.MIMETYPE_TEXT_INTENT;
 import static android.view.WindowInsets.Type.navigationBars;
 import static android.view.WindowInsets.Type.statusBars;
 
-import static com.android.launcher3.Flags.enablePredictiveBackGesture;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
@@ -42,6 +41,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.launcher3.dragndrop.SimpleDragLayer;
+import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.WidgetItem;
 import com.android.launcher3.model.WidgetPredictionsRequester;
 import com.android.launcher3.model.WidgetsModel;
@@ -108,6 +108,7 @@ public class WidgetPickerActivity extends BaseActivity {
     private SimpleDragLayer<WidgetPickerActivity> mDragLayer;
     private WidgetsModel mModel;
     private LauncherAppState mApp;
+    private StringCache mStringCache;
     private WidgetPredictionsRequester mWidgetPredictionsRequester;
     private final WidgetPickerDataProvider mWidgetPickerDataProvider =
             new WidgetPickerDataProvider();
@@ -170,11 +171,6 @@ public class WidgetPickerActivity extends BaseActivity {
 
     @Override
     protected void registerBackDispatcher() {
-        if (!enablePredictiveBackGesture()) {
-            super.registerBackDispatcher();
-            return;
-        }
-
         getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                 OnBackInvokedDispatcher.PRIORITY_DEFAULT,
                 new BackAnimationCallback());
@@ -293,6 +289,11 @@ public class WidgetPickerActivity extends BaseActivity {
         MODEL_EXECUTOR.execute(() -> {
             LauncherAppState app = LauncherAppState.getInstance(this);
             mModel.update(app, null);
+
+            StringCache stringCache = new StringCache();
+            stringCache.loadStrings(this);
+
+            bindStringCache(stringCache);
             bindWidgets(mModel.getWidgetsByPackageItem());
             // Open sheet once widgets are available, so that it doesn't interrupt the open
             // animation.
@@ -303,6 +304,10 @@ public class WidgetPickerActivity extends BaseActivity {
                 mWidgetPredictionsRequester.request(mAddedWidgets, this::bindRecommendedWidgets);
             }
         });
+    }
+
+    private void bindStringCache(final StringCache stringCache) {
+        MAIN_EXECUTOR.execute(() -> mStringCache = stringCache);
     }
 
     private void bindWidgets(Map<PackageItemInfo, List<WidgetItem>> widgets) {
@@ -340,6 +345,12 @@ public class WidgetPickerActivity extends BaseActivity {
         if (mWidgetPredictionsRequester != null) {
             mWidgetPredictionsRequester.clear();
         }
+    }
+
+    @Nullable
+    @Override
+    public StringCache getStringCache() {
+        return mStringCache;
     }
 
     /**

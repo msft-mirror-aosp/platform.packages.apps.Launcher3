@@ -27,6 +27,7 @@ import static com.android.launcher3.widget.picker.model.data.WidgetPickerDataUti
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.Process;
+import android.os.UserHandle;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -342,14 +343,9 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
                 false);
         mSuggestedWidgetsHeader.setExpanded(true);
 
-        PackageItemInfo packageItemInfo = new PackageItemInfo(
+        PackageItemInfo packageItemInfo = new HighresPackageItemInfo(
                 /* packageName= */ SUGGESTIONS_PACKAGE_NAME,
-                Process.myUserHandle()) {
-            @Override
-            public boolean usingLowResIcon() {
-                return false;
-            }
-        };
+                Process.myUserHandle());
         String suggestionsHeaderTitle = getContext().getString(
                 R.string.suggested_widgets_header_title);
         String suggestionsRightPaneTitle = getContext().getString(
@@ -376,17 +372,14 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
             mSuggestedWidgetsPackageUserKey = PackageUserKey.fromPackageItemInfo(packageItemInfo);
             final boolean isChangingHeaders = mSelectedHeader == null
                     || !mSelectedHeader.equals(mSuggestedWidgetsPackageUserKey);
-            // If the initial focus view is still focused, it is likely a programmatic header
-            // click.
-            if (mSelectedHeader != null
-                    && !getAccessibilityInitialFocusView().isAccessibilityFocused()) {
-                post(() -> {
-                    mRightPaneScrollView.setAccessibilityPaneTitle(suggestionsRightPaneTitle);
-                    mRightPaneScrollView.performAccessibilityAction(
-                            AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null);
-                });
-            }
             if (isChangingHeaders)  {
+                // If the initial focus view is still focused or widget picker is still opening, it
+                // is likely a programmatic header click.
+                if (mSelectedHeader != null && !mOpenCloseAnimation.getAnimationPlayer().isRunning()
+                        && !getAccessibilityInitialFocusView().isAccessibilityFocused()) {
+                    mRightPaneScrollView.setAccessibilityPaneTitle(suggestionsRightPaneTitle);
+                    focusOnFirstWidgetCell(mWidgetRecommendationsView);
+                }
                 // If switching from another header, unselect any WidgetCells. This is necessary
                 // because we do not clear/recycle the WidgetCells in the recommendations container
                 // when the header is clicked, only when onRecommendationsBound is called. That
@@ -464,6 +457,13 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
         if (!isWidgetAvailable) {
             mRightPane.removeAllViews();
             mRightPane.addView(mNoWidgetsView);
+            // with no widgets message, no header is selected on left
+            if (mSuggestedWidgetsPackageUserKey != null
+                    && mSuggestedWidgetsPackageUserKey.equals(mSelectedHeader)
+                    && mSuggestedWidgetsHeader != null) {
+                mSuggestedWidgetsHeader.setExpanded(false);
+            }
+            mSelectedHeader = null;
         }
         super.updateRecyclerViewVisibility(adapterHolder);
     }
@@ -505,9 +505,10 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
             public void onHeaderChanged(@NonNull PackageUserKey selectedHeader) {
                 final boolean isSameHeader = mSelectedHeader != null
                         && mSelectedHeader.equals(selectedHeader);
-                // If the initial focus view is still focused, it is likely a programmatic header
-                // click.
+                // If the initial focus view is still focused or widget picker is still opening, it
+                // is likely a programmatic header click.
                 final boolean isUserClick = mSelectedHeader != null
+                        && !mOpenCloseAnimation.getAnimationPlayer().isRunning()
                         && !getAccessibilityInitialFocusView().isAccessibilityFocused();
                 mSelectedHeader = selectedHeader;
                 final boolean showDefaultWidgets = mWidgetOptionsMenuState != null
@@ -658,5 +659,16 @@ public class WidgetsTwoPaneSheet extends WidgetsFullSheet {
          * <p>If true, shows all widgets; else shows the default widgets.</p>
          */
         public boolean showAllWidgets = false;
+    }
+
+    private static class HighresPackageItemInfo extends PackageItemInfo {
+        HighresPackageItemInfo(String packageName, UserHandle user) {
+            super(packageName, user);
+        }
+
+        @Override
+        public boolean usingLowResIcon() {
+            return false;
+        }
     }
 }

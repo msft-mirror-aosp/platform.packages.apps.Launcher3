@@ -19,20 +19,18 @@ package com.android.quickstep.task.viewmodel
 import android.annotation.ColorInt
 import android.app.ActivityTaskManager.INVALID_TASK_ID
 import android.graphics.Matrix
-import android.graphics.Point
+import android.util.Log
 import androidx.core.graphics.ColorUtils
 import com.android.quickstep.recents.data.RecentTasksRepository
 import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.usecase.ThumbnailPositionState
 import com.android.quickstep.recents.viewmodel.RecentsViewData
-import com.android.quickstep.task.thumbnail.GetSplashSizeUseCase
 import com.android.quickstep.task.thumbnail.SplashAlphaUseCase
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Snapshot
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.SnapshotSplash
-import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Splash
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.Uninitialized
 import com.android.systemui.shared.recents.model.Task
 import kotlin.math.max
@@ -55,7 +53,6 @@ class TaskThumbnailViewModel(
     private val tasksRepository: RecentTasksRepository,
     private val getThumbnailPositionUseCase: GetThumbnailPositionUseCase,
     private val splashAlphaUseCase: SplashAlphaUseCase,
-    private val getSplashSizeUseCase: GetSplashSizeUseCase,
 ) {
     private val task = MutableStateFlow<Flow<Task?>>(flowOf(null))
     private val splashProgress = MutableStateFlow(flowOf(0f))
@@ -86,7 +83,7 @@ class TaskThumbnailViewModel(
         combine(
                 task.flatMapLatest { it }.map { it?.key?.id }.distinctUntilChanged(),
                 recentsViewData.runningTaskIds,
-                recentsViewData.runningTaskShowScreenshot
+                recentsViewData.runningTaskShowScreenshot,
             ) { taskId, runningTaskIds, runningTaskShowScreenshot ->
                 runningTaskIds.contains(taskId) && !runningTaskShowScreenshot
             }
@@ -94,19 +91,27 @@ class TaskThumbnailViewModel(
 
     val uiState: Flow<TaskThumbnailUiState> =
         combine(task.flatMapLatest { it }, isLiveTile) { taskVal, isRunning ->
+                // TODO(b/369339561) This log is firing a lot. Reduce emissions from TasksRepository
+                //  then re-enable this log.
+                //                Log.d(
+                //                    TAG,
+                //                    "Received task and / or live tile update. taskVal: $taskVal"
+                //                    + " isRunning: $isRunning.",
+                //                )
                 when {
                     taskVal == null -> Uninitialized
                     isRunning -> LiveTile
                     isBackgroundOnly(taskVal) ->
                         BackgroundOnly(taskVal.colorBackground.removeAlpha())
                     isSnapshotSplashState(taskVal) ->
-                        SnapshotSplash(createSnapshotState(taskVal), createSplashState(taskVal))
+                        SnapshotSplash(createSnapshotState(taskVal), taskVal.icon)
                     else -> Uninitialized
                 }
             }
             .distinctUntilChanged()
 
     fun bind(taskId: Int) {
+        Log.d(TAG, "bind taskId: $taskId")
         this.taskId = taskId
         task.value = tasksRepository.getTaskDataById(taskId)
         splashProgress.value = splashAlphaUseCase.execute(taskId)
@@ -139,15 +144,10 @@ class TaskThumbnailViewModel(
         return Snapshot(bitmap, thumbnailData.rotation, task.colorBackground.removeAlpha())
     }
 
-    private fun createSplashState(task: Task): Splash {
-        val taskIcon = task.icon
-        val size = if (taskIcon == null) Point() else getSplashSizeUseCase.execute(taskIcon)
-        return Splash(taskIcon, size)
-    }
-
     @ColorInt private fun Int.removeAlpha(): Int = ColorUtils.setAlphaComponent(this, 0xff)
 
     private companion object {
         const val MAX_SCRIM_ALPHA = 0.4f
+        const val TAG = "TaskThumbnailViewModel"
     }
 }

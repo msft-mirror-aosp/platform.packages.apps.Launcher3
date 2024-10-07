@@ -1,5 +1,5 @@
 package: "com.android.launcher3"
-container: "system_ext"
+container: "system"
 
 flag {
     name: "enable_expanding_pause_work_button"
@@ -316,6 +316,7 @@ flag {
     description: "Menu in Taskbar with options to launch and manage multiple instances of the same app"
     bug: "355237285"
 }
+
 flag {
     name: "navigate_to_child_preference"
     namespace: "launcher"
@@ -328,6 +329,117 @@ flag {
     namespace: "launcher"
     description: "Archived apps will use new cloud icon in app title instead of overlay"
     bug: "350758155"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "letter_fast_scroller"
+    namespace: "launcher"
+    description: "Change fast scroller to a lettered list"
+    bug: "358673724"
+}
+
+flag {
+    name: "enable_desktop_task_alpha_animation"
+    namespace: "launcher"
+    description: "Enables the animation of the desktop task's background view"
+    bug: "320307666"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "ignore_three_finger_trackpad_for_nav_handle_long_press"
+    namespace: "launcher"
+    description: "Ignore three finger trackpad event for nav handle long press"
+    bug: "342143522"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "one_grid_specs"
+    namespace: "launcher"
+    description: "Defines the new specs for grids based on OneGrid"
+    bug: "364711064"
+}
+
+flag {
+    name: "one_grid_mounted_mode"
+    namespace: "launcher"
+    description: "Support a fixed landscape mode for handheld devices"
+    bug: "364711735"
+}
+
+flag {
+    name: "one_grid_rotation_handling"
+    namespace: "launcher"
+    description: "New landscape approach for the workspace using different rows and columns in landscape and portrait"
+    bug: "364711814"
+}
+
+flag {
+    name: "grid_migration_refactor"
+    namespace: "launcher"
+    description: "Refactor grid migration such that the code is simpler to understand and update"
+    bug: "358399271"
+}
+
+flag {
+    name: "accessibility_scroll_on_allapps"
+    namespace: "launcher"
+    description: "Scroll to item position if accessibility focused"
+    bug: "265392261"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_dismiss_prediction_undo"
+    namespace: "launcher"
+    description: "Show an 'Undo' snackbar when users dismiss a predicted hotseat item"
+    bug: "270394476"
+}
+
+flag {
+    name: "enable_all_apps_button_in_hotseat"
+    namespace: "launcher"
+    description: "Enables displaying the all apps button in the hotseat."
+    bug: "270393897"
+}
+
+flag {
+    name: "taskbar_quiet_mode_change_support"
+    namespace: "launcher"
+    description: "Support changing quiet mode for user profiles in taskbar."
+    bug: "345760034"
+}
+
+flag {
+    name: "taskbar_overflow"
+    namespace: "launcher"
+    description: "Show recent apps in the taskbar overflow."
+    bug: "368119679"
+}
+
+flag {
+    name: "enable_active_gesture_proto_log"
+    namespace: "launcher"
+    description: "Enables tracking active gesture logs in ProtoLog"
+    bug: "293182501"
+}
+
+
+flag {
+    name: "coordinate_workspace_scale"
+    namespace: "launcher"
+    description: "Ensure that the workspace and hotseat scale doesn't conflict and transitions smoothly between launching and closing apps"
+    bug: "366403487"
     metadata {
       purpose: PURPOSE_BUGFIX
     }

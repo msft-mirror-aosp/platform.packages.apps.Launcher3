@@ -29,6 +29,8 @@ import android.content.Intent;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.quickstep.fallback.window.RecentsWindowManager;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -42,6 +44,9 @@ public class TaskAnimationManagerTest {
     private Context mContext;
 
     @Mock
+    private RecentsWindowManager mRecentsWindowManager;
+
+    @Mock
     private SystemUiProxy mSystemUiProxy;
 
     private TaskAnimationManager mTaskAnimationManager;
@@ -49,7 +54,7 @@ public class TaskAnimationManagerTest {
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
-        mTaskAnimationManager = new TaskAnimationManager(mContext) {
+        mTaskAnimationManager = new TaskAnimationManager(mContext, mRecentsWindowManager) {
             @Override
             SystemUiProxy getSystemUiProxy() {
                 return mSystemUiProxy;
@@ -59,8 +64,6 @@ public class TaskAnimationManagerTest {
 
     @Test
     public void startRecentsActivity_allowBackgroundLaunch() {
-        assumeTrue(TaskAnimationManager.ENABLE_SHELL_TRANSITIONS);
-
         final LauncherActivityInterface activityInterface = mock(LauncherActivityInterface.class);
         final GestureState gestureState = mock(GestureState.class);
         final RecentsAnimationCallbacks.RecentsAnimationListener listener =

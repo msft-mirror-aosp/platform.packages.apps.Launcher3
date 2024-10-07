@@ -25,13 +25,14 @@ import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_LANDS
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_PORTRAIT;
 import static com.android.launcher3.Utilities.dpiFromPx;
 import static com.android.launcher3.Utilities.pxFromSp;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.icons.GraphicsUtils.getShapePath;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 import static com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.testing.shared.ResourceUtils.pxFromDp;
 import static com.android.launcher3.testing.shared.ResourceUtils.roundPxValueFromFloat;
+import static com.android.wm.shell.Flags.enableBubbleBar;
+import static com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar;
 import static com.android.wm.shell.Flags.enableTinyTaskbar;
 
 import android.annotation.SuppressLint;
@@ -65,8 +66,10 @@ import com.android.launcher3.responsive.ResponsiveSpec.Companion.ResponsiveSpecT
 import com.android.launcher3.responsive.ResponsiveSpec.DimensionType;
 import com.android.launcher3.responsive.ResponsiveSpecsProvider;
 import com.android.launcher3.util.CellContentDimensions;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.IconSizeSteps;
+import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.ResourceHelper;
 import com.android.launcher3.util.WindowBounds;
 import com.android.launcher3.util.window.WindowManagerProxy;
@@ -220,6 +223,8 @@ public class DeviceProfile {
     public int hotseatBarBottomSpacePx;
     public int hotseatBarEndOffset;
     public int hotseatQsbSpace;
+    public int inlineNavButtonsEndSpacingPx;
+    public int navButtonsLayoutWidthPx;
     public int springLoadedHotseatBarTopMarginPx;
     // These 2 values are only used for isVerticalBar
     // Padding between edge of screen and hotseat
@@ -234,7 +239,6 @@ public class DeviceProfile {
     private final int mMinHotseatIconSpacePx;
     private final int mMinHotseatQsbWidthPx;
     private final int mMaxHotseatIconSpacePx;
-    public final int inlineNavButtonsEndSpacingPx;
     // Space required for the bubble bar between the hotseat and the edge of the screen. If there's
     // not enough space, the hotseat will adjust itself for the bubble bar.
     private final int mBubbleBarSpaceThresholdPx;
@@ -315,6 +319,74 @@ public class DeviceProfile {
     public final boolean isTransientTaskbar;
     // DragController
     public int flingToDeleteThresholdVelocity;
+
+    /** Used only as an alternative to mocking when null values cannot be used. */
+    @VisibleForTesting
+    public DeviceProfile() {
+        inv = null;
+        mInfo = null;
+        mMetrics = null;
+        mIconSizeSteps = null;
+        isTablet = false;
+        isPhone = false;
+        transposeLayoutWithOrientation = false;
+        isMultiDisplay = false;
+        isTwoPanels = false;
+        isPredictiveBackSwipe = false;
+        isQsbInline = false;
+        isLandscape = false;
+        isMultiWindowMode = false;
+        isGestureMode = false;
+        isLeftRightSplit = false;
+        windowX = 0;
+        windowY = 0;
+        widthPx = 0;
+        heightPx = 0;
+        availableWidthPx = 0;
+        availableHeightPx = 0;
+        rotationHint = 0;
+        aspectRatio = 1;
+        mIsScalableGrid = false;
+        mTypeIndex = 0;
+        mIsResponsiveGrid = false;
+        desiredWorkspaceHorizontalMarginOriginalPx = 0;
+        edgeMarginPx = 0;
+        workspaceContentScale = 0;
+        workspaceSpringLoadedMinNextPageVisiblePx = 0;
+        extraSpace = 0;
+        workspacePageIndicatorHeight = 0;
+        mWorkspacePageIndicatorOverlapWorkspace = 0;
+        numFolderRows = 0;
+        numFolderColumns = 0;
+        folderLabelTextScale = 0;
+        areNavButtonsInline = false;
+        mHotseatBarEdgePaddingPx = 0;
+        mHotseatBarWorkspaceSpacePx = 0;
+        hotseatQsbWidth = 0;
+        hotseatQsbHeight = 0;
+        hotseatQsbVisualHeight = 0;
+        hotseatQsbShadowHeight = 0;
+        hotseatBorderSpace = 0;
+        mMinHotseatIconSpacePx = 0;
+        mMinHotseatQsbWidthPx = 0;
+        mMaxHotseatIconSpacePx = 0;
+        inlineNavButtonsEndSpacingPx = 0;
+        mBubbleBarSpaceThresholdPx = 0;
+        numShownAllAppsColumns = 0;
+        overviewActionsHeight = 0;
+        overviewActionsTopMarginPx = 0;
+        overviewActionsButtonSpacing = 0;
+        mViewScaleProvider = null;
+        mDotRendererWorkSpace = null;
+        mDotRendererAllApps = null;
+        taskbarHeight = 0;
+        stashedTaskbarHeight = 0;
+        taskbarBottomMargin = 0;
+        taskbarIconSize = 0;
+        mTransientTaskbarClaimedSpace = 0;
+        startAlignTaskbar = false;
+        isTransientTaskbar = false;
+    }
 
     /** TODO: Once we fully migrate to staged split, remove "isMultiWindowMode" */
     DeviceProfile(Context context, InvariantDeviceProfile inv, Info info, WindowBounds windowBounds,
@@ -435,7 +507,7 @@ public class DeviceProfile {
         bottomSheetCloseDuration = res.getInteger(R.integer.config_bottomSheetCloseDuration);
         if (isTablet) {
             bottomSheetWorkspaceScale = workspaceContentScale;
-            if (isMultiDisplay && !ENABLE_MULTI_DISPLAY_PARTIAL_DEPTH.get()) {
+            if (isMultiDisplay) {
                 // TODO(b/259893832): Revert to use maxWallpaperScale to calculate bottomSheetDepth
                 // when screen recorder bug is fixed.
                 if (enableScalingRevealHomeAnimation()) {
@@ -625,17 +697,12 @@ public class DeviceProfile {
         if (areNavButtonsInline && !isPhone) {
             inlineNavButtonsEndSpacingPx =
                     res.getDimensionPixelSize(inv.inlineNavButtonsEndSpacing);
-            /*
-             * 3 nav buttons +
-             * Spacing between nav buttons +
-             * Space at the end for contextual buttons
-             */
-            hotseatBarEndOffset = 3 * res.getDimensionPixelSize(R.dimen.taskbar_nav_buttons_size)
-                    + 2 * res.getDimensionPixelSize(R.dimen.taskbar_button_space_inbetween)
-                    + inlineNavButtonsEndSpacingPx;
-        } else {
-            inlineNavButtonsEndSpacingPx = 0;
-            hotseatBarEndOffset = 0;
+            /* 3 nav buttons + Spacing between nav buttons */
+            navButtonsLayoutWidthPx = 3 * res.getDimensionPixelSize(
+                    R.dimen.taskbar_nav_buttons_size)
+                    + 2 * res.getDimensionPixelSize(R.dimen.taskbar_button_space_inbetween);
+            /* nav buttons layout width + Space at the end for contextual buttons */
+            hotseatBarEndOffset = navButtonsLayoutWidthPx + inlineNavButtonsEndSpacingPx;
         }
 
         mBubbleBarSpaceThresholdPx =
@@ -989,6 +1056,7 @@ public class DeviceProfile {
         return mHotseatColumnSpan;
     }
 
+    @VisibleForTesting
     public int getHotseatWidthPx() {
         return mHotseatWidthPx;
     }
@@ -2146,6 +2214,10 @@ public class DeviceProfile {
                 mHotseatBarEdgePaddingPx));
         writer.println(prefix + pxToDpStr("mHotseatBarWorkspaceSpacePx",
                 mHotseatBarWorkspaceSpacePx));
+        writer.println(prefix
+                + pxToDpStr("inlineNavButtonsEndSpacingPx", inlineNavButtonsEndSpacingPx));
+        writer.println(prefix
+                + pxToDpStr("navButtonsLayoutWidthPx", navButtonsLayoutWidthPx));
         writer.println(prefix + pxToDpStr("hotseatBarEndOffset", hotseatBarEndOffset));
         writer.println(prefix + pxToDpStr("hotseatQsbSpace", hotseatQsbSpace));
         writer.println(prefix + pxToDpStr("hotseatQsbHeight", hotseatQsbHeight));
@@ -2257,6 +2329,25 @@ public class DeviceProfile {
         config.densityDpi = info.getDensityDpi();
         config.smallestScreenWidthDp = (int) info.smallestSizeDp(bounds);
         return c.createConfigurationContext(config);
+    }
+
+    /**
+     * Returns whether Taskbar and Hotseat should adjust horizontally on bubble bar location update.
+     */
+    public boolean shouldAdjustHotseatOnBubblesLocationUpdate(Context context) {
+        return enableBubbleBar()
+                && enableBubbleBarInPersistentTaskBar()
+                && DisplayController.getNavigationMode(context)
+                == NavigationMode.THREE_BUTTONS;
+    }
+
+    /** Returns hotseat translation X for the bubble bar position. */
+    public int getHotseatTranslationXForBubbleBar(boolean isNavbarOnRight) {
+        if (isNavbarOnRight) {
+            return 0;
+        } else {
+            return navButtonsLayoutWidthPx;
+        }
     }
 
     /**

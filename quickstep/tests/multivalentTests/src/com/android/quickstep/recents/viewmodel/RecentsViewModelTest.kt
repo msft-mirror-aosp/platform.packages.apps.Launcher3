@@ -71,41 +71,52 @@ class RecentsViewModelTest {
     }
 
     @Test
-    fun thumbnailOverrideWaitAndReset() = runTest {
+    fun updatesRunningTaskShowScreenshot() = runTest {
+        systemUnderTest.setRunningTaskShowScreenshot(true)
+        systemUnderTest.waitForRunningTaskShowScreenshotToUpdate()
+    }
+
+    @Test
+    fun waitForThumbnailsToUpdate() = runTest {
+        // Given taskRepository with visible 2 tasks containing thumbnailData
         val thumbnailData1 = createThumbnailData().apply { snapshotId = 1 }
         val thumbnailData2 = createThumbnailData().apply { snapshotId = 2 }
         tasksRepository.seedTasks(tasks)
         tasksRepository.seedThumbnailData(mapOf(1 to thumbnailData1, 2 to thumbnailData2))
+        systemUnderTest.updateVisibleTasks(listOf(1, 2))
 
         val thumbnailDataFlow1 = tasksRepository.getThumbnailById(1)
         val thumbnailDataFlow2 = tasksRepository.getThumbnailById(2)
 
-        systemUnderTest.refreshAllTaskData()
-        systemUnderTest.updateVisibleTasks(listOf(1, 2))
-
+        // Then getThumbnailById should initially contains correct thumbnailData
         assertThat(thumbnailDataFlow1.first()).isEqualTo(thumbnailData1)
         assertThat(thumbnailDataFlow2.first()).isEqualTo(thumbnailData2)
 
-        systemUnderTest.setRunningTaskShowScreenshot(true)
-        val thumbnailOverride = mapOf(2 to createThumbnailData().apply { snapshotId = 3 })
-        systemUnderTest.addOrUpdateThumbnailOverride(thumbnailOverride)
+        // When thumbnailData is updated in taskRepository
+        tasksRepository.seedThumbnailData(
+            mapOf(1 to thumbnailData1, 2 to createThumbnailData().apply { snapshotId = 3 })
+        )
+        // setVisibleTasks forces FakeTasksRepository to update the flows returned by
+        // getThumbnailById
+        tasksRepository.setVisibleTasks(listOf(1, 2))
 
-        systemUnderTest.waitForRunningTaskShowScreenshotToUpdate()
-        val expectedUpdate = mapOf(2 to createThumbnailData().apply { snapshotId = 3 })
-        systemUnderTest.waitForThumbnailsToUpdate(expectedUpdate)
-
+        // Then wait for thumbnailData should complete, and the previous getThumbnailById flow
+        // should return updated values
+        systemUnderTest.waitForThumbnailsToUpdate(
+            mapOf(2 to createThumbnailData().apply { snapshotId = 3 })
+        )
         assertThat(thumbnailDataFlow1.first()).isEqualTo(thumbnailData1)
         assertThat(thumbnailDataFlow2.first()?.snapshotId).isEqualTo(3)
+    }
 
-        systemUnderTest.onReset()
+    @Test
+    fun waitForThumbnailsToUpdate_emptyMap() = runTest {
+        systemUnderTest.waitForThumbnailsToUpdate(emptyMap())
+    }
 
-        assertThat(thumbnailDataFlow1.first()).isNull()
-        assertThat(thumbnailDataFlow2.first()).isNull()
-
-        systemUnderTest.updateVisibleTasks(listOf(1, 2))
-
-        assertThat(thumbnailDataFlow1.first()).isEqualTo(thumbnailData1)
-        assertThat(thumbnailDataFlow2.first()).isEqualTo(thumbnailData2)
+    @Test
+    fun waitForThumbnailsToUpdate_null() = runTest {
+        systemUnderTest.waitForThumbnailsToUpdate(null)
     }
 
     private fun createTaskWithId(taskId: Int) =

@@ -23,7 +23,7 @@ import com.android.launcher3.util.LauncherMultivalentJUnit
 import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.quickstep.views.TaskViewType
 import com.android.systemui.shared.recents.model.Task
-import com.android.wm.shell.common.split.SplitScreenConstants
+import com.android.wm.shell.shared.split.SplitScreenConstants
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -66,7 +66,7 @@ class GroupTaskTest {
                 Rect(),
                 1,
                 2,
-                SplitScreenConstants.SNAP_TO_50_50
+                SplitScreenConstants.SNAP_TO_2_50_50
             )
         val task1 = GroupTask(createTask(1), createTask(2), splitBounds, TaskViewType.GROUPED)
         val task2 = GroupTask(createTask(1), createTask(2), splitBounds, TaskViewType.GROUPED)
@@ -81,7 +81,7 @@ class GroupTaskTest {
                 Rect(),
                 1,
                 2,
-                SplitScreenConstants.SNAP_TO_50_50
+                SplitScreenConstants.SNAP_TO_2_50_50
             )
         val splitBounds2 =
             SplitConfigurationOptions.SplitBounds(
@@ -89,7 +89,7 @@ class GroupTaskTest {
                 Rect(),
                 1,
                 2,
-                SplitScreenConstants.SNAP_TO_30_70
+                SplitScreenConstants.SNAP_TO_2_33_66
             )
         val task1 = GroupTask(createTask(1), createTask(2), splitBounds1, TaskViewType.GROUPED)
         val task2 = GroupTask(createTask(1), createTask(2), splitBounds2, TaskViewType.GROUPED)

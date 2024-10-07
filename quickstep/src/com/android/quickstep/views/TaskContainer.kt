@@ -56,7 +56,7 @@ class TaskContainer(
     @SplitConfigurationOptions.StagePosition val stagePosition: Int,
     val digitalWellBeingToast: DigitalWellBeingToast?,
     val showWindowsView: View?,
-    taskOverlayFactory: TaskOverlayFactory
+    taskOverlayFactory: TaskOverlayFactory,
 ) {
     val overlay: TaskOverlayFactory.TaskOverlay<*> = taskOverlayFactory.createOverlay(this)
     lateinit var taskContainerData: TaskContainerData
@@ -146,6 +146,7 @@ class TaskContainer(
             }
 
     fun bind() {
+        digitalWellBeingToast?.bind(task, taskView, snapshotView, stagePosition)
         if (enableRefactorTaskThumbnail()) {
             bindThumbnailView()
         } else {
@@ -159,6 +160,8 @@ class TaskContainer(
         if (enableRefactorTaskThumbnail()) {
             taskView.removeView(thumbnailView)
         }
+        snapshotView.scaleX = 1f
+        snapshotView.scaleY = 1f
         overlay.destroy()
     }
 
@@ -169,6 +172,21 @@ class TaskContainer(
     fun setOverlayEnabled(enabled: Boolean) {
         if (!enableRefactorTaskThumbnail()) {
             thumbnailViewDeprecated.setOverlayEnabled(enabled)
+        }
+    }
+
+    fun addChildForAccessibility(outChildren: ArrayList<View>) {
+        addAccessibleChildToList(iconView.asView(), outChildren)
+        addAccessibleChildToList(snapshotView, outChildren)
+        showWindowsView?.let { addAccessibleChildToList(it, outChildren) }
+        digitalWellBeingToast?.let { addAccessibleChildToList(it, outChildren) }
+    }
+
+    private fun addAccessibleChildToList(view: View, outChildren: ArrayList<View>) {
+        if (view.includeForAccessibility()) {
+            outChildren.add(view)
+        } else {
+            view.addChildrenForAccessibility(outChildren)
         }
     }
 }

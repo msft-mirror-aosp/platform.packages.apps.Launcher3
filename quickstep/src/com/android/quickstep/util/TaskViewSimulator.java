@@ -24,7 +24,6 @@ import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITIO
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_UNDEFINED;
 import static com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
-import static com.android.quickstep.TaskAnimationManager.ENABLE_SHELL_TRANSITIONS;
 import static com.android.quickstep.util.RecentsOrientedState.postDisplayRotation;
 import static com.android.quickstep.util.RecentsOrientedState.preDisplayRotation;
 
@@ -306,6 +305,14 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
     }
 
     /**
+     * Override the pivot used to apply scale changes.
+     */
+    public void setPivotOverride(PointF pivotOverride) {
+        mPivotOverride = pivotOverride;
+        getFullScreenScale();
+    }
+
+    /**
      * Adds animation for all the components corresponding to transition from an app to overview.
      */
     public void addAppToOverviewAnim(PendingAnimation pa, Interpolator interpolator) {
@@ -535,21 +542,12 @@ public class TaskViewSimulator implements TransformParams.BuilderProxy {
 
         // If mDrawsBelowRecents is unset, no reordering will be enforced.
         if (mDrawsBelowRecents != null) {
-            // In legacy transitions, the animation leashes remain in same hierarchy in the
-            // TaskDisplayArea, so we don't want to bump the layer too high otherwise it will
-            // conflict with layers that WM core positions (ie. the input consumers).  For shell
-            // transitions, the animation leashes are reparented to an animation container so we
-            // can bump layers as needed.
-            if (ENABLE_SHELL_TRANSITIONS) {
-                builder.setLayer(mDrawsBelowRecents
-                        ? Integer.MIN_VALUE + app.prefixOrderIndex
-                        // 1000 is an arbitrary number to give room for multiple layers.
-                        : Integer.MAX_VALUE - 1000 + app.prefixOrderIndex);
-            } else {
-                builder.setLayer(mDrawsBelowRecents
-                        ? Integer.MIN_VALUE + app.prefixOrderIndex
-                        : 0);
-            }
+            // In shell transitions, the animation leashes are reparented to an animation container
+            // so we can bump layers as needed.
+            builder.setLayer(mDrawsBelowRecents
+                    ? Integer.MIN_VALUE + app.prefixOrderIndex
+                    // 1000 is an arbitrary number to give room for multiple layers.
+                    : Integer.MAX_VALUE - 1000 + app.prefixOrderIndex);
         }
     }
 

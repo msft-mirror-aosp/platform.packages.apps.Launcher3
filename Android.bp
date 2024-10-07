@@ -17,7 +17,7 @@ package {
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
-min_launcher3_sdk_version = "30"
+min_launcher3_sdk_version = "31"
 
 // Targets that don't inherit framework aconfig libs (i.e., those that don't set
 // `platform_apis: true`) must manually link them.
@@ -27,7 +27,7 @@ java_defaults {
         "android.os.flags-aconfig-java",
         "android.appwidget.flags-aconfig-java",
         "com.android.window.flags.window-aconfig-java",
-    ]
+    ],
 }
 
 // Common source files used to build launcher (java and kotlin)
@@ -64,8 +64,80 @@ filegroup {
 filegroup {
     name: "launcher-quickstep-src",
     srcs: [
-        "quickstep/src/**/*.java",
         "quickstep/src/**/*.kt",
+        "quickstep/src/**/*.java",
+        ":launcher-quickstep-processed-protolog-src",
+    ],
+}
+
+// Launcher ProtoLog support
+filegroup {
+    name: "launcher-quickstep-unprocessed-protolog-src",
+    srcs: [
+        "quickstep/src_protolog/**/*.java",
+    ],
+}
+
+java_library {
+    name: "launcher-quickstep_protolog-groups",
+    srcs: [
+        "quickstep/src_protolog/**/*.java",
+    ],
+    static_libs: [
+        "protolog-group",
+        "androidx.annotation_annotation",
+        "com_android_launcher3_flags_lib",
+    ],
+}
+
+genrule {
+    name: "launcher-quickstep-processed-protolog-src",
+    srcs: [
+        ":protolog-impl",
+        ":launcher-quickstep-unprocessed-protolog-src",
+        ":launcher-quickstep_protolog-groups",
+    ],
+    tools: ["protologtool"],
+    cmd: "$(location protologtool) transform-protolog-calls " +
+        "--protolog-class com.android.internal.protolog.common.ProtoLog " +
+        "--loggroups-class com.android.quickstep.util.QuickstepProtoLogGroup " +
+        "--loggroups-jar $(location :launcher-quickstep_protolog-groups) " +
+        "--viewer-config-file-path /system_ext/etc/launcher.quickstep.protolog.pb " +
+        "--output-srcjar $(out) " +
+        "$(locations :launcher-quickstep-unprocessed-protolog-src)",
+    out: ["launcher.quickstep.protolog.srcjar"],
+}
+
+genrule {
+    name: "gen-launcher.quickstep.protolog.pb",
+    srcs: [
+        ":launcher-quickstep-unprocessed-protolog-src",
+        ":launcher-quickstep_protolog-groups",
+    ],
+    tools: ["protologtool"],
+    cmd: "$(location protologtool) generate-viewer-config " +
+        "--protolog-class com.android.internal.protolog.common.ProtoLog " +
+        "--loggroups-class com.android.quickstep.util.QuickstepProtoLogGroup " +
+        "--loggroups-jar $(location :launcher-quickstep_protolog-groups) " +
+        "--viewer-config-type proto " +
+        "--viewer-config $(out) " +
+        "$(locations :launcher-quickstep-unprocessed-protolog-src)",
+    out: ["launcher.quickstep.protolog.pb"],
+}
+
+prebuilt_etc {
+    name: "launcher.quickstep.protolog.pb",
+    system_ext_specific: true,
+    src: ":gen-launcher.quickstep.protolog.pb",
+    filename_from_src: true,
+}
+
+// Source code for quickstep dagger
+filegroup {
+    name: "launcher-quickstep-dagger",
+    srcs: [
+        "quickstep/dagger/**/*.java",
+        "quickstep/dagger/**/*.kt",
     ],
 }
 
@@ -153,7 +225,7 @@ launcher_compose_java_defaults {
     soong_config_variables: {
         release_enable_compose_in_launcher: {
             srcs: [
-                ":launcher-compose-enabled-src"
+                ":launcher-compose-enabled-src",
             ],
 
             // Compose dependencies
@@ -166,7 +238,7 @@ launcher_compose_java_defaults {
             // in compose/launcher3/facade/disabled/.
             conditions_default: {
                 srcs: [
-                    ":launcher-compose-disabled-src"
+                    ":launcher-compose-disabled-src",
                 ],
                 static_libs: [],
             },
@@ -179,7 +251,7 @@ quickstep_compose_java_defaults {
     soong_config_variables: {
         release_enable_compose_in_launcher: {
             srcs: [
-                ":launcher-quickstep-compose-enabled-src"
+                ":launcher-quickstep-compose-enabled-src",
             ],
 
             // Compose dependencies
@@ -192,7 +264,7 @@ quickstep_compose_java_defaults {
             // in compose/quickstep/facade/disabled/.
             conditions_default: {
                 srcs: [
-                    ":launcher-quickstep-compose-disabled-src"
+                    ":launcher-quickstep-compose-disabled-src",
                 ],
                 static_libs: [],
             },
@@ -221,7 +293,7 @@ launcher_compose_tests_java_defaults {
 android_library {
     name: "launcher-aosp-tapl",
     libs: [
-        "framework-statsd",
+        "framework-statsd.stubs.module_lib",
     ],
     static_libs: [
         "androidx.annotation_annotation",
@@ -322,7 +394,9 @@ android_library {
         "kotlinx_coroutines",
         "com_android_launcher3_flags_lib",
         "com_android_wm_shell_flags_lib",
-
+        "dagger2",
+        "jsr330",
+        "com_android_systemui_shared_flags_lib",
     ],
     manifest: "AndroidManifest-common.xml",
     sdk_version: "current",
@@ -357,6 +431,7 @@ android_app {
     sdk_version: "current",
     min_sdk_version: min_launcher3_sdk_version,
     target_sdk_version: "current",
+    plugins: ["dagger2-compiler"],
     privileged: true,
     system_ext_specific: true,
 
@@ -385,13 +460,15 @@ android_library {
         "quickstep/res",
     ],
     libs: [
-        "framework-statsd",
+        "framework-statsd.stubs.module_lib",
     ],
     static_libs: [
         "Launcher3ResLib",
         "lottie",
         "SystemUISharedLib",
         "SettingsLibSettingsTheme",
+        "dagger2",
+        "protolog-group",
     ],
     manifest: "quickstep/AndroidManifest.xml",
     min_sdk_version: "current",
@@ -407,6 +484,7 @@ android_library {
     srcs: [
         ":launcher-src",
         ":launcher-quickstep-src",
+        ":launcher-quickstep-dagger",
         "go/quickstep/src/**/*.java",
         "go/quickstep/src/**/*.kt",
     ],
@@ -421,7 +499,10 @@ android_library {
         "QuickstepResLib",
         "androidx.room_room-runtime",
     ],
-    plugins: ["androidx.room_room-compiler-plugin"],
+    plugins: [
+        "androidx.room_room-compiler-plugin",
+        "dagger2-compiler",
+    ],
     manifest: "quickstep/AndroidManifest.xml",
     additional_manifests: [
         "go/AndroidManifest.xml",
@@ -437,16 +518,17 @@ android_library {
     name: "Launcher3QuickStepLib",
     defaults: [
         "launcher_compose_defaults",
-        "quickstep_compose_defaults"
+        "quickstep_compose_defaults",
     ],
     srcs: [
         ":launcher-src",
         ":launcher-quickstep-src",
+        ":launcher-quickstep-dagger",
         ":launcher-build-config",
     ],
     resource_dirs: [],
     libs: [
-        "framework-statsd",
+        "framework-statsd.stubs.module_lib",
     ],
     // Note the ordering here is important when it comes to resource
     // overriding. We want the most specific resource overrides defined
@@ -458,6 +540,7 @@ android_library {
     ],
     manifest: "quickstep/AndroidManifest.xml",
     platform_apis: true,
+    plugins: ["dagger2-compiler"],
     min_sdk_version: "current",
     // TODO(b/319712088): re-enable use_resource_processor
     use_resource_processor: false,
@@ -484,7 +567,10 @@ android_app {
         "Launcher2",
         "Launcher3",
     ],
-    required: ["privapp_whitelist_com.android.launcher3"],
+    required: [
+        "privapp_whitelist_com.android.launcher3",
+        "launcher.quickstep.protolog.pb",
+    ],
 
     resource_dirs: ["quickstep/res"],
 
@@ -499,7 +585,6 @@ android_app {
     },
 
 }
-
 
 // Build rule for Launcher3 Go app with quickstep for Android Go devices.
 // Note that the following two rules are exactly same, and should
@@ -540,6 +625,7 @@ android_app {
         include_filter: ["com.android.launcher3.*"],
     },
 }
+
 android_app {
     name: "Launcher3QuickStepGo",
     static_libs: ["Launcher3GoLib"],

@@ -43,6 +43,7 @@ import com.android.launcher3.util.Executors.SimpleThreadFactory;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.quickstep.recents.data.RecentTasksDataSource;
+import com.android.quickstep.recents.data.TaskVisualsChangeNotifier;
 import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.TaskVisualsChangeListener;
@@ -55,6 +56,7 @@ import com.android.systemui.shared.system.TaskStackChangeListeners;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -65,7 +67,8 @@ import java.util.function.Predicate;
  */
 @TargetApi(Build.VERSION_CODES.O)
 public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
-        TaskStackChangeListener, TaskVisualsChangeListener, SafeCloseable {
+        TaskStackChangeListener, TaskVisualsChangeListener, TaskVisualsChangeNotifier,
+        SafeCloseable {
 
     // We do not need any synchronization for this variable as its only written on UI thread.
     public static final MainThreadInitializedObject<RecentsModel> INSTANCE =
@@ -74,7 +77,8 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
     private static final Executor RECENTS_MODEL_EXECUTOR = Executors.newSingleThreadExecutor(
             new SimpleThreadFactory("TaskThumbnailIconCache-", THREAD_PRIORITY_BACKGROUND));
 
-    private final List<TaskVisualsChangeListener> mThumbnailChangeListeners = new ArrayList<>();
+    private final ConcurrentLinkedQueue<TaskVisualsChangeListener> mThumbnailChangeListeners =
+            new ConcurrentLinkedQueue<>();
     private final Context mContext;
 
     private final RecentTasksList mTaskList;
@@ -237,8 +241,8 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
     public boolean onTaskSnapshotChanged(int taskId, ThumbnailData snapshot) {
         mThumbnailCache.updateTaskSnapShot(taskId, snapshot);
 
-        for (int i = mThumbnailChangeListeners.size() - 1; i >= 0; i--) {
-            Task task = mThumbnailChangeListeners.get(i).onTaskThumbnailChanged(taskId, snapshot);
+        for (TaskVisualsChangeListener listener : mThumbnailChangeListeners) {
+            Task task = listener.onTaskThumbnailChanged(taskId, snapshot);
             if (task != null) {
                 task.thumbnail = snapshot;
             }
@@ -267,8 +271,8 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
     @Override
     public void onAppIconChanged(String packageName, UserHandle user) {
         mIconCache.invalidateCacheEntries(packageName, user);
-        for (int i = mThumbnailChangeListeners.size() - 1; i >= 0; i--) {
-            mThumbnailChangeListeners.get(i).onTaskIconChanged(packageName, user);
+        for (TaskVisualsChangeListener listener : mThumbnailChangeListeners) {
+            listener.onTaskIconChanged(packageName, user);
         }
     }
 
@@ -287,6 +291,7 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
     /**
      * Adds a listener for visuals changes
      */
+    @Override
     public void addThumbnailChangeListener(TaskVisualsChangeListener listener) {
         mThumbnailChangeListeners.add(listener);
     }
@@ -294,6 +299,7 @@ public class RecentsModel implements RecentTasksDataSource, IconChangeListener,
     /**
      * Removes a previously added listener
      */
+    @Override
     public void removeThumbnailChangeListener(TaskVisualsChangeListener listener) {
         mThumbnailChangeListeners.remove(listener);
     }

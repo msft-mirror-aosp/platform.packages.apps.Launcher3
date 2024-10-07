@@ -16,6 +16,7 @@
 
 package com.android.launcher3.taskbar.bubbles.stashing
 
+import android.graphics.Rect
 import android.view.InsetsController
 import android.view.MotionEvent
 import android.view.View
@@ -23,8 +24,8 @@ import com.android.launcher3.taskbar.TaskbarInsetsController
 import com.android.launcher3.taskbar.bubbles.BubbleBarView
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController
 import com.android.launcher3.taskbar.bubbles.BubbleStashedHandleViewController
-import com.android.wm.shell.common.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.animation.PhysicsAnimator
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import java.io.PrintWriter
 
 /** StashController that defines stashing behaviour for the taskbar modes. */
@@ -55,14 +56,29 @@ interface BubbleStashController {
         fun runAfterInit(action: Runnable)
     }
 
+    /** Launcher states bubbles cares about */
+    enum class BubbleLauncherState {
+        /* When launcher is in overview */
+        OVERVIEW,
+        /* When launcher is on home */
+        HOME,
+        /* We're in an app */
+        IN_APP,
+    }
+
+    /** The current launcher state */
+    var launcherState: BubbleLauncherState
+
     /** Whether bubble bar is currently stashed */
     val isStashed: Boolean
 
     /** Whether launcher enters or exits the home page. */
-    var isBubblesShowingOnHome: Boolean
+    val isBubblesShowingOnHome: Boolean
+        get() = launcherState == BubbleLauncherState.HOME
 
     /** Whether launcher enters or exits the overview page. */
-    var isBubblesShowingOnOverview: Boolean
+    val isBubblesShowingOnOverview: Boolean
+        get() = launcherState == BubbleLauncherState.OVERVIEW
 
     /** Updated when sysui locked state changes, when locked, bubble bar is not shown. */
     var isSysuiLocked: Boolean
@@ -146,6 +162,9 @@ interface BubbleStashController {
     /** Returns the translation of the handle. */
     fun getHandleTranslationY(): Float?
 
+    /** Returns bounds of the handle */
+    fun getHandleBounds(bounds: Rect)
+
     /**
      * Returns bubble bar Y position according to [isBubblesShowingOnHome] and
      * [isBubblesShowingOnOverview] values. Default implementation only analyse
@@ -181,8 +200,5 @@ interface BubbleStashController {
 
         /** How long to translate Y coordinate of the BubbleBar. */
         const val BAR_TRANSLATION_DURATION = 300L
-
-        /** The scale bubble bar animates to when being stashed. */
-        const val STASHED_BAR_SCALE = 0.5f
     }
 }

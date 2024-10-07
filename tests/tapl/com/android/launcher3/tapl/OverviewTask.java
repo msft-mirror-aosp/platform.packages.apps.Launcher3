@@ -156,8 +156,8 @@ public final class OverviewTask {
                 return;
             }
 
-            boolean taskWasFocused = mLauncher.isTablet() && getVisibleHeight() == mLauncher
-                    .getFocusedTaskHeightForTablet();
+            boolean taskWasFocused = mLauncher.isTablet()
+                    && getVisibleHeight() == mLauncher.getOverviewTaskSize().height();
             List<Integer> originalTasksCenterX =
                     getCurrentTasksCenterXList().stream().sorted().toList();
             boolean isClearAllVisibleBeforeDismiss = mOverview.isClearAllVisible();
@@ -282,10 +282,11 @@ public final class OverviewTask {
      * Returns whether the given String is contained in this Task's contentDescription. Also returns
      * true if both Strings are null.
      *
-     * TODO(b/326565120): remove Nullable support once the bug causing it to be null is fixed.
+     * TODO(b/342627272): remove Nullable support once the bug causing it to be null is fixed.
      */
-    public boolean containsContentDescription(@Nullable String expected) {
-        String actual = mTask.getContentDescription();
+    public boolean containsContentDescription(@Nullable String expected,
+            OverviewSplitTask overviewSplitTask) {
+        String actual = findObjectInTask(overviewSplitTask.snapshotRes).getContentDescription();
         if (actual == null && expected == null) {
             return true;
         }
@@ -293,6 +294,14 @@ public final class OverviewTask {
             return false;
         }
         return actual.contains(expected);
+    }
+
+    /**
+     * Returns whether the given String is contained in this Task's contentDescription. Also returns
+     * true if both Strings are null
+     */
+    public boolean containsContentDescription(@Nullable String expected) {
+        return containsContentDescription(expected, DEFAULT);
     }
 
     private TaskViewType getType() {

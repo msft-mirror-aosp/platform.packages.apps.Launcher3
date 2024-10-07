@@ -18,6 +18,8 @@ package com.android.launcher3.taskbar.bubbles;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
+import android.animation.Animator;
+import android.animation.AnimatorSet;
 import android.content.res.Resources;
 import android.graphics.Point;
 import android.graphics.PointF;
@@ -34,6 +36,7 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatedFloat;
+import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.taskbar.TaskbarControllers;
 import com.android.launcher3.taskbar.TaskbarInsetsController;
@@ -43,7 +46,7 @@ import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.SystemUiProxy;
-import com.android.wm.shell.common.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.io.PrintWriter;
 import java.util.List;
@@ -80,12 +83,24 @@ public class BubbleBarViewController {
 
     // These are exposed to {@link BubbleStashController} to animate for stashing/un-stashing
     private final MultiValueAlpha mBubbleBarAlpha;
-    private final AnimatedFloat mBubbleBarScale = new AnimatedFloat(this::updateScale);
+    private final AnimatedFloat mBubbleBarBubbleAlpha = new AnimatedFloat(this::updateBubbleAlpha);
+    private final AnimatedFloat mBubbleBarBackgroundAlpha = new AnimatedFloat(
+            this::updateBackgroundAlpha);
+    private final AnimatedFloat mBubbleBarScaleX = new AnimatedFloat(this::updateScaleX);
+    private final AnimatedFloat mBubbleBarScaleY = new AnimatedFloat(this::updateScaleY);
+    private final AnimatedFloat mBubbleBarBackgroundScaleX = new AnimatedFloat(
+            this::updateBackgroundScaleX);
+    private final AnimatedFloat mBubbleBarBackgroundScaleY = new AnimatedFloat(
+            this::updateBackgroundScaleY);
     private final AnimatedFloat mBubbleBarTranslationY = new AnimatedFloat(
             this::updateTranslationY);
+    private final AnimatedFloat mBubbleOffsetY = new AnimatedFloat(
+            this::updateBubbleOffsetY);
 
     // Modified when swipe up is happening on the bubble bar or task bar.
     private float mBubbleBarSwipeUpTranslationY;
+    // Modified when bubble bar is springing back into the stash handle.
+    private float mBubbleBarStashTranslationY;
 
     // Whether the bar is hidden for a sysui state.
     private boolean mHiddenForSysui;
@@ -119,12 +134,13 @@ public class BubbleBarViewController {
         mBubbleDragController = bubbleControllers.bubbleDragController;
         mTaskbarStashController = controllers.taskbarStashController;
         mTaskbarInsetsController = controllers.taskbarInsetsController;
-        mBubbleBarViewAnimator = new BubbleBarViewAnimator(mBarView, mBubbleStashController);
+        mBubbleBarViewAnimator = new BubbleBarViewAnimator(
+                mBarView, mBubbleStashController, mBubbleBarController::showExpandedView);
         mTaskbarViewPropertiesProvider = taskbarViewPropertiesProvider;
         onBubbleBarConfigurationChanged(/* animate= */ false);
         mActivity.addOnDeviceProfileChangeListener(
                 dp -> onBubbleBarConfigurationChanged(/* animate= */ true));
-        mBubbleBarScale.updateValue(1f);
+        mBubbleBarScaleY.updateValue(1f);
         mBubbleClickListener = v -> onBubbleClicked((BubbleView) v);
         mBubbleBarClickListener = v -> expandBubbleBar();
         mBubbleDragController.setupBubbleBarView(mBarView);
@@ -254,16 +270,65 @@ public class BubbleBarViewController {
         return mBubbleBarAlpha;
     }
 
-    public AnimatedFloat getBubbleBarScale() {
-        return mBubbleBarScale;
+    public AnimatedFloat getBubbleBarBubbleAlpha() {
+        return mBubbleBarBubbleAlpha;
+    }
+
+    public AnimatedFloat getBubbleBarBackgroundAlpha() {
+        return mBubbleBarBackgroundAlpha;
+    }
+
+    public AnimatedFloat getBubbleBarScaleX() {
+        return mBubbleBarScaleX;
+    }
+
+    public AnimatedFloat getBubbleBarScaleY() {
+        return mBubbleBarScaleY;
+    }
+
+    public AnimatedFloat getBubbleBarBackgroundScaleX() {
+        return mBubbleBarBackgroundScaleX;
+    }
+
+    public AnimatedFloat getBubbleBarBackgroundScaleY() {
+        return mBubbleBarBackgroundScaleY;
     }
 
     public AnimatedFloat getBubbleBarTranslationY() {
         return mBubbleBarTranslationY;
     }
 
+    public AnimatedFloat getBubbleOffsetY() {
+        return mBubbleOffsetY;
+    }
+
+    public float getBubbleBarCollapsedWidth() {
+        return mBarView.collapsedWidth();
+    }
+
     public float getBubbleBarCollapsedHeight() {
         return mBarView.getBubbleBarCollapsedHeight();
+    }
+
+    /**
+     * @see BubbleBarView#getRelativePivotX()
+     */
+    public float getBubbleBarRelativePivotX() {
+        return mBarView.getRelativePivotX();
+    }
+
+    /**
+     * @see BubbleBarView#getRelativePivotY()
+     */
+    public float getBubbleBarRelativePivotY() {
+        return mBarView.getRelativePivotY();
+    }
+
+    /**
+     * @see BubbleBarView#setRelativePivot(float, float)
+     */
+    public void setBubbleBarRelativePivot(float x, float y) {
+        mBarView.setRelativePivot(x, y);
     }
 
     /**
@@ -283,6 +348,14 @@ public class BubbleBarViewController {
      */
     public BubbleBarLocation getBubbleBarLocation() {
         return mBarView.getBubbleBarLocation();
+    }
+
+    /**
+     * @return {@code true} if bubble bar is on the left edge of the screen, {@code false} if on
+     * the right
+     */
+    public boolean isBubbleBarOnLeft() {
+        return mBarView.getBubbleBarLocation().isOnLeft(mBarView.isLayoutRtl());
     }
 
     /**
@@ -306,6 +379,15 @@ public class BubbleBarViewController {
      */
     public Rect getBubbleBarBounds() {
         return mBarView.getBubbleBarBounds();
+    }
+
+    /** Checks that bubble bar is visible and that the motion event is within bounds. */
+    public boolean isEventOverBubbleBar(MotionEvent event) {
+        if (!isBubbleBarVisible()) return false;
+        final Rect bounds = getBubbleBarBounds();
+        final int bubbleBarTopOnScreen = mBarView.getRestingTopPositionOnScreen();
+        final float x = event.getX();
+        return event.getRawY() >= bubbleBarTopOnScreen && x >= bounds.left && x <= bounds.right;
     }
 
     /** Whether a new bubble is animating. */
@@ -358,7 +440,7 @@ public class BubbleBarViewController {
             if (hidden) {
                 mBarView.setAlpha(0);
                 mBarView.setExpanded(false);
-                updatePersistentTaskbar(/* isBubbleBarExpanded = */ false);
+                adjustTaskbarAndHotseatToBubbleBarState(/* isBubbleBarExpanded = */ false);
             }
             mActivity.bubbleBarVisibilityChanged(!hidden);
         }
@@ -464,18 +546,45 @@ public class BubbleBarViewController {
         updateTranslationY();
     }
 
-    private void updateTranslationY() {
-        mBarView.setTranslationY(mBubbleBarTranslationY.value
-                + mBubbleBarSwipeUpTranslationY);
+    /**
+     * Sets the translation of the bubble bar during the stash animation.
+     */
+    public void setTranslationYForStash(float transY) {
+        mBubbleBarStashTranslationY = transY;
+        updateTranslationY();
     }
 
-    /**
-     * Applies scale properties for the entire bubble bar.
-     */
-    private void updateScale() {
-        float scale = mBubbleBarScale.value;
+    private void updateTranslationY() {
+        mBarView.setTranslationY(mBubbleBarTranslationY.value + mBubbleBarSwipeUpTranslationY
+                + mBubbleBarStashTranslationY);
+    }
+
+    private void updateScaleX(float scale) {
         mBarView.setScaleX(scale);
+    }
+
+    private void updateScaleY(float scale) {
         mBarView.setScaleY(scale);
+    }
+
+    private void updateBackgroundScaleX(float scale) {
+        mBarView.setBackgroundScaleX(scale);
+    }
+
+    private void updateBackgroundScaleY(float scale) {
+        mBarView.setBackgroundScaleY(scale);
+    }
+
+    private void updateBubbleAlpha(float alpha) {
+        mBarView.setBubbleAlpha(alpha);
+    }
+
+    private void updateBubbleOffsetY(float transY) {
+        mBarView.setBubbleOffsetY(transY);
+    }
+
+    private void updateBackgroundAlpha(float alpha) {
+        mBarView.setBackgroundAlpha(alpha);
     }
 
     //
@@ -566,7 +675,8 @@ public class BubbleBarViewController {
                 // if the animation is suppressed, immediately stash or show the bubble bar to
                 // ensure they've been initialized.
                 if (mTaskbarStashController.isInApp()
-                        && mBubbleStashController.isTransientTaskBar()) {
+                        && mBubbleStashController.isTransientTaskBar()
+                        && mTaskbarStashController.isStashed()) {
                     mBubbleStashController.stashBubbleBarImmediate();
                 } else {
                     mBubbleStashController.showBubbleBarImmediate();
@@ -583,9 +693,8 @@ public class BubbleBarViewController {
     public void animateBubbleNotification(BubbleBarBubble bubble, boolean isExpanding,
             boolean isUpdate) {
         boolean isInApp = mTaskbarStashController.isInApp();
-        // if this is the first bubble, animate to the initial state. one bubble is the overflow
-        // so check for at most 2 children.
-        if (mBarView.getChildCount() <= 2 && !isUpdate) {
+        // if this is the first bubble, animate to the initial state.
+        if (mBarView.getBubbleChildCount() == 1 && !isUpdate) {
             mBubbleBarViewAnimator.animateToInitialState(bubble, isInApp, isExpanding);
             return;
         }
@@ -627,7 +736,7 @@ public class BubbleBarViewController {
     public void setExpanded(boolean isExpanded) {
         if (isExpanded != mBarView.isExpanded()) {
             mBarView.setExpanded(isExpanded);
-            updatePersistentTaskbar(isExpanded);
+            adjustTaskbarAndHotseatToBubbleBarState(isExpanded);
             if (!isExpanded) {
                 mSystemUiProxy.collapseBubbles();
             } else {
@@ -638,13 +747,25 @@ public class BubbleBarViewController {
         }
     }
 
-    private void updatePersistentTaskbar(boolean isBubbleBarExpanded) {
-        if (mBubbleStashController.isTransientTaskBar()) return;
-        boolean hideTaskbar = isBubbleBarExpanded && isIntersectingTaskbar();
-        mTaskbarViewPropertiesProvider
-                .getIconsAlpha()
-                .animateToValue(hideTaskbar ? 0 : 1)
-                .start();
+    /**
+     * Hides the persistent taskbar if it is going to intersect with the expanded bubble bar if in
+     * app or overview. Set the hotseat stashed state if on launcher home screen. If not on launcher
+     * home screen and hotseat is stashed immediately un-stashes the hotseat.
+     */
+    private void adjustTaskbarAndHotseatToBubbleBarState(boolean isBubbleBarExpanded) {
+        if (mBubbleStashController.isBubblesShowingOnHome()) {
+            mTaskbarStashController.stashHotseat(isBubbleBarExpanded);
+        } else if (!mBubbleStashController.isTransientTaskBar()) {
+            boolean hideTaskbar = isBubbleBarExpanded && isIntersectingTaskbar();
+            mTaskbarViewPropertiesProvider
+                    .getIconsAlpha()
+                    .animateToValue(hideTaskbar ? 0 : 1)
+                    .start();
+        }
+        if (!mBubbleStashController.isBubblesShowingOnHome()
+                && mTaskbarStashController.isHiddenForBubbles()) {
+            mTaskbarStashController.unStashHotseatInstantly();
+        }
     }
 
     /** Return {@code true} if expanded bubble bar would intersect the taskbar. */
@@ -763,6 +884,53 @@ public class BubbleBarViewController {
         mBoundsChangeListener = listener;
     }
 
+    /** Called when the controller is destroyed. */
+    public void onDestroy() {
+        adjustTaskbarAndHotseatToBubbleBarState(/*isBubbleBarExpanded = */false);
+    }
+
+    /**
+     * Create an animator for showing or hiding bubbles when stashed state changes
+     *
+     * @param isStashed {@code true} when bubble bar should be stashed to the handle
+     */
+    public Animator createRevealAnimatorForStashChange(boolean isStashed) {
+        Rect stashedHandleBounds = new Rect();
+        mBubbleStashController.getHandleBounds(stashedHandleBounds);
+        int childCount = mBarView.getChildCount();
+        float newChildWidth = (float) stashedHandleBounds.width() / childCount;
+        AnimatorSet animatorSet = new AnimatorSet();
+        for (int i = 0; i < childCount; i++) {
+            BubbleView child = (BubbleView) mBarView.getChildAt(i);
+            animatorSet.play(
+                    createRevealAnimForBubble(child, isStashed, stashedHandleBounds,
+                            newChildWidth));
+        }
+        return animatorSet;
+    }
+
+    private Animator createRevealAnimForBubble(BubbleView bubbleView, boolean isStashed,
+            Rect stashedHandleBounds, float newWidth) {
+        Rect viewBounds = new Rect(0, 0, bubbleView.getWidth(), bubbleView.getHeight());
+
+        int viewCenterY = viewBounds.centerY();
+        int halfHandleHeight = stashedHandleBounds.height() / 2;
+        int widthDelta = Math.max(0, (int) (viewBounds.width() - newWidth) / 2);
+
+        Rect stashedViewBounds = new Rect(
+                viewBounds.left + widthDelta,
+                viewCenterY - halfHandleHeight,
+                viewBounds.right - widthDelta,
+                viewCenterY + halfHandleHeight
+        );
+
+        float viewRadius = 0f; // Use 0 to not clip the new message dot or the app icon
+        float stashedRadius = stashedViewBounds.height() / 2f;
+
+        return new RoundedRectRevealOutlineProvider(viewRadius, stashedRadius, viewBounds,
+                stashedViewBounds).createRevealAnimator(bubbleView, !isStashed, 0);
+    }
+
     /**
      * Listener to receive updates about bubble bar bounds changing
      */
@@ -784,6 +952,7 @@ public class BubbleBarViewController {
         pw.println("  mShouldShowEducation: " + mShouldShowEducation);
         pw.println("  mBubbleBarTranslationY.value: " + mBubbleBarTranslationY.value);
         pw.println("  mBubbleBarSwipeUpTranslationY: " + mBubbleBarSwipeUpTranslationY);
+        pw.println("  mOverflowAdded: " + mOverflowAdded);
         if (mBarView != null) {
             mBarView.dump(pw);
         } else {

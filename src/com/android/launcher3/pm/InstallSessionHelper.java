@@ -17,7 +17,6 @@
 package com.android.launcher3.pm;
 
 import android.content.Context;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherApps;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageInstaller.SessionInfo;
@@ -32,12 +31,17 @@ import androidx.annotation.WorkerThread;
 import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.SessionCommitReceiver;
+import com.android.launcher3.dagger.ApplicationContext;
+import com.android.launcher3.dagger.LauncherAppSingleton;
+import com.android.launcher3.dagger.LauncherBaseAppComponent;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.ItemInstallQueue;
+import com.android.launcher3.util.ApplicationInfoWrapper;
+import com.android.launcher3.util.DaggerSingletonObject;
+import com.android.launcher3.util.DaggerSingletonTracker;
+import com.android.launcher3.util.ExecutorUtil;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
-import com.android.launcher3.util.MainThreadInitializedObject;
-import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.SafeCloseable;
@@ -48,10 +52,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
+import javax.inject.Inject;
+
 /**
  * Utility class to tracking install sessions
  */
 @SuppressWarnings("NewApi")
+@LauncherAppSingleton
 public class InstallSessionHelper implements SafeCloseable {
 
     @NonNull
@@ -65,8 +72,8 @@ public class InstallSessionHelper implements SafeCloseable {
     private static final boolean DEBUG = false;
 
     @NonNull
-    public static final MainThreadInitializedObject<InstallSessionHelper> INSTANCE =
-            new MainThreadInitializedObject<>(InstallSessionHelper::new);
+    public static final DaggerSingletonObject<InstallSessionHelper> INSTANCE =
+            new DaggerSingletonObject<>(LauncherBaseAppComponent::getInstallSessionHelper);
 
     @Nullable
     private final LauncherApps mLauncherApps;
@@ -83,10 +90,13 @@ public class InstallSessionHelper implements SafeCloseable {
     @Nullable
     private IntSet mPromiseIconIds;
 
-    public InstallSessionHelper(@NonNull final Context context) {
+    @Inject
+    public InstallSessionHelper(@NonNull @ApplicationContext final Context context,
+            DaggerSingletonTracker tracker) {
         mInstaller = context.getPackageManager().getPackageInstaller();
         mAppContext = context.getApplicationContext();
         mLauncherApps = context.getSystemService(LauncherApps.class);
+        ExecutorUtil.executeSyncOnMainOrFail(() -> tracker.addCloseable(this));
     }
 
     @Override
@@ -171,8 +181,7 @@ public class InstallSessionHelper implements SafeCloseable {
         synchronized (mSessionVerifiedMap) {
             if (!mSessionVerifiedMap.containsKey(pkg)) {
                 boolean hasSystemFlag = DEBUG || mAppContext.getPackageName().equals(pkg)
-                        || PackageManagerHelper.INSTANCE.get(mAppContext)
-                                .getApplicationInfo(pkg, user, ApplicationInfo.FLAG_SYSTEM) != null;
+                        || new ApplicationInfoWrapper(mAppContext, pkg, user).isSystem();
                 mSessionVerifiedMap.put(pkg, hasSystemFlag);
             }
         }
@@ -245,8 +254,8 @@ public class InstallSessionHelper implements SafeCloseable {
                 && sessionInfo.getInstallReason() == PackageManager.INSTALL_REASON_USER
                 && sessionInfo.getAppIcon() != null
                 && !TextUtils.isEmpty(sessionInfo.getAppLabel())
-                && !PackageManagerHelper.INSTANCE.get(mAppContext).isAppInstalled(
-                        sessionInfo.getAppPackageName(), getUserHandle(sessionInfo));
+                && !new ApplicationInfoWrapper(mAppContext, sessionInfo.getAppPackageName(),
+                        getUserHandle(sessionInfo)).isInstalled();
     }
 
     public InstallSessionTracker registerInstallTracker(

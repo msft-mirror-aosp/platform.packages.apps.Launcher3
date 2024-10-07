@@ -16,11 +16,11 @@
 package com.android.launcher3.statehandlers;
 
 import static android.view.View.VISIBLE;
+import static android.window.flags.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY;
 
-import static com.android.launcher3.LauncherState.BACKGROUND_APP;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
+import android.content.Context;
 import android.os.Debug;
 import android.util.Log;
 import android.view.View;
@@ -30,16 +30,20 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
+import com.android.launcher3.statemanager.BaseState;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.SystemUiProxy;
+import com.android.quickstep.fallback.RecentsState;
 import com.android.wm.shell.desktopmode.IDesktopTaskListener;
+import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
+import java.io.PrintWriter;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.Executor;
 
 /**
  * Controls the visibility of the workspace and the resumed / paused state when desktop mode
@@ -49,8 +53,8 @@ public class DesktopVisibilityController {
 
     private static final String TAG = "DesktopVisController";
     private static final boolean DEBUG = false;
-    private final Launcher mLauncher;
     private final Set<DesktopVisibilityListener> mDesktopVisibilityListeners = new HashSet<>();
+    private final Set<TaskbarDesktopModeListener> mTaskbarDesktopModeListeners = new HashSet<>();
 
     private int mVisibleDesktopTasksCount;
     private boolean mInOverviewState;
@@ -60,23 +64,43 @@ public class DesktopVisibilityController {
     @Nullable
     private DesktopTaskListenerImpl mDesktopTaskListener;
 
-    public DesktopVisibilityController(Launcher launcher) {
-        mLauncher = launcher;
+    @Nullable
+    private Context mContext;
+
+    public DesktopVisibilityController(@NonNull Context context) {
+        setContext(context);
     }
 
-    /**
-     * Register a listener with System UI to receive updates about desktop tasks state
-     */
-    public void registerSystemUiListener() {
-        mDesktopTaskListener = new DesktopTaskListenerImpl(this, mLauncher.getDisplayId());
-        SystemUiProxy.INSTANCE.get(mLauncher).setDesktopTaskListener(mDesktopTaskListener);
+    /** Sets the context and re-registers the System Ui listener */
+    private void setContext(@Nullable Context context) {
+        unregisterSystemUiListener();
+        mContext = context;
+        registerSystemUiListener();
+    }
+
+    /** Register a listener with System UI to receive updates about desktop tasks state */
+    private void registerSystemUiListener() {
+        if (mContext == null) {
+            return;
+        }
+        if (mDesktopTaskListener != null) {
+            return;
+        }
+        mDesktopTaskListener = new DesktopTaskListenerImpl(this, mContext.getDisplayId());
+        SystemUiProxy.INSTANCE.get(mContext).setDesktopTaskListener(mDesktopTaskListener);
     }
 
     /**
      * Clear listener from System UI that was set with {@link #registerSystemUiListener()}
      */
-    public void unregisterSystemUiListener() {
-        SystemUiProxy.INSTANCE.get(mLauncher).setDesktopTaskListener(null);
+    private void unregisterSystemUiListener() {
+        if (mContext == null) {
+            return;
+        }
+        if (mDesktopTaskListener == null) {
+            return;
+        }
+        SystemUiProxy.INSTANCE.get(mContext).setDesktopTaskListener(null);
         mDesktopTaskListener.release();
         mDesktopTaskListener = null;
     }
@@ -110,11 +134,24 @@ public class DesktopVisibilityController {
         mDesktopVisibilityListeners.remove(listener);
     }
 
+    /** Registers a listener for Taskbar changes in Desktop Mode. */
+    public void registerTaskbarDesktopModeListener(TaskbarDesktopModeListener listener) {
+        mTaskbarDesktopModeListeners.add(listener);
+    }
+
+    /** Removes a previously registered listener for Taskbar changes in Desktop Mode. */
+    public void unregisterTaskbarDesktopModeListener(TaskbarDesktopModeListener listener) {
+        mTaskbarDesktopModeListeners.remove(listener);
+    }
+
     /**
      * Sets the number of desktop windows that are visible and updates launcher visibility based on
      * it.
      */
     public void setVisibleDesktopTasksCount(int visibleTasksCount) {
+        if (mContext == null) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "setVisibleDesktopTasksCount: visibleTasksCount=" + visibleTasksCount
                     + " currentValue=" + mVisibleDesktopTasksCount);
@@ -130,7 +167,8 @@ public class DesktopVisibilityController {
                 notifyDesktopVisibilityListeners(areDesktopTasksVisibleNow);
             }
 
-            if (!WALLPAPER_ACTIVITY.isEnabled(mLauncher) && wasVisible != isVisible) {
+            if (!ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()
+                    && wasVisible != isVisible) {
                 // TODO: b/333533253 - Remove after flag rollout
                 if (mVisibleDesktopTasksCount > 0) {
                     setLauncherViewsVisibility(View.INVISIBLE);
@@ -149,19 +187,33 @@ public class DesktopVisibilityController {
         }
     }
 
+    public void onLauncherStateChanged(LauncherState state) {
+        onLauncherStateChanged(
+                state, state == LauncherState.BACKGROUND_APP, state.isRecentsViewVisible);
+    }
+
+    public void onLauncherStateChanged(RecentsState state) {
+        onLauncherStateChanged(
+                state, state == RecentsState.BACKGROUND_APP, state.isRecentsViewVisible());
+    }
+
     /**
      * Process launcher state change and update launcher view visibility based on desktop state
      */
-    public void onLauncherStateChanged(LauncherState state) {
+    public void onLauncherStateChanged(
+            BaseState<?> state, boolean isBackgroundAppState, boolean isRecentsViewVisible) {
         if (DEBUG) {
             Log.d(TAG, "onLauncherStateChanged: newState=" + state);
         }
-        setBackgroundStateEnabled(state == BACKGROUND_APP);
+        setBackgroundStateEnabled(isBackgroundAppState);
         // Desktop visibility tracks overview and background state separately
-        setOverviewStateEnabled(state != BACKGROUND_APP && state.isRecentsViewVisible);
+        setOverviewStateEnabled(!isBackgroundAppState && isRecentsViewVisible);
     }
 
     private void setOverviewStateEnabled(boolean overviewStateEnabled) {
+        if (mContext == null) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "setOverviewStateEnabled: enabled=" + overviewStateEnabled
                     + " currentValue=" + mInOverviewState);
@@ -174,7 +226,7 @@ public class DesktopVisibilityController {
                 notifyDesktopVisibilityListeners(areDesktopTasksVisibleNow);
             }
 
-            if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
+            if (ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()) {
                 return;
             }
             // TODO: b/333533253 - Clean up after flag rollout
@@ -192,13 +244,26 @@ public class DesktopVisibilityController {
     }
 
     private void notifyDesktopVisibilityListeners(boolean areDesktopTasksVisible) {
+        if (mContext == null) {
+            return;
+        }
         if (DEBUG) {
             Log.d(TAG, "notifyDesktopVisibilityListeners: visible=" + areDesktopTasksVisible);
         }
         for (DesktopVisibilityListener listener : mDesktopVisibilityListeners) {
             listener.onDesktopVisibilityChanged(areDesktopTasksVisible);
         }
-        DisplayController.handleInfoChangeForDesktopMode(mLauncher);
+        DisplayController.INSTANCE.get(mContext).notifyConfigChange();
+    }
+
+    private void notifyTaskbarDesktopModeListeners(boolean doesAnyTaskRequireTaskbarRounding) {
+        if (DEBUG) {
+            Log.d(TAG, "notifyTaskbarDesktopModeListeners: doesAnyTaskRequireTaskbarRounding="
+                    + doesAnyTaskRequireTaskbarRounding);
+        }
+        for (TaskbarDesktopModeListener listener : mTaskbarDesktopModeListeners) {
+            listener.onTaskbarCornerRoundingUpdate(doesAnyTaskRequireTaskbarRounding);
+        }
     }
 
     /**
@@ -274,22 +339,32 @@ public class DesktopVisibilityController {
      * TODO: b/333533253 - Remove after flag rollout
      */
     private void setLauncherViewsVisibility(int visibility) {
-        if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
+        if (mContext == null) {
+            return;
+        }
+        if (ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()) {
             return;
         }
         if (DEBUG) {
             Log.d(TAG, "setLauncherViewsVisibility: visibility=" + visibility + " "
                     + Debug.getCaller());
         }
-        View workspaceView = mLauncher.getWorkspace();
-        if (workspaceView != null) {
-            workspaceView.setVisibility(visibility);
+        if (!(mContext instanceof ActivityContext activity)) {
+            return;
         }
-        View dragLayer = mLauncher.getDragLayer();
+        View dragLayer = activity.getDragLayer();
         if (dragLayer != null) {
             dragLayer.setVisibility(visibility);
         }
-        if (mLauncher instanceof QuickstepLauncher ql && ql.getTaskbarUIController() != null
+        if (!(activity instanceof Launcher launcher)) {
+            return;
+        }
+        View workspaceView = launcher.getWorkspace();
+        if (workspaceView != null) {
+            workspaceView.setVisibility(visibility);
+        }
+        if (launcher instanceof QuickstepLauncher ql
+                && ql.getTaskbarUIController() != null
                 && mVisibleDesktopTasksCount != 0) {
             ql.getTaskbarUIController().onLauncherVisibilityChanged(visibility == VISIBLE);
         }
@@ -299,7 +374,10 @@ public class DesktopVisibilityController {
      * TODO: b/333533253 - Remove after flag rollout
      */
     private void markLauncherPaused() {
-        if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
+        if (mContext == null) {
+            return;
+        }
+        if (ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()) {
             return;
         }
         if (DEBUG) {
@@ -316,7 +394,10 @@ public class DesktopVisibilityController {
      * TODO: b/333533253 - Remove after flag rollout
      */
     private void markLauncherResumed() {
-        if (WALLPAPER_ACTIVITY.isEnabled(mLauncher)) {
+        if (mContext == null) {
+            return;
+        }
+        if (ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()) {
             return;
         }
         if (DEBUG) {
@@ -330,6 +411,22 @@ public class DesktopVisibilityController {
         if (activity != null && activity.isResumed()) {
             activity.setResumed();
         }
+    }
+
+    public void onDestroy() {
+        setContext(null);
+    }
+
+    public void dumpLogs(String prefix, PrintWriter pw) {
+        pw.println(prefix + "DesktopVisibilityController:");
+
+        pw.println(prefix + "\tmDesktopVisibilityListeners=" + mDesktopVisibilityListeners);
+        pw.println(prefix + "\tmVisibleDesktopTasksCount=" + mVisibleDesktopTasksCount);
+        pw.println(prefix + "\tmInOverviewState=" + mInOverviewState);
+        pw.println(prefix + "\tmBackgroundStateEnabled=" + mBackgroundStateEnabled);
+        pw.println(prefix + "\tmGestureInProgress=" + mGestureInProgress);
+        pw.println(prefix + "\tmDesktopTaskListener=" + mDesktopTaskListener);
+        pw.println(prefix + "\tmContext=" + mContext);
     }
 
     /** A listener for when the user enters/exits Desktop Mode. */
@@ -377,7 +474,29 @@ public class DesktopVisibilityController {
 
         @Override
         public void onStashedChanged(int displayId, boolean stashed) {
-            Log.w(TAG, "IDesktopTaskListener: onStashedChanged is deprecated");
+            Log.w(TAG, "DesktopTaskListenerImpl: onStashedChanged is deprecated");
         }
+
+        @Override
+        public void onTaskbarCornerRoundingUpdate(boolean doesAnyTaskRequireTaskbarRounding) {
+            MAIN_EXECUTOR.execute(() -> {
+                if (mController != null && DesktopModeStatus.useRoundedCorners()) {
+                    Log.d(TAG, "DesktopTaskListenerImpl: doesAnyTaskRequireTaskbarRounding= "
+                            + doesAnyTaskRequireTaskbarRounding);
+                    mController.notifyTaskbarDesktopModeListeners(
+                            doesAnyTaskRequireTaskbarRounding);
+                }
+            });
+        }
+    }
+
+    /** A listener for Taskbar in Desktop Mode. */
+    public interface TaskbarDesktopModeListener {
+        /**
+         * Callback for when task is resized in desktop mode.
+         *
+         * @param doesAnyTaskRequireTaskbarRounding whether task requires taskbar corner roundness.
+         */
+        void onTaskbarCornerRoundingUpdate(boolean doesAnyTaskRequireTaskbarRounding);
     }
 }

@@ -26,11 +26,11 @@ import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
-import static com.android.wm.shell.common.split.SplitScreenConstants.SNAP_TO_50_50;
-import static com.android.wm.shell.common.split.SplitScreenConstants.SNAP_TO_NONE;
-import static com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT;
-import static com.android.wm.shell.common.split.SplitScreenConstants.SPLIT_POSITION_TOP_OR_LEFT;
-import static com.android.wm.shell.common.split.SplitScreenConstants.isPersistentSnapPosition;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_2_50_50;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_NONE;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_TOP_OR_LEFT;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.isPersistentSnapPosition;
 
 import android.content.Context;
 import android.content.Intent;
@@ -70,7 +70,7 @@ import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
-import com.android.wm.shell.common.split.SplitScreenConstants.PersistentSnapPosition;
+import com.android.wm.shell.shared.split.SplitScreenConstants.PersistentSnapPosition;
 
 import java.util.Arrays;
 import java.util.List;
@@ -189,7 +189,7 @@ public class AppPairsController {
         @PersistentSnapPosition int snapPosition = gtv.getSnapPosition();
         if (snapPosition == SNAP_TO_NONE) {
             // Free snap mode is enabled, just save it as 50/50 split.
-            snapPosition = SNAP_TO_50_50;
+            snapPosition = SNAP_TO_2_50_50;
         }
         if (!isPersistentSnapPosition(snapPosition)) {
             // If we received an illegal snap position, log an error and do not create the app pair
@@ -242,8 +242,7 @@ public class AppPairsController {
         WorkspaceItemInfo app2 = appPairIcon.getInfo().getSecondApp();
         ComponentKey app1Key = new ComponentKey(app1.getTargetComponent(), app1.user);
         ComponentKey app2Key = new ComponentKey(app2.getTargetComponent(), app2.user);
-        mSplitSelectStateController.setLaunchingCuj(cuj);
-        InteractionJankMonitorWrapper.begin(appPairIcon, cuj);
+        mSplitSelectStateController.setLaunchingCuj(appPairIcon, cuj);
 
         mSplitSelectStateController.findLastActiveTasksAndRunCallback(
                 Arrays.asList(app1Key, app2Key),

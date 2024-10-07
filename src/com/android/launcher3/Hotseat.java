@@ -33,14 +33,43 @@ import android.view.ViewDebug;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import androidx.annotation.IntDef;
+import androidx.annotation.Nullable;
+
 import com.android.launcher3.util.HorizontalInsettableView;
+import com.android.launcher3.util.MultiPropertyFactory;
+import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.launcher3.util.MultiTranslateDelegate;
+import com.android.launcher3.util.MultiValueAlpha;
 import com.android.launcher3.views.ActivityContext;
+
+import java.io.PrintWriter;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
 /**
  * View class that represents the bottom row of the home screen.
  */
 public class Hotseat extends CellLayout implements Insettable {
+
+    public static final int ALPHA_CHANNEL_TASKBAR_ALIGNMENT = 0;
+    public static final int ALPHA_CHANNEL_PREVIEW_RENDERER = 1;
+    public static final int ALPHA_CHANNEL_TASKBAR_STASH = 2;
+    public static final int ALPHA_CHANNEL_CHANNELS_COUNT = 3;
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @IntDef({ALPHA_CHANNEL_TASKBAR_ALIGNMENT, ALPHA_CHANNEL_PREVIEW_RENDERER,
+            ALPHA_CHANNEL_TASKBAR_STASH})
+    public @interface HotseatQsbAlphaId {
+    }
+
+    public static final int ICONS_TRANSLATION_X_NAV_BAR_ALIGNMENT = 0;
+    public static final int ICONS_TRANSLATION_X_CHANNELS_COUNT = 1;
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @IntDef({ICONS_TRANSLATION_X_NAV_BAR_ALIGNMENT})
+    public @interface IconsTranslationX {
+    }
 
     // Ratio of empty space, qsb should take up to appear visually centered.
     public static final float QSB_CENTER_FACTOR = .325f;
@@ -50,6 +79,12 @@ public class Hotseat extends CellLayout implements Insettable {
     private boolean mHasVerticalHotseat;
     private Workspace<?> mWorkspace;
     private boolean mSendTouchToWorkspace;
+    private final MultiValueAlpha mIconsAlphaChannels;
+    private final MultiValueAlpha mQsbAlphaChannels;
+
+    private @Nullable MultiProperty mQsbTranslationX;
+
+    private final MultiPropertyFactory mIconsTranslationXFactory;
 
     private final View mQsb;
 
@@ -63,9 +98,28 @@ public class Hotseat extends CellLayout implements Insettable {
 
     public Hotseat(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-
         mQsb = LayoutInflater.from(context).inflate(R.layout.search_container_hotseat, this, false);
         addView(mQsb);
+        mIconsAlphaChannels = new MultiValueAlpha(getShortcutsAndWidgets(),
+                ALPHA_CHANNEL_CHANNELS_COUNT);
+        if (mQsb instanceof Reorderable qsbReorderable) {
+            mQsbTranslationX = qsbReorderable.getTranslateDelegate()
+                    .getTranslationX(MultiTranslateDelegate.INDEX_NAV_BAR_ANIM);
+        }
+        mIconsTranslationXFactory = new MultiPropertyFactory<>(getShortcutsAndWidgets(),
+                VIEW_TRANSLATE_X, ICONS_TRANSLATION_X_CHANNELS_COUNT, Float::sum);
+        mQsbAlphaChannels = new MultiValueAlpha(mQsb, ALPHA_CHANNEL_CHANNELS_COUNT);
+    }
+
+    /** Provides translation X for hotseat icons for the channel. */
+    public MultiProperty getIconsTranslationX(@IconsTranslationX int channelId) {
+        return mIconsTranslationXFactory.get(channelId);
+    }
+
+    /** Provides translation X for hotseat Qsb. */
+    @Nullable
+    public MultiProperty getQsbTranslationX() {
+        return mQsbTranslationX;
     }
 
     /**
@@ -270,21 +324,27 @@ public class Hotseat extends CellLayout implements Insettable {
     }
 
     /**
-     * Sets the alpha value of just our ShortcutAndWidgetContainer.
+     * Sets the alpha value of the specified alpha channel of just our ShortcutAndWidgetContainer.
      */
-    public void setIconsAlpha(float alpha) {
-        getShortcutsAndWidgets().setAlpha(alpha);
+    public void setIconsAlpha(float alpha, @HotseatQsbAlphaId int channelId) {
+        getIconsAlpha(channelId).setValue(alpha);
     }
 
     /**
      * Sets the alpha value of just our QSB.
      */
-    public void setQsbAlpha(float alpha) {
-        mQsb.setAlpha(alpha);
+    public void setQsbAlpha(float alpha, @HotseatQsbAlphaId int channelId) {
+        getQsbAlpha(channelId).setValue(alpha);
     }
 
-    public float getIconsAlpha() {
-        return getShortcutsAndWidgets().getAlpha();
+    /** Returns the alpha channel for ShortcutAndWidgetContainer */
+    public MultiProperty getIconsAlpha(@HotseatQsbAlphaId int channelId) {
+        return mIconsAlphaChannels.get(channelId);
+    }
+
+    /** Returns the alpha channel for Qsb */
+    public MultiProperty getQsbAlpha(@HotseatQsbAlphaId int channelId) {
+        return mQsbAlphaChannels.get(channelId);
     }
 
     /**
@@ -292,6 +352,26 @@ public class Hotseat extends CellLayout implements Insettable {
      */
     public View getQsb() {
         return mQsb;
+    }
+
+    /** Dumps the Hotseat internal state */
+    public void dump(String prefix, PrintWriter writer) {
+        writer.println(prefix + "Hotseat:");
+        mIconsAlphaChannels.dump(
+                prefix + "\t",
+                writer,
+                "mIconsAlphaChannels",
+                "ALPHA_CHANNEL_TASKBAR_ALIGNMENT",
+                "ALPHA_CHANNEL_PREVIEW_RENDERER",
+                "ALPHA_CHANNEL_TASKBAR_STASH");
+        mQsbAlphaChannels.dump(
+                prefix + "\t",
+                writer,
+                "mQsbAlphaChannels",
+                "ALPHA_CHANNEL_TASKBAR_ALIGNMENT",
+                "ALPHA_CHANNEL_PREVIEW_RENDERER",
+                "ALPHA_CHANNEL_TASKBAR_STASH"
+        );
     }
 
 }

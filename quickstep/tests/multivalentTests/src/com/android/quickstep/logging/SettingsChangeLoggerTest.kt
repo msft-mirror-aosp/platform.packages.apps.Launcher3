@@ -34,9 +34,7 @@ import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NAVI
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_NOTIFICATION_DOT_ENABLED
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_THEMED_ICON_DISABLED
 import com.android.launcher3.states.RotationHelper.ALLOW_ROTATION_PREFERENCE_KEY
-import com.google.android.apps.nexuslauncher.PrefKey.KEY_ENABLE_MINUS_ONE
-import com.google.android.apps.nexuslauncher.PrefKey.OVERVIEW_SUGGESTED_ACTIONS
-import com.google.android.apps.nexuslauncher.PrefKey.SMARTSPACE_ON_HOME_SCREEN
+import com.android.launcher3.util.DaggerSingletonTracker
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Before
@@ -65,6 +63,7 @@ class SettingsChangeLoggerTest {
     @Mock private lateinit var mMockLogger: StatsLogManager.StatsLogger
 
     @Captor private lateinit var mEventCaptor: ArgumentCaptor<StatsLogManager.EventEnum>
+    @Mock private lateinit var mTracker: DaggerSingletonTracker
 
     private var mDefaultThemedIcons = false
     private var mDefaultAllowRotation = false
@@ -82,7 +81,7 @@ class SettingsChangeLoggerTest {
         // To match the default value of ALLOW_ROTATION
         LauncherPrefs.get(mContext).put(item = ALLOW_ROTATION, value = false)
 
-        mSystemUnderTest = SettingsChangeLogger(mContext, mStatsLogManager)
+        mSystemUnderTest = SettingsChangeLogger(mContext, mStatsLogManager, mTracker)
     }
 
     @After
@@ -93,7 +92,7 @@ class SettingsChangeLoggerTest {
 
     @Test
     fun loggingPrefs_correctDefaultValue() {
-        val systemUnderTest = SettingsChangeLogger(mContext, mStatsLogManager)
+        val systemUnderTest = SettingsChangeLogger(mContext, mStatsLogManager, mTracker)
 
         assertThat(systemUnderTest.loggingPrefs[ALLOW_ROTATION_PREFERENCE_KEY]!!.defaultValue)
             .isFalse()
@@ -120,7 +119,7 @@ class SettingsChangeLoggerTest {
         LauncherPrefs.get(mContext).put(item = ALLOW_ROTATION, value = true)
 
         // This a new object so the values of mLoggablePrefs will be different
-        SettingsChangeLogger(mContext, mStatsLogManager).logSnapshot(mInstanceId)
+        SettingsChangeLogger(mContext, mStatsLogManager, mTracker).logSnapshot(mInstanceId)
 
         verify(mMockLogger, atLeastOnce()).log(mEventCaptor.capture())
         val capturedEvents = mEventCaptor.allValues
@@ -141,7 +140,14 @@ class SettingsChangeLoggerTest {
             .isTrue()
         assertThat(capturedEvents.any { it.id == LAUNCHER_HOME_SCREEN_SUGGESTIONS_ENABLED.id })
             .isTrue()
-        // LAUNCHER_GOOGLE_APP_SWIPE_LEFT_ENABLED
-        assertThat(capturedEvents.any { it.id == 617 }).isTrue()
+        assertThat(capturedEvents.any { it.id == LAUNCHER_GOOGLE_APP_SWIPE_LEFT_ENABLED }).isTrue()
+    }
+
+    companion object {
+        private const val KEY_ENABLE_MINUS_ONE = "pref_enable_minus_one"
+        private const val OVERVIEW_SUGGESTED_ACTIONS = "pref_overview_action_suggestions"
+        private const val SMARTSPACE_ON_HOME_SCREEN = "pref_smartspace_home_screen"
+
+        private const val LAUNCHER_GOOGLE_APP_SWIPE_LEFT_ENABLED = 617
     }
 }

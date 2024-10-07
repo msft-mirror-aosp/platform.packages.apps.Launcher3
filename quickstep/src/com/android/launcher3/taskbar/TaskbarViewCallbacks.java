@@ -28,7 +28,8 @@ import androidx.annotation.Nullable;
 import com.android.internal.jank.Cuj;
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
-import com.android.wm.shell.common.bubbles.BubbleBarLocation;
+import com.android.wm.shell.Flags;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 /**
  * Callbacks for {@link TaskbarView} to interact with its controller.
@@ -51,7 +52,7 @@ public class TaskbarViewCallbacks {
     }
 
     /** Trigger All Apps button click action. */
-    protected void triggerAllAppsButtonClick(View v) {
+    public void triggerAllAppsButtonClick(View v) {
         InteractionJankMonitorWrapper.begin(v, Cuj.CUJ_LAUNCHER_OPEN_ALL_APPS,
                 /* tag= */ "TASKBAR_BUTTON");
         mActivity.getStatsLogManager().logger().log(LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP);
@@ -59,7 +60,7 @@ public class TaskbarViewCallbacks {
     }
 
     /** Trigger All Apps button long click action. */
-    protected void triggerAllAppsButtonLongClick() {
+    public void triggerAllAppsButtonLongClick() {
         mActivity.getStatsLogManager().logger().log(LAUNCHER_TASKBAR_ALLAPPS_BUTTON_LONG_PRESS);
     }
 
@@ -72,6 +73,11 @@ public class TaskbarViewCallbacks {
             mControllers.taskbarPinningController.showPinningView(v);
             return true;
         };
+    }
+
+    /** Check to see if we support long press on taskbar divider */
+    public boolean supportsDividerLongPress() {
+        return !mActivity.isThreeButtonNav();
     }
 
     public View.OnTouchListener getTaskbarDividerRightClickListener() {
@@ -121,5 +127,34 @@ public class TaskbarViewCallbacks {
             return bubbleBarViewController.getBubbleBarLocation();
         }
         return null;
+    }
+
+    /** Returns true if bubble bar controllers present and enabled in persistent taskbar. */
+    public boolean isBubbleBarEnabledInPersistentTaskbar() {
+        return Flags.enableBubbleBarInPersistentTaskBar()
+                && mControllers.bubbleControllers.isPresent();
+    }
+
+    /** Returns on click listener for the taskbar overflow view. */
+    public View.OnClickListener getOverflowOnClickListener() {
+        return new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mControllers.keyboardQuickSwitchController.openQuickSwitchView(
+                        mControllers.taskbarViewController.getTaskIdsForPinnedApps());
+            }
+        };
+    }
+
+    /** Returns on long click listener for the taskbar overflow view. */
+    public View.OnLongClickListener getOverflowOnLongClickListener() {
+        return new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                mControllers.keyboardQuickSwitchController.openQuickSwitchView(
+                        mControllers.taskbarViewController.getTaskIdsForPinnedApps());
+                return true;
+            }
+        };
     }
 }

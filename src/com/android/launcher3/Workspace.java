@@ -235,6 +235,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     boolean mChildrenLayersEnabled = true;
 
     private boolean mStripScreensOnPageStopMoving = false;
+    public boolean mHasOnLayoutBeenCalled = false;
 
     private boolean mWorkspaceFadeInAdjacentScreens;
 
@@ -1122,6 +1123,11 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         return super.onTouchEvent(ev);
     }
 
+    @Override
+    protected void onDisallowSwipeToMinusOnePage() {
+        mLauncher.getOverlayManager().onDisallowSwipeToMinusOnePage();
+    }
+
     /**
      * Called directly from a CellLayout (not by the framework), after we've been added as a
      * listener via setOnInterceptTouchEventListener(). This allows us to tell the CellLayout
@@ -1445,6 +1451,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        mHasOnLayoutBeenCalled = true; // b/349929393 - is the required call to onLayout not done?
         if (mUnlockWallpaperFromDefaultPageOnLayout) {
             mWallpaperOffset.setLockToDefaultPage(false);
             mUnlockWallpaperFromDefaultPageOnLayout = false;

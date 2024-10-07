@@ -63,6 +63,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
 import com.android.launcher3.desktop.DesktopRecentsTransitionController;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
@@ -121,9 +122,6 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
     // Strong refs to runners which are cleared when the activity is destroyed
     private RemoteAnimationFactory mActivityLaunchAnimationRunner;
 
-    // For handling degenerate cases where starting an activity doesn't actually trigger the remote
-    // animation callback
-    private final Handler mHandler = new Handler();
     private final Runnable mAnimationStartTimeoutRunnable = this::onAnimationStartTimeout;
     private SplitSelectStateController mSplitSelectStateController;
     @Nullable
@@ -136,7 +134,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
         SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(this);
         // SplitSelectStateController needs to be created before setContentView()
         mSplitSelectStateController =
-                new SplitSelectStateController(this, mHandler, getStateManager(),
+                new SplitSelectStateController(this, getStateManager(),
                         null /* depthController */, getStatsLogManager(),
                         systemUiProxy, RecentsModel.INSTANCE.get(this),
                         null /*activityBackCallback*/);
@@ -197,7 +195,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
     }
 
     @Override
-    protected void onHandleConfigurationChanged() {
+    public void onHandleConfigurationChanged() {
         initDeviceProfile();
 
         AbstractFloatingView.closeOpenViews(this, true,
@@ -351,7 +349,6 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
     @Override
     protected void onStop() {
         super.onStop();
-
         // Workaround for b/78520668, explicitly trim memory once UI is hidden
         onTrimMemory(TRIM_MEMORY_UI_HIDDEN);
         mFallbackRecentsView.updateLocusId();
@@ -524,5 +521,11 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
     @Override
     public boolean isRecentsViewVisible() {
         return getStateManager().getState().isRecentsViewVisible();
+    }
+
+    @Nullable
+    @Override
+    public DesktopVisibilityController getDesktopVisibilityController() {
+        return mTISBindHelper.getDesktopVisibilityController();
     }
 }
