@@ -202,6 +202,8 @@ import com.android.systemui.unfold.updates.RotationChangeProvider;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
+import kotlin.Unit;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -213,8 +215,6 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-
-import kotlin.Unit;
 
 public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         SystemShortcut.BubbleActivityStarter {
@@ -1103,9 +1103,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         if (isBubbleBarEnabled()
                 && enableBubbleBarInPersistentTaskBar()
                 && mBubbleBarLocation != null) {
-            boolean isBubblesOnLeft = mBubbleBarLocation.isOnLeft(isRtl(getResources()));
+            boolean isRtl = isRtl(getResources());
+            boolean isBubblesOnLeft = mBubbleBarLocation.isOnLeft(isRtl);
             translationX += mDeviceProfile
-                    .getHotseatTranslationXForBubbleBar(/* isNavbarOnRight = */ isBubblesOnLeft);
+                    .getHotseatTranslationXForBubbleBar(isBubblesOnLeft, isRtl);
         }
         if (isBubbleBarEnabled() && hasBubbles()) {
             // TODO(368379159) : create a class to reuse computation logic
