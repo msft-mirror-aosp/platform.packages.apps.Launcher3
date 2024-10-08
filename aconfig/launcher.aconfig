@@ -451,3 +451,10 @@ flag {
       purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "enable_tiered_widgets_by_default_in_picker"
+    namespace: "launcher"
+    description: "Shows filtered set of widgets by default and an option to show all widgets in the widget picker"
+    bug: "356127021"
+}
