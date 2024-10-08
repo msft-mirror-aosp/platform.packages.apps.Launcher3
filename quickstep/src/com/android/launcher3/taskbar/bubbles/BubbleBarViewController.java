@@ -106,6 +106,8 @@ public class BubbleBarViewController {
     private boolean mHiddenForSysui;
     // Whether the bar is hidden because there are no bubbles.
     private boolean mHiddenForNoBubbles = true;
+    // Whether the bar is hidden when stashed
+    private boolean mHiddenForStashed;
     private boolean mShouldShowEducation;
 
     public boolean mOverflowAdded;
@@ -467,9 +469,17 @@ public class BubbleBarViewController {
         }
     }
 
+    /** Sets whether the bubble bar should be hidden due to stashed state */
+    public void setHiddenForStashed(boolean hidden) {
+        if (mHiddenForStashed != hidden) {
+            mHiddenForStashed = hidden;
+            updateVisibilityForStateChange();
+        }
+    }
+
     // TODO: (b/273592694) animate it
     private void updateVisibilityForStateChange() {
-        if (!mHiddenForSysui && !mHiddenForNoBubbles) {
+        if (!mHiddenForSysui && !mHiddenForNoBubbles && !mHiddenForStashed) {
             mBarView.setVisibility(VISIBLE);
         } else {
             mBarView.setVisibility(INVISIBLE);

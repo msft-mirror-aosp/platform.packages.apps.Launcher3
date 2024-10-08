@@ -879,9 +879,10 @@ public class TaskbarLauncherStateController {
                 mControllers.taskbarActivityContext)) {
             return;
         }
-        boolean isBubblesOnLeft = location.isOnLeft(isRtl(mLauncher.getResources()));
+        boolean isRtl = isRtl(mLauncher.getResources());
+        boolean isBubblesOnLeft = location.isOnLeft(isRtl);
         int targetX = deviceProfile
-                .getHotseatTranslationXForBubbleBar(/* isNavbarOnRight= */ isBubblesOnLeft);
+                .getHotseatTranslationXForBubbleBar(isBubblesOnLeft, isRtl);
         updateHotseatAndQsbTranslationX(targetX, animate);
     }
 
