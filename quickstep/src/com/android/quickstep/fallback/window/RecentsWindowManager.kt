@@ -18,11 +18,9 @@ package com.android.quickstep.fallback.window
 
 import android.animation.AnimatorSet
 import android.app.ActivityOptions
-import android.content.ComponentName
 import android.content.Context
 import android.content.LocusId
 import android.os.Bundle
-import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -30,7 +28,6 @@ import android.view.RemoteAnimationAdapter
 import android.view.RemoteAnimationTarget
 import android.view.SurfaceControl
 import android.view.View
-import android.view.Window
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 import android.window.RemoteTransition
@@ -63,6 +60,7 @@ import com.android.quickstep.fallback.RecentsState.HOME
 import com.android.quickstep.fallback.RecentsState.MODAL_TASK
 import com.android.quickstep.fallback.RecentsState.OVERVIEW_SPLIT_SELECT
 import com.android.quickstep.util.RecentsAtomicAnimationFactory
+import com.android.quickstep.util.RecentsWindowProtoLogProxy
 import com.android.quickstep.util.SplitSelectStateController
 import com.android.quickstep.util.TISBindHelper
 import com.android.quickstep.views.OverviewActionsView
@@ -71,9 +69,12 @@ import com.android.quickstep.views.RecentsViewContainer
 import java.util.function.Predicate
 
 /**
- * Class that will manage RecentsView lifecycle within a window and interface correctly
- * where needed. This allows us to run RecentsView in a window where needed.
- * todo: b/365776320, b/365777482
+ * Class that will manage RecentsView lifecycle within a window and interface correctly where
+ * needed. This allows us to run RecentsView in a window where needed. todo: b/365776320,
+ * b/365777482
+ *
+ * To add new protologs, see [RecentsWindowProtoLogProxy]. To enable logging to logcat, see
+ * [QuickstepProtoLogGroup.Constants.DEBUG_RECENTS_WINDOW]
  */
 class RecentsWindowManager(context: Context) :
     RecentsWindowContext(context), RecentsViewContainer, StatefulContainer<RecentsState> {
@@ -81,12 +82,12 @@ class RecentsWindowManager(context: Context) :
     companion object {
         private const val HOME_APPEAR_DURATION: Long = 250
         private const val TAG = "RecentsWindowManager"
-        private const val DEBUG = false
     }
 
     protected var recentsView: FallbackRecentsView<RecentsWindowManager>? = null
     private val windowContext: Context = createWindowContext(TYPE_APPLICATION_OVERLAY, null)
-    private val windowManager: WindowManager = windowContext.getSystemService(WindowManager::class.java)!!
+    private val windowManager: WindowManager =
+        windowContext.getSystemService(WindowManager::class.java)!!
     private var layoutInflater: LayoutInflater = LayoutInflater.from(this).cloneInContext(this)
     private var stateManager: StateManager<RecentsState, RecentsWindowManager> =
         StateManager<RecentsState, RecentsWindowManager>(this, RecentsState.BG_LAUNCHER)
@@ -138,11 +139,11 @@ class RecentsWindowManager(context: Context) :
 
     private val mAnimationToHomeFactory =
         RemoteAnimationFactory {
-                _: Int,
-                appTargets: Array<RemoteAnimationTarget>?,
-                wallpaperTargets: Array<RemoteAnimationTarget>?,
-                nonAppTargets: Array<RemoteAnimationTarget>?,
-                result: LauncherAnimationRunner.AnimationResult? ->
+            _: Int,
+            appTargets: Array<RemoteAnimationTarget>?,
+            wallpaperTargets: Array<RemoteAnimationTarget>?,
+            nonAppTargets: Array<RemoteAnimationTarget>?,
+            result: LauncherAnimationRunner.AnimationResult? ->
             val controller =
                 getStateManager().createAnimationToNewWorkspace(BG_LAUNCHER, HOME_APPEAR_DURATION)
             controller.dispatchOnStart()
@@ -171,6 +172,7 @@ class RecentsWindowManager(context: Context) :
         }
 
     fun cleanup() {
+        RecentsWindowProtoLogProxy.logCleanup(isShown)
         if (isShown) {
             windowManager.removeViewImmediate(windowView)
             isShown = false
@@ -178,6 +180,7 @@ class RecentsWindowManager(context: Context) :
     }
 
     fun startRecentsWindow() {
+        RecentsWindowProtoLogProxy.logStartRecentsWindow(isShown, windowView == null)
         if (isShown) return
         if (windowView == null) {
             windowView = layoutInflater.inflate(R.layout.fallback_recents_activity, null)
@@ -245,37 +248,24 @@ class RecentsWindowManager(context: Context) :
 
     override fun onStateSetStart(state: RecentsState?) {
         super.onStateSetStart(state)
-        logState(state, "state started:")
+        RecentsWindowProtoLogProxy.logOnStateSetStart(getStateName(state))
     }
 
     override fun onStateSetEnd(state: RecentsState?) {
         super.onStateSetEnd(state)
-        logState(state, "state ended:")
+        RecentsWindowProtoLogProxy.logOnStateSetEnd(getStateName(state))
     }
 
-    private fun logState(state: RecentsState?, prefix: String) {
-        if (!DEBUG) {
-            return
-        }
-        if (state != null) {
-            when (state) {
-                DEFAULT -> Log.d(TAG, prefix + "default")
-                MODAL_TASK -> {
-                    Log.d(TAG, prefix + "MODAL_TASK")
-                }
-                BACKGROUND_APP -> {
-                    Log.d(TAG, prefix + "BACKGROUND_APP")
-                }
-                HOME -> {
-                    Log.d(TAG, prefix + "HOME")
-                }
-                BG_LAUNCHER -> {
-                    Log.d(TAG, prefix + "BG_LAUNCHER")
-                }
-                OVERVIEW_SPLIT_SELECT -> {
-                    Log.d(TAG, prefix + "OVERVIEW_SPLIT_SELECT")
-                }
-            }
+    private fun getStateName(state: RecentsState?): String {
+        return when (state) {
+            null -> "NULL"
+            DEFAULT -> "default"
+            MODAL_TASK -> "MODAL_TASK"
+            BACKGROUND_APP -> "BACKGROUND_APP"
+            HOME -> "HOME"
+            BG_LAUNCHER -> "BG_LAUNCHER"
+            OVERVIEW_SPLIT_SELECT -> "OVERVIEW_SPLIT_SELECT"
+            else -> "ordinal=" + state.ordinal
         }
     }
 
