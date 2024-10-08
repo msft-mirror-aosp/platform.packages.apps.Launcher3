@@ -80,7 +80,16 @@ class BubbleViewTest {
                 )
             bubbleView = inflater.inflate(R.layout.bubblebar_item_view, null, false) as BubbleView
             bubble =
-                BubbleBarBubble(bubbleInfo, bubbleView, bitmap, bitmap, Color.WHITE, Path(), "")
+                BubbleBarBubble(
+                    bubbleInfo,
+                    bubbleView,
+                    bitmap,
+                    bitmap,
+                    Color.WHITE,
+                    Path(),
+                    "",
+                    null,
+                )
             bubbleView.setBubble(bubble)
         }
         InstrumentationRegistry.getInstrumentation().waitForIdleSync()
