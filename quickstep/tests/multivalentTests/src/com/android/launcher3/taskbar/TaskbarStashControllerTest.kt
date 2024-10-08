@@ -35,7 +35,8 @@ import com.android.launcher3.taskbar.TaskbarStashController.TASKBAR_STASH_DURATI
 import com.android.launcher3.taskbar.TaskbarStashController.TRANSIENT_TASKBAR_STASH_ALPHA_DURATION
 import com.android.launcher3.taskbar.TaskbarStashController.TRANSIENT_TASKBAR_STASH_DURATION
 import com.android.launcher3.taskbar.TaskbarViewController.ALPHA_INDEX_STASH
-import com.android.launcher3.taskbar.bubbles.BubbleControllers
+import com.android.launcher3.taskbar.bubbles.BubbleBarViewController
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController
 import com.android.launcher3.taskbar.rules.TaskbarModeRule
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.PINNED
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.THREE_BUTTONS
@@ -52,7 +53,6 @@ import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING
 import com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_BAR
 import com.google.common.truth.Truth.assertThat
-import java.util.Optional
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -60,6 +60,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(LauncherMultivalentJUnit::class)
+@EnableFlags(FLAG_ENABLE_BUBBLE_BAR)
 @EmulatedDevices(["pixelTablet2023"])
 class TaskbarStashControllerTest {
     private val context = TaskbarWindowSandboxContext.create(getInstrumentation().targetContext)
@@ -74,7 +75,8 @@ class TaskbarStashControllerTest {
     @InjectController lateinit var stashedHandleViewController: StashedHandleViewController
     @InjectController lateinit var dragLayerController: TaskbarDragLayerController
     @InjectController lateinit var autohideSuspendController: TaskbarAutohideSuspendController
-    @InjectController lateinit var bubbleControllers: Optional<BubbleControllers>
+    @InjectController lateinit var bubbleBarViewController: BubbleBarViewController
+    @InjectController lateinit var bubbleStashController: BubbleStashController
 
     private val activityContext by taskbarUnitTestRule::activityContext
 
@@ -420,60 +422,55 @@ class TaskbarStashControllerTest {
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_BUBBLE_BAR)
     @TaskbarMode(TRANSIENT)
     fun testUpdateAndAnimateTransientTaskbar_unstashTaskbarWithBubbles_bubbleBarUnstashes() {
         getInstrumentation().runOnMainSync {
-            bubbleControllers.get().bubbleBarViewController.setHiddenForBubbles(false)
-            bubbleControllers.get().bubbleStashController.stashBubbleBarImmediate()
+            bubbleBarViewController.setHiddenForBubbles(false)
+            bubbleStashController.stashBubbleBarImmediate()
             stashController.updateAndAnimateTransientTaskbar(false, true)
         }
-        assertThat(bubbleControllers.get().bubbleStashController.isStashed).isFalse()
+        assertThat(bubbleStashController.isStashed).isFalse()
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_BUBBLE_BAR)
     @TaskbarMode(TRANSIENT)
     fun testUpdateAndAnimateTransientTaskbar_unstashTaskbarWithoutBubbles_bubbleBarStashed() {
         getInstrumentation().runOnMainSync {
-            bubbleControllers.get().bubbleBarViewController.setHiddenForBubbles(false)
-            bubbleControllers.get().bubbleStashController.stashBubbleBarImmediate()
+            bubbleBarViewController.setHiddenForBubbles(false)
+            bubbleStashController.stashBubbleBarImmediate()
             stashController.updateAndAnimateTransientTaskbar(false, false)
         }
-        assertThat(bubbleControllers.get().bubbleStashController.isStashed).isTrue()
+        assertThat(bubbleStashController.isStashed).isTrue()
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_BUBBLE_BAR)
     @TaskbarMode(TRANSIENT)
     fun testUpdateAndAnimateTransientTaskbar_stashTaskbarWithBubbles_bubbleBarStashes() {
         getInstrumentation().runOnMainSync {
-            bubbleControllers.get().bubbleBarViewController.setHiddenForBubbles(false)
-            bubbleControllers.get().bubbleStashController.showBubbleBarImmediate()
+            bubbleBarViewController.setHiddenForBubbles(false)
+            bubbleStashController.showBubbleBarImmediate()
             stashController.updateAndAnimateTransientTaskbar(true, true)
         }
-        assertThat(bubbleControllers.get().bubbleStashController.isStashed).isTrue()
+        assertThat(bubbleStashController.isStashed).isTrue()
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_BUBBLE_BAR)
     @TaskbarMode(TRANSIENT)
     fun testUpdateAndAnimateTransientTaskbar_stashTaskbarWithoutBubbles_bubbleBarUnstashed() {
         getInstrumentation().runOnMainSync {
-            bubbleControllers.get().bubbleBarViewController.setHiddenForBubbles(false)
-            bubbleControllers.get().bubbleStashController.showBubbleBarImmediate()
+            bubbleBarViewController.setHiddenForBubbles(false)
+            bubbleStashController.showBubbleBarImmediate()
             stashController.updateAndAnimateTransientTaskbar(true, false)
         }
-        assertThat(bubbleControllers.get().bubbleStashController.isStashed).isFalse()
+        assertThat(bubbleStashController.isStashed).isFalse()
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_BUBBLE_BAR)
     @TaskbarMode(TRANSIENT)
     fun testUpdateAndAnimateTransientTaskbar_bubbleBarExpandedBeforeTimeout_expandedAfterwards() {
         getInstrumentation().runOnMainSync {
-            bubbleControllers.get().bubbleBarViewController.setHiddenForBubbles(false)
-            bubbleControllers.get().bubbleBarViewController.isExpanded = true
+            bubbleBarViewController.setHiddenForBubbles(false)
+            bubbleBarViewController.isExpanded = true
             stashController.updateAndAnimateTransientTaskbar(false)
             animatorTestRule.advanceTimeBy(stashController.stashDuration)
         }
@@ -483,7 +480,7 @@ class TaskbarStashControllerTest {
             stashController.timeoutAlarm.finishAlarm()
             animatorTestRule.advanceTimeBy(stashController.stashDuration)
         }
-        assertThat(bubbleControllers.get().bubbleBarViewController.isExpanded).isTrue()
+        assertThat(bubbleBarViewController.isExpanded).isTrue()
     }
 
     @Test
