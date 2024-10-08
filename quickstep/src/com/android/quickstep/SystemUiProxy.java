@@ -1492,6 +1492,17 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         }
     }
 
+    /** Call shell to remove the desktop that is on given `displayId` */
+    public void removeDesktop(int displayId) {
+        if (mDesktopMode != null) {
+            try {
+                mDesktopMode.removeDesktop(displayId);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call removeDesktop", e);
+            }
+        }
+    }
+
     //
     // Unfold transition
     //
