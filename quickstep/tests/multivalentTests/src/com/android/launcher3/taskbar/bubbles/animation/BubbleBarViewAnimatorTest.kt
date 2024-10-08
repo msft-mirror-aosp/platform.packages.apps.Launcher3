@@ -886,7 +886,16 @@ class BubbleBarViewAnimatorTest {
             bubbleView =
                 inflater.inflate(R.layout.bubblebar_item_view, bubbleBarView, false) as BubbleView
             bubble =
-                BubbleBarBubble(bubbleInfo, bubbleView, bitmap, bitmap, Color.WHITE, Path(), "")
+                BubbleBarBubble(
+                    bubbleInfo,
+                    bubbleView,
+                    bitmap,
+                    bitmap,
+                    Color.WHITE,
+                    Path(),
+                    "",
+                    null,
+                )
             bubbleView.setBubble(bubble)
             bubbleBarView.addView(bubbleView)
         }
