@@ -1316,6 +1316,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         mTISBindHelper.setPredictiveBackToHomeInProgress(isInProgress);
     }
 
+    public boolean getPredictiveBackToHomeInProgress() {
+        return mIsPredictiveBackToHomeInProgress;
+    }
+
     @Override
     public boolean areDesktopTasksVisible() {
         DesktopVisibilityController desktopVisibilityController = getDesktopVisibilityController();
