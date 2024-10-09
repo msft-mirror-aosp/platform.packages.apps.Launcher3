@@ -176,7 +176,7 @@ public class LauncherAppState implements SafeCloseable {
                     () -> LauncherPrefs.get(mContext).removeListener(observer, THEMED_ICONS));
 
             InstallSessionTracker installSessionTracker =
-                    InstallSessionHelper.INSTANCE.get(context).registerInstallTracker(mModel);
+                    InstallSessionHelper.INSTANCE.get(context).registerInstallTracker(callbacks);
             mOnTerminateCallback.add(installSessionTracker::unregister);
         });
 

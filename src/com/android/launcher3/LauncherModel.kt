@@ -16,10 +16,8 @@
 package com.android.launcher3
 
 import android.app.admin.DevicePolicyManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 import android.content.pm.ShortcutInfo
 import android.os.UserHandle
 import android.text.TextUtils
@@ -29,7 +27,6 @@ import androidx.annotation.WorkerThread
 import com.android.launcher3.celllayout.CellPosMapper
 import com.android.launcher3.config.FeatureFlags
 import com.android.launcher3.icons.IconCache
-import com.android.launcher3.icons.cache.BaseIconCache
 import com.android.launcher3.model.AddWorkspaceItemsTask
 import com.android.launcher3.model.AllAppsList
 import com.android.launcher3.model.BaseLauncherBinder
@@ -42,23 +39,17 @@ import com.android.launcher3.model.ModelDelegate
 import com.android.launcher3.model.ModelLauncherCallbacks
 import com.android.launcher3.model.ModelTaskController
 import com.android.launcher3.model.ModelWriter
-import com.android.launcher3.model.PackageInstallStateChangedTask
 import com.android.launcher3.model.PackageUpdatedTask
 import com.android.launcher3.model.ReloadStringCacheTask
 import com.android.launcher3.model.ShortcutsChangedTask
 import com.android.launcher3.model.UserLockStateChangedTask
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.WorkspaceItemInfo
-import com.android.launcher3.pm.InstallSessionTracker
-import com.android.launcher3.pm.PackageInstallInfo
 import com.android.launcher3.pm.UserCache
 import com.android.launcher3.shortcuts.ShortcutRequest
 import com.android.launcher3.testing.shared.TestProtocol.sDebugTracing
-import com.android.launcher3.util.ApplicationInfoWrapper
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.Executors.MODEL_EXECUTOR
-import com.android.launcher3.util.IntSet
-import com.android.launcher3.util.ItemInfoMatcher
 import com.android.launcher3.util.PackageManagerHelper
 import com.android.launcher3.util.PackageUserKey
 import com.android.launcher3.util.Preconditions
@@ -66,7 +57,6 @@ import java.io.FileDescriptor
 import java.io.PrintWriter
 import java.util.concurrent.CancellationException
 import java.util.function.Consumer
-import java.util.function.Supplier
 
 /**
  * Maintains in-memory state of the Launcher. It is expected that there should be only one
@@ -80,7 +70,7 @@ class LauncherModel(
     private val appFilter: AppFilter,
     private val mPmHelper: PackageManagerHelper,
     isPrimaryInstance: Boolean,
-) : InstallSessionTracker.Callback {
+) {
 
     private val mCallbacksList = ArrayList<BgDataModel.Callbacks>(1)
 
@@ -156,10 +146,10 @@ class LauncherModel(
     fun onAppIconChanged(packageName: String, user: UserHandle) {
         // Update the icon for the calendar package
         enqueueModelUpdateTask(PackageUpdatedTask(PackageUpdatedTask.OP_UPDATE, user, packageName))
-        val pinnedShortcuts: List<ShortcutInfo> =
-            ShortcutRequest(context, user).forPackage(packageName).query(ShortcutRequest.PINNED)
-        if (pinnedShortcuts.isNotEmpty()) {
-            enqueueModelUpdateTask(ShortcutsChangedTask(packageName, pinnedShortcuts, user, false))
+        ShortcutRequest(context, user).forPackage(packageName).query(ShortcutRequest.PINNED).let {
+            if (it.isNotEmpty()) {
+                enqueueModelUpdateTask(ShortcutsChangedTask(packageName, it, user, false))
+            }
         }
     }
 
@@ -176,14 +166,13 @@ class LauncherModel(
 
     fun onBroadcastIntent(intent: Intent) {
         if (DEBUG_RECEIVER || sDebugTracing) Log.d(TAG, "onReceive intent=$intent")
-        val action = intent.action
-        if (Intent.ACTION_LOCALE_CHANGED == action) {
-            // If we have changed locale we need to clear out the labels in all apps/workspace.
-            forceReload()
-        } else if (DevicePolicyManager.ACTION_DEVICE_POLICY_RESOURCE_UPDATED == action) {
-            enqueueModelUpdateTask(ReloadStringCacheTask(this.modelDelegate))
-        } else if (BuildConfig.IS_STUDIO_BUILD && LauncherAppState.ACTION_FORCE_ROLOAD == action) {
-            forceReload()
+        when (intent.action) {
+            Intent.ACTION_LOCALE_CHANGED,
+            LauncherAppState.ACTION_FORCE_ROLOAD ->
+                // If we have changed locale we need to clear out the labels in all apps/workspace.
+                forceReload()
+            DevicePolicyManager.ACTION_DEVICE_POLICY_RESOURCE_UPDATED ->
+                enqueueModelUpdateTask(ReloadStringCacheTask(this.modelDelegate))
         }
     }
 
@@ -193,43 +182,43 @@ class LauncherModel(
      * @see UserCache.addUserEventListener
      */
     fun onUserEvent(user: UserHandle, action: String) {
-        if (Intent.ACTION_MANAGED_PROFILE_AVAILABLE == action && mShouldReloadWorkProfile) {
-            mShouldReloadWorkProfile = false
-            forceReload()
-        } else if (
-            Intent.ACTION_MANAGED_PROFILE_AVAILABLE == action ||
-                Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE == action
-        ) {
-            mShouldReloadWorkProfile = false
-            enqueueModelUpdateTask(
-                PackageUpdatedTask(PackageUpdatedTask.OP_USER_AVAILABILITY_CHANGE, user)
-            )
-        } else if (
-            UserCache.ACTION_PROFILE_LOCKED == action || UserCache.ACTION_PROFILE_UNLOCKED == action
-        ) {
-            enqueueModelUpdateTask(
-                UserLockStateChangedTask(user, UserCache.ACTION_PROFILE_UNLOCKED == action)
-            )
-        } else if (
-            UserCache.ACTION_PROFILE_ADDED == action || UserCache.ACTION_PROFILE_REMOVED == action
-        ) {
-            forceReload()
-        } else if (
-            UserCache.ACTION_PROFILE_AVAILABLE == action ||
-                UserCache.ACTION_PROFILE_UNAVAILABLE == action
-        ) {
-            /*
-             * This broadcast is only available when android.os.Flags.allowPrivateProfile() is set.
-             * For Work-profile this broadcast will be sent in addition to
-             * ACTION_MANAGED_PROFILE_AVAILABLE/UNAVAILABLE.
-             * So effectively, this if block only handles the non-work profile case.
-             */
-            enqueueModelUpdateTask(
-                PackageUpdatedTask(PackageUpdatedTask.OP_USER_AVAILABILITY_CHANGE, user)
-            )
-        }
-        if (Intent.ACTION_MANAGED_PROFILE_REMOVED == action) {
-            LauncherPrefs.get(mApp.context).put(LauncherPrefs.WORK_EDU_STEP, 0)
+        when (action) {
+            Intent.ACTION_MANAGED_PROFILE_AVAILABLE -> {
+                if (mShouldReloadWorkProfile) {
+                    forceReload()
+                } else {
+                    enqueueModelUpdateTask(
+                        PackageUpdatedTask(PackageUpdatedTask.OP_USER_AVAILABILITY_CHANGE, user)
+                    )
+                }
+                mShouldReloadWorkProfile = false
+            }
+            Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE -> {
+                mShouldReloadWorkProfile = false
+                enqueueModelUpdateTask(
+                    PackageUpdatedTask(PackageUpdatedTask.OP_USER_AVAILABILITY_CHANGE, user)
+                )
+            }
+            UserCache.ACTION_PROFILE_LOCKED ->
+                enqueueModelUpdateTask(UserLockStateChangedTask(user, false))
+            UserCache.ACTION_PROFILE_UNLOCKED ->
+                enqueueModelUpdateTask(UserLockStateChangedTask(user, true))
+            Intent.ACTION_MANAGED_PROFILE_REMOVED -> {
+                LauncherPrefs.get(mApp.context).put(LauncherPrefs.WORK_EDU_STEP, 0)
+                forceReload()
+            }
+            UserCache.ACTION_PROFILE_ADDED,
+            UserCache.ACTION_PROFILE_REMOVED -> forceReload()
+            UserCache.ACTION_PROFILE_AVAILABLE,
+            UserCache.ACTION_PROFILE_UNAVAILABLE -> {
+                // This broadcast is only available when android.os.Flags.allowPrivateProfile() is
+                // set. For Work-profile this broadcast will be sent in addition to
+                // ACTION_MANAGED_PROFILE_AVAILABLE/UNAVAILABLE. So effectively, this if block only
+                // handles the non-work profile case.
+                enqueueModelUpdateTask(
+                    PackageUpdatedTask(PackageUpdatedTask.OP_USER_AVAILABILITY_CHANGE, user)
+                )
+            }
         }
     }
 
@@ -243,12 +232,7 @@ class LauncherModel(
             stopLoader()
             mModelLoaded = false
         }
-
-        // Start the loader if launcher is already running, otherwise the loader will run,
-        // the next time launcher starts
-        if (hasCallbacks()) {
-            startLoader()
-        }
+        rebindCallbacks()
     }
 
     /** Rebinds all existing callbacks with already loaded model */
@@ -325,7 +309,6 @@ class LauncherModel(
                     }
                     return true
                 } else {
-                    stopLoader()
                     mLoaderTask =
                         LoaderTask(
                             mApp,
@@ -373,83 +356,6 @@ class LauncherModel(
             }
         }
         MODEL_EXECUTOR.post { callback.accept(if (isModelLoaded()) mBgDataModel else null) }
-    }
-
-    override fun onInstallSessionCreated(sessionInfo: PackageInstallInfo) {
-        if (FeatureFlags.PROMISE_APPS_IN_ALL_APPS.get()) {
-            enqueueModelUpdateTask { taskController, _, apps ->
-                apps.addPromiseApp(mApp.context, sessionInfo)
-                taskController.bindApplicationsIfNeeded()
-            }
-        }
-    }
-
-    override fun onSessionFailure(packageName: String, user: UserHandle) {
-        enqueueModelUpdateTask { taskController, dataModel, apps ->
-            val iconCache = mApp.iconCache
-            val removedIds = IntSet()
-            val archivedWorkspaceItemsToCacheRefresh = HashSet<WorkspaceItemInfo>()
-            val isAppArchived = ApplicationInfoWrapper(mApp.context, packageName, user).isArchived()
-            synchronized(dataModel) {
-                if (isAppArchived) {
-                    // Remove package icon cache entry for archived app in case of a session
-                    // failure.
-                    mApp.iconCache.remove(
-                        ComponentName(packageName, packageName + BaseIconCache.EMPTY_CLASS_NAME),
-                        user,
-                    )
-                }
-                for (info in dataModel.itemsIdMap) {
-                    if (
-                        (info is WorkspaceItemInfo && info.hasPromiseIconUi()) &&
-                            user == info.user &&
-                            info.intent != null
-                    ) {
-                        if (TextUtils.equals(packageName, info.intent!!.getPackage())) {
-                            removedIds.add(info.id)
-                        }
-                        if (info.isArchived()) {
-                            // Refresh icons on the workspace for archived apps.
-                            iconCache.getTitleAndIcon(info, info.usingLowResIcon())
-                            archivedWorkspaceItemsToCacheRefresh.add(info)
-                        }
-                    }
-                }
-                if (isAppArchived) {
-                    apps.updateIconsAndLabels(hashSetOf(packageName), user)
-                }
-            }
-
-            if (!removedIds.isEmpty && !isAppArchived) {
-                taskController.deleteAndBindComponentsRemoved(
-                    ItemInfoMatcher.ofItemIds(removedIds),
-                    "removed because install session failed",
-                )
-            }
-            if (archivedWorkspaceItemsToCacheRefresh.isNotEmpty()) {
-                taskController.bindUpdatedWorkspaceItems(
-                    archivedWorkspaceItemsToCacheRefresh.stream().toList()
-                )
-            }
-            if (isAppArchived) {
-                taskController.bindApplicationsIfNeeded()
-            }
-        }
-    }
-
-    override fun onPackageStateChanged(installInfo: PackageInstallInfo) {
-        enqueueModelUpdateTask(PackageInstallStateChangedTask(installInfo))
-    }
-
-    /** Updates the icons and label of all pending icons for the provided package name. */
-    override fun onUpdateSessionDisplay(key: PackageUserKey, info: PackageInstaller.SessionInfo) {
-        mApp.iconCache.updateSessionCache(key, info)
-
-        val packages = HashSet<String>()
-        packages.add(key.mPackageName)
-        enqueueModelUpdateTask(
-            CacheDataUpdatedTask(CacheDataUpdatedTask.OP_SESSION_UPDATE, key.mUser, packages)
-        )
     }
 
     inner class LoaderTransaction(task: LoaderTask) : AutoCloseable {
@@ -545,19 +451,11 @@ class LauncherModel(
     }
 
     fun updateAndBindWorkspaceItem(si: WorkspaceItemInfo, info: ShortcutInfo) {
-        updateAndBindWorkspaceItem {
-            si.updateFromDeepShortcutInfo(info, mApp.context)
-            mApp.iconCache.getShortcutIcon(si, info)
-            si
-        }
-    }
-
-    /** Utility method to update a shortcut on the background thread. */
-    private fun updateAndBindWorkspaceItem(itemProvider: Supplier<WorkspaceItemInfo>) {
         enqueueModelUpdateTask { taskController, _, _ ->
-            val info = itemProvider.get()
-            taskController.getModelWriter().updateItemInDatabase(info)
-            taskController.bindUpdatedWorkspaceItems(listOf(info))
+            si.updateFromDeepShortcutInfo(info, context)
+            iconCache.getShortcutIcon(si, info)
+            taskController.getModelWriter().updateItemInDatabase(si)
+            taskController.bindUpdatedWorkspaceItems(listOf(si))
         }
     }
 
