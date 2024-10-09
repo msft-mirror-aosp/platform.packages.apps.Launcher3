@@ -45,7 +45,6 @@ import android.view.animation.Interpolator;
 import androidx.annotation.FloatRange;
 import androidx.annotation.Nullable;
 
-import com.android.app.animation.Interpolators;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.DeviceProfile.OnDeviceProfileChangeListener;
 import com.android.launcher3.Launcher;
@@ -280,10 +279,9 @@ public class AllAppsTransitionController
             return;
         }
 
-        float deceleratedProgress = Interpolators.BACK_GESTURE.getInterpolation(backProgress);
         float scaleProgress = ScrollableLayoutManager.PREDICTIVE_BACK_MIN_SCALE
                 + (1 - ScrollableLayoutManager.PREDICTIVE_BACK_MIN_SCALE)
-                * (1 - deceleratedProgress);
+                * (1 - backProgress);
 
         mAllAppScale.updateValue(scaleProgress);
     }
