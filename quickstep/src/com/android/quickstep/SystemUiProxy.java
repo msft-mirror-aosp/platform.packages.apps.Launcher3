@@ -46,11 +46,11 @@ import android.view.IRemoteAnimationRunner;
 import android.view.MotionEvent;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
+import android.window.DesktopModeFlags;
 import android.window.IOnBackInvokedCallback;
 import android.window.RemoteTransition;
 import android.window.TaskSnapshot;
 import android.window.TransitionFilter;
-import android.window.flags.DesktopModeFlags;
 
 import androidx.annotation.MainThread;
 import androidx.annotation.Nullable;

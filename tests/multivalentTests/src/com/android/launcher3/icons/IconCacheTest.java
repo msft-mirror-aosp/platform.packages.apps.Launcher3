@@ -68,7 +68,6 @@ import com.android.launcher3.shortcuts.ShortcutKey;
 import com.android.launcher3.util.ApplicationInfoWrapper;
 import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.PackageUserKey;
-import com.android.launcher3.util.RoboApiWrapper;
 
 import com.google.common.truth.Truth;
 
@@ -148,7 +147,6 @@ public class IconCacheTest {
 
     @Test
     public void launcherActivityInfo_cached_in_memory() {
-        RoboApiWrapper.INSTANCE.initialize();
         ComponentName cn = new ComponentName(TEST_PACKAGE, TEST_ACTIVITY);
         UserHandle user = myUserHandle();
         ComponentKey cacheKey = new ComponentKey(cn, user);
@@ -213,7 +211,6 @@ public class IconCacheTest {
 
     @Test
     public void item_kept_in_db_if_nothing_changes() {
-        RoboApiWrapper.INSTANCE.initialize();
         ComponentName cn = new ComponentName(TEST_PACKAGE, TEST_ACTIVITY);
         UserHandle user = myUserHandle();
 
@@ -232,7 +229,6 @@ public class IconCacheTest {
 
     @Test
     public void item_updated_in_db_if_appInfo_changes() {
-        RoboApiWrapper.INSTANCE.initialize();
         ComponentName cn = new ComponentName(TEST_PACKAGE, TEST_ACTIVITY);
         UserHandle user = myUserHandle();
 
@@ -253,7 +249,6 @@ public class IconCacheTest {
 
     @Test
     public void item_removed_in_db_if_item_removed() {
-        RoboApiWrapper.INSTANCE.initialize();
         ComponentName cn = new ComponentName(TEST_PACKAGE, TEST_ACTIVITY);
         UserHandle user = myUserHandle();
 
