@@ -29,10 +29,7 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageInstaller;
-import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ShortcutInfo;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteException;
@@ -66,6 +63,7 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.CancellableTask;
+import com.android.launcher3.util.ComponentKey;
 import com.android.launcher3.util.InstantAppResolver;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.widget.WidgetSections;
@@ -143,15 +141,9 @@ public class IconCache extends BaseIconCache {
     public synchronized void updateIconsForPkg(@NonNull final String packageName,
             @NonNull final UserHandle user) {
         removeIconsForPkg(packageName, user);
-        try {
-            PackageInfo info = mPackageManager.getPackageInfo(packageName,
-                    PackageManager.GET_UNINSTALLED_PACKAGES);
-            long userSerial = mUserManager.getSerialNumberForUser(user);
-            for (LauncherActivityInfo app : mLauncherApps.getActivityList(packageName, user)) {
-                addIconToDBAndMemCache(app, mLauncherActivityInfoCachingLogic, info, userSerial);
-            }
-        } catch (NameNotFoundException e) {
-            Log.d(TAG, "Package not found", e);
+        long userSerial = mUserManager.getSerialNumberForUser(user);
+        for (LauncherActivityInfo app : mLauncherApps.getActivityList(packageName, user)) {
+            addIconToDBAndMemCache(app, mLauncherActivityInfoCachingLogic, userSerial);
         }
     }
 
@@ -600,6 +592,11 @@ public class IconCache extends BaseIconCache {
     public void updateSessionCache(PackageUserKey key, PackageInstaller.SessionInfo info) {
         cachePackageInstallInfo(key.mPackageName, key.mUser, info.getAppIcon(),
                 info.getAppLabel());
+    }
+
+    @VisibleForTesting
+    synchronized boolean isItemInDb(ComponentKey cacheKey) {
+        return getEntryFromDBLocked(cacheKey, new CacheEntry(), false);
     }
 
     /**
