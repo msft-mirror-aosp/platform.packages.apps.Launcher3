@@ -786,6 +786,9 @@ public class TaskbarLauncherStateController {
     }
 
     protected void stashHotseat(boolean stash) {
+        // align taskbar with the hotseat icons before performing any animation
+        mControllers.taskbarViewController.setLauncherIconAlignment(/* alignmentRatio = */ 1,
+                mLauncher.getDeviceProfile());
         TaskbarStashController stashController = mControllers.taskbarStashController;
         stashController.updateStateForFlag(FLAG_STASHED_FOR_BUBBLES, stash);
         Runnable swapHotseatWithTaskbar = new Runnable() {
@@ -898,19 +901,6 @@ public class TaskbarLauncherStateController {
             mHotseatTranslationXAnimation.cancel();
             mHotseatTranslationXAnimation = null;
         }
-        Runnable postAnimationAction = new Runnable() {
-            @Override
-            public void run() {
-                mHotseatTranslationXAnimation = null;
-                // We only need to align the task bar when on launcher home screen
-                if (mControllers.taskbarStashController.isOnHome()) {
-                    mControllers.taskbarViewController.setLauncherIconAlignment(
-                            /* alignmentRatio = */ 1,
-                            mLauncher.getDeviceProfile()
-                    );
-                }
-            }
-        };
         Hotseat hotseat = mLauncher.getHotseat();
         AnimatorSet translationXAnimation = new AnimatorSet();
         MultiProperty iconsTranslationX = mLauncher.getHotseat()
@@ -933,14 +923,12 @@ public class TaskbarLauncherStateController {
             }
         }
         if (!animate) {
-            postAnimationAction.run();
             return;
         }
         mHotseatTranslationXAnimation = translationXAnimation;
         translationXAnimation.setStartDelay(FADE_OUT_ANIM_POSITION_DURATION_MS);
         translationXAnimation.setDuration(FADE_IN_ANIM_ALPHA_DURATION_MS);
         translationXAnimation.setInterpolator(Interpolators.EMPHASIZED);
-        translationXAnimation.addListener(AnimatorListeners.forEndCallback(postAnimationAction));
         translationXAnimation.start();
     }
 
