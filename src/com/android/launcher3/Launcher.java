@@ -1872,13 +1872,18 @@ public class Launcher extends StatefulActivity<LauncherState>
             }
         }
 
-        // Exit spring loaded mode if necessary after adding the widget
-        Runnable onComplete = MULTI_SELECT_EDIT_MODE.get() ? null
-                : () -> mStateManager.goToState(NORMAL, SPRING_LOADED_EXIT_DELAY);
+        // Exit spring loaded mode if necessary after adding the widget; unless config activity was
+        // started.
+        Runnable onComplete = MULTI_SELECT_EDIT_MODE.get() ? null : () -> mStateManager.goToState(
+                NORMAL, SPRING_LOADED_EXIT_DELAY);
         completeAddAppWidget(appWidgetId, info, boundWidget,
                 addFlowHandler.getProviderInfo(this), addFlowHandler.needsConfigure(),
                 false, widgetPreviewBitmap);
-        mWorkspace.removeExtraEmptyScreenDelayed(delay, false, onComplete);
+        // Remove extra screen if widget drop concluded. If a config activity was started, extra
+        // screen will be removed when we get back its result.
+        if (!isActivityStarted) {
+            mWorkspace.removeExtraEmptyScreenDelayed(delay, false, onComplete);
+        }
     }
 
     public void addPendingItem(PendingAddItemInfo info, int container, int screenId,
