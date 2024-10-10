@@ -129,6 +129,7 @@ import android.view.animation.Interpolator;
 import android.widget.ListView;
 import android.widget.OverScroller;
 import android.widget.Toast;
+import android.window.DesktopModeFlags;
 import android.window.PictureInPictureSurfaceTransaction;
 
 import androidx.annotation.NonNull;
@@ -3141,7 +3142,9 @@ public abstract class RecentsView<
         // Horizontal grid translation for each task
         float[] gridTranslations = new float[taskCount];
 
-        int lastLargeTaskIndex = Integer.MAX_VALUE;
+        TaskView lastLargeTaskView = mUtils.getLastLargeTaskView(getTaskViews());
+        int lastLargeTaskIndex =
+                (lastLargeTaskView == null) ? Integer.MAX_VALUE : indexOfChild(lastLargeTaskView);
         Set<Integer> largeTasksIndices = new HashSet<>();
         int focusedTaskShift = 0;
         int largeTaskWidthAndSpacing = 0;
@@ -3177,7 +3180,6 @@ public abstract class RecentsView<
                 taskView.setGridTranslationY((mLastComputedTaskSize.height() + taskTopMargin
                         - taskView.getLayoutParams().height) / 2f);
 
-                lastLargeTaskIndex = i;
                 largeTasksIndices.add(i);
                 largeTaskWidthAndSpacing = taskWidthAndSpacing;
 
@@ -3934,9 +3936,11 @@ public abstract class RecentsView<
                     if (shouldRemoveTask) {
                         if (dismissedTaskView.isRunningTask()) {
                             finishRecentsAnimation(true /* toRecents */, false /* shouldPip */,
-                                    () -> removeTaskInternal(dismissedTaskViewId));
+                                    () -> removeTaskInternal(dismissedTaskViewId,
+                                            dismissedTaskView instanceof DesktopTaskView));
                         } else {
-                            removeTaskInternal(dismissedTaskViewId);
+                            removeTaskInternal(dismissedTaskViewId,
+                                    dismissedTaskView instanceof DesktopTaskView);
                         }
                         announceForAccessibility(
                                 getResources().getString(R.string.task_view_closed));
@@ -4304,16 +4308,21 @@ public abstract class RecentsView<
         return lastVisibleIndex;
     }
 
-    private void removeTaskInternal(int dismissedTaskViewId) {
+    private void removeTaskInternal(int dismissedTaskViewId, boolean isDesktop) {
         int[] taskIds = getTaskIdsForTaskViewId(dismissedTaskViewId);
-        UI_HELPER_EXECUTOR.getHandler().post(
-                () -> {
-                    for (int taskId : taskIds) {
-                        if (taskId != -1) {
-                            ActivityManagerWrapper.getInstance().removeTask(taskId);
-                        }
+        UI_HELPER_EXECUTOR.getHandler().post(() -> {
+            if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_BACK_NAVIGATION.isTrue() && isDesktop) {
+                // TODO: b/372005228 - Use the api with desktop id instead.
+                SystemUiProxy.INSTANCE.get(getContext()).removeDesktop(
+                        mContainer.getDisplay().getDisplayId());
+            } else {
+                for (int taskId : taskIds) {
+                    if (taskId != -1) {
+                        ActivityManagerWrapper.getInstance().removeTask(taskId);
                     }
-                });
+                }
+            }
+        });
     }
 
     protected void onDismissAnimationEnds() {
@@ -5418,6 +5427,7 @@ public abstract class RecentsView<
 
         int taskIndex = indexOfChild(taskView);
         int centerTaskIndex = getCurrentPage();
+        boolean isRunningTask = taskView.isRunningTask();
 
         float toScale = getMaxScaleForFullScreen();
         boolean showAsGrid = showAsGrid();
@@ -5436,13 +5446,16 @@ public abstract class RecentsView<
                             mTempPointF);
                     setPivotX(mTempPointF.x);
                     setPivotY(mTempPointF.y);
-                    runActionOnRemoteHandles(
-                            remoteTargetHandle -> {
-                                remoteTargetHandle.getTaskViewSimulator().setPivotOverride(
-                                        mTempPointF);
-                                remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(
-                                        false);
-                            });
+
+                    if (!isRunningTask) {
+                        runActionOnRemoteHandles(
+                                remoteTargetHandle -> {
+                                    remoteTargetHandle.getTaskViewSimulator().setPivotOverride(
+                                            mTempPointF);
+                                    remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(
+                                            false);
+                                });
+                    }
                 }
             });
         } else if (!showAsGrid) {

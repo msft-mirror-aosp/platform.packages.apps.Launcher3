@@ -23,6 +23,7 @@ import static com.android.launcher3.LauncherAnimUtils.SCALE_PROPERTY;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_ALPHA;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_Y;
+import static com.android.launcher3.Utilities.isRtl;
 import static com.android.launcher3.Utilities.mapRange;
 import static com.android.launcher3.anim.AnimatedFloat.VALUE;
 import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
@@ -159,7 +160,9 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     private final View.OnLayoutChangeListener mTaskbarViewLayoutChangeListener =
             (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
                 updateTaskbarIconTranslationXForPinning();
-                mControllers.navbarButtonsViewController.onTaskbarLayoutChanged();
+                if (BubbleBarController.isBubbleBarEnabled()) {
+                    mControllers.navbarButtonsViewController.onLayoutsUpdated();
+                }
             };
 
     // Animation to align icons with Launcher, created lazily. This allows the controller to be
@@ -837,10 +840,10 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         int hotseatNavBarTranslationX = 0;
         if (mCurrentBubbleBarLocation != null
                 && taskbarDp.shouldAdjustHotseatOnBubblesLocationUpdate(mActivity)) {
-            boolean isBubblesOnLeft = mCurrentBubbleBarLocation.isOnLeft(
-                    mTaskbarView.isLayoutRtl());
+            boolean isRtl = mTaskbarView.isLayoutRtl();
+            boolean isBubblesOnLeft = mCurrentBubbleBarLocation.isOnLeft(isRtl);
             hotseatNavBarTranslationX = taskbarDp
-                    .getHotseatTranslationXForBubbleBar(/* isNavbarOnRight = */ isBubblesOnLeft);
+                    .getHotseatTranslationXForBubbleBar(isBubblesOnLeft, isRtl);
         }
         for (int i = 0; i < mTaskbarView.getChildCount(); i++) {
             View child = mTaskbarView.getChildAt(i);
