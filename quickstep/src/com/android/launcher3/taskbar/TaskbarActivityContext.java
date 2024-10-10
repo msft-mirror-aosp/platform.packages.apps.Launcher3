@@ -949,6 +949,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      * Hides the taskbar icons and background when the notication shade is expanded.
      */
     private void onNotificationShadeExpandChanged(boolean isExpanded, boolean skipAnim) {
+        // Close all floating views within the Taskbar window to make sure nothing is shown over
+        // the notification shade.
+        if (isExpanded) {
+            AbstractFloatingView.closeAllOpenViewsExcept(this, TYPE_TASKBAR_OVERLAY_PROXY);
+        }
+
         float alpha = isExpanded ? 0 : 1;
         AnimatorSet anim = new AnimatorSet();
         anim.play(mControllers.taskbarViewController.getTaskbarIconAlpha().get(
@@ -1538,6 +1544,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     /**
      * Called when we want to unstash taskbar when user performs swipes up gesture.
+     *
      * @param delayTaskbarBackground whether we will delay the taskbar background animation
      */
     public void onSwipeToUnstashTaskbar(boolean delayTaskbarBackground) {
