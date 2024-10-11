@@ -136,7 +136,7 @@ class AsyncBindingTest {
     @Test
     fun test_bind_sync_partially_inflates_on_background() {
         modelHelper.loadModelSync()
-        assertTrue(modelHelper.model.isModelLoaded)
+        assertTrue(modelHelper.model.isModelLoaded())
         callbacks.inflater = itemInflater
 
         val firstPageBindIds = IntSet()
