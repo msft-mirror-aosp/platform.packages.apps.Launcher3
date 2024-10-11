@@ -84,10 +84,7 @@ import java.util.function.Predicate
  * [QuickstepProtoLogGroup.Constants.DEBUG_RECENTS_WINDOW]
  */
 class RecentsWindowManager(context: Context) :
-    RecentsWindowContext(context),
-    RecentsViewContainer,
-    StatefulContainer<RecentsState>,
-    RecentsAnimationListener {
+    RecentsWindowContext(context), RecentsViewContainer, StatefulContainer<RecentsState> {
 
     companion object {
         private const val HOME_APPEAR_DURATION: Long = 250
@@ -128,6 +125,17 @@ class RecentsWindowManager(context: Context) :
             }
         }
 
+    private val recentsAnimationListener =
+        object : RecentsAnimationListener {
+            override fun onRecentsAnimationCanceled(thumbnailDatas: HashMap<Int, ThumbnailData>) {
+                recentAnimationStopped()
+            }
+
+            override fun onRecentsAnimationFinished(controller: RecentsAnimationController) {
+                recentAnimationStopped()
+            }
+        }
+
     init {
         FallbackWindowInterface.init(this)
         TaskStackChangeListeners.getInstance().registerTaskStackListener(taskStackChangeListener)
@@ -138,7 +146,7 @@ class RecentsWindowManager(context: Context) :
         cleanupRecentsWindow()
         FallbackWindowInterface.getInstance()?.destroy()
         TaskStackChangeListeners.getInstance().unregisterTaskStackListener(taskStackChangeListener)
-        callbacks?.removeListener(this)
+        callbacks?.removeListener(recentsAnimationListener)
     }
 
     override fun startHome() {
@@ -203,7 +211,7 @@ class RecentsWindowManager(context: Context) :
             windowManager.removeViewImmediate(windowView)
         }
         stateManager.moveToRestState()
-        callbacks?.removeListener(this)
+        callbacks?.removeListener(recentsAnimationListener)
     }
 
     private fun isShowing(): Boolean {
@@ -249,17 +257,7 @@ class RecentsWindowManager(context: Context) :
         onInitListener?.test(true)
 
         this.callbacks = callbacks
-        callbacks?.addListener(this)
-    }
-
-    override fun onRecentsAnimationCanceled(thumbnailDatas: HashMap<Int, ThumbnailData>) {
-        super.onRecentsAnimationCanceled(thumbnailDatas)
-        recentAnimationStopped()
-    }
-
-    override fun onRecentsAnimationFinished(controller: RecentsAnimationController) {
-        super.onRecentsAnimationFinished(controller)
-        recentAnimationStopped()
+        callbacks?.addListener(recentsAnimationListener)
     }
 
     private fun recentAnimationStopped() {
