@@ -29,6 +29,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -122,7 +123,8 @@ public class BubbleBarViewController {
     @Nullable
     private BubbleBarBoundsChangeListener mBoundsChangeListener;
 
-    public BubbleBarViewController(TaskbarActivityContext activity, BubbleBarView barView) {
+    public BubbleBarViewController(TaskbarActivityContext activity, BubbleBarView barView,
+            FrameLayout bubbleBarContainer) {
         mActivity = activity;
         mBarView = barView;
         mSystemUiProxy = SystemUiProxy.INSTANCE.get(mActivity);
