@@ -1090,6 +1090,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
                 if (groupTask.containsTask(task.key.id)) {
                     mTaskbarView.applyGroupTaskToBubbleTextView(btv, groupTask);
                 }
+            } else if (view instanceof TaskbarOverflowView overflowButton) {
+                overflowButton.updateTaskIsShown(task);
             }
         }
     }
