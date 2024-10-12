@@ -1079,16 +1079,6 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         }
     }
 
-    public void removeFromSideStage(int taskId) {
-        if (mSplitScreen != null) {
-            try {
-                mSplitScreen.removeFromSideStage(taskId);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Failed call removeFromSideStage");
-            }
-        }
-    }
-
     //
     // One handed
     //
