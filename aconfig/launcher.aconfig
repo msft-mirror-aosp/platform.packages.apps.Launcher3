@@ -448,6 +448,12 @@ flag {
     bug: "292269949"
 }
 
+flag {
+    name: "enable_state_manager_proto_log"
+    namespace: "launcher"
+    description: "Enables tracking state manager logs in ProtoLog"
+    bug: "292269949"
+}
 
 flag {
     name: "coordinate_workspace_scale"
