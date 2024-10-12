@@ -71,6 +71,7 @@ import android.view.Surface;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 import android.window.RemoteTransition;
 
@@ -268,8 +269,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         NearestTouchFrame navButtonsView = mDragLayer.findViewById(R.id.navbuttons_view);
         StashedHandleView stashedHandleView = mDragLayer.findViewById(R.id.stashed_handle);
         BubbleBarView bubbleBarView = null;
+        FrameLayout bubbleBarContainer = null;
         if (isTransientTaskbar || Flags.enableBubbleBarInPersistentTaskBar()) {
             bubbleBarView = mDragLayer.findViewById(R.id.taskbar_bubbles);
+            bubbleBarContainer = mDragLayer.findViewById(R.id.taskbar_bubbles_container);
         }
         StashedHandleView bubbleHandleView = mDragLayer.findViewById(R.id.stashed_bubble_handle);
 
@@ -296,7 +299,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                     : new PersistentBubbleStashController(dimensionsProvider);
             bubbleControllersOptional = Optional.of(new BubbleControllers(
                     new BubbleBarController(this, bubbleBarView),
-                    new BubbleBarViewController(this, bubbleBarView),
+                    new BubbleBarViewController(this, bubbleBarView, bubbleBarContainer),
                     bubbleStashController,
                     bubbleHandleController,
                     new BubbleDragController(this),

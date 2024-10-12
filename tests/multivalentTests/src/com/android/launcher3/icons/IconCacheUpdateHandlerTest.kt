@@ -18,10 +18,8 @@ package com.android.launcher3.icons
 
 import android.content.ComponentName
 import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
 import android.database.MatrixCursor
 import android.os.Process.myUserHandle
-import androidx.test.core.app.ApplicationProvider.getApplicationContext
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.launcher3.icons.cache.BaseIconCache
@@ -49,7 +47,7 @@ class IconCacheUpdateHandlerTest {
     @Mock private lateinit var baseIconCache: BaseIconCache
 
     private var cursor: MatrixCursor? = null
-    private var cachingLogic = CachedObjectCachingLogic<BaseIconCache>(getApplicationContext())
+    private var cachingLogic = CachedObjectCachingLogic
 
     @Before
     fun setup() {
@@ -137,14 +135,13 @@ fun IconCache.waitForUpdateHandlerToFinish() {
     }
 }
 
-class TestCachedObject(val cn: ComponentName, val freshnessId: String) :
-    CachedObject<BaseIconCache> {
+class TestCachedObject(val cn: ComponentName, val freshnessId: String) : CachedObject {
 
     override fun getComponent() = cn
 
     override fun getUser() = myUserHandle()
 
-    override fun getLabel(pm: PackageManager?): CharSequence? = null
+    override fun getLabel(): CharSequence? = null
 
     override fun getApplicationInfo(): ApplicationInfo? = null
 
