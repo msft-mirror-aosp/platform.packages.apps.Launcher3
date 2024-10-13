@@ -19,7 +19,6 @@ package com.android.launcher3.taskbar.rules
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.SetFlagsRule
-import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.taskbar.TaskbarKeyguardController
 import com.android.launcher3.taskbar.TaskbarManager
@@ -43,9 +42,8 @@ import org.junit.runners.model.Statement
 @EmulatedDevices(["pixelFoldable2023", "pixelTablet2023"])
 class TaskbarUnitTestRuleTest {
 
-    private val context = TaskbarWindowSandboxContext.create(getInstrumentation().targetContext)
-
-    @get:Rule(order = 0) val setFlagsRule = SetFlagsRule()
+    @get:Rule(order = 0) val context = TaskbarWindowSandboxContext.create()
+    @get:Rule(order = 1) val setFlagsRule = SetFlagsRule()
 
     @Test
     fun testSetup_taskbarInitialized() {

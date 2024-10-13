@@ -73,7 +73,16 @@ object FakeBubbleViewFactory {
                 context.resources.getString(com.android.internal.R.string.config_icon_mask)
             )
         val bubble =
-            BubbleBarBubble(bubbleInfo, bubbleView, badge, icon, dotColor, dotPath, "test app")
+            BubbleBarBubble(
+                bubbleInfo,
+                bubbleView,
+                badge,
+                icon,
+                dotColor,
+                dotPath,
+                "test app",
+                null,
+            )
         bubbleView.setBubble(bubble)
         return bubbleView
     }

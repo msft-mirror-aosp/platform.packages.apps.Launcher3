@@ -88,8 +88,8 @@ import android.view.ViewTreeObserver.OnScrollChangedListener;
 import android.view.WindowInsets;
 import android.view.animation.Interpolator;
 import android.widget.Toast;
+import android.window.DesktopModeFlags;
 import android.window.PictureInPictureSurfaceTransaction;
-import android.window.flags.DesktopModeFlags;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -156,6 +156,8 @@ import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.startingsurface.SplashScreenExitAnimationUtils;
 
+import kotlin.Unit;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -164,8 +166,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
-
-import kotlin.Unit;
 
 /**
  * Handles the navigation gestures when Launcher is the default home activity.

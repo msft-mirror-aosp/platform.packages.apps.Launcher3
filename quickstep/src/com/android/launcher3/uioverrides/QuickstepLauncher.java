@@ -19,7 +19,7 @@ import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.os.Trace.TRACE_TAG_APP;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_OPTIMIZE_MEASURE;
 import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED;
-import static android.window.flags.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY;
+import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.internal.jank.Cuj.CUJ_LAUNCHER_LAUNCH_APP_PAIR_FROM_WORKSPACE;
@@ -1314,6 +1314,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     public void setPredictiveBackToHomeInProgress(boolean isInProgress) {
         mIsPredictiveBackToHomeInProgress = isInProgress;
         mTISBindHelper.setPredictiveBackToHomeInProgress(isInProgress);
+    }
+
+    public boolean getPredictiveBackToHomeInProgress() {
+        return mIsPredictiveBackToHomeInProgress;
     }
 
     @Override
