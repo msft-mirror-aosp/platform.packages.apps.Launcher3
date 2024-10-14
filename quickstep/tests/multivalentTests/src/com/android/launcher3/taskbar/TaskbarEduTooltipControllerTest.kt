@@ -14,17 +14,11 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.taskbar.test
+package com.android.launcher3.taskbar
 
 import android.util.Log
 import com.android.launcher3.Utilities
-import com.android.launcher3.taskbar.TOOLTIP_STEP_FEATURES
-import com.android.launcher3.taskbar.TOOLTIP_STEP_NONE
-import com.android.launcher3.taskbar.TOOLTIP_STEP_PINNING
-import com.android.launcher3.taskbar.TOOLTIP_STEP_SWIPE
-import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnMainSync
-import com.android.launcher3.taskbar.TaskbarEduTooltipController
 import com.android.launcher3.taskbar.rules.TaskbarModeRule
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.PINNED
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.THREE_BUTTONS
