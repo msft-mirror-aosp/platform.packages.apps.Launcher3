@@ -1493,6 +1493,17 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         }
     }
 
+    /** Call shell to move a task with given `taskId` to external display. */
+    public void moveToExternalDisplay(int taskId) {
+        if (mDesktopMode != null) {
+            try {
+                mDesktopMode.moveToExternalDisplay(taskId);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call moveToExternalDisplay", e);
+            }
+        }
+    }
+
     //
     // Unfold transition
     //

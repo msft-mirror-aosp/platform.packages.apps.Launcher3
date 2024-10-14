@@ -221,6 +221,9 @@ public class StatsLogManager implements ResourceBasedOverride {
         @UiEvent(doc = "User tapped on desktop icon on a task menu.")
         LAUNCHER_SYSTEM_SHORTCUT_DESKTOP_TAP(1706),
 
+        @UiEvent(doc = "Use tapped on external display icon on a task menu,")
+        LAUNCHER_SYSTEM_SHORTCUT_EXTERNAL_DISPLAY_TAP(1957),
+
         @UiEvent(doc = "User tapped on pause app system shortcut.")
         LAUNCHER_SYSTEM_SHORTCUT_PAUSE_TAP(521),
 
