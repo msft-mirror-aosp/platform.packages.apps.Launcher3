@@ -443,13 +443,33 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (mTaskbarDividerContainer != null && !recentTasks.isEmpty()) {
             addView(mTaskbarDividerContainer, nextViewIndex++);
             mAddedDividerForRecents = true;
-            if (mTaskbarOverflowView != null) {
+        }
+
+        // At this point, the all apps button has not been added as a child view, but needs to be
+        // accounted for when comparing current icon count to max number of icons.
+        int nonTaskIconsToBeAdded = 1;
+
+        boolean supportsOverflow = Flags.taskbarOverflow();
+        if (supportsOverflow) {
+            int numberOfSupportedRecents = 0;
+            for (GroupTask task : recentTasks) {
+                // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
+                if (!task.hasMultipleTasks()) {
+                    ++numberOfSupportedRecents;
+                }
+            }
+            if (nextViewIndex + numberOfSupportedRecents + nonTaskIconsToBeAdded > mMaxNumIcons
+                    && mTaskbarOverflowView != null) {
                 addView(mTaskbarOverflowView, nextViewIndex++);
             }
         }
 
         // Add Recent/Running icons.
         for (GroupTask task : recentTasks) {
+            if (supportsOverflow && nextViewIndex + nonTaskIconsToBeAdded >= mMaxNumIcons) {
+                break;
+            }
+
             // Replace any Recent views with the appropriate type if it's not already that type.
             final int expectedLayoutResId;
             boolean isCollection = false;
@@ -519,51 +539,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
         }
 
-        updateRecentAppsToFit();
-
         if (mActivityContext.getDeviceProfile().isQsbInline) {
             addView(mQsb, mIsRtl ? getChildCount() : 0);
             // Always set QSB to invisible after re-adding.
             mQsb.setVisibility(View.INVISIBLE);
-        }
-    }
-
-    /**
-     * Updates the recent apps portion of the taskbar by:
-     * - Removing overflow affordance if overflow is not needed.
-     * - Removing any recent apps that do not fit.
-     */
-    private void updateRecentAppsToFit() {
-        if (!Flags.taskbarOverflow()) {
-            return;
-        }
-        int indexOfFirstRecentApp = -1;
-        int size = getChildCount();
-        boolean removeOverflowView = true;
-
-        for (int i = 0; i < size; ++i) {
-            if (getChildAt(i).getTag() instanceof GroupTask) {
-                indexOfFirstRecentApp = i;
-                removeOverflowView = false;
-                break;
-            }
-        }
-
-        if (indexOfFirstRecentApp != -1) {
-            // We pre-maturely added the overflow icon, so we can take it out of the count.
-            int numRecentAppsToRemove = Math.max(0, getChildCount() - mMaxNumIcons + 1);
-            if (numRecentAppsToRemove <= 1) {
-                // We can fit all of the recent apps if we remove the overflow icon.
-                removeOverflowView = true;
-            } else {
-                for (int i = 0; i < numRecentAppsToRemove; ++i) {
-                    removeAndRecycle(getChildAt(indexOfFirstRecentApp));
-                }
-            }
-        }
-
-        if (removeOverflowView) {
-            removeView(mTaskbarOverflowView);
         }
     }
 
