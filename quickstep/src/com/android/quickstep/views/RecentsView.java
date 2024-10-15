@@ -6673,6 +6673,26 @@ public abstract class RecentsView<
         successCallback.run();
     }
 
+    /**
+     * Move the provided task into external display and invoke {@code successCallback} if succeeded.
+     */
+    public void moveTaskToExternalDisplay(TaskContainer taskContainer, Runnable successCallback) {
+        if (!DesktopModeStatus.canEnterDesktopMode(mContext)) {
+            return;
+        }
+        switchToScreenshot(() -> finishRecentsAnimation(/* toRecents= */true, /* shouldPip= */false,
+                () -> moveTaskToDesktopInternal(taskContainer, successCallback)));
+    }
+
+    private void moveTaskToDesktopInternal(TaskContainer taskContainer, Runnable successCallback) {
+        if (mDesktopRecentsTransitionController == null) {
+            return;
+        }
+        mDesktopRecentsTransitionController.moveToExternalDisplay(taskContainer.getTask().key.id);
+        successCallback.run();
+    }
+
+
     // Logs when the orientation of Overview changes. We log both real and fake orientation changes.
     private void logOrientationChanged() {
         // Only log when Overview is showing.
