@@ -16,7 +16,6 @@
 package com.android.launcher3.taskbar;
 
 import static android.content.Context.RECEIVER_NOT_EXPORTED;
-import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
@@ -72,7 +71,7 @@ import com.android.launcher3.util.SimpleBroadcastReceiver;
 import com.android.quickstep.AllAppsActionManager;
 import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.SystemUiProxy;
-import com.android.quickstep.util.AssistUtils;
+import com.android.quickstep.util.ContextualSearchInvoker;
 import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
@@ -220,7 +219,7 @@ public class TaskbarManager {
             TaskbarNavButtonCallbacks navCallbacks,
             @NonNull DesktopVisibilityController desktopVisibilityController) {
         Display display =
-                context.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY);
+                context.getSystemService(DisplayManager.class).getDisplay(context.getDisplayId());
         mContext = context.createWindowContext(display,
                 ENABLE_TASKBAR_NAVBAR_UNIFICATION ? TYPE_NAVIGATION_BAR : TYPE_NAVIGATION_BAR_PANEL,
                 null);
@@ -250,7 +249,7 @@ public class TaskbarManager {
                 SystemUiProxy.INSTANCE.get(mContext),
                 ContextualEduStatsManager.INSTANCE.get(mContext),
                 new Handler(),
-                AssistUtils.newInstance(mContext));
+                ContextualSearchInvoker.newInstance(mContext));
         mComponentCallbacks = new ComponentCallbacks() {
             private Configuration mOldConfig = mContext.getResources().getConfiguration();
 
@@ -672,11 +671,6 @@ public class TaskbarManager {
     @VisibleForTesting
     public void setSuspended(boolean isSuspended) {
         mIsSuspended = isSuspended;
-        if (mIsSuspended) {
-            removeTaskbarRootViewFromWindow();
-        } else {
-            addTaskbarRootViewToWindow();
-        }
     }
 
     private void addTaskbarRootViewToWindow() {

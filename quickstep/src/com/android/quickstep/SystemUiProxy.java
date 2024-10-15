@@ -64,7 +64,7 @@ import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.quickstep.util.ActiveGestureProtoLogProxy;
-import com.android.quickstep.util.AssistUtils;
+import com.android.quickstep.util.ContextualSearchInvoker;
 import com.android.quickstep.util.unfold.ProxyUnfoldTransitionProvider;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -311,8 +311,8 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         setBackToLauncherCallback(mBackToLauncherCallback, mBackToLauncherRunner);
         setUnfoldAnimationListener(mUnfoldAnimationListener);
         setDesktopTaskListener(mDesktopTaskListener);
-        setAssistantOverridesRequested(
-                AssistUtils.newInstance(mContext).getSysUiAssistOverrideInvocationTypes());
+        setAssistantOverridesRequested(ContextualSearchInvoker.newInstance(mContext)
+                .getSysUiAssistOverrideInvocationTypes());
         mStateChangeCallbacks.forEach(Runnable::run);
 
         if (mUnfoldTransitionProvider != null) {
@@ -1075,16 +1075,6 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
                         instanceId);
             } catch (RemoteException e) {
                 Log.w(TAG, splitFailureMessage("startIntent", "RemoteException"), e);
-            }
-        }
-    }
-
-    public void removeFromSideStage(int taskId) {
-        if (mSplitScreen != null) {
-            try {
-                mSplitScreen.removeFromSideStage(taskId);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Failed call removeFromSideStage");
             }
         }
     }
