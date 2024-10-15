@@ -19,6 +19,7 @@ package com.android.launcher3.dagger;
 import android.content.Context;
 
 import com.android.launcher3.graphics.IconShape;
+import com.android.launcher3.model.ItemInstallQueue;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.DaggerSingletonTracker;
@@ -45,6 +46,7 @@ public interface LauncherBaseAppComponent {
     CustomWidgetManager getCustomWidgetManager();
     IconShape getIconShape();
     InstallSessionHelper getInstallSessionHelper();
+    ItemInstallQueue getItemInstallQueue();
     RefreshRateTracker getRefreshRateTracker();
     ScreenOnTracker getScreenOnTracker();
     SettingsCache getSettingsCache();
