@@ -122,8 +122,8 @@ import com.android.quickstep.inputconsumers.TrackpadStatusBarInputConsumer;
 import com.android.quickstep.util.ActiveGestureLog;
 import com.android.quickstep.util.ActiveGestureLog.CompoundString;
 import com.android.quickstep.util.ActiveGestureProtoLogProxy;
-import com.android.quickstep.util.AssistStateManager;
-import com.android.quickstep.util.AssistUtils;
+import com.android.quickstep.util.ContextualSearchInvoker;
+import com.android.quickstep.util.ContextualSearchStateManager;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.systemui.shared.recents.IOverviewProxy;
 import com.android.systemui.shared.recents.ISystemUiProxy;
@@ -297,7 +297,8 @@ public class TouchInteractionService extends Service {
         @Override
         public void onAssistantOverrideInvoked(int invocationType) {
             executeForTouchInteractionService(tis -> {
-                if (!AssistUtils.newInstance(tis).tryStartAssistOverride(invocationType)) {
+                if (!ContextualSearchInvoker.newInstance(tis)
+                        .tryStartAssistOverride(invocationType)) {
                     Log.w(TAG, "Failed to invoke Assist override");
                 }
             });
@@ -1640,8 +1641,8 @@ public class TouchInteractionService extends Service {
         }
         mTaskbarManager.dumpLogs("", pw);
         mDesktopVisibilityController.dumpLogs("", pw);
-        pw.println("AssistStateManager:");
-        AssistStateManager.INSTANCE.get(this).dump("\t", pw);
+        pw.println("ContextualSearchStateManager:");
+        ContextualSearchStateManager.INSTANCE.get(this).dump("\t", pw);
         SystemUiProxy.INSTANCE.get(this).dump(pw);
         DeviceConfigWrapper.get().dump("   ", pw);
     }
