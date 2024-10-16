@@ -419,10 +419,8 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
             mDepthController.setActivityStarted(isStarted());
         }
 
-        if ((changeBits & ACTIVITY_STATE_RESUMED) != 0) {
-            if (!FeatureFlags.enableHomeTransitionListener() && mTaskbarUIController != null) {
-                mTaskbarUIController.onLauncherVisibilityChanged(hasBeenResumed());
-            }
+        if ((changeBits & ACTIVITY_STATE_RESUMED) != 0 && mTaskbarUIController != null) {
+            mTaskbarUIController.onLauncherPausedOrResumed(isPaused());
         }
 
         super.onActivityFlagsChanged(changeBits);
