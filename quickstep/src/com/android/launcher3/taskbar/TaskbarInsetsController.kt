@@ -151,30 +151,26 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
                 DisplayController.showLockedTaskbarOnHome(context)
         ) {
             // adding the taskbar touch region
-            val touchableHeight: Int
             var left = 0
             var right = context.deviceProfile.widthPx
-            var bubbleBarAdjustment = 0
+            val touchableHeight: Int
             if (uiController.isAnimatingToLauncher) {
                 val dp = controllers.taskbarActivityContext.deviceProfile
                 touchableHeight = windowLayoutParams.height
                 if (dp.isQsbInline) {
                     // if Qsb is inline need to exclude search icon from touch region
                     val isRtl = Utilities.isRtl(context.resources)
-                    bubbleControllers?.bubbleBarViewController?.let {
-                        if (dp.shouldAdjustHotseatOnBubblesLocationUpdate(context)) {
+                    val navBarOffset =
+                        bubbleControllers?.bubbleBarViewController?.let {
                             val isBubblesOnLeft = it.bubbleBarLocation.isOnLeft(isRtl)
-                            bubbleBarAdjustment =
-                                dp.getHotseatTranslationXForBubbleBar(isBubblesOnLeft, isRtl)
-                        }
-                    }
+                            dp.getHotseatTranslationXForNavBar(context, isBubblesOnLeft)
+                        } ?: 0
                     val hotseatPadding: Rect = dp.getHotseatLayoutPadding(context)
                     val borderSpacing: Int = dp.hotseatBorderSpace
                     if (isRtl) {
-                        right =
-                            dp.widthPx - hotseatPadding.right + borderSpacing + bubbleBarAdjustment
+                        right = dp.widthPx - hotseatPadding.right + borderSpacing + navBarOffset
                     } else {
-                        left = hotseatPadding.left - borderSpacing + bubbleBarAdjustment
+                        left = hotseatPadding.left - borderSpacing + navBarOffset
                     }
                 }
             } else {

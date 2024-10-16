@@ -893,19 +893,18 @@ public class TaskbarLauncherStateController {
         mBubbleBarLocation = location;
         if (location == null) {
             // bubble bar is not present, hence no location, resetting the hotseat
-            updateHotseatAndQsbTranslationX(0, animate);
+            updateHotseatAndQsbTranslationX(/* targetValue = */ 0, animate);
             mBubbleBarLocation = null;
             return;
         }
         DeviceProfile deviceProfile = mLauncher.getDeviceProfile();
-        if (!deviceProfile.shouldAdjustHotseatOnBubblesLocationUpdate(
+        if (!deviceProfile.shouldAdjustHotseatOnNavBarLocationUpdate(
                 mControllers.taskbarActivityContext)) {
             return;
         }
-        boolean isRtl = isRtl(mLauncher.getResources());
-        boolean isBubblesOnLeft = location.isOnLeft(isRtl);
+        boolean isBubblesOnLeft = location.isOnLeft(isRtl(mLauncher.getResources()));
         int targetX = deviceProfile
-                .getHotseatTranslationXForBubbleBar(isBubblesOnLeft, isRtl);
+                .getHotseatTranslationXForNavBar(mLauncher, isBubblesOnLeft);
         updateHotseatAndQsbTranslationX(targetX, animate);
     }
 
