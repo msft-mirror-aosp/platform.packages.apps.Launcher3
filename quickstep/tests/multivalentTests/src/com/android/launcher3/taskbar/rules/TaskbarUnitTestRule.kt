@@ -19,12 +19,10 @@ package com.android.launcher3.taskbar.rules
 import android.app.Instrumentation
 import android.app.PendingIntent
 import android.content.IIntentSender
-import android.content.Intent
 import android.provider.Settings.Secure.NAV_BAR_KIDS_MODE
 import android.provider.Settings.Secure.USER_SETUP_COMPLETE
 import android.provider.Settings.Secure.getUriFor
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.rule.ServiceTestRule
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.taskbar.TaskbarActivityContext
@@ -35,11 +33,8 @@ import com.android.launcher3.taskbar.TaskbarViewController
 import com.android.launcher3.taskbar.bubbles.BubbleControllers
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.InjectController
 import com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR
-import com.android.launcher3.util.LauncherMultivalentJUnit.Companion.isRunningInRobolectric
 import com.android.launcher3.util.TestUtil
 import com.android.quickstep.AllAppsActionManager
-import com.android.quickstep.TouchInteractionService
-import com.android.quickstep.TouchInteractionService.TISBinder
 import java.lang.reflect.Field
 import java.lang.reflect.ParameterizedType
 import java.util.Optional
@@ -80,7 +75,6 @@ class TaskbarUnitTestRule(
 ) : TestRule {
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private val serviceTestRule = ServiceTestRule()
 
     private lateinit var taskbarManager: TaskbarManager
 
@@ -107,22 +101,6 @@ class TaskbarUnitTestRule(
                 context.settingsCacheSandbox[getUriFor(NAV_BAR_KIDS_MODE)] =
                     if (description.getAnnotation(NavBarKidsMode::class.java) != null) 1 else 0
 
-                // Check for existing Taskbar instance from Launcher process.
-                val launcherTaskbarManager: TaskbarManager? =
-                    if (!isRunningInRobolectric) {
-                        try {
-                            val tisBinder =
-                                serviceTestRule.bindService(
-                                    Intent(context, TouchInteractionService::class.java)
-                                ) as? TISBinder
-                            tisBinder?.taskbarManager
-                        } catch (_: Exception) {
-                            null
-                        }
-                    } else {
-                        null
-                    }
-
                 taskbarManager =
                     TestUtil.getOnUiThread {
                         object :
@@ -144,20 +122,12 @@ class TaskbarUnitTestRule(
                 try {
                     TaskbarViewController.enableModelLoadingForTests(false)
 
-                    // Replace Launcher Taskbar window with test instance.
-                    instrumentation.runOnMainSync {
-                        launcherTaskbarManager?.setSuspended(true)
-                        taskbarManager.onUserUnlocked() // Required to complete initialization.
-                    }
+                    // Required to complete initialization.
+                    instrumentation.runOnMainSync { taskbarManager.onUserUnlocked() }
 
                     base.evaluate()
                 } finally {
-                    // Revert Taskbar window.
-                    instrumentation.runOnMainSync {
-                        taskbarManager.destroy()
-                        launcherTaskbarManager?.setSuspended(false)
-                    }
-
+                    instrumentation.runOnMainSync { taskbarManager.destroy() }
                     TaskbarViewController.enableModelLoadingForTests(true)
                 }
             }

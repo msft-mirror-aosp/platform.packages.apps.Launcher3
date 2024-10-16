@@ -115,7 +115,6 @@ public class TaskbarManager {
     private WindowManager mWindowManager;
     private FrameLayout mTaskbarRootLayout;
     private boolean mAddedWindow;
-    private boolean mIsSuspended;
     private final TaskbarNavButtonController mNavButtonController;
     private final ComponentCallbacks mComponentCallbacks;
 
@@ -446,8 +445,6 @@ public class TaskbarManager {
      */
     @VisibleForTesting
     public synchronized void recreateTaskbar() {
-        if (mIsSuspended) return;
-
         Trace.beginSection("recreateTaskbar");
         try {
             DeviceProfile dp = mUserUnlocked ?
@@ -661,16 +658,6 @@ public class TaskbarManager {
         } else {
             mTaskbarActivityContext.dumpLogs(prefix + "\t", pw);
         }
-    }
-
-    /**
-     * Removes Taskbar from the window manager and prevents recreation if {@code true}.
-     * <p>
-     * Suspending is for testing purposes only; avoid calling this method in production.
-     */
-    @VisibleForTesting
-    public void setSuspended(boolean isSuspended) {
-        mIsSuspended = isSuspended;
     }
 
     private void addTaskbarRootViewToWindow() {
