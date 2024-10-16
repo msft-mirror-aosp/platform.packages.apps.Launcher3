@@ -18,14 +18,13 @@ package com.android.launcher3.taskbar
 
 import android.util.Log
 import com.android.launcher3.Utilities
+import com.android.launcher3.taskbar.TaskbarControllerTestUtil.asProperty
 import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnMainSync
 import com.android.launcher3.taskbar.rules.TaskbarModeRule
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.PINNED
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.THREE_BUTTONS
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.TRANSIENT
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.TaskbarMode
-import com.android.launcher3.taskbar.rules.TaskbarPinningPreferenceRule
-import com.android.launcher3.taskbar.rules.TaskbarPreferenceRule
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.InjectController
 import com.android.launcher3.taskbar.rules.TaskbarWindowSandboxContext
@@ -47,19 +46,9 @@ class TaskbarEduTooltipControllerTest {
 
     @get:Rule(order = 0) val context = TaskbarWindowSandboxContext.create()
 
-    @get:Rule(order = 1)
-    val tooltipStepPreferenceRule =
-        TaskbarPreferenceRule(context, OnboardingPrefs.TASKBAR_EDU_TOOLTIP_STEP.prefItem)
+    @get:Rule(order = 1) val taskbarModeRule = TaskbarModeRule(context)
 
-    @get:Rule(order = 2)
-    val searchEduPreferenceRule =
-        TaskbarPreferenceRule(context, OnboardingPrefs.TASKBAR_SEARCH_EDU_SEEN)
-
-    @get:Rule(order = 3) val taskbarPinningPreferenceRule = TaskbarPinningPreferenceRule(context)
-
-    @get:Rule(order = 4) val taskbarModeRule = TaskbarModeRule(context)
-
-    @get:Rule(order = 5) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
+    @get:Rule(order = 2) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
 
     @InjectController lateinit var taskbarEduTooltipController: TaskbarEduTooltipController
 
@@ -67,6 +56,9 @@ class TaskbarEduTooltipControllerTest {
         get() = taskbarUnitTestRule.activityContext
 
     private val wasInTestHarness = Utilities.isRunningInTestHarness()
+
+    private var tooltipStep by OnboardingPrefs.TASKBAR_EDU_TOOLTIP_STEP.prefItem.asProperty(context)
+    private var searchEduSeen by OnboardingPrefs.TASKBAR_SEARCH_EDU_SEEN.asProperty(context)
 
     @Before
     fun setUp() {
@@ -85,7 +77,7 @@ class TaskbarEduTooltipControllerTest {
     @Test
     @TaskbarMode(THREE_BUTTONS)
     fun testMaybeShowSwipeEdu_whenTaskbarIsInThreeButtonMode_doesNotShowSwipeEdu() {
-        tooltipStepPreferenceRule.value = TOOLTIP_STEP_SWIPE
+        tooltipStep = TOOLTIP_STEP_SWIPE
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_SWIPE)
         runOnMainSync { taskbarEduTooltipController.maybeShowSwipeEdu() }
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_SWIPE)
@@ -95,7 +87,7 @@ class TaskbarEduTooltipControllerTest {
     @Test
     @TaskbarMode(TRANSIENT)
     fun testMaybeShowSwipeEdu_whenSwipeEduAlreadyShown_doesNotShowSwipeEdu() {
-        tooltipStepPreferenceRule.value = TOOLTIP_STEP_FEATURES
+        tooltipStep = TOOLTIP_STEP_FEATURES
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_FEATURES)
         runOnMainSync { taskbarEduTooltipController.maybeShowSwipeEdu() }
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_FEATURES)
@@ -105,7 +97,7 @@ class TaskbarEduTooltipControllerTest {
     @Test
     @TaskbarMode(TRANSIENT)
     fun testMaybeShowSwipeEdu_whenUserHasNotSeen_doesShowSwipeEdu() {
-        tooltipStepPreferenceRule.value = TOOLTIP_STEP_SWIPE
+        tooltipStep = TOOLTIP_STEP_SWIPE
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_SWIPE)
         runOnMainSync { taskbarEduTooltipController.maybeShowSwipeEdu() }
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_FEATURES)
@@ -115,7 +107,7 @@ class TaskbarEduTooltipControllerTest {
     @Test
     @TaskbarMode(TRANSIENT)
     fun testMaybeShowFeaturesEdu_whenFeatureEduAlreadyShown_doesNotShowFeatureEdu() {
-        tooltipStepPreferenceRule.value = TOOLTIP_STEP_NONE
+        tooltipStep = TOOLTIP_STEP_NONE
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_NONE)
         runOnMainSync { taskbarEduTooltipController.maybeShowFeaturesEdu() }
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_NONE)
@@ -125,7 +117,7 @@ class TaskbarEduTooltipControllerTest {
     @Test
     @TaskbarMode(TRANSIENT)
     fun testMaybeShowFeaturesEdu_whenUserHasNotSeen_doesShowFeatureEdu() {
-        tooltipStepPreferenceRule.value = TOOLTIP_STEP_FEATURES
+        tooltipStep = TOOLTIP_STEP_FEATURES
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_FEATURES)
         runOnMainSync { taskbarEduTooltipController.maybeShowFeaturesEdu() }
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_NONE)
@@ -135,7 +127,7 @@ class TaskbarEduTooltipControllerTest {
     @Test
     @TaskbarMode(THREE_BUTTONS)
     fun testMaybeShowPinningEdu_whenTaskbarIsInThreeButtonMode_doesNotShowPinningEdu() {
-        tooltipStepPreferenceRule.value = TOOLTIP_STEP_PINNING
+        tooltipStep = TOOLTIP_STEP_PINNING
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_PINNING)
         runOnMainSync { taskbarEduTooltipController.maybeShowFeaturesEdu() }
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_PINNING)
@@ -146,7 +138,7 @@ class TaskbarEduTooltipControllerTest {
     @TaskbarMode(TRANSIENT)
     fun testMaybeShowPinningEdu_whenUserHasNotSeen_doesShowPinningEdu() {
         // Test standalone pinning edu, where user has seen taskbar edu before, but not pinning edu.
-        tooltipStepPreferenceRule.value = TOOLTIP_STEP_PINNING
+        tooltipStep = TOOLTIP_STEP_PINNING
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_PINNING)
         runOnMainSync { taskbarEduTooltipController.maybeShowFeaturesEdu() }
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_NONE)
@@ -156,21 +148,21 @@ class TaskbarEduTooltipControllerTest {
     @Test
     @TaskbarMode(TRANSIENT)
     fun testIsBeforeTooltipFeaturesStep_whenUserHasNotSeenFeatureEdu_shouldReturnTrue() {
-        tooltipStepPreferenceRule.value = TOOLTIP_STEP_SWIPE
+        tooltipStep = TOOLTIP_STEP_SWIPE
         assertThat(taskbarEduTooltipController.isBeforeTooltipFeaturesStep).isTrue()
     }
 
     @Test
     @TaskbarMode(TRANSIENT)
     fun testIsBeforeTooltipFeaturesStep_whenUserHasSeenFeatureEdu_shouldReturnFalse() {
-        tooltipStepPreferenceRule.value = TOOLTIP_STEP_NONE
+        tooltipStep = TOOLTIP_STEP_NONE
         assertThat(taskbarEduTooltipController.isBeforeTooltipFeaturesStep).isFalse()
     }
 
     @Test
     @TaskbarMode(TRANSIENT)
     fun testHide_whenTooltipIsOpen_shouldCloseTooltip() {
-        tooltipStepPreferenceRule.value = TOOLTIP_STEP_SWIPE
+        tooltipStep = TOOLTIP_STEP_SWIPE
         assertThat(taskbarEduTooltipController.tooltipStep).isEqualTo(TOOLTIP_STEP_SWIPE)
         assertThat(taskbarEduTooltipController.isTooltipOpen).isFalse()
         runOnMainSync { taskbarEduTooltipController.maybeShowSwipeEdu() }
@@ -190,7 +182,7 @@ class TaskbarEduTooltipControllerTest {
     @Test
     @TaskbarMode(PINNED)
     fun testMaybeShowSearchEdu_whenTaskbarIsPinnedAndUserHasSeenSearchEdu_shouldNotShowSearchEdu() {
-        searchEduPreferenceRule.value = true
+        searchEduSeen = true
         assertThat(taskbarEduTooltipController.userHasSeenSearchEdu).isTrue()
         runOnMainSync { taskbarEduTooltipController.hide() }
         assertThat(taskbarEduTooltipController.isTooltipOpen).isFalse()
