@@ -168,6 +168,13 @@ public class ContextualSearchStateManager implements ResourceBasedOverride, Safe
         return 0;
     }
 
+    /**
+     * Get the User group based on the behavior to trigger Assistant.
+     */
+    public Optional<Integer> getLPUserGroup() {
+        return Optional.empty();
+    }
+
     /** Get the haptic bit overridden by AGSA. */
     public Optional<Boolean> getShouldPlayHapticOverride() {
         return Optional.empty();
