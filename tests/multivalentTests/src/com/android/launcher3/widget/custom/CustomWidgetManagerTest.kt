@@ -23,6 +23,7 @@ import android.platform.test.flag.junit.SetFlagsRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
+import com.android.launcher3.util.DaggerSingletonTracker
 import com.android.launcher3.util.LauncherModelHelper.SandboxModelContext
 import com.android.launcher3.util.PluginManagerWrapper
 import com.android.launcher3.util.WidgetUtils
@@ -57,12 +58,13 @@ class CustomWidgetManagerTest {
 
     @Mock private lateinit var pluginManager: PluginManagerWrapper
     @Mock private lateinit var mockAppWidgetManager: AppWidgetManager
+    @Mock private lateinit var tracker: DaggerSingletonTracker
 
     @Before
     fun setUp() {
         MockitoAnnotations.initMocks(this)
         context.putObject(PluginManagerWrapper.INSTANCE, pluginManager)
-        underTest = CustomWidgetManager(context, mockAppWidgetManager)
+        underTest = CustomWidgetManager(context, mockAppWidgetManager, tracker)
     }
 
     @After
