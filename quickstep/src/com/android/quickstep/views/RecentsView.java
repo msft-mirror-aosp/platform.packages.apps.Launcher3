@@ -3807,7 +3807,7 @@ public abstract class RecentsView<
                 }
             } else if (!showAsGrid || (enableLargeDesktopWindowingTile()
                     && dismissedTaskView.isLargeTile()
-                    && nextFocusedTaskView == null)) {
+                    && nextFocusedTaskView == null && !dismissingForSplitSelection)) {
                 int offset = getOffsetToDismissedTask(scrollDiffPerPage, dismissedIndex, taskCount);
                 int scrollDiff = newScroll[i] - oldScroll[i] + offset;
                 if (scrollDiff != 0) {
