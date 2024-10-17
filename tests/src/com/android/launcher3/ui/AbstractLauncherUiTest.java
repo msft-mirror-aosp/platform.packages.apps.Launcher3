@@ -414,6 +414,7 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
     public void verifyLauncherState() {
         try {
             // Limits UI tests affecting tests running after them.
+            mDevice.pressHome();
             mLauncher.waitForLauncherInitialized();
             if (mLauncherPid != 0) {
                 assertEquals("Launcher crashed, pid mismatch:",
