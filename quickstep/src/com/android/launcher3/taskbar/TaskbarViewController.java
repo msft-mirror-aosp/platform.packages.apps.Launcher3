@@ -837,12 +837,11 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
 
         int firstRecentTaskIndex = -1;
         int hotseatNavBarTranslationX = 0;
-        if (mCurrentBubbleBarLocation != null
-                && taskbarDp.shouldAdjustHotseatOnBubblesLocationUpdate(mActivity)) {
-            boolean isRtl = mTaskbarView.isLayoutRtl();
-            boolean isBubblesOnLeft = mCurrentBubbleBarLocation.isOnLeft(isRtl);
+        if (mCurrentBubbleBarLocation != null) {
+            boolean isBubblesOnLeft = mCurrentBubbleBarLocation
+                    .isOnLeft(mTaskbarView.isLayoutRtl());
             hotseatNavBarTranslationX = taskbarDp
-                    .getHotseatTranslationXForBubbleBar(isBubblesOnLeft, isRtl);
+                    .getHotseatTranslationXForNavBar(mActivity, isBubblesOnLeft);
         }
         for (int i = 0; i < mTaskbarView.getChildCount(); i++) {
             View child = mTaskbarView.getChildAt(i);
