@@ -5575,15 +5575,13 @@ public abstract class RecentsView<
                 remoteTargetHandle -> remoteTargetHandle.getTaskViewSimulator()
                         .addOverviewToAppAnim(mPendingAnimation, interpolator));
         mPendingAnimation.addOnFrameCallback(this::redrawLiveTile);
-        if (taskView instanceof DesktopTaskView && mRemoteTargetHandles != null) {
-            mPendingAnimation.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    runActionOnRemoteHandles(remoteTargetHandle ->
-                            remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(false));
-                }
-            });
-        }
+        mPendingAnimation.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                runActionOnRemoteHandles(remoteTargetHandle ->
+                        remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(false));
+            }
+        });
         mPendingAnimation.addEndListener(isSuccess -> {
             if (isSuccess) {
                 if (taskView instanceof GroupedTaskView && hasAllValidTaskIds(taskView.getTaskIds())
@@ -5615,6 +5613,13 @@ public abstract class RecentsView<
     protected Unit onTaskLaunchAnimationEnd(boolean success) {
         if (success) {
             resetTaskVisuals();
+        } else {
+            // If launch animation didn't complete i.e. user dragged live tile down and then
+            // back up and returned to Overview, then we need to ensure we reset the
+            // view to draw below recents so that it can't be interacted with.
+            runActionOnRemoteHandles(remoteTargetHandle ->
+                    remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(true));
+            redrawLiveTile();
         }
         return Unit.INSTANCE;
     }
