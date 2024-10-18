@@ -18,6 +18,10 @@ package com.android.launcher3.taskbar.bubbles;
 import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 
+import static com.android.launcher3.Utilities.mapRange;
+import static com.android.launcher3.taskbar.TaskbarPinningController.PINNING_PERSISTENT;
+import static com.android.launcher3.taskbar.TaskbarPinningController.PINNING_TRANSIENT;
+
 import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.content.res.Resources;
@@ -41,11 +45,13 @@ import com.android.launcher3.anim.RoundedRectRevealOutlineProvider;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
 import com.android.launcher3.taskbar.TaskbarControllers;
 import com.android.launcher3.taskbar.TaskbarInsetsController;
+import com.android.launcher3.taskbar.TaskbarSharedState;
 import com.android.launcher3.taskbar.TaskbarStashController;
 import com.android.launcher3.taskbar.bubbles.animation.BubbleBarViewAnimator;
 import com.android.launcher3.taskbar.bubbles.flyout.BubbleBarFlyoutController;
 import com.android.launcher3.taskbar.bubbles.flyout.BubbleBarFlyoutPositioner;
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.SystemUiProxy;
@@ -101,6 +107,9 @@ public class BubbleBarViewController {
             this::updateTranslationY);
     private final AnimatedFloat mBubbleOffsetY = new AnimatedFloat(
             this::updateBubbleOffsetY);
+    private final AnimatedFloat mBubbleBarTranslationYForPinning = new AnimatedFloat(
+            this::updateTranslationY);
+
 
     // Modified when swipe up is happening on the bubble bar or task bar.
     private float mBubbleBarSwipeUpTranslationY;
@@ -120,8 +129,9 @@ public class BubbleBarViewController {
     private BubbleBarViewAnimator mBubbleBarViewAnimator;
     private final FrameLayout mBubbleBarContainer;
     private BubbleBarFlyoutController mBubbleBarFlyoutController;
-
+    private TaskbarSharedState mTaskbarSharedState;
     private final TimeSource mTimeSource = System::currentTimeMillis;
+    private final int mTaskbarTranslationDelta;
 
     @Nullable
     private BubbleBarBoundsChangeListener mBoundsChangeListener;
@@ -135,11 +145,13 @@ public class BubbleBarViewController {
         mBubbleBarAlpha = new MultiValueAlpha(mBarView, 1 /* num alpha channels */);
         mIconSize = activity.getResources().getDimensionPixelSize(
                 R.dimen.bubblebar_icon_size);
+        mTaskbarTranslationDelta = getBubbleBarTranslationDeltaForTaskbar(activity);
     }
 
     /** Initializes controller. */
     public void init(TaskbarControllers controllers, BubbleControllers bubbleControllers,
             TaskbarViewPropertiesProvider taskbarViewPropertiesProvider) {
+        mTaskbarSharedState = controllers.getSharedState();
         mBubbleStashController = bubbleControllers.bubbleStashController;
         mBubbleBarController = bubbleControllers.bubbleBarController;
         mBubbleDragController = bubbleControllers.bubbleDragController;
@@ -167,6 +179,10 @@ public class BubbleBarViewController {
                         mBoundsChangeListener.onBoundsChanged();
                     }
                 });
+        float pinningValue = DisplayController.isTransientTaskbar(mActivity)
+                ? PINNING_TRANSIENT
+                : PINNING_PERSISTENT;
+        mBubbleBarTranslationYForPinning.updateValue(pinningValue);
         mBarView.setController(new BubbleBarView.Controller() {
             @Override
             public float getBubbleBarTranslationY() {
@@ -218,6 +234,11 @@ public class BubbleBarViewController {
                 mBubbleBarController.updateBubbleBarLocation(location);
             }
         };
+    }
+
+    /** Returns animated float property for controlling pining Y position. */
+    public AnimatedFloat getBubbleBarTranslationYForPinning() {
+        return mBubbleBarTranslationYForPinning;
     }
 
     private BubbleBarFlyoutPositioner createFlyoutPositioner() {
@@ -646,7 +667,35 @@ public class BubbleBarViewController {
 
     private void updateTranslationY() {
         mBarView.setTranslationY(mBubbleBarTranslationY.value + mBubbleBarSwipeUpTranslationY
-                + mBubbleBarStashTranslationY);
+                + mBubbleBarStashTranslationY + getBubbleBarTranslationYForTaskbarPinning());
+    }
+
+    /** Computes translation y for taskbar pinning. */
+    private float getBubbleBarTranslationYForTaskbarPinning() {
+        if (mTaskbarSharedState == null) return 0f;
+        float animationProgress = mBubbleBarTranslationYForPinning.value;
+        if (mTaskbarSharedState.startTaskbarVariantIsTransient) {
+            return mapRange(animationProgress, /* min = */ 0f, mTaskbarTranslationDelta);
+        } else {
+            return mapRange(animationProgress, -mTaskbarTranslationDelta, /* max = */ 0f);
+        }
+    }
+
+    /**
+     * Calculates the vertical difference in the bubble bar positions for pinned and transient
+     * taskbar modes.
+     */
+    private int getBubbleBarTranslationDeltaForTaskbar(TaskbarActivityContext activity) {
+        Resources res = activity.getResources();
+        int persistentBubbleSize = res
+                .getDimensionPixelSize(R.dimen.bubblebar_icon_size_persistent_taskbar);
+        int persistentSpacingSize = res
+                .getDimensionPixelSize(R.dimen.bubblebar_icon_spacing_persistent_taskbar);
+        int persistentBubbleBarSize = persistentBubbleSize + persistentSpacingSize * 2;
+        int persistentTaskbarHeight = activity.getPersistentTaskbarDeviceProfile().taskbarHeight;
+        int persistentBubbleBarY = (persistentTaskbarHeight - persistentBubbleBarSize) / 2;
+        int transientBubbleBarY = activity.getTransientTaskbarDeviceProfile().taskbarBottomMargin;
+        return transientBubbleBarY - persistentBubbleBarY;
     }
 
     private void updateScaleX(float scale) {
