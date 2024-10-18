@@ -471,3 +471,10 @@ flag {
     description: "Shows filtered set of widgets by default and an option to show all widgets in the widget picker"
     bug: "356127021"
 }
+
+flag {
+    name: "show_taskbar_pinning_popup_from_anywhere"
+    namespace: "launcher"
+    description: "Shows the pinning popup view after long-pressing or right-clicking anywhere on the pinned taskbar"
+    bug: "297325541"
+}

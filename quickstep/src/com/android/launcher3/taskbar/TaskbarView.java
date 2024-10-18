@@ -316,7 +316,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (mAllAppsButtonContainer != null) {
             mAllAppsButtonContainer.setUpCallbacks(callbacks);
         }
-        if (mTaskbarDividerContainer != null && callbacks.supportsDividerLongPress()) {
+        if (mTaskbarDividerContainer != null
+                && mActivityContext.getTaskbarFeatureEvaluator().getSupportsPinningPopup()) {
             mTaskbarDividerContainer.setUpCallbacks(callbacks);
         }
         if (mTaskbarOverflowView != null) {
@@ -324,6 +325,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                     mControllerCallbacks.getOverflowOnClickListener());
             mTaskbarOverflowView.setOnLongClickListener(
                     mControllerCallbacks.getOverflowOnLongClickListener());
+        }
+        if (Flags.showTaskbarPinningPopupFromAnywhere()
+                && mActivityContext.getTaskbarFeatureEvaluator().getSupportsPinningPopup()) {
+            setOnTouchListener(mControllerCallbacks.getTaskbarTouchListener());
         }
     }
 
