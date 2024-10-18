@@ -606,6 +606,9 @@ public class TouchInteractionService extends Service {
             this::createFallbackSwipeHandler;
     private final AbsSwipeUpHandler.Factory mRecentsWindowSwipeHandlerFactory =
             this::createRecentsWindowSwipeHandler;
+    // This needs to be a member to be queued and potentially removed later if the service is
+    // destroyed before the user is unlocked
+    private final Runnable mUserUnlockedRunnable = this::onUserUnlocked;
 
     private final ScreenOnTracker.ScreenOnListener mScreenOnListener = this::onScreenOnChanged;
 
@@ -677,8 +680,7 @@ public class TouchInteractionService extends Service {
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
 
         // Call runOnUserUnlocked() before any other callbacks to ensure everything is initialized.
-        LockedUserState.get(this).runOnUserUnlocked(this::onUserUnlocked);
-        LockedUserState.get(this).runOnUserUnlocked(mTaskbarManager::onUserUnlocked);
+        LockedUserState.get(this).runOnUserUnlocked(mUserUnlockedRunnable);
         mDeviceState.addNavigationModeChangedCallback(this::onNavigationModeChanged);
         sConnected = true;
 
@@ -745,6 +747,8 @@ public class TouchInteractionService extends Service {
 
         mOverviewComponentObserver.setOverviewChangeListener(this::onOverviewTargetChange);
         onOverviewTargetChange(mOverviewComponentObserver.isHomeAndOverviewSame());
+
+        mTaskbarManager.onUserUnlocked();
     }
 
     public OverviewCommandHelper getOverviewCommandHelper() {
@@ -835,6 +839,7 @@ public class TouchInteractionService extends Service {
         mDesktopVisibilityController.onDestroy();
         sConnected = false;
 
+        LockedUserState.get(this).removeOnUserUnlockedRunnable(mUserUnlockedRunnable);
         ScreenOnTracker.INSTANCE.get(this).removeListener(mScreenOnListener);
         super.onDestroy();
     }
