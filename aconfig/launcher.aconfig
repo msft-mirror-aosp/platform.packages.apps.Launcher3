@@ -478,3 +478,10 @@ flag {
     description: "Shows the pinning popup view after long-pressing or right-clicking anywhere on the pinned taskbar"
     bug: "297325541"
 }
+
+flag {
+    name: "enable_launcher_overview_in_window"
+    namespace: "launcher"
+    description: "Enables launcher recents opening inside of a window instead of being hosted in launcher activity."
+    bug: "292269949"
+}
