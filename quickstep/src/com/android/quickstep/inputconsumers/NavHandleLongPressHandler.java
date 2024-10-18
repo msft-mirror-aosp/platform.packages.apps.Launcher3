@@ -30,7 +30,6 @@ import android.view.ViewConfiguration;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.LauncherApplication;
 import com.android.launcher3.R;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
@@ -62,8 +61,7 @@ public class NavHandleLongPressHandler implements ResourceBasedOverride {
         mContext = context;
         mStatsLogManager = StatsLogManager.newInstance(context);
         mVibratorWrapper = VibratorWrapper.INSTANCE.get(mContext);
-        mContextualSearchHapticManager = ((LauncherApplication) context.getApplicationContext())
-                .getAppComponent().getContextualSearchHapticManager();
+        mContextualSearchHapticManager = ContextualSearchHapticManager.INSTANCE.get(context);
         mContextualSearchInvoker = ContextualSearchInvoker.newInstance(mContext);
     }
 
