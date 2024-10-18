@@ -1426,10 +1426,10 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     /**
      * If task with the given id is on the desktop, bring it to front
      */
-    public void showDesktopApp(int taskId) {
+    public void showDesktopApp(int taskId, @Nullable RemoteTransition transition) {
         if (mDesktopMode != null) {
             try {
-                mDesktopMode.showDesktopApp(taskId);
+                mDesktopMode.showDesktopApp(taskId, transition);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call showDesktopApp", e);
             }
@@ -1535,7 +1535,7 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
      * Starts the recents activity. The caller should manage the thread on which this is called.
      */
     public boolean startRecentsActivity(Intent intent, ActivityOptions options,
-            RecentsAnimationListener listener) {
+            RecentsAnimationListener listener, boolean useSyntheticRecentsTransition) {
         if (mRecentTasks == null) {
             ActiveGestureProtoLogProxy.logRecentTasksMissing();
             return false;
@@ -1566,6 +1566,9 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
             }
         };
         final Bundle optsBundle = options.toBundle();
+        if (useSyntheticRecentsTransition) {
+            optsBundle.putBoolean("is_synthetic_recents_transition", true);
+        }
         try {
             mRecentTasks.startRecentsTransition(mRecentsPendingIntent, intent, optsBundle,
                     mContext.getIApplicationThread(), runner);
