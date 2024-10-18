@@ -2355,18 +2355,23 @@ public class DeviceProfile {
     /**
      * Returns whether Taskbar and Hotseat should adjust horizontally on bubble bar location update.
      */
-    public boolean shouldAdjustHotseatOnBubblesLocationUpdate(Context context) {
+    public boolean shouldAdjustHotseatOnNavBarLocationUpdate(Context context) {
         return enableBubbleBar()
                 && enableBubbleBarInPersistentTaskBar()
                 && !DisplayController.getNavigationMode(context).hasGestures;
     }
 
     /** Returns hotseat translation X for the bubble bar position. */
-    public int getHotseatTranslationXForBubbleBar(boolean isNavbarOnRight, boolean isRtl) {
-        if (isNavbarOnRight) {
-            return isRtl ? -navButtonsLayoutWidthPx : 0;
+    public int getHotseatTranslationXForNavBar(Context context, boolean isBubblesOnLeft) {
+        if (shouldAdjustHotseatOnNavBarLocationUpdate(context)) {
+            boolean isRtl = Utilities.isRtl(context.getResources());
+            if (isBubblesOnLeft) {
+                return isRtl ? -navButtonsLayoutWidthPx : 0;
+            } else {
+                return isRtl ? 0 : navButtonsLayoutWidthPx;
+            }
         } else {
-            return isRtl ? 0 : navButtonsLayoutWidthPx;
+            return 0;
         }
     }
 
