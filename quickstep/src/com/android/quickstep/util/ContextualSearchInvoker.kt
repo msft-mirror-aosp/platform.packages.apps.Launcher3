@@ -22,7 +22,6 @@ import android.app.contextualsearch.ContextualSearchManager.FEATURE_CONTEXTUAL_S
 import android.content.Context
 import android.util.Log
 import com.android.internal.app.AssistUtils
-import com.android.launcher3.LauncherApplication
 import com.android.launcher3.R
 import com.android.launcher3.logging.StatsLogManager
 import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_LAUNCH_ASSISTANT_FAILED_SERVICE_ERROR
@@ -57,9 +56,7 @@ internal constructor(
         TopTaskTracker.INSTANCE[context],
         SystemUiProxy.INSTANCE[context],
         StatsLogManager.newInstance(context),
-        (context.applicationContext as LauncherApplication)
-            .appComponent
-            .contextualSearchHapticManager,
+        ContextualSearchHapticManager.INSTANCE[context],
         context.getSystemService(ContextualSearchManager::class.java),
     )
 

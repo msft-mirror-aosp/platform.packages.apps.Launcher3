@@ -1704,7 +1704,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 duration);
 
         View allAppsButton = mControllers.taskbarViewController.getAllAppsButtonView();
-        if (allAppsButton != null && !FeatureFlags.enableAllAppsButtonInHotseat()) {
+        if (!FeatureFlags.enableAllAppsButtonInHotseat()) {
             ValueAnimator alphaOverride = ValueAnimator.ofFloat(0, 1);
             alphaOverride.setDuration(duration);
             alphaOverride.addUpdateListener(a -> {
