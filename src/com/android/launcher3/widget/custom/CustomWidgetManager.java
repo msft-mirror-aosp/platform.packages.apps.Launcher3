@@ -41,7 +41,6 @@ import com.android.launcher3.util.DaggerSingletonTracker;
 import com.android.launcher3.util.ExecutorUtil;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.PluginManagerWrapper;
-import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.systemui.plugins.CustomWidgetPlugin;
@@ -61,7 +60,7 @@ import javax.inject.Inject;
  * CustomWidgetManager handles custom widgets implemented as a plugin.
  */
 @LauncherAppSingleton
-public class CustomWidgetManager implements PluginListener<CustomWidgetPlugin>, SafeCloseable {
+public class CustomWidgetManager implements PluginListener<CustomWidgetPlugin> {
 
     public static final DaggerSingletonObject<CustomWidgetManager> INSTANCE =
             new DaggerSingletonObject<>(LauncherBaseAppComponent::getCustomWidgetManager);
@@ -75,12 +74,14 @@ public class CustomWidgetManager implements PluginListener<CustomWidgetPlugin>, 
     private final @NonNull AppWidgetManager mAppWidgetManager;
 
     @Inject
-    CustomWidgetManager(@ApplicationContext Context context, DaggerSingletonTracker tracker) {
-        this(context, AppWidgetManager.getInstance(context), tracker);
+    CustomWidgetManager(@ApplicationContext Context context, PluginManagerWrapper pluginManager,
+            DaggerSingletonTracker tracker) {
+        this(context, pluginManager, AppWidgetManager.getInstance(context), tracker);
     }
 
     @VisibleForTesting
     CustomWidgetManager(@ApplicationContext Context context,
+            PluginManagerWrapper pluginManager,
             @NonNull AppWidgetManager widgetManager,
             DaggerSingletonTracker tracker) {
         mContext = context;
@@ -88,11 +89,9 @@ public class CustomWidgetManager implements PluginListener<CustomWidgetPlugin>, 
         mPlugins = new HashMap<>();
         mCustomWidgets = new ArrayList<>();
 
+        pluginManager.addPluginListener(this, CustomWidgetPlugin.class, true);
 
         ExecutorUtil.executeSyncOnMainOrFail(() -> {
-            PluginManagerWrapper.INSTANCE.get(context)
-                    .addPluginListener(this, CustomWidgetPlugin.class, true);
-
             if (enableSmartspaceAsAWidget()) {
                 for (String s: context.getResources()
                         .getStringArray(R.array.custom_widget_providers)) {
@@ -110,13 +109,8 @@ public class CustomWidgetManager implements PluginListener<CustomWidgetPlugin>, 
                 }
             }
 
-            tracker.addCloseable(this);
+            tracker.addCloseable(() -> pluginManager.removePluginListener(this));
         });
-    }
-
-    @Override
-    public void close() {
-        PluginManagerWrapper.INSTANCE.get(mContext).removePluginListener(this);
     }
 
     @Override

@@ -21,17 +21,15 @@ import android.os.VibrationEffect
 import android.os.VibrationEffect.Composition
 import android.os.Vibrator
 import com.android.launcher3.dagger.ApplicationContext
-import com.android.launcher3.dagger.LauncherAppSingleton
+import com.android.launcher3.util.MainThreadInitializedObject
+import com.android.launcher3.util.SafeCloseable
 import com.android.launcher3.util.VibratorWrapper
 import com.android.quickstep.DeviceConfigWrapper.Companion.get
-import javax.inject.Inject
 import kotlin.math.pow
 
 /** Manages haptics relating to Contextual Search invocations. */
-@LauncherAppSingleton
 class ContextualSearchHapticManager
-@Inject
-internal constructor(@ApplicationContext private val context: Context) {
+internal constructor(@ApplicationContext private val context: Context) : SafeCloseable {
 
     private var searchEffect = createSearchEffect()
     private var contextualSearchStateManager = ContextualSearchStateManager.INSTANCE[context]
@@ -97,5 +95,11 @@ internal constructor(@ApplicationContext private val context: Context) {
             }
             VibratorWrapper.INSTANCE[context].vibrate(composition.compose())
         }
+    }
+
+    override fun close() {}
+
+    companion object {
+        @JvmField val INSTANCE = MainThreadInitializedObject { ContextualSearchHapticManager(it) }
     }
 }
