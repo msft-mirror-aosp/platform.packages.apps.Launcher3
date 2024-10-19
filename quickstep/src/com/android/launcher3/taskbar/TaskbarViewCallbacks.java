@@ -19,15 +19,19 @@ package com.android.launcher3.taskbar;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_LONG_PRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
+import android.view.GestureDetector;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.internal.jank.Cuj;
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController;
+import com.android.launcher3.util.DisplayController;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.wm.shell.Flags;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
@@ -40,12 +44,14 @@ public class TaskbarViewCallbacks {
     private final TaskbarActivityContext mActivity;
     private final TaskbarControllers mControllers;
     private final TaskbarView mTaskbarView;
+    private final GestureDetector mGestureDetector;
 
     public TaskbarViewCallbacks(TaskbarActivityContext activity, TaskbarControllers controllers,
             TaskbarView taskbarView) {
         mActivity = activity;
         mControllers = controllers;
         mTaskbarView = taskbarView;
+        mGestureDetector = new GestureDetector(activity, new TaskbarViewGestureListener());
     }
 
     public View.OnClickListener getIconOnClickListener() {
@@ -70,23 +76,23 @@ public class TaskbarViewCallbacks {
         return false;
     }
 
-    public View.OnLongClickListener getTaskbarDividerLongClickListener() {
-        return v -> {
-            mControllers.taskbarPinningController.showPinningView(v);
-            return true;
-        };
+    @SuppressLint("ClickableViewAccessibility")
+    public View.OnTouchListener getTaskbarTouchListener() {
+        return (view, event) -> mGestureDetector.onTouchEvent(event);
     }
 
-    /** Check to see if we support long press on taskbar divider */
-    public boolean supportsDividerLongPress() {
-        return !mActivity.isThreeButtonNav();
+    public View.OnLongClickListener getTaskbarDividerLongClickListener() {
+        return v -> {
+            mControllers.taskbarPinningController.showPinningView(v, getDividerCenterX());
+            return true;
+        };
     }
 
     public View.OnTouchListener getTaskbarDividerRightClickListener() {
         return (v, event) -> {
             if (event.isFromSource(InputDevice.SOURCE_MOUSE)
                     && event.getButtonState() == MotionEvent.BUTTON_SECONDARY) {
-                mControllers.taskbarPinningController.showPinningView(v);
+                mControllers.taskbarPinningController.showPinningView(v, getDividerCenterX());
                 return true;
             }
             return false;
@@ -158,5 +164,33 @@ public class TaskbarViewCallbacks {
                 return true;
             }
         };
+    }
+
+    private float getDividerCenterX() {
+        View divider = mTaskbarView.getTaskbarDividerViewContainer();
+        if (divider == null) {
+            return 0.0f;
+        }
+        return divider.getX() + (float) divider.getWidth() / 2;
+    }
+
+    private class TaskbarViewGestureListener extends GestureDetector.SimpleOnGestureListener {
+        @Override
+        public boolean onDown(@NonNull MotionEvent event) {
+            return true;
+        }
+
+        @Override
+        public boolean onSingleTapUp(@NonNull MotionEvent event) {
+            return true;
+        }
+
+        @Override
+        public void onLongPress(MotionEvent event) {
+            if (DisplayController.isPinnedTaskbar(mActivity)) {
+                mControllers.taskbarPinningController.showPinningView(mTaskbarView,
+                        event.getRawX());
+            }
+        }
     }
 }
