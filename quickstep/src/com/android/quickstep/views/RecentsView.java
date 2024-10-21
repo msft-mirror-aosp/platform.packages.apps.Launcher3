@@ -5045,7 +5045,8 @@ public abstract class RecentsView<
         mSplitHiddenTaskView = getTaskViewByTaskId(splitSelectSource.alreadyRunningTaskId);
         mSplitHiddenTaskViewIndex = indexOfChild(mSplitHiddenTaskView);
         mSplitSelectStateController
-                .setAnimateCurrentTaskDismissal(splitSelectSource.animateCurrentTaskDismissal);
+                .setAnimateCurrentTaskDismissal(splitSelectSource.animateCurrentTaskDismissal
+                        && mSplitHiddenTaskView != null);
 
         // Prevent dismissing whole task if we're only initiating from one of 2 tasks in split pair
         mSplitSelectStateController.setDismissingFromSplitPair(mSplitHiddenTaskView != null
