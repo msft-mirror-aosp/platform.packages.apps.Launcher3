@@ -187,7 +187,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     @ViewDebug.ExportedProperty(category = "launcher")
     private DotInfo mDotInfo;
     private DotRenderer mDotRenderer;
-    private Locale mCurrentLocale;
+    private String mCurrentLanguage;
     @ViewDebug.ExportedProperty(category = "launcher", deepExport = true)
     protected DotRenderer.DrawParams mDotParams;
     private Animator mDotScaleAnim;
@@ -298,7 +298,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
         mDotParams = new DotRenderer.DrawParams();
 
-        mCurrentLocale = context.getResources().getConfiguration().locale;
+        mCurrentLanguage = context.getResources().getConfiguration().locale.getLanguage();
         setEllipsize(TruncateAt.END);
         setAccessibilityDelegate(mActivity.getAccessibilityDelegate());
         setTextAlpha(1f);
@@ -494,7 +494,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     protected boolean isCurrentLanguageEnglish() {
-        return mCurrentLocale.equals(Locale.US);
+        return mCurrentLanguage.equals(Locale.ENGLISH.getLanguage());
     }
 
     @UiThread
