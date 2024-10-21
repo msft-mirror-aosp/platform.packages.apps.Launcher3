@@ -5430,7 +5430,6 @@ public abstract class RecentsView<
 
         int taskIndex = indexOfChild(taskView);
         int centerTaskIndex = getCurrentPage();
-        boolean isRunningTask = taskView.isRunningTask();
 
         float toScale = getMaxScaleForFullScreen();
         boolean showAsGrid = showAsGrid();
@@ -5450,7 +5449,9 @@ public abstract class RecentsView<
                     setPivotX(mTempPointF.x);
                     setPivotY(mTempPointF.y);
 
-                    if (!isRunningTask) {
+                    // If live tile is not launching, apply pivot to live tile as well and bring it
+                    // above RecentsView to avoid wallpaper blur from being applied to it.
+                    if (!taskView.isRunningTask()) {
                         runActionOnRemoteHandles(
                                 remoteTargetHandle -> {
                                     remoteTargetHandle.getTaskViewSimulator().setPivotOverride(
