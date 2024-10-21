@@ -3939,11 +3939,9 @@ public abstract class RecentsView<
                     if (shouldRemoveTask) {
                         if (dismissedTaskView.isRunningTask()) {
                             finishRecentsAnimation(true /* toRecents */, false /* shouldPip */,
-                                    () -> removeTaskInternal(dismissedTaskViewId,
-                                            dismissedTaskView instanceof DesktopTaskView));
+                                    () -> removeTaskInternal(dismissedTaskView));
                         } else {
-                            removeTaskInternal(dismissedTaskViewId,
-                                    dismissedTaskView instanceof DesktopTaskView);
+                            removeTaskInternal(dismissedTaskView);
                         }
                         announceForAccessibility(
                                 getResources().getString(R.string.task_view_closed));
@@ -4311,22 +4309,24 @@ public abstract class RecentsView<
         return lastVisibleIndex;
     }
 
-    private void removeTaskInternal(int dismissedTaskViewId, boolean isDesktop) {
-        int[] taskIds = getTaskIdsForTaskViewId(dismissedTaskViewId);
-        UI_HELPER_EXECUTOR.getHandler().post(() -> {
-            if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_BACK_NAVIGATION.isTrue() && isDesktop) {
-                // TODO: b/372005228 - Use the api with desktop id instead.
-                SystemUiProxy.INSTANCE.get(getContext()).removeDesktop(
-                        mContainer.getDisplay().getDisplayId());
-            } else {
-                for (int taskId : taskIds) {
-                    if (taskId != -1) {
-                        ActivityManagerWrapper.getInstance().removeTask(taskId);
-                    }
+  private void removeTaskInternal(@NonNull TaskView dismissedTaskView) {
+    UI_HELPER_EXECUTOR
+        .getHandler()
+        .post(
+            () -> {
+              if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_BACK_NAVIGATION.isTrue()
+                  && dismissedTaskView instanceof DesktopTaskView) {
+                // TODO: b/362720497 - Use the api with desktop id instead.
+                SystemUiProxy.INSTANCE
+                    .get(getContext())
+                    .removeDesktop(mContainer.getDisplay().getDisplayId());
+              } else {
+                for (int taskId : dismissedTaskView.getTaskIds()) {
+                    ActivityManagerWrapper.getInstance().removeTask(taskId);
                 }
-            }
-        });
-    }
+              }
+            });
+  }
 
     protected void onDismissAnimationEnds() {
         AccessibilityManagerCompat.sendTestProtocolEventToTest(getContext(),
