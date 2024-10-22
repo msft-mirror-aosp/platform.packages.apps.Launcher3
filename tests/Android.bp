@@ -148,6 +148,7 @@ android_test {
     platform_apis: true,
     test_config: "Launcher3Tests.xml",
     data: [":Launcher3"],
+    plugins: ["dagger2-compiler"],
     test_suites: ["general-tests"],
 }
 
@@ -237,6 +238,7 @@ android_robolectric_test {
         "truth",
     ],
     instrumentation_for: "Launcher3",
+    plugins: ["dagger2-compiler"],
     upstream: true,
     strict_mode: false,
 }
