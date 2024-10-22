@@ -123,10 +123,7 @@ class TaskbarPinningController(private val context: TaskbarActivityContext) :
         controllers.bubbleControllers.getOrNull()?.bubbleBarViewController?.let {
             // if bubble bar is not visible no need to add it`s animations
             if (!it.isBubbleBarVisible) return@let
-            // TODO(b/345698412): add scale animation
-            animatorSet.playTogether(
-                it.bubbleBarTranslationYForPinning.animateToValue(animateToValue)
-            )
+            animatorSet.playTogether(it.bubbleBarPinning.animateToValue(animateToValue))
         }
         animatorSet.interpolator = Interpolators.EMPHASIZED
         return animatorSet
