@@ -67,6 +67,7 @@ public class KeyboardQuickSwitchViewController {
 
     private boolean mOnDesktop;
     private boolean mWasDesktopTaskFilteredOut;
+    private boolean mWasOpenedFromTaskbar;
 
     protected KeyboardQuickSwitchViewController(
             @NonNull TaskbarControllers controllers,
@@ -83,6 +84,10 @@ public class KeyboardQuickSwitchViewController {
         return mCurrentFocusIndex;
     }
 
+    protected boolean wasOpenedFromTaskbar() {
+        return mWasOpenedFromTaskbar;
+    }
+
     protected void openQuickSwitchView(
             @NonNull List<GroupTask> tasks,
             int numHiddenTasks,
@@ -96,6 +101,7 @@ public class KeyboardQuickSwitchViewController {
         mOverlayContext.getDragLayer().addView(mKeyboardQuickSwitchView);
         mOnDesktop = onDesktop;
         mWasDesktopTaskFilteredOut = wasDesktopTaskFilteredOut;
+        mWasOpenedFromTaskbar = wasOpenedFromTaskbar;
 
         mKeyboardQuickSwitchView.applyLoadPlan(
                 mOverlayContext,
@@ -246,6 +252,7 @@ public class KeyboardQuickSwitchViewController {
         pw.println(prefix + "\tmCurrentFocusIndex=" + mCurrentFocusIndex);
         pw.println(prefix + "\tmOnDesktop=" + mOnDesktop);
         pw.println(prefix + "\tmWasDesktopTaskFilteredOut=" + mWasDesktopTaskFilteredOut);
+        pw.println(prefix + "\tmWasOpenedFromTaskbar=" + mWasOpenedFromTaskbar);
     }
 
     /**
