@@ -224,10 +224,10 @@ import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.AllAppsSwipeController;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.ActivityResultInfo;
-import com.android.launcher3.util.ActivityTracker;
 import com.android.launcher3.util.BackPressHandler;
 import com.android.launcher3.util.CannedAnimationCoordinator;
 import com.android.launcher3.util.ComponentKey;
+import com.android.launcher3.util.ContextTracker;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInflater;
@@ -292,7 +292,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         PluginListener<LauncherOverlayPlugin> {
     public static final String TAG = "Launcher";
 
-    public static final ActivityTracker<Launcher> ACTIVITY_TRACKER = new ActivityTracker<>();
+    public static final ContextTracker.ActivityTracker<Launcher> ACTIVITY_TRACKER =
+            new ContextTracker.ActivityTracker<>();
 
     static final boolean LOGD = false;
 
@@ -1778,7 +1779,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Override
     public void onDestroy() {
         super.onDestroy();
-        ACTIVITY_TRACKER.onActivityDestroyed(this);
+        ACTIVITY_TRACKER.onContextDestroyed(this);
 
         SettingsCache.INSTANCE.get(this).unregister(TOUCHPAD_NATURAL_SCROLLING,
                 mNaturalScrollingChangedListener);
