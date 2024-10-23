@@ -18,6 +18,7 @@ package com.android.launcher3.dagger;
 
 import android.content.Context;
 
+import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
 import com.android.launcher3.graphics.IconShape;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.util.ApiWrapper;
@@ -43,6 +44,7 @@ import dagger.BindsInstance;
 public interface LauncherBaseAppComponent {
     DaggerSingletonTracker getDaggerSingletonTracker();
     ApiWrapper getApiWrapper();
+    ContextualEduStatsManager getContextualEduStatsManager();
     CustomWidgetManager getCustomWidgetManager();
     IconShape getIconShape();
     InstallSessionHelper getInstallSessionHelper();
