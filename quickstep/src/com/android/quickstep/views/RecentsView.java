@@ -1935,6 +1935,9 @@ public abstract class RecentsView<
 
         // Keep same previous focused task
         TaskView newFocusedTaskView = getTaskViewByTaskIds(focusedTaskIds);
+        if (enableLargeDesktopWindowingTile() && newFocusedTaskView instanceof DesktopTaskView) {
+            newFocusedTaskView = null;
+        }
         // If the list changed, maybe the focused task doesn't exist anymore
         int newFocusedTaskViewIndex = mUtils.getFocusedTaskIndex(taskGroups);
         if (newFocusedTaskView == null && getTaskViewCount() > newFocusedTaskViewIndex) {
@@ -2975,10 +2978,19 @@ public abstract class RecentsView<
         boolean runningTaskTileHidden = mRunningTaskTileHidden;
         setCurrentTask(runningTaskViewId);
 
-        boolean shouldFocusRunningTask = !(enableGridOnlyOverview()
-                || (enableLargeDesktopWindowingTile()
-                && getRunningTaskView() instanceof DesktopTaskView));
-        setFocusedTaskViewId(shouldFocusRunningTask ? runningTaskViewId : INVALID_TASK_ID);
+        int focusedTaskViewId;
+        if (enableGridOnlyOverview()) {
+            focusedTaskViewId = INVALID_TASK_ID;
+        } else if (enableLargeDesktopWindowingTile()
+                && getRunningTaskView() instanceof DesktopTaskView) {
+            TaskView focusedTaskView = getTaskViewAt(getDesktopTaskViewCount());
+            focusedTaskViewId =
+                    focusedTaskView != null ? focusedTaskView.getTaskViewId() : INVALID_TASK_ID;
+        } else {
+            focusedTaskViewId = runningTaskViewId;
+        }
+        setFocusedTaskViewId(focusedTaskViewId);
+
         runOnPageScrollsInitialized(() -> setCurrentPage(getRunningTaskIndex()));
         setRunningTaskViewShowScreenshot(false);
         setRunningTaskHidden(runningTaskTileHidden);
