@@ -18,6 +18,7 @@ package com.android.launcher3.widget.custom;
 
 import static com.android.launcher3.Flags.enableSmartspaceAsAWidget;
 import static com.android.launcher3.model.data.LauncherAppWidgetInfo.CUSTOM_WIDGET_ID;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.widget.LauncherAppWidgetProviderInfo.CLS_CUSTOM_WIDGET_PREFIX;
 
 import android.appwidget.AppWidgetManager;
@@ -38,7 +39,6 @@ import com.android.launcher3.dagger.LauncherAppSingleton;
 import com.android.launcher3.dagger.LauncherBaseAppComponent;
 import com.android.launcher3.util.DaggerSingletonObject;
 import com.android.launcher3.util.DaggerSingletonTracker;
-import com.android.launcher3.util.ExecutorUtil;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
@@ -90,27 +90,23 @@ public class CustomWidgetManager implements PluginListener<CustomWidgetPlugin> {
         mCustomWidgets = new ArrayList<>();
 
         pluginManager.addPluginListener(this, CustomWidgetPlugin.class, true);
-
-        ExecutorUtil.executeSyncOnMainOrFail(() -> {
-            if (enableSmartspaceAsAWidget()) {
-                for (String s: context.getResources()
-                        .getStringArray(R.array.custom_widget_providers)) {
-                    try {
-                        Class<?> cls = Class.forName(s);
-                        CustomWidgetPlugin plugin = (CustomWidgetPlugin)
-                                cls.getDeclaredConstructor(Context.class).newInstance(context);
-                        onPluginConnected(plugin, context);
-                    } catch (ClassNotFoundException | InstantiationException
-                             | IllegalAccessException
-                             | ClassCastException | NoSuchMethodException
-                             | InvocationTargetException e) {
-                        Log.e(TAG, "Exception found when trying to add custom widgets: " + e);
-                    }
+        if (enableSmartspaceAsAWidget()) {
+            for (String s: context.getResources()
+                    .getStringArray(R.array.custom_widget_providers)) {
+                try {
+                    Class<?> cls = Class.forName(s);
+                    CustomWidgetPlugin plugin = (CustomWidgetPlugin)
+                            cls.getDeclaredConstructor(Context.class).newInstance(context);
+                    MAIN_EXECUTOR.execute(() -> onPluginConnected(plugin, context));
+                } catch (ClassNotFoundException | InstantiationException
+                         | IllegalAccessException
+                         | ClassCastException | NoSuchMethodException
+                         | InvocationTargetException e) {
+                    Log.e(TAG, "Exception found when trying to add custom widgets: " + e);
                 }
             }
-
-            tracker.addCloseable(() -> pluginManager.removePluginListener(this));
-        });
+        }
+        tracker.addCloseable(() -> pluginManager.removePluginListener(this));
     }
 
     @Override
