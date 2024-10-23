@@ -140,6 +140,7 @@ class BubbleBarFlyoutView(
 
     init {
         LayoutInflater.from(context).inflate(R.layout.bubblebar_flyout, this, true)
+        id = R.id.bubble_bar_flyout_view
 
         val ta = context.obtainStyledAttributes(intArrayOf(android.R.attr.dialogCornerRadius))
         cornerRadius = ta.getDimensionPixelSize(0, 0).toFloat()

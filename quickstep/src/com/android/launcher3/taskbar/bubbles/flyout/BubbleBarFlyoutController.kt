@@ -21,8 +21,8 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.core.animation.ValueAnimator
 import com.android.launcher3.R
+import com.android.systemui.util.addListener
 import com.android.systemui.util.doOnEnd
-import com.android.systemui.util.doOnStart
 
 /** Creates and manages the visibility of the [BubbleBarFlyoutView]. */
 class BubbleBarFlyoutController
@@ -35,14 +35,19 @@ constructor(
 ) {
 
     private companion object {
-        const val EXPAND_COLLAPSE_ANIMATION_DURATION_MS = 250L
+        const val ANIMATION_DURATION_MS = 250L
     }
 
     private var flyout: BubbleBarFlyoutView? = null
     private val horizontalMargin =
         container.context.resources.getDimensionPixelSize(R.dimen.transient_taskbar_bottom_margin)
 
-    fun setUpFlyout(message: BubbleBarFlyoutMessage) {
+    private enum class AnimationType {
+        COLLAPSE,
+        FADE,
+    }
+
+    fun setUpAndShowFlyout(message: BubbleBarFlyoutMessage, onEnd: () -> Unit) {
         flyout?.let(container::removeView)
         val flyout = BubbleBarFlyoutView(container.context, positioner, flyoutScheduler)
 
@@ -58,27 +63,42 @@ constructor(
         lp.marginEnd = horizontalMargin
         container.addView(flyout, lp)
 
-        val animator =
-            ValueAnimator.ofFloat(0f, 1f).setDuration(EXPAND_COLLAPSE_ANIMATION_DURATION_MS)
+        val animator = ValueAnimator.ofFloat(0f, 1f).setDuration(ANIMATION_DURATION_MS)
         animator.addUpdateListener { _ ->
             flyout.updateExpansionProgress(animator.animatedValue as Float)
         }
-        animator.doOnStart {
-            val flyoutTop = flyout.top + flyout.translationY
-            // If the top position of the flyout is negative, then it's bleeding over the
-            // top boundary of its parent view
-            if (flyoutTop < 0) topBoundaryListener.extendTopBoundary(space = -flyoutTop.toInt())
-        }
+        animator.addListener(
+            onStart = {
+                val flyoutTop = flyout.top + flyout.translationY
+                // If the top position of the flyout is negative, then it's bleeding over the
+                // top boundary of its parent view
+                if (flyoutTop < 0) topBoundaryListener.extendTopBoundary(space = -flyoutTop.toInt())
+            },
+            onEnd = { onEnd() },
+        )
         flyout.showFromCollapsed(message) { animator.start() }
         this.flyout = flyout
     }
 
-    fun hideFlyout(endAction: () -> Unit) {
+    fun cancelFlyout(endAction: () -> Unit) {
+        hideFlyout(AnimationType.FADE, endAction)
+    }
+
+    fun collapseFlyout(endAction: () -> Unit) {
+        hideFlyout(AnimationType.COLLAPSE, endAction)
+    }
+
+    private fun hideFlyout(animationType: AnimationType, endAction: () -> Unit) {
+        // TODO: b/277815200 - stop the current animation if it's running
         val flyout = this.flyout ?: return
-        val animator =
-            ValueAnimator.ofFloat(1f, 0f).setDuration(EXPAND_COLLAPSE_ANIMATION_DURATION_MS)
-        animator.addUpdateListener { _ ->
-            flyout.updateExpansionProgress(animator.animatedValue as Float)
+        val animator = ValueAnimator.ofFloat(1f, 0f).setDuration(ANIMATION_DURATION_MS)
+        when (animationType) {
+            AnimationType.FADE ->
+                animator.addUpdateListener { _ -> flyout.alpha = animator.animatedValue as Float }
+            AnimationType.COLLAPSE ->
+                animator.addUpdateListener { _ ->
+                    flyout.updateExpansionProgress(animator.animatedValue as Float)
+                }
         }
         animator.doOnEnd {
             container.removeView(flyout)

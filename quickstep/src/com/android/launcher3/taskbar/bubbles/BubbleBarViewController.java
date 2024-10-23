@@ -148,7 +148,8 @@ public class BubbleBarViewController {
         mBubbleBarFlyoutController = new BubbleBarFlyoutController(
                 mBubbleBarContainer, createFlyoutPositioner(), createFlyoutTopBoundaryListener());
         mBubbleBarViewAnimator = new BubbleBarViewAnimator(
-                mBarView, mBubbleStashController, mBubbleBarController::showExpandedView);
+                mBarView, mBubbleStashController, mBubbleBarFlyoutController,
+                mBubbleBarController::showExpandedView);
         mTaskbarViewPropertiesProvider = taskbarViewPropertiesProvider;
         onBubbleBarConfigurationChanged(/* animate= */ false);
         mActivity.addOnDeviceProfileChangeListener(
@@ -781,6 +782,11 @@ public class BubbleBarViewController {
     /** Animates the bubble bar to notify the user about a bubble change. */
     public void animateBubbleNotification(BubbleBarBubble bubble, boolean isExpanding,
             boolean isUpdate) {
+        // if we're expanded, don't animate the bubble bar. just show the notification dot.
+        if (isExpanded()) {
+            bubble.getView().updateDotVisibility(/* animate= */ true);
+            return;
+        }
         boolean isInApp = mTaskbarStashController.isInApp();
         // if this is the first bubble, animate to the initial state.
         if (mBarView.getBubbleChildCount() == 1 && !isUpdate) {
@@ -789,13 +795,12 @@ public class BubbleBarViewController {
         }
         boolean persistentTaskbarOrOnHome = mBubbleStashController.isBubblesShowingOnHome()
                 || !mBubbleStashController.isTransientTaskBar();
-        if (persistentTaskbarOrOnHome && !isExpanded()) {
+        if (persistentTaskbarOrOnHome) {
             mBubbleBarViewAnimator.animateBubbleBarForCollapsed(bubble, isExpanding);
             return;
         }
 
-        // only animate the new bubble if we're in an app, have handle view and not auto expanding
-        if (isInApp && mBubbleStashController.getHasHandleView() && !isExpanded()) {
+        if (isInApp && mBubbleStashController.getHasHandleView()) {
             mBubbleBarViewAnimator.animateBubbleInForStashed(bubble, isExpanding);
         }
     }
