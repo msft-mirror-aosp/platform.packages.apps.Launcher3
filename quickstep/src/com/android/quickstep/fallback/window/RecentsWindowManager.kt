@@ -39,6 +39,7 @@ import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.statemanager.StateManager
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory
 import com.android.launcher3.statemanager.StatefulContainer
+import com.android.launcher3.taskbar.TaskbarUIController
 import com.android.launcher3.util.ContextTracker
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.RunnableList
@@ -116,6 +117,7 @@ class RecentsWindowManager(context: Context) :
 
     private var callbacks: RecentsAnimationCallbacks? = null
 
+    private var taskbarUIController: TaskbarUIController? = null
     private var tisBindHelper: TISBindHelper = TISBindHelper(this) {}
 
     // Callback array that corresponds to events defined in @ActivityEvent
@@ -283,6 +285,18 @@ class RecentsWindowManager(context: Context) :
 
     override fun getDesktopVisibilityController(): DesktopVisibilityController? {
         return tisBindHelper.desktopVisibilityController
+    }
+
+    override fun setTaskbarUIController(taskbarUIController: TaskbarUIController?) {
+        this.taskbarUIController = taskbarUIController
+    }
+
+    override fun getTaskbarUIController(): TaskbarUIController? {
+        return taskbarUIController
+    }
+
+    override fun getTISBindHelper(): TISBindHelper {
+        return tisBindHelper
     }
 
     fun registerInitListener(onInitListener: Predicate<Boolean>) {

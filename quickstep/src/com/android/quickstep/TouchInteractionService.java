@@ -776,10 +776,13 @@ public class TouchInteractionService extends Service {
         mAllAppsActionManager.setHomeAndOverviewSame(isHomeAndOverviewSame);
         RecentsViewContainer newOverviewContainer =
                 mOverviewComponentObserver.getContainerInterface().getCreatedContainer();
-        if (newOverviewContainer != null
-                && newOverviewContainer instanceof StatefulActivity activity) {
-            //TODO(b/368030750) refactor taskbarManager to accept RecentsViewContainer
-            mTaskbarManager.setActivity(activity);
+        if (newOverviewContainer != null) {
+            if (newOverviewContainer instanceof StatefulActivity activity) {
+                // This will also call setRecentsViewContainer() internally.
+                mTaskbarManager.setActivity(activity);
+            } else {
+                mTaskbarManager.setRecentsViewContainer(newOverviewContainer);
+            }
         }
         mTISBinder.onOverviewTargetChange();
     }
