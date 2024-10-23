@@ -34,6 +34,7 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.app.animation.Interpolators;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatedFloat;
@@ -68,6 +69,9 @@ public class BubbleBarViewController {
     private static final float APP_ICON_LARGE_DP = 52f;
     /** The dot size is defined as a percentage of the icon size. */
     private static final float DOT_TO_BUBBLE_SIZE_RATIO = 0.228f;
+    public static final int TASKBAR_FADE_IN_DURATION_MS = 150;
+    public static final int TASKBAR_FADE_IN_DELAY_MS = 50;
+    public static final int TASKBAR_FADE_OUT_DURATION_MS = 100;
     private final SystemUiProxy mSystemUiProxy;
     private final TaskbarActivityContext mActivity;
     private final BubbleBarView mBarView;
@@ -851,10 +855,15 @@ public class BubbleBarViewController {
             mTaskbarStashController.stashHotseat(isBubbleBarExpanded);
         } else if (!mBubbleStashController.isTransientTaskBar()) {
             boolean hideTaskbar = isBubbleBarExpanded && isIntersectingTaskbar();
-            mTaskbarViewPropertiesProvider
-                    .getIconsAlpha()
-                    .animateToValue(hideTaskbar ? 0 : 1)
-                    .start();
+            Animator taskbarAlphaAnimator = mTaskbarViewPropertiesProvider.getIconsAlpha()
+                    .animateToValue(hideTaskbar ? 0 : 1);
+            taskbarAlphaAnimator.setDuration(hideTaskbar
+                    ? TASKBAR_FADE_OUT_DURATION_MS : TASKBAR_FADE_IN_DURATION_MS);
+            if (!hideTaskbar) {
+                taskbarAlphaAnimator.setStartDelay(TASKBAR_FADE_IN_DELAY_MS);
+            }
+            taskbarAlphaAnimator.setInterpolator(Interpolators.LINEAR);
+            taskbarAlphaAnimator.start();
         }
         if (!mBubbleStashController.isBubblesShowingOnHome()
                 && mTaskbarStashController.isHiddenForBubbles()) {
