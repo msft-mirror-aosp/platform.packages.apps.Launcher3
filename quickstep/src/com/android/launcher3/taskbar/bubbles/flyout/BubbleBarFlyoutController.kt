@@ -16,13 +16,13 @@
 
 package com.android.launcher3.taskbar.bubbles.flyout
 
+import android.graphics.Rect
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.core.animation.ValueAnimator
 import com.android.launcher3.R
 import com.android.systemui.util.addListener
-import com.android.systemui.util.doOnEnd
 
 /** Creates and manages the visibility of the [BubbleBarFlyoutView]. */
 class BubbleBarFlyoutController
@@ -30,7 +30,7 @@ class BubbleBarFlyoutController
 constructor(
     private val container: FrameLayout,
     private val positioner: BubbleBarFlyoutPositioner,
-    private val topBoundaryListener: TopBoundaryListener,
+    private val callbacks: FlyoutCallbacks,
     private val flyoutScheduler: FlyoutScheduler = HandlerScheduler(container),
 ) {
 
@@ -46,6 +46,15 @@ constructor(
         COLLAPSE,
         FADE,
     }
+
+    /** The bounds of the flyout. */
+    val flyoutBounds: Rect?
+        get() {
+            val flyout = this.flyout ?: return null
+            val rect = Rect(flyout.bounds)
+            rect.offset(0, flyout.translationY.toInt())
+            return rect
+        }
 
     fun setUpAndShowFlyout(message: BubbleBarFlyoutMessage, onEnd: () -> Unit) {
         flyout?.let(container::removeView)
@@ -72,9 +81,12 @@ constructor(
                 val flyoutTop = flyout.top + flyout.translationY
                 // If the top position of the flyout is negative, then it's bleeding over the
                 // top boundary of its parent view
-                if (flyoutTop < 0) topBoundaryListener.extendTopBoundary(space = -flyoutTop.toInt())
+                if (flyoutTop < 0) callbacks.extendTopBoundary(space = -flyoutTop.toInt())
             },
-            onEnd = { onEnd() },
+            onEnd = {
+                onEnd()
+                flyout.setOnClickListener { callbacks.flyoutClicked() }
+            },
         )
         flyout.showFromCollapsed(message) { animator.start() }
         this.flyout = flyout
@@ -100,21 +112,15 @@ constructor(
                     flyout.updateExpansionProgress(animator.animatedValue as Float)
                 }
         }
-        animator.doOnEnd {
-            container.removeView(flyout)
-            this@BubbleBarFlyoutController.flyout = null
-            topBoundaryListener.resetTopBoundary()
-            endAction()
-        }
+        animator.addListener(
+            onStart = { flyout.setOnClickListener(null) },
+            onEnd = {
+                container.removeView(flyout)
+                this@BubbleBarFlyoutController.flyout = null
+                callbacks.resetTopBoundary()
+                endAction()
+            },
+        )
         animator.start()
-    }
-
-    /** Notifies when the top boundary of the flyout view changes. */
-    interface TopBoundaryListener {
-        /** Requests to extend the top boundary of the parent to fully include the flyout. */
-        fun extendTopBoundary(space: Int)
-
-        /** Resets the top boundary of the parent. */
-        fun resetTopBoundary()
     }
 }
