@@ -122,6 +122,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
     private final int mMaxNumIcons;
 
+    private final int mAllAppsButtonTranslationOffset;
+
     public TaskbarView(@NonNull Context context) {
         this(context, null);
     }
@@ -141,8 +143,6 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         mActivityContext = ActivityContext.lookupContext(context);
         mIconLayoutBounds = mActivityContext.getTransientTaskbarBounds();
         Resources resources = getResources();
-        boolean isTransientTaskbar = DisplayController.isTransientTaskbar(mActivityContext)
-                && !mActivityContext.isPhoneMode();
         mIsRtl = Utilities.isRtl(resources);
         mTransientTaskbarMinWidth = resources.getDimension(R.dimen.transient_taskbar_min_width);
 
@@ -173,6 +173,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         setWillNotDraw(false);
 
         mAllAppsButtonContainer = new TaskbarAllAppsButtonContainer(context);
+        mAllAppsButtonTranslationOffset =  (int) getResources().getDimension(
+                mAllAppsButtonContainer.getAllAppsButtonTranslationXOffset(isTransientTaskbar()));
 
         if (enableTaskbarPinning() || enableRecentsInTaskbar()) {
             mTaskbarDividerContainer = new TaskbarDividerContainer(context);
@@ -221,9 +223,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 enableTaskbarPinning() && !mActivityContext.isThreeButtonNav();
         availableWidth -= iconSize - (int) getResources().getDimension(
                 mAllAppsButtonContainer.getAllAppsButtonTranslationXOffset(
-                        forceTransientTaskbarSize || (
-                                DisplayController.isTransientTaskbar(mActivityContext)
-                                        && !mActivityContext.isPhoneMode())));
+                        forceTransientTaskbarSize || isTransientTaskbar()));
         ++additionalIcons;
 
         return Math.floorDiv(availableWidth, iconSize) + additionalIcons;
@@ -690,6 +690,15 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         mIconLayoutBounds.right = iconEnd;
         mIconLayoutBounds.top = (bottom - top - mIconTouchSize) / 2;
         mIconLayoutBounds.bottom = mIconLayoutBounds.top + mIconTouchSize;
+
+        // With rtl layout, the all apps button will be translated by `allAppsButtonOffset` after
+        // layout completion (by `TaskbarViewController`). Offset the icon end by the same amount
+        // when laying out icons, so the taskbar content remains centered after all apps button
+        // translation.
+        if (layoutRtl) {
+            iconEnd += mAllAppsButtonTranslationOffset;
+        }
+
         int count = getChildCount();
         for (int i = count; i > 0; i--) {
             View child = getChildAt(i - 1);
@@ -720,6 +729,15 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         }
 
         mIconLayoutBounds.left = iconEnd;
+
+        // Adjust the icon layout bounds by the amount by which all apps button will be translated
+        // post layout to maintain margin between all apps button and the edge of the transient
+        // taskbar background. Done for ltr layout only - for rtl layout, the offset needs to be
+        // adjusted on the right, which is done by offsetting `iconEnd` after setting
+        // `mIconLayoutBounds.right`.
+        if (!layoutRtl) {
+            mIconLayoutBounds.left += mAllAppsButtonTranslationOffset;
+        }
 
         if (mIconLayoutBounds.right - mIconLayoutBounds.left < mTransientTaskbarMinWidth) {
             int center = mIconLayoutBounds.centerX();
@@ -763,12 +781,13 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     /**
      * Returns the space used by the icons
      */
-    public int getIconLayoutWidth() {
+    private int getIconLayoutWidth() {
         int countExcludingQsb = getChildCount();
         DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
         if (deviceProfile.isQsbInline) {
             countExcludingQsb--;
         }
+
         int iconLayoutBoundsWidth =
                 countExcludingQsb * (mItemMarginLeftRight * 2 + mIconTouchSize);
 
@@ -777,17 +796,28 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             // All Apps icon, divider icon, and first app icon in taskbar
             iconLayoutBoundsWidth -= mItemMarginLeftRight * 4;
         }
+
+        // The all apps button container gets offset horizontally, reducing the overall taskbar
+        // view size.
+        iconLayoutBoundsWidth -= mAllAppsButtonTranslationOffset;
+
         return iconLayoutBoundsWidth;
     }
 
     /**
-     * Returns the app icons currently shown in the taskbar.
+     * Returns the app icons currently shown in the taskbar. The returned list does not include qsb,
+     * but it includes all apps button and icon divider views.
      */
     public View[] getIconViews() {
         final int count = getChildCount();
-        View[] icons = new View[count];
+        if (count == 0) {
+            return new View[0];
+        }
+        View[] icons = new View[count - (mActivityContext.getDeviceProfile().isQsbInline ? 1 : 0)];
+        int insertionPoint = 0;
         for (int i = 0; i < count; i++) {
-            icons[i] = getChildAt(i);
+            if (getChildAt(i)  == mQsb) continue;
+            icons[insertionPoint++] = getChildAt(i);
         }
         return icons;
     }
@@ -869,9 +899,22 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // Ignore, we just implement Insettable to draw behind system insets.
     }
 
+    private boolean isTransientTaskbar() {
+        return DisplayController.isTransientTaskbar(mActivityContext)
+                && !mActivityContext.isPhoneMode();
+    }
+
     public boolean areIconsVisible() {
         // Consider the overall visibility
         return getVisibility() == VISIBLE;
+    }
+
+    /**
+     * @return The all apps button horizontal offset used to calculate the taskbar contents width
+     * during layout.
+     */
+    public int getAllAppsButtonTranslationXOffsetUsedForLayout() {
+        return mAllAppsButtonTranslationOffset;
     }
 
     /**
