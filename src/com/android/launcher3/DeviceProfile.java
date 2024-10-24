@@ -2019,6 +2019,18 @@ public class DeviceProfile {
     }
 
     /**
+     * Returns the number of pixels the hotseat icons vertical center is translated from the bottom
+     * of the screen.
+     */
+    public int getHotseatVerticalCenter() {
+        return hotseatBarSizePx
+                - (isQsbInline ? 0 : hotseatQsbVisualHeight)
+                - hotseatQsbSpace
+                - (hotseatCellHeightPx / 2)
+                + ((hotseatCellHeightPx - iconSizePx) / 2);
+    }
+
+    /**
      * Returns the number of pixels the taskbar is translated from the bottom of the screen.
      */
     public int getTaskbarOffsetY() {
