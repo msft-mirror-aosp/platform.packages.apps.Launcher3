@@ -188,7 +188,7 @@ public abstract class BaseActivity extends Activity implements ActivityContext {
 
     public SystemUiController getSystemUiController() {
         if (mSystemUiController == null) {
-            mSystemUiController = new SystemUiController(getWindow());
+            mSystemUiController = new SystemUiController(getWindow().getDecorView());
         }
         return mSystemUiController;
     }
@@ -304,6 +304,10 @@ public abstract class BaseActivity extends Activity implements ActivityContext {
      */
     public void setPaused() {
         removeActivityFlags(ACTIVITY_STATE_RESUMED | ACTIVITY_STATE_DEFERRED_RESUMED);
+    }
+
+    public boolean isPaused() {
+        return !hasBeenResumed() && (mActivityFlags & ACTIVITY_STATE_DEFERRED_RESUMED) == 0;
     }
 
     /**

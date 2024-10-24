@@ -23,26 +23,7 @@ import com.android.launcher3.util.DisplayController
 
 /** Evaluates all the features taskbar can have. */
 class TaskbarFeatureEvaluator
-private constructor(
-    private val taskbarActivityContext: TaskbarActivityContext,
-) {
-
-    companion object {
-        @Volatile private lateinit var taskbarFeatureEvaluator: TaskbarFeatureEvaluator
-
-        @JvmStatic
-        fun getInstance(
-            taskbarActivityContext: TaskbarActivityContext,
-        ): TaskbarFeatureEvaluator {
-            synchronized(this) {
-                if (!::taskbarFeatureEvaluator.isInitialized) {
-                    taskbarFeatureEvaluator = TaskbarFeatureEvaluator(taskbarActivityContext)
-                }
-                return taskbarFeatureEvaluator
-            }
-        }
-    }
-
+private constructor(private val taskbarActivityContext: TaskbarActivityContext) {
     val hasAllApps = true
     val hasAppIcons = true
     val hasBubbles = false
@@ -59,4 +40,25 @@ private constructor(
 
     val isLandscape: Boolean
         get() = taskbarActivityContext.deviceProfile.isLandscape
+
+    val supportsPinningPopup: Boolean
+        get() = !hasNavButtons
+
+    fun onDestroy() {
+        taskbarFeatureEvaluator = null
+    }
+
+    companion object {
+        @Volatile private var taskbarFeatureEvaluator: TaskbarFeatureEvaluator? = null
+
+        @JvmStatic
+        fun getInstance(taskbarActivityContext: TaskbarActivityContext): TaskbarFeatureEvaluator {
+            synchronized(this) {
+                if (taskbarFeatureEvaluator == null) {
+                    taskbarFeatureEvaluator = TaskbarFeatureEvaluator(taskbarActivityContext)
+                }
+                return taskbarFeatureEvaluator!!
+            }
+        }
+    }
 }

@@ -21,7 +21,6 @@ import static com.android.launcher3.Flags.enableUnfoldStateAnimation;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.SplitConfigurationOptions.StagePosition;
-import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.RECENT_TASKS_MISSING;
 import static com.android.quickstep.util.LogUtils.splitFailureMessage;
 
 import android.app.ActivityManager;
@@ -43,12 +42,11 @@ import android.os.Message;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.Log;
-import android.view.IRecentsAnimationController;
-import android.view.IRecentsAnimationRunner;
 import android.view.IRemoteAnimationRunner;
 import android.view.MotionEvent;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
+import android.window.DesktopModeFlags;
 import android.window.IOnBackInvokedCallback;
 import android.window.RemoteTransition;
 import android.window.TaskSnapshot;
@@ -56,6 +54,7 @@ import android.window.TransitionFilter;
 
 import androidx.annotation.MainThread;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.annotation.WorkerThread;
 
 import com.android.internal.logging.InstanceId;
@@ -64,8 +63,8 @@ import com.android.internal.view.AppearanceRegion;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.SafeCloseable;
-import com.android.quickstep.util.ActiveGestureLog;
-import com.android.quickstep.util.AssistUtils;
+import com.android.quickstep.util.ActiveGestureProtoLogProxy;
+import com.android.quickstep.util.ContextualSearchInvoker;
 import com.android.quickstep.util.unfold.ProxyUnfoldTransitionProvider;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.recents.model.ThumbnailData;
@@ -89,10 +88,11 @@ import com.android.wm.shell.draganddrop.IDragAndDrop;
 import com.android.wm.shell.onehanded.IOneHanded;
 import com.android.wm.shell.recents.IRecentTasks;
 import com.android.wm.shell.recents.IRecentTasksListener;
+import com.android.wm.shell.recents.IRecentsAnimationController;
+import com.android.wm.shell.recents.IRecentsAnimationRunner;
 import com.android.wm.shell.shared.GroupedRecentTaskInfo;
 import com.android.wm.shell.shared.IShellTransitions;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
-import com.android.wm.shell.shared.desktopmode.DesktopModeFlags;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 import com.android.wm.shell.shared.split.SplitBounds;
@@ -161,6 +161,7 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     private IRemoteAnimationRunner mBackToLauncherRunner;
     private IDragAndDrop mDragAndDrop;
     private final HomeVisibilityState mHomeVisibilityState = new HomeVisibilityState();
+    private final FocusState mFocusState = new FocusState();
 
     // Used to dedupe calls to SystemUI
     private int mLastShelfHeight;
@@ -187,7 +188,8 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     @Nullable
     private final ProxyUnfoldTransitionProvider mUnfoldTransitionProvider;
 
-    private SystemUiProxy(Context context) {
+    @VisibleForTesting
+    protected SystemUiProxy(Context context) {
         mContext = context;
         mAsyncHandler = new Handler(UI_HELPER_EXECUTOR.getLooper(), this::handleMessageAsync);
         final Intent baseIntent = new Intent().setPackage(mContext.getPackageName());
@@ -299,6 +301,7 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         registerSplitScreenListener(mSplitScreenListener);
         registerSplitSelectListener(mSplitSelectListener);
         mHomeVisibilityState.init(mShellTransitions);
+        mFocusState.init(mShellTransitions);
         setStartingWindowListener(mStartingWindowListener);
         setLauncherUnlockAnimationController(
                 mLauncherActivityClass, mLauncherUnlockAnimationController);
@@ -308,8 +311,8 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         setBackToLauncherCallback(mBackToLauncherCallback, mBackToLauncherRunner);
         setUnfoldAnimationListener(mUnfoldAnimationListener);
         setDesktopTaskListener(mDesktopTaskListener);
-        setAssistantOverridesRequested(
-                AssistUtils.newInstance(mContext).getSysUiAssistOverrideInvocationTypes());
+        setAssistantOverridesRequested(ContextualSearchInvoker.newInstance(mContext)
+                .getSysUiAssistOverrideInvocationTypes());
         mStateChangeCallbacks.forEach(Runnable::run);
 
         if (mUnfoldTransitionProvider != null) {
@@ -1076,16 +1079,6 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         }
     }
 
-    public void removeFromSideStage(int taskId) {
-        if (mSplitScreen != null) {
-            try {
-                mSplitScreen.removeFromSideStage(taskId);
-            } catch (RemoteException e) {
-                Log.w(TAG, "Failed call removeFromSideStage");
-            }
-        }
-    }
-
     //
     // One handed
     //
@@ -1141,6 +1134,10 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
 
     public HomeVisibilityState getHomeVisibilityState() {
         return mHomeVisibilityState;
+    }
+
+    public FocusState getFocusState() {
+        return mFocusState;
     }
 
     /**
@@ -1395,7 +1392,7 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
 
     private boolean shouldEnableRunningTasksForDesktopMode() {
         return DesktopModeStatus.canEnterDesktopMode(mContext)
-                && DesktopModeFlags.TASKBAR_RUNNING_APPS.isEnabled(mContext);
+                && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_TASKBAR_RUNNING_APPS.isTrue();
     }
 
     private boolean handleMessageAsync(Message msg) {
@@ -1429,10 +1426,10 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     /**
      * If task with the given id is on the desktop, bring it to front
      */
-    public void showDesktopApp(int taskId) {
+    public void showDesktopApp(int taskId, @Nullable RemoteTransition transition) {
         if (mDesktopMode != null) {
             try {
-                mDesktopMode.showDesktopApp(taskId);
+                mDesktopMode.showDesktopApp(taskId, transition);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call showDesktopApp", e);
             }
@@ -1485,6 +1482,28 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         }
     }
 
+    /** Call shell to remove the desktop that is on given `displayId` */
+    public void removeDesktop(int displayId) {
+        if (mDesktopMode != null) {
+            try {
+                mDesktopMode.removeDesktop(displayId);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call removeDesktop", e);
+            }
+        }
+    }
+
+    /** Call shell to move a task with given `taskId` to external display. */
+    public void moveToExternalDisplay(int taskId) {
+        if (mDesktopMode != null) {
+            try {
+                mDesktopMode.moveToExternalDisplay(taskId);
+            } catch (RemoteException e) {
+                Log.w(TAG, "Failed call moveToExternalDisplay", e);
+            }
+        }
+    }
+
     //
     // Unfold transition
     //
@@ -1516,9 +1535,9 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
      * Starts the recents activity. The caller should manage the thread on which this is called.
      */
     public boolean startRecentsActivity(Intent intent, ActivityOptions options,
-            RecentsAnimationListener listener) {
+            RecentsAnimationListener listener, boolean useSyntheticRecentsTransition) {
         if (mRecentTasks == null) {
-            ActiveGestureLog.INSTANCE.addLog("Null mRecentTasks", RECENT_TASKS_MISSING);
+            ActiveGestureProtoLogProxy.logRecentTasksMissing();
             return false;
         }
         final IRecentsAnimationRunner runner = new IRecentsAnimationRunner.Stub() {
@@ -1547,6 +1566,9 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
             }
         };
         final Bundle optsBundle = options.toBundle();
+        if (useSyntheticRecentsTransition) {
+            optsBundle.putBoolean("is_synthetic_recents_transition", true);
+        }
         try {
             mRecentTasks.startRecentsTransition(mRecentsPendingIntent, intent, optsBundle,
                     mContext.getIApplicationThread(), runner);
@@ -1591,6 +1613,7 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
         pw.println("\tmOneHanded=" + mOneHanded);
         pw.println("\tmShellTransitions=" + mShellTransitions);
         pw.println("\tmHomeVisibilityState=" + mHomeVisibilityState);
+        pw.println("\tmFocusState=" + mFocusState);
         pw.println("\tmStartingWindow=" + mStartingWindow);
         pw.println("\tmStartingWindowListener=" + mStartingWindowListener);
         pw.println("\tmSysuiUnlockAnimationController=" + mSysuiUnlockAnimationController);

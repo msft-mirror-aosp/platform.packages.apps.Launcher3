@@ -16,6 +16,9 @@
 
 package com.android.launcher3.allapps;
 
+import static androidx.constraintlayout.widget.ConstraintSet.MATCH_CONSTRAINT;
+import static androidx.constraintlayout.widget.ConstraintSet.WRAP_CONTENT;
+
 import android.content.Context;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
@@ -23,6 +26,7 @@ import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.widget.TextView;
 
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.graphics.ColorUtils;
 
 import com.android.launcher3.R;
@@ -38,8 +42,6 @@ public class LetterListTextView extends TextView {
     private final Drawable mLetterBackground;
     private final int mLetterListTextWidthAndHeight;
     private final int mTextColor;
-    private final int mBackgroundColor;
-    private final int mSelectedColor;
 
     public LetterListTextView(Context context) {
         this(context, null, 0);
@@ -55,8 +57,6 @@ public class LetterListTextView extends TextView {
         mLetterListTextWidthAndHeight = context.getResources().getDimensionPixelSize(
                 R.dimen.fastscroll_list_letter_size);
         mTextColor = Themes.getAttrColor(context, R.attr.materialColorOnSurface);
-        mBackgroundColor = Themes.getAttrColor(context, R.attr.materialColorSurfaceContainer);
-        mSelectedColor = Themes.getAttrColor(context, R.attr.materialColorOnSecondary);
     }
 
     @Override
@@ -68,6 +68,20 @@ public class LetterListTextView extends TextView {
         setWidth(mLetterListTextWidthAndHeight);
         setTextSize(mLetterListTextWidthAndHeight);
         setVisibility(VISIBLE);
+    }
+
+    /**
+     * Applies a viewId to the letter list text view and sets the background and text based on the
+     * sectionInfo.
+     */
+    public void apply(AlphabeticalAppsList.FastScrollSectionInfo fastScrollSectionInfo,
+            int viewId) {
+        setId(viewId);
+        setText(fastScrollSectionInfo.sectionName);
+        ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
+                MATCH_CONSTRAINT, WRAP_CONTENT);
+        lp.dimensionRatio = "v,1:1";
+        setLayoutParams(lp);
     }
 
     /**
@@ -83,24 +97,9 @@ public class LetterListTextView extends TextView {
         float cutOffMin = currentFingerY - (getHeight() * 2);
         float cutOffMax = currentFingerY + (getHeight() * 2);
         float cutOffDistance = cutOffMax - cutOffMin;
-        // Update the background blend color
         boolean isWithinAnimationBounds = getY() < cutOffMax && getY() > cutOffMin;
-        if (isWithinAnimationBounds) {
-            getBackground().setColorFilter(new PorterDuffColorFilter(
-                    getBlendColorBasedOnYPosition(currentFingerY, cutOffDistance),
-                    PorterDuff.Mode.MULTIPLY));
-        } else {
-            getBackground().setColorFilter(new PorterDuffColorFilter(
-                    mBackgroundColor, PorterDuff.Mode.MULTIPLY));
-        }
         translateBasedOnYPosition(currentFingerY, cutOffDistance, isWithinAnimationBounds);
         scaleBasedOnYPosition(currentFingerY, cutOffDistance, isWithinAnimationBounds);
-    }
-
-    private int getBlendColorBasedOnYPosition(int y, float cutOffDistance) {
-        float raisedCosineBlend = (float) Math.cos(((y - getY()) / (cutOffDistance)) * Math.PI);
-        float blendRatio = Utilities.boundToRange(raisedCosineBlend, 0f, 1f);
-        return ColorUtils.blendARGB(mBackgroundColor, mSelectedColor, blendRatio);
     }
 
     private void scaleBasedOnYPosition(int y, float cutOffDistance,

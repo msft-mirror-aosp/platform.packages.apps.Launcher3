@@ -17,8 +17,6 @@ package com.android.launcher3.taskbar;
 
 import static androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
 
-import static com.android.launcher3.taskbar.KeyboardQuickSwitchController.MAX_TASKS;
-
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
@@ -58,8 +56,12 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * View that allows quick switching between recent tasks through keyboard alt-tab and alt-shift-tab
- * commands.
+ * View that allows quick switching between recent tasks.
+ *
+ * Can be access via:
+ * - keyboard alt-tab
+ * - alt-shift-tab
+ * - taskbar overflow button
  */
 public class KeyboardQuickSwitchView extends ConstraintLayout {
 
@@ -196,7 +198,7 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
 
         View previousTaskView = null;
         LayoutInflater layoutInflater = LayoutInflater.from(context);
-        int tasksToDisplay = Math.min(MAX_TASKS, groupTasks.size());
+        int tasksToDisplay = groupTasks.size();
         for (int i = 0; i < tasksToDisplay; i++) {
             GroupTask groupTask = groupTasks.get(i);
             KeyboardQuickSwitchTaskView currentTaskView = createAndAddTaskView(
@@ -214,11 +216,13 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
                     groupTask.mSplitBounds == null
                             || groupTask.mSplitBounds.leftTopTaskId == groupTask.task1.key.id
                             || groupTask.task2 == null;
-            currentTaskView.setThumbnails(
+
+            currentTaskView.setThumbnailsForSplitTasks(
                     firstTaskIsLeftTopTask ? groupTask.task1 : groupTask.task2,
                     firstTaskIsLeftTopTask ? groupTask.task2 : groupTask.task1,
                     updateTasks ? mViewCallbacks::updateThumbnailInBackground : null,
-                    updateTasks ? mViewCallbacks::updateIconInBackground : null);
+                    updateTasks ? mViewCallbacks::updateIconInBackground : null,
+                    groupTask.mSplitBounds);
 
             previousTaskView = currentTaskView;
         }

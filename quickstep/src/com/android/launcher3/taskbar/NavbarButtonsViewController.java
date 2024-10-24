@@ -23,6 +23,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 import static com.android.launcher3.LauncherAnimUtils.ROTATION_DRAWABLE_PERCENT;
 import static com.android.launcher3.LauncherAnimUtils.VIEW_TRANSLATE_X;
 import static com.android.launcher3.Utilities.getDescendantCoordRelativeToAncestor;
+import static com.android.launcher3.anim.AnimatorListeners.forEndCallback;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
 import static com.android.launcher3.taskbar.LauncherTaskbarUIController.SYSUI_SURFACE_PROGRESS_INDEX;
 import static com.android.launcher3.taskbar.TaskbarNavButtonController.BUTTON_A11Y;
@@ -48,7 +49,9 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_Q
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SHORTCUT_HELPER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING;
+import static com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar;
 
+import android.animation.Animator;
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
 import android.annotation.DrawableRes;
@@ -91,6 +94,7 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AlphaUpdateListener;
 import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarButton;
+import com.android.launcher3.taskbar.bubbles.BubbleBarController;
 import com.android.launcher3.taskbar.navbutton.NavButtonLayoutFactory;
 import com.android.launcher3.taskbar.navbutton.NavButtonLayoutFactory.NavButtonLayoutter;
 import com.android.launcher3.taskbar.navbutton.NearestTouchFrame;
@@ -106,6 +110,7 @@ import com.android.systemui.shared.rotation.RotationButton;
 import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
+import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -115,7 +120,8 @@ import java.util.function.IntPredicate;
 /**
  * Controller for managing nav bar buttons in taskbar
  */
-public class NavbarButtonsViewController implements TaskbarControllers.LoggableTaskbarController {
+public class NavbarButtonsViewController implements TaskbarControllers.LoggableTaskbarController,
+        BubbleBarController.BubbleBarLocationListener {
 
     private final Rect mTempRect = new Rect();
 
@@ -167,14 +173,17 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     // Used for IME+A11Y buttons
     private final ViewGroup mEndContextualContainer;
     private final ViewGroup mStartContextualContainer;
-    private final int mLightIconColorOnHome;
-    private final int mDarkIconColorOnHome;
-    /** Color to use for navigation bar buttons, if they are on on a Taskbar surface background. */
+    private final int mLightIconColorOnWorkspace;
+    private final int mDarkIconColorOnWorkspace;
+    /** Color to use for navbar buttons, if they are on on a Taskbar surface background. */
     private final int mOnBackgroundIconColor;
+
+    private @Nullable Animator mNavBarLocationAnimator;
+    private @Nullable BubbleBarLocation mBubbleBarTargetLocation;
 
     private final AnimatedFloat mTaskbarNavButtonTranslationY = new AnimatedFloat(
             this::updateNavButtonTranslationY);
-    private final AnimatedFloat mTaskbarNavButtonTranslationYForInAppDisplay = new AnimatedFloat(
+    private final AnimatedFloat mNavButtonTranslationYForInAppDisplay = new AnimatedFloat(
             this::updateNavButtonTranslationY);
     private final AnimatedFloat mTaskbarNavButtonTranslationYForIme = new AnimatedFloat(
             this::updateNavButtonTranslationY);
@@ -182,7 +191,10 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     // Used for System UI state updates that should translate the nav button for in-app display.
     private final AnimatedFloat mNavButtonInAppDisplayProgressForSysui = new AnimatedFloat(
             this::updateNavButtonInAppDisplayProgressForSysui);
-    /** Expected nav button dark intensity communicated via the framework. */
+    /**
+     * Expected nav button dark intensity piped down from {@code LightBarController} in framework
+     * via {@code TaskbarDelegate}.
+     */
     private final AnimatedFloat mTaskbarNavButtonDarkIntensity = new AnimatedFloat(
             this::onDarkIntensityChanged);
     /** {@code 1} if the Taskbar background color is fully opaque. */
@@ -237,8 +249,8 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         mEndContextualContainer = mNavButtonsView.findViewById(R.id.end_contextual_buttons);
         mStartContextualContainer = mNavButtonsView.findViewById(R.id.start_contextual_buttons);
 
-        mLightIconColorOnHome = context.getColor(R.color.taskbar_nav_icon_light_color_on_home);
-        mDarkIconColorOnHome = context.getColor(R.color.taskbar_nav_icon_dark_color_on_home);
+        mLightIconColorOnWorkspace = context.getColor(R.color.taskbar_nav_icon_light_color_on_home);
+        mDarkIconColorOnWorkspace = context.getColor(R.color.taskbar_nav_icon_dark_color_on_home);
         mOnBackgroundIconColor = Utilities.isDarkTheme(context)
                 ? context.getColor(R.color.taskbar_nav_icon_light_color)
                 : context.getColor(R.color.taskbar_nav_icon_dark_color);
@@ -397,6 +409,12 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             }
         };
         mSeparateWindowParent.recreateControllers();
+        if (BubbleBarController.isBubbleBarEnabled()) {
+            mNavButtonsView.addOnLayoutChangeListener(
+                    (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
+                            onLayoutsUpdated()
+            );
+        }
     }
 
     private void initButtons(ViewGroup navContainer, ViewGroup endContainer,
@@ -686,8 +704,8 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     }
 
     /** Use to set the translationY for the all nav+contextual buttons when in Launcher */
-    public AnimatedFloat getTaskbarNavButtonTranslationYForInAppDisplay() {
-        return mTaskbarNavButtonTranslationYForInAppDisplay;
+    public AnimatedFloat getNavButtonTranslationYForInAppDisplay() {
+        return mNavButtonTranslationYForInAppDisplay;
     }
 
     /** Use to set the dark intensity for the all nav+contextual buttons */
@@ -733,54 +751,84 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         if (mContext.isPhoneButtonNavMode()) {
             return;
         }
-        final float normalTranslationY = mTaskbarNavButtonTranslationY.value;
-        final float imeAdjustmentTranslationY = mTaskbarNavButtonTranslationYForIme.value;
-        TaskbarUIController uiController = mControllers.uiController;
-        final float inAppDisplayAdjustmentTranslationY =
-                (uiController instanceof LauncherTaskbarUIController
-                        && ((LauncherTaskbarUIController) uiController).shouldUseInAppLayout())
-                        ? mTaskbarNavButtonTranslationYForInAppDisplay.value : 0;
-
-        mLastSetNavButtonTranslationY = normalTranslationY
-                + imeAdjustmentTranslationY
-                + inAppDisplayAdjustmentTranslationY;
+        mLastSetNavButtonTranslationY = calculateNavButtonTranslationY();
         mNavButtonsView.setTranslationY(mLastSetNavButtonTranslationY);
     }
 
+    /**
+     * Calculates the translationY of the nav buttons based on the current device state.
+     */
+    private float calculateNavButtonTranslationY() {
+        float translationY =
+                mTaskbarNavButtonTranslationY.value + mTaskbarNavButtonTranslationYForIme.value;
+        if (mControllers.uiController.shouldUseInAppLayout()) {
+            translationY += mNavButtonTranslationYForInAppDisplay.value;
+        }
+        return translationY;
+    }
+
+    /**
+     * Sets Taskbar 3-button mode icon colors based on the
+     * {@link #mTaskbarNavButtonDarkIntensity} value piped in from Framework. For certain cases
+     * in large screen taskbar where there may be opaque surfaces, the selected SystemUI button
+     * colors are intentionally overridden.
+     * <p>
+     * This method is also called when any of the AnimatedFloat instances change.
+     */
     private void updateNavButtonColor() {
         final ArgbEvaluator argbEvaluator = ArgbEvaluator.getInstance();
-        final int sysUiNavButtonIconColorOnHome = (int) argbEvaluator.evaluate(
-                mTaskbarNavButtonDarkIntensity.value,
-                mLightIconColorOnHome,
-                mDarkIconColorOnHome);
-
-        final int iconColor;
-        if (ENABLE_TASKBAR_NAVBAR_UNIFICATION && mContext.isPhoneMode()) {
-            iconColor = sysUiNavButtonIconColorOnHome;
-        } else {
-            // Override the color from framework if nav buttons are over an opaque Taskbar surface.
-            iconColor = (int) argbEvaluator.evaluate(
-                    mOnBackgroundNavButtonColorOverrideMultiplier.value * Math.max(
-                            mOnTaskbarBackgroundNavButtonColorOverride.value,
-                            mSlideInViewVisibleNavButtonColorOverride.value),
-                    sysUiNavButtonIconColorOnHome,
-                    mOnBackgroundIconColor);
+        int taskbarNavButtonColor = getSysUiIconColorOnHome(argbEvaluator);
+        // Only phone mode foldable button colors should be identical to SysUI navbar colors.
+        if (!(ENABLE_TASKBAR_NAVBAR_UNIFICATION && mContext.isPhoneMode())) {
+            taskbarNavButtonColor = getTaskbarButtonColor(argbEvaluator, taskbarNavButtonColor);
         }
+        applyButtonColors(taskbarNavButtonColor);
+    }
 
+    /**
+     * Taskbar 3-button mode icon colors based on the
+     * {@link #mTaskbarNavButtonDarkIntensity} value piped in from Framework.
+     */
+    private int getSysUiIconColorOnHome(ArgbEvaluator argbEvaluator) {
+        return (int) argbEvaluator.evaluate(getTaskbarNavButtonDarkIntensity().value,
+                mLightIconColorOnWorkspace, mDarkIconColorOnWorkspace);
+    }
+
+    /**
+     * If Taskbar background is opaque or slide in overlay is visible, the selected SystemUI button
+     * colors are intentionally overridden. The override can be disabled when
+     * {@link #mOnBackgroundNavButtonColorOverrideMultiplier} is {@code 0}.
+     */
+    private int getTaskbarButtonColor(ArgbEvaluator argbEvaluator, int sysUiIconColorOnHome) {
+        final float sysUIColorOverride =
+                mOnBackgroundNavButtonColorOverrideMultiplier.value * Math.max(
+                        mOnTaskbarBackgroundNavButtonColorOverride.value,
+                        mSlideInViewVisibleNavButtonColorOverride.value);
+        return (int) argbEvaluator.evaluate(sysUIColorOverride, sysUiIconColorOnHome,
+                mOnBackgroundIconColor);
+    }
+
+    /**
+     * Iteratively sets button colors for each button in {@link #mAllButtons}.
+     */
+    private void applyButtonColors(int iconColor) {
         for (ImageView button : mAllButtons) {
             button.setImageTintList(ColorStateList.valueOf(iconColor));
             Drawable background = button.getBackground();
             if (background instanceof KeyButtonRipple) {
                 ((KeyButtonRipple) background).setDarkIntensity(
-                        mTaskbarNavButtonDarkIntensity.value);
+                        getTaskbarNavButtonDarkIntensity().value);
             }
         }
     }
 
+    /**
+     * Updates Taskbar 3-Button icon colors as {@link #mTaskbarNavButtonDarkIntensity} changes.
+     */
     private void onDarkIntensityChanged() {
         updateNavButtonColor();
         if (mContext.isPhoneMode()) {
-            mTaskbarTransitions.onDarkIntensityChanged(mTaskbarNavButtonDarkIntensity.value);
+            mTaskbarTransitions.onDarkIntensityChanged(getTaskbarNavButtonDarkIntensity().value);
         }
     }
 
@@ -1116,7 +1164,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         pw.println(prefix + "\t\tmTaskbarNavButtonTranslationY="
                 + mTaskbarNavButtonTranslationY.value);
         pw.println(prefix + "\t\tmTaskbarNavButtonTranslationYForInAppDisplay="
-                + mTaskbarNavButtonTranslationYForInAppDisplay.value);
+                + mNavButtonTranslationYForInAppDisplay.value);
         pw.println(prefix + "\t\tmTaskbarNavButtonTranslationYForIme="
                 + mTaskbarNavButtonTranslationYForIme.value);
         pw.println(prefix + "\t\tmTaskbarNavButtonDarkIntensity="
@@ -1166,6 +1214,100 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
      */
     public void updateTaskbarAlignment(float alignment) {
         mHitboxExtender.onAnimationProgressToOverview(alignment);
+    }
+
+    /** Adjusts navigation buttons layout accordingly to the bubble bar position. */
+    @Override
+    public void onBubbleBarLocationUpdated(BubbleBarLocation location) {
+        boolean locationUpdated = location != mBubbleBarTargetLocation;
+        if (locationUpdated) {
+            cancelExistingNavBarAnimation();
+        } else {
+            endExistingAnimation();
+        }
+        mNavButtonContainer.setTranslationX(getNavBarTranslationX(location));
+        mBubbleBarTargetLocation = location;
+    }
+
+    /** Animates navigation buttons accordingly to the bubble bar position. */
+    @Override
+    public void onBubbleBarLocationAnimated(BubbleBarLocation location) {
+        if (location == mBubbleBarTargetLocation) return;
+        cancelExistingNavBarAnimation();
+        mBubbleBarTargetLocation = location;
+        int finalX = getNavBarTranslationX(location);
+        Animator teleportAnimator = BarsLocationAnimatorHelper
+                .getTeleportAnimatorForNavButtons(location, mNavButtonContainer, finalX);
+        teleportAnimator.addListener(forEndCallback(() -> mNavBarLocationAnimator = null));
+        mNavBarLocationAnimator = teleportAnimator;
+        mNavBarLocationAnimator.start();
+    }
+
+    private void endExistingAnimation() {
+        if (mNavBarLocationAnimator != null) {
+            mNavBarLocationAnimator.end();
+            mNavBarLocationAnimator = null;
+        }
+    }
+
+    private void cancelExistingNavBarAnimation() {
+        if (mNavBarLocationAnimator != null) {
+            mNavBarLocationAnimator.cancel();
+            mNavBarLocationAnimator = null;
+        }
+    }
+
+    private int getNavBarTranslationX(BubbleBarLocation location) {
+        boolean isNavbarOnRight = location.isOnLeft(mNavButtonsView.isLayoutRtl());
+        DeviceProfile dp = mContext.getDeviceProfile();
+        float navBarTargetStartX;
+        if (mContext.shouldStartAlignTaskbar()) {
+            int navBarSpacing = dp.inlineNavButtonsEndSpacingPx;
+            // If the taskbar is start aligned the navigation bar is aligned to the start or end of
+            // the container, depending on the bubble bar location
+            if (isNavbarOnRight) {
+                navBarTargetStartX = dp.widthPx - navBarSpacing - mNavButtonContainer.getWidth();
+            } else {
+                navBarTargetStartX = navBarSpacing;
+            }
+        } else {
+            // If the task bar is not start aligned, the navigation bar is located in the center
+            // between the taskbar and screen edges, depending on the bubble bar location.
+            float navbarWidth = mNavButtonContainer.getWidth();
+            Rect taskbarBounds = mControllers.taskbarViewController.getIconLayoutBounds();
+            if (isNavbarOnRight) {
+                if (mNavButtonsView.isLayoutRtl()) {
+                    float taskBarEnd = taskbarBounds.right;
+                    navBarTargetStartX = (dp.widthPx + taskBarEnd - navbarWidth) / 2;
+                } else {
+                    navBarTargetStartX = mNavButtonContainer.getLeft();
+                }
+            } else {
+                float taskBarStart = taskbarBounds.left;
+                navBarTargetStartX = (taskBarStart - navbarWidth) / 2;
+            }
+        }
+        return (int) navBarTargetStartX - mNavButtonContainer.getLeft();
+    }
+
+    /** Adjusts the navigation buttons layout position according to the bubble bar location. */
+    public void onLayoutsUpdated() {
+        // no need to do anything if on phone, or if taskbar or navbar views were not placed on
+        // screen.
+        if (mContext.getDeviceProfile().isPhone
+                || mControllers.taskbarViewController.getIconLayoutBounds().isEmpty()
+                || mNavButtonsView.getWidth() == 0) {
+            return;
+        }
+        if (enableBubbleBarInPersistentTaskBar()
+                && mControllers.bubbleControllers.isPresent()) {
+            if (mBubbleBarTargetLocation == null) {
+                // only set bubble bar location if it was not set before
+                mBubbleBarTargetLocation = mControllers.bubbleControllers.get()
+                        .bubbleBarViewController.getBubbleBarLocation();
+            }
+            onBubbleBarLocationUpdated(mBubbleBarTargetLocation);
+        }
     }
 
     private class RotationButtonListener implements RotationButton.RotationButtonUpdatesCallback {
