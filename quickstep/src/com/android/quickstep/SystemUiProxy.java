@@ -1426,10 +1426,10 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle, SafeCloseable {
     /**
      * If task with the given id is on the desktop, bring it to front
      */
-    public void showDesktopApp(int taskId) {
+    public void showDesktopApp(int taskId, @Nullable RemoteTransition transition) {
         if (mDesktopMode != null) {
             try {
-                mDesktopMode.showDesktopApp(taskId);
+                mDesktopMode.showDesktopApp(taskId, transition);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call showDesktopApp", e);
             }

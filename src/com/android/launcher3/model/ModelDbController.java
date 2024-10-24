@@ -20,15 +20,16 @@ import static android.util.Base64.NO_PADDING;
 import static android.util.Base64.NO_WRAP;
 
 import static com.android.launcher3.DefaultLayoutParser.RES_PARTNER_DEFAULT_LAYOUT;
+import static com.android.launcher3.LauncherPrefs.NO_DB_FILES_RESTORED;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR;
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.LauncherSettings.Favorites.addTableToDb;
 import static com.android.launcher3.LauncherSettings.Settings.BLOB_KEY_PREFIX;
-import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_PROVIDER_KEY;
 import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_DIGEST_LABEL;
 import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_DIGEST_TAG;
+import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_PROVIDER_KEY;
 import static com.android.launcher3.provider.LauncherDbUtils.tableExists;
 
 import android.app.blob.BlobHandle;
@@ -97,6 +98,7 @@ public class ModelDbController {
 
     private static final String EMPTY_DATABASE_CREATED = "EMPTY_DATABASE_CREATED";
     public static final String EXTRA_DB_NAME = "db_name";
+    public static final String DATA_TYPE_DB_FILE = "database_file";
 
     protected DatabaseHelper mOpenHelper;
 
@@ -295,7 +297,15 @@ public class ModelDbController {
 
         if (!migrateGridIfNeeded()) {
             if (restoreEventLogger != null) {
-                sendMetricsForFailedMigration(restoreEventLogger, getDb());
+                if (LauncherPrefs.get(mContext).get(NO_DB_FILES_RESTORED)) {
+                    restoreEventLogger.logLauncherItemsRestoreFailed(DATA_TYPE_DB_FILE, 1,
+                            RestoreError.DATABASE_FILE_NOT_RESTORED);
+                    LauncherPrefs.get(mContext).put(NO_DB_FILES_RESTORED, false);
+                    FileLog.d(TAG, "There is no data to migrate: resetting launcher database");
+                } else {
+                    restoreEventLogger.logLauncherItemsRestored(DATA_TYPE_DB_FILE, 1);
+                    sendMetricsForFailedMigration(restoreEventLogger, getDb());
+                }
             }
             FileLog.d(TAG, "Migration failed: resetting launcher database");
             createEmptyDB();
@@ -304,6 +314,8 @@ public class ModelDbController {
 
             // Write the grid state to avoid another migration
             new DeviceGridState(LauncherAppState.getIDP(mContext)).writeToPrefs(mContext);
+        } else if (restoreEventLogger != null) {
+            restoreEventLogger.logLauncherItemsRestored(DATA_TYPE_DB_FILE, 1);
         }
     }
 
@@ -317,17 +329,17 @@ public class ModelDbController {
         createDbIfNotExists();
         if (LauncherPrefs.get(mContext).get(getEmptyDbCreatedKey())) {
             // If we have already create a new DB, ignore migration
-            Log.d(TAG, "migrateGridIfNeeded: new DB already created, skipping migration");
+            FileLog.d(TAG, "migrateGridIfNeeded: new DB already created, skipping migration");
             return false;
         }
         InvariantDeviceProfile idp = LauncherAppState.getIDP(mContext);
         if (!GridSizeMigrationUtil.needsToMigrate(mContext, idp)) {
-            Log.d(TAG, "migrateGridIfNeeded: no grid migration needed");
+            FileLog.d(TAG, "migrateGridIfNeeded: no grid migration needed");
             return true;
         }
         String targetDbName = new DeviceGridState(idp).getDbFile();
         if (TextUtils.equals(targetDbName, mOpenHelper.getDatabaseName())) {
-            Log.e(TAG, "migrateGridIfNeeded: target db is same as current: " + targetDbName);
+            FileLog.e(TAG, "migrateGridIfNeeded: target db is same as current: " + targetDbName);
             return false;
         }
         DatabaseHelper oldHelper = mOpenHelper;

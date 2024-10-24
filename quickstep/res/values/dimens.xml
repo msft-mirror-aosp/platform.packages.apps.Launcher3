@@ -356,12 +356,10 @@
     <dimen name="taskbar_back_button_suw_start_margin">48dp</dimen>
     <dimen name="taskbar_back_button_suw_bottom_margin">1dp</dimen>
     <dimen name="taskbar_back_button_suw_height">72dp</dimen>
-    <dimen name="taskbar_running_app_indicator_height">4dp</dimen>
-    <dimen name="taskbar_running_app_indicator_width">14dp</dimen>
-    <dimen name="taskbar_running_app_indicator_top_margin">2dp</dimen>
-    <dimen name="taskbar_minimized_app_indicator_height">2dp</dimen>
-    <dimen name="taskbar_minimized_app_indicator_width">12dp</dimen>
-    <dimen name="taskbar_minimized_app_indicator_top_margin">2dp</dimen>
+    <dimen name="taskbar_running_app_indicator_height">2dp</dimen>
+    <dimen name="taskbar_running_app_indicator_width">12dp</dimen>
+    <dimen name="taskbar_running_app_indicator_top_margin">4dp</dimen>
+    <dimen name="taskbar_minimized_app_indicator_width">6dp</dimen>
 
     <!-- Transient taskbar -->
     <dimen name="transient_taskbar_padding">12dp</dimen>
@@ -424,6 +422,7 @@
     <!--- Taskbar Pinning -->
     <dimen name="taskbar_pinning_popup_menu_width">300dp</dimen>
     <dimen name="taskbar_pinning_popup_menu_vertical_margin">16dp</dimen>
+    <dimen name="taskbar_pinning_popup_menu_min_padding_from_screen_edge">16dp</dimen>
 
     <!--- Floating Ime Inset height-->
     <dimen name="floating_ime_inset_height">60dp</dimen>

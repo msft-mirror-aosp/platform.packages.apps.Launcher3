@@ -1935,6 +1935,9 @@ public abstract class RecentsView<
 
         // Keep same previous focused task
         TaskView newFocusedTaskView = getTaskViewByTaskIds(focusedTaskIds);
+        if (enableLargeDesktopWindowingTile() && newFocusedTaskView instanceof DesktopTaskView) {
+            newFocusedTaskView = null;
+        }
         // If the list changed, maybe the focused task doesn't exist anymore
         int newFocusedTaskViewIndex = mUtils.getFocusedTaskIndex(taskGroups);
         if (newFocusedTaskView == null && getTaskViewCount() > newFocusedTaskViewIndex) {
@@ -2975,10 +2978,19 @@ public abstract class RecentsView<
         boolean runningTaskTileHidden = mRunningTaskTileHidden;
         setCurrentTask(runningTaskViewId);
 
-        boolean shouldFocusRunningTask = !(enableGridOnlyOverview()
-                || (enableLargeDesktopWindowingTile()
-                && getRunningTaskView() instanceof DesktopTaskView));
-        setFocusedTaskViewId(shouldFocusRunningTask ? runningTaskViewId : INVALID_TASK_ID);
+        int focusedTaskViewId;
+        if (enableGridOnlyOverview()) {
+            focusedTaskViewId = INVALID_TASK_ID;
+        } else if (enableLargeDesktopWindowingTile()
+                && getRunningTaskView() instanceof DesktopTaskView) {
+            TaskView focusedTaskView = getTaskViewAt(getDesktopTaskViewCount());
+            focusedTaskViewId =
+                    focusedTaskView != null ? focusedTaskView.getTaskViewId() : INVALID_TASK_ID;
+        } else {
+            focusedTaskViewId = runningTaskViewId;
+        }
+        setFocusedTaskViewId(focusedTaskViewId);
+
         runOnPageScrollsInitialized(() -> setCurrentPage(getRunningTaskIndex()));
         setRunningTaskViewShowScreenshot(false);
         setRunningTaskHidden(runningTaskTileHidden);
@@ -3810,7 +3822,7 @@ public abstract class RecentsView<
                 }
             } else if (!showAsGrid || (enableLargeDesktopWindowingTile()
                     && dismissedTaskView.isLargeTile()
-                    && nextFocusedTaskView == null)) {
+                    && nextFocusedTaskView == null && !dismissingForSplitSelection)) {
                 int offset = getOffsetToDismissedTask(scrollDiffPerPage, dismissedIndex, taskCount);
                 int scrollDiff = newScroll[i] - oldScroll[i] + offset;
                 if (scrollDiff != 0) {
@@ -3939,11 +3951,9 @@ public abstract class RecentsView<
                     if (shouldRemoveTask) {
                         if (dismissedTaskView.isRunningTask()) {
                             finishRecentsAnimation(true /* toRecents */, false /* shouldPip */,
-                                    () -> removeTaskInternal(dismissedTaskViewId,
-                                            dismissedTaskView instanceof DesktopTaskView));
+                                    () -> removeTaskInternal(dismissedTaskView));
                         } else {
-                            removeTaskInternal(dismissedTaskViewId,
-                                    dismissedTaskView instanceof DesktopTaskView);
+                            removeTaskInternal(dismissedTaskView);
                         }
                         announceForAccessibility(
                                 getResources().getString(R.string.task_view_closed));
@@ -4311,22 +4321,24 @@ public abstract class RecentsView<
         return lastVisibleIndex;
     }
 
-    private void removeTaskInternal(int dismissedTaskViewId, boolean isDesktop) {
-        int[] taskIds = getTaskIdsForTaskViewId(dismissedTaskViewId);
-        UI_HELPER_EXECUTOR.getHandler().post(() -> {
-            if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_BACK_NAVIGATION.isTrue() && isDesktop) {
-                // TODO: b/372005228 - Use the api with desktop id instead.
-                SystemUiProxy.INSTANCE.get(getContext()).removeDesktop(
-                        mContainer.getDisplay().getDisplayId());
-            } else {
-                for (int taskId : taskIds) {
-                    if (taskId != -1) {
-                        ActivityManagerWrapper.getInstance().removeTask(taskId);
-                    }
+  private void removeTaskInternal(@NonNull TaskView dismissedTaskView) {
+    UI_HELPER_EXECUTOR
+        .getHandler()
+        .post(
+            () -> {
+              if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_BACK_NAVIGATION.isTrue()
+                  && dismissedTaskView instanceof DesktopTaskView) {
+                // TODO: b/362720497 - Use the api with desktop id instead.
+                SystemUiProxy.INSTANCE
+                    .get(getContext())
+                    .removeDesktop(mContainer.getDisplay().getDisplayId());
+              } else {
+                for (int taskId : dismissedTaskView.getTaskIds()) {
+                    ActivityManagerWrapper.getInstance().removeTask(taskId);
                 }
-            }
-        });
-    }
+              }
+            });
+  }
 
     protected void onDismissAnimationEnds() {
         AccessibilityManagerCompat.sendTestProtocolEventToTest(getContext(),
@@ -5045,7 +5057,8 @@ public abstract class RecentsView<
         mSplitHiddenTaskView = getTaskViewByTaskId(splitSelectSource.alreadyRunningTaskId);
         mSplitHiddenTaskViewIndex = indexOfChild(mSplitHiddenTaskView);
         mSplitSelectStateController
-                .setAnimateCurrentTaskDismissal(splitSelectSource.animateCurrentTaskDismissal);
+                .setAnimateCurrentTaskDismissal(splitSelectSource.animateCurrentTaskDismissal
+                        && mSplitHiddenTaskView != null);
 
         // Prevent dismissing whole task if we're only initiating from one of 2 tasks in split pair
         mSplitSelectStateController.setDismissingFromSplitPair(mSplitHiddenTaskView != null
@@ -5430,7 +5443,6 @@ public abstract class RecentsView<
 
         int taskIndex = indexOfChild(taskView);
         int centerTaskIndex = getCurrentPage();
-        boolean isRunningTask = taskView.isRunningTask();
 
         float toScale = getMaxScaleForFullScreen();
         boolean showAsGrid = showAsGrid();
@@ -5450,7 +5462,9 @@ public abstract class RecentsView<
                     setPivotX(mTempPointF.x);
                     setPivotY(mTempPointF.y);
 
-                    if (!isRunningTask) {
+                    // If live tile is not launching, apply pivot to live tile as well and bring it
+                    // above RecentsView to avoid wallpaper blur from being applied to it.
+                    if (!taskView.isRunningTask()) {
                         runActionOnRemoteHandles(
                                 remoteTargetHandle -> {
                                     remoteTargetHandle.getTaskViewSimulator().setPivotOverride(
@@ -5575,15 +5589,13 @@ public abstract class RecentsView<
                 remoteTargetHandle -> remoteTargetHandle.getTaskViewSimulator()
                         .addOverviewToAppAnim(mPendingAnimation, interpolator));
         mPendingAnimation.addOnFrameCallback(this::redrawLiveTile);
-        if (taskView instanceof DesktopTaskView && mRemoteTargetHandles != null) {
-            mPendingAnimation.addListener(new AnimatorListenerAdapter() {
-                @Override
-                public void onAnimationStart(Animator animation) {
-                    runActionOnRemoteHandles(remoteTargetHandle ->
-                            remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(false));
-                }
-            });
-        }
+        mPendingAnimation.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+                runActionOnRemoteHandles(remoteTargetHandle ->
+                        remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(false));
+            }
+        });
         mPendingAnimation.addEndListener(isSuccess -> {
             if (isSuccess) {
                 if (taskView instanceof GroupedTaskView && hasAllValidTaskIds(taskView.getTaskIds())
@@ -5615,6 +5627,13 @@ public abstract class RecentsView<
     protected Unit onTaskLaunchAnimationEnd(boolean success) {
         if (success) {
             resetTaskVisuals();
+        } else {
+            // If launch animation didn't complete i.e. user dragged live tile down and then
+            // back up and returned to Overview, then we need to ensure we reset the
+            // view to draw below recents so that it can't be interacted with.
+            runActionOnRemoteHandles(remoteTargetHandle ->
+                    remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(true));
+            redrawLiveTile();
         }
         return Unit.INSTANCE;
     }

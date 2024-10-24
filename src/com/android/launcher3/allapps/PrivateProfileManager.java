@@ -220,7 +220,7 @@ public class PrivateProfileManager extends UserProfileManager {
      * when animation is not running.
      */
     public void reset() {
-        // Ensure the state of the header views is what it should be before animating.
+        // Ensure the state of the header view is what it should be before animating.
         updateView();
         getMainRecyclerView().setChildAttachedConsumer(null);
         int previousState = getCurrentState();
@@ -435,6 +435,7 @@ public class PrivateProfileManager extends UserProfileManager {
                 lockPill.setVisibility(GONE);
             }
         }
+        mPSHeader.invalidate();
     }
 
     /** Sets the enablement of the profile when header or button is clicked. */
@@ -474,7 +475,8 @@ public class PrivateProfileManager extends UserProfileManager {
                 break;
             }
             // Make the private space apps gone to "collapse".
-            if (mFloatingMaskView == null && isPrivateSpaceItem(currentItem)) {
+            if ((mFloatingMaskView == null && isPrivateSpaceItem(currentItem)) ||
+                    currentItem.viewType == VIEW_TYPE_PRIVATE_SPACE_SYS_APPS_DIVIDER) {
                 RecyclerView.ViewHolder viewHolder =
                         allAppsRecyclerView.findViewHolderForAdapterPosition(i);
                 if (viewHolder != null) {

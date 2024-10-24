@@ -257,7 +257,7 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
 
     protected TestRule getRulesInsideActivityMonitor() {
         final ViewCaptureRule viewCaptureRule = new ViewCaptureRule(
-                Launcher.ACTIVITY_TRACKER::getCreatedActivity);
+                Launcher.ACTIVITY_TRACKER::getCreatedContext);
         final RuleChain inner = RuleChain
                 .outerRule(new PortraitLandscapeRunner<LAUNCHER_TYPE>(this))
                 .around(new FailureWatcher(mLauncher, viewCaptureRule::getViewCaptureData))
@@ -414,6 +414,7 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
     public void verifyLauncherState() {
         try {
             // Limits UI tests affecting tests running after them.
+            mDevice.pressHome();
             mLauncher.waitForLauncherInitialized();
             if (mLauncherPid != 0) {
                 assertEquals("Launcher crashed, pid mismatch:",
@@ -455,7 +456,7 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
 
     protected <T> T getFromLauncher(Function<LAUNCHER_TYPE, T> f) {
         if (!TestHelpers.isInLauncherProcess()) return null;
-        return getOnUiThread(() -> f.apply(Launcher.ACTIVITY_TRACKER.getCreatedActivity()));
+        return getOnUiThread(() -> f.apply(Launcher.ACTIVITY_TRACKER.getCreatedContext()));
     }
 
     protected void executeOnLauncher(Consumer<LAUNCHER_TYPE> f) {
