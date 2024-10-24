@@ -1344,7 +1344,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (requestArgs != null) {
             setWaitingForResult(requestArgs);
         }
-        mPendingActivityRequestCode = savedState.getInt(RUNTIME_STATE_PENDING_REQUEST_CODE);
+        mPendingActivityRequestCode = savedState.getInt(
+                RUNTIME_STATE_PENDING_REQUEST_CODE, mPendingActivityRequestCode);
 
         mPendingActivityResult = savedState.getParcelable(RUNTIME_STATE_PENDING_ACTIVITY_RESULT);
 
