@@ -41,14 +41,7 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
     private lateinit var overlayInitializedScope: CoroutineScope
     private var uiState: TaskOverlayUiState = Disabled
 
-    private val viewModel: TaskOverlayViewModel by lazy {
-        TaskOverlayViewModel(
-            task = task,
-            recentsViewData = RecentsDependencies.get(),
-            getThumbnailPositionUseCase = RecentsDependencies.get(),
-            recentTasksRepository = RecentsDependencies.get()
-        )
-    }
+    private lateinit var viewModel: TaskOverlayViewModel
 
     // TODO(b/331753115): TaskOverlay should listen for state changes and react.
     val enabledState: Enabled
@@ -60,12 +53,19 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
         viewModel.getThumbnailPositionState(
             overlay.snapshotView.width,
             overlay.snapshotView.height,
-            overlay.snapshotView.isLayoutRtl
+            overlay.snapshotView.isLayoutRtl,
         )
 
     fun init() {
         overlayInitializedScope =
             CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("TaskOverlayHelper"))
+        viewModel =
+            TaskOverlayViewModel(
+                task = task,
+                recentsViewData = RecentsDependencies.get(),
+                getThumbnailPositionUseCase = RecentsDependencies.get(),
+                recentTasksRepository = RecentsDependencies.get(),
+            )
         viewModel.overlayState
             .onEach {
                 uiState = it
