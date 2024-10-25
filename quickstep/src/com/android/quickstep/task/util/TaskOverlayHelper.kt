@@ -17,6 +17,7 @@
 package com.android.quickstep.task.util
 
 import android.util.Log
+import android.view.View.OnLayoutChangeListener
 import com.android.quickstep.TaskOverlayFactory
 import com.android.quickstep.recents.di.RecentsDependencies
 import com.android.quickstep.recents.di.get
@@ -47,6 +48,10 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
     val enabledState: Enabled
         get() = uiState as Enabled
 
+    private val snapshotLayoutChangeListener = OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+        (uiState as? Enabled)?.let { initOverlay(it) }
+    }
+
     fun getThumbnailMatrix() = getThumbnailPositionState().matrix
 
     private fun getThumbnailPositionState() =
@@ -76,9 +81,7 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
                 }
             }
             .launchIn(overlayInitializedScope)
-        overlay.snapshotView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            (uiState as? Enabled)?.let { initOverlay(it) }
-        }
+        overlay.snapshotView.addOnLayoutChangeListener(snapshotLayoutChangeListener)
     }
 
     private fun initOverlay(enabledState: Enabled) {
@@ -96,6 +99,7 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
     fun destroy() {
         overlayInitializedScope.cancel()
         uiState = Disabled
+        overlay.snapshotView.removeOnLayoutChangeListener(snapshotLayoutChangeListener)
         reset()
     }
 
