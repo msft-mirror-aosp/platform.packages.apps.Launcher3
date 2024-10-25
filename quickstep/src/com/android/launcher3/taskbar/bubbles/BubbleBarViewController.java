@@ -45,6 +45,7 @@ import com.android.launcher3.taskbar.TaskbarStashController;
 import com.android.launcher3.taskbar.bubbles.animation.BubbleBarViewAnimator;
 import com.android.launcher3.taskbar.bubbles.flyout.BubbleBarFlyoutController;
 import com.android.launcher3.taskbar.bubbles.flyout.BubbleBarFlyoutPositioner;
+import com.android.launcher3.taskbar.bubbles.flyout.FlyoutCallbacks;
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
@@ -146,7 +147,7 @@ public class BubbleBarViewController {
         mTaskbarStashController = controllers.taskbarStashController;
         mTaskbarInsetsController = controllers.taskbarInsetsController;
         mBubbleBarFlyoutController = new BubbleBarFlyoutController(
-                mBubbleBarContainer, createFlyoutPositioner(), createFlyoutTopBoundaryListener());
+                mBubbleBarContainer, createFlyoutPositioner(), createFlyoutCallbacks());
         mBubbleBarViewAnimator = new BubbleBarViewAnimator(
                 mBarView, mBubbleStashController, mBubbleBarFlyoutController,
                 mBubbleBarController::showExpandedView);
@@ -175,7 +176,9 @@ public class BubbleBarViewController {
 
             @Override
             public void onBubbleBarTouched() {
-                BubbleBarViewController.this.onBubbleBarTouched();
+                if (isAnimatingNewBubble()) {
+                    interruptAnimationForTouch();
+                }
             }
 
             @Override
@@ -273,8 +276,8 @@ public class BubbleBarViewController {
         };
     }
 
-    private BubbleBarFlyoutController.TopBoundaryListener createFlyoutTopBoundaryListener() {
-        return new BubbleBarFlyoutController.TopBoundaryListener() {
+    private FlyoutCallbacks createFlyoutCallbacks() {
+        return new FlyoutCallbacks() {
             @Override
             public void extendTopBoundary(int space) {
                 int defaultSize = mActivity.getDefaultTaskbarWindowSize();
@@ -284,6 +287,12 @@ public class BubbleBarViewController {
             @Override
             public void resetTopBoundary() {
                 mActivity.setTaskbarWindowSize(mActivity.getDefaultTaskbarWindowSize());
+            }
+
+            @Override
+            public void flyoutClicked() {
+                interruptAnimationForTouch();
+                expandBubbleBar();
             }
         };
     }
@@ -304,12 +313,10 @@ public class BubbleBarViewController {
         }
     }
 
-    private void onBubbleBarTouched() {
-        if (isAnimatingNewBubble()) {
-            mBubbleBarViewAnimator.onBubbleBarTouchedWhileAnimating();
-            mBubbleStashController.onNewBubbleAnimationInterrupted(false,
-                    mBarView.getTranslationY());
-        }
+    /** Interrupts the running animation for a touch event on the bubble bar or flyout. */
+    private void interruptAnimationForTouch() {
+        mBubbleBarViewAnimator.interruptForTouch();
+        mBubbleStashController.onNewBubbleAnimationInterrupted(false, mBarView.getTranslationY());
     }
 
     private void expandBubbleBar() {
@@ -461,6 +468,12 @@ public class BubbleBarViewController {
      */
     public Rect getBubbleBarBounds() {
         return mBarView.getBubbleBarBounds();
+    }
+
+    /** Returns the bounds of the flyout view if it exists, or {@code null} otherwise. */
+    @Nullable
+    public Rect getFlyoutBounds() {
+        return mBubbleBarFlyoutController.getFlyoutBounds();
     }
 
     /** Checks that bubble bar is visible and that the motion event is within bounds. */
@@ -843,22 +856,16 @@ public class BubbleBarViewController {
 
     /**
      * Hides the persistent taskbar if it is going to intersect with the expanded bubble bar if in
-     * app or overview. Set the hotseat stashed state if on launcher home screen. If not on launcher
-     * home screen and hotseat is stashed immediately un-stashes the hotseat.
+     * app or overview.
      */
     private void adjustTaskbarAndHotseatToBubbleBarState(boolean isBubbleBarExpanded) {
-        if (mBubbleStashController.isBubblesShowingOnHome()) {
-            mTaskbarStashController.stashHotseat(isBubbleBarExpanded);
-        } else if (!mBubbleStashController.isTransientTaskBar()) {
+        if (!mBubbleStashController.isBubblesShowingOnHome()
+                && !mBubbleStashController.isTransientTaskBar()) {
             boolean hideTaskbar = isBubbleBarExpanded && isIntersectingTaskbar();
             mTaskbarViewPropertiesProvider
                     .getIconsAlpha()
                     .animateToValue(hideTaskbar ? 0 : 1)
                     .start();
-        }
-        if (!mBubbleStashController.isBubblesShowingOnHome()
-                && mTaskbarStashController.isHiddenForBubbles()) {
-            mTaskbarStashController.unStashHotseatInstantly();
         }
     }
 
