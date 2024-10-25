@@ -304,6 +304,17 @@ public class BubbleBarView extends FrameLayout {
     }
 
     /**
+     * Set the bubble icons size and spacing between the bubbles and the borders of the bubble
+     * bar.
+     */
+    public void setIconSizeAndPaddingForPinning(float newIconSize, float newBubbleBarPadding) {
+        mBubbleBarPadding = newBubbleBarPadding;
+        mIconScale = newIconSize / mIconSize;
+        updateBubblesLayoutProperties(mBubbleBarLocation);
+        invalidate();
+    }
+
+    /**
      * Sets new icon sizes and newBubbleBarPadding between icons and bubble bar borders.
      *
      * @param newIconSize         new icon size
