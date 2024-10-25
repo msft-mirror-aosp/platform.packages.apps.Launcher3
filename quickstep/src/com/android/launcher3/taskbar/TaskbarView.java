@@ -197,11 +197,13 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     private int calculateMaxNumIcons() {
         DeviceProfile deviceProfile = mActivityContext.getDeviceProfile();
         int availableWidth = deviceProfile.widthPx;
+        int defaultEdgeMargin =
+                (int) getResources().getDimension(deviceProfile.inv.inlineNavButtonsEndSpacing);
 
         // Reserve space required for edge margins, or for navbar if shown. If task bar needs to be
         // center aligned with nav bar shown, reserve space on both sides.
-        availableWidth -= Math.max(deviceProfile.edgeMarginPx, deviceProfile.hotseatBarEndOffset);
-        availableWidth -= Math.max(deviceProfile.edgeMarginPx,
+        availableWidth -= Math.max(defaultEdgeMargin, deviceProfile.hotseatBarEndOffset);
+        availableWidth -= Math.max(defaultEdgeMargin,
                 mShouldTryStartAlign ? 0 : deviceProfile.hotseatBarEndOffset);
 
         // The space taken by an item icon used during layout.
