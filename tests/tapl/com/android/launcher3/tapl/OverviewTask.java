@@ -74,7 +74,7 @@ public final class OverviewTask {
             return getCombinedSplitTaskHeight();
         }
 
-        UiObject2 taskSnapshot1 = findObjectInTask(DEFAULT.snapshotRes);
+        UiObject2 taskSnapshot1 = findObjectInTask((isDesktop() ? DESKTOP : DEFAULT).snapshotRes);
         return taskSnapshot1.getVisibleBounds().height();
     }
 
