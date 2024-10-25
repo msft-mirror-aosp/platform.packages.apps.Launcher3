@@ -313,10 +313,8 @@ public class BaseLauncherBinder {
                 bindItemsInChunks(currentWorkspaceItems, ITEMS_CHUNK, mUiExecutor);
                 bindItemsInChunks(currentAppWidgets, 1, mUiExecutor);
             }
-            if (!FeatureFlags.CHANGE_MODEL_DELEGATE_LOADING_ORDER.get()) {
-                mExtraItems.forEach(item ->
-                        executeCallbacksTask(c -> c.bindExtraContainerItems(item), mUiExecutor));
-            }
+            mExtraItems.forEach(item ->
+                    executeCallbacksTask(c -> c.bindExtraContainerItems(item), mUiExecutor));
 
             RunnableList pendingTasks = new RunnableList();
             Executor pendingExecutor = pendingTasks::add;
