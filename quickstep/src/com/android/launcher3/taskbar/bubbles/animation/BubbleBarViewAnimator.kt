@@ -471,8 +471,8 @@ constructor(
         bubbleStashController.updateTaskbarTouchRegion()
     }
 
-    /** Handles touching the animating bubble bar. */
-    fun onBubbleBarTouchedWhileAnimating() {
+    /** Interrupts the animation due to touching the bubble bar or flyout. */
+    fun interruptForTouch() {
         PhysicsAnimator.getInstance(bubbleBarView).cancelIfRunning()
         bubbleStashController.getStashedHandlePhysicsAnimator().cancelIfRunning()
         cancelFlyout()
