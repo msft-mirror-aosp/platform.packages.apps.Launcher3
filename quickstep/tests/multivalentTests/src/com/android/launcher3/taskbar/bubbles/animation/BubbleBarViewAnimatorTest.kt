@@ -40,6 +40,7 @@ import com.android.launcher3.taskbar.bubbles.BubbleView
 import com.android.launcher3.taskbar.bubbles.flyout.BubbleBarFlyoutController
 import com.android.launcher3.taskbar.bubbles.flyout.BubbleBarFlyoutMessage
 import com.android.launcher3.taskbar.bubbles.flyout.BubbleBarFlyoutPositioner
+import com.android.launcher3.taskbar.bubbles.flyout.FlyoutCallbacks
 import com.android.launcher3.taskbar.bubbles.flyout.FlyoutScheduler
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController
 import com.android.wm.shell.shared.animation.PhysicsAnimator
@@ -179,9 +180,7 @@ class BubbleBarViewAnimatorTest {
         // verify the hide bubble animation is pending
         assertThat(animatorScheduler.delayedBlock).isNotNull()
 
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            animator.onBubbleBarTouchedWhileAnimating()
-        }
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { animator.interruptForTouch() }
 
         waitForFlyoutToHide()
 
@@ -992,18 +991,20 @@ class BubbleBarViewAnimatorTest {
                 override val collapsedElevation = 1f
                 override val distanceToRevealTriangle = 10f
             }
-        val topBoundaryListener =
-            object : BubbleBarFlyoutController.TopBoundaryListener {
+        val flyoutCallbacks =
+            object : FlyoutCallbacks {
                 override fun extendTopBoundary(space: Int) {}
 
                 override fun resetTopBoundary() {}
+
+                override fun flyoutClicked() {}
             }
         val flyoutScheduler = FlyoutScheduler { block -> block.invoke() }
         flyoutController =
             BubbleBarFlyoutController(
                 flyoutContainer,
                 flyoutPositioner,
-                topBoundaryListener,
+                flyoutCallbacks,
                 flyoutScheduler,
             )
     }
