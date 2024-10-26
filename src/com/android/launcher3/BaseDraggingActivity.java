@@ -50,8 +50,6 @@ public abstract class BaseDraggingActivity extends BaseActivity
     // automatically when user interacts with the launcher.
     public static final Object AUTO_CANCEL_ACTION_MODE = new Object();
 
-    private boolean mIsThemeUpdatedBeforeRecreate;
-
     private ActionMode mCurrentActionMode;
 
     private int mThemeRes = R.style.AppTheme;
@@ -82,13 +80,8 @@ public abstract class BaseDraggingActivity extends BaseActivity
         updateTheme();
     }
 
-    public boolean isThemeUpdatedBeforeRecreate() {
-        return mIsThemeUpdatedBeforeRecreate;
-    }
-
     protected void updateTheme() {
         if (mThemeRes != Themes.getActivityThemeRes(this)) {
-            mIsThemeUpdatedBeforeRecreate = true;
             recreate();
         }
     }
