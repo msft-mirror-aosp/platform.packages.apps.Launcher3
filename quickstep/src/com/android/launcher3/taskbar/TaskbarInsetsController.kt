@@ -145,6 +145,7 @@ class TaskbarInsetsController(val context: TaskbarActivityContext) : LoggableTas
             // if bubble bar is visible or animating new bubble, add bar bounds to the touch region
             if (isBubbleBarVisible || isAnimatingNewBubble) {
                 defaultTouchableRegion.addBoundsToRegion(bubbleBarViewController.bubbleBarBounds)
+                defaultTouchableRegion.addBoundsToRegion(bubbleBarViewController.flyoutBounds)
             }
         }
         if (
