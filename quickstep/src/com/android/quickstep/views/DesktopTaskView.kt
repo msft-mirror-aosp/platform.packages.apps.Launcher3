@@ -39,6 +39,7 @@ import com.android.launcher3.util.ViewPool
 import com.android.launcher3.util.rects.set
 import com.android.quickstep.BaseContainerInterface
 import com.android.quickstep.TaskOverlayFactory
+import com.android.quickstep.ViewUtils
 import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.util.RecentsOrientedState
 import com.android.systemui.shared.recents.model.Task
@@ -312,6 +313,11 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
     }
 
     override fun getThumbnailFullscreenParams() = snapshotDrawParams
+
+    override fun addChildrenForAccessibility(outChildren: ArrayList<View>) {
+        super.addChildrenForAccessibility(outChildren)
+        ViewUtils.addAccessibleChildToList(backgroundView, outChildren)
+    }
 
     companion object {
         private const val TAG = "DesktopTaskView"
