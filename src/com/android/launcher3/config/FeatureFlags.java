@@ -63,11 +63,6 @@ public final class FeatureFlags {
      * <p>
      */
     // TODO(Block 3): Clean up flags
-    public static final BooleanFlag ENABLE_WORKSPACE_LOADING_OPTIMIZATION = getDebugFlag(251502424,
-            "ENABLE_WORKSPACE_LOADING_OPTIMIZATION", DISABLED,
-            "load the current workspace screen visible to the user before the rest rather than "
-                    + "loading all of them at once.");
-
     public static final BooleanFlag CHANGE_MODEL_DELEGATE_LOADING_ORDER = getDebugFlag(251502424,
             "CHANGE_MODEL_DELEGATE_LOADING_ORDER", DISABLED,
             "changes the timing of the loading and binding of delegate items during "
