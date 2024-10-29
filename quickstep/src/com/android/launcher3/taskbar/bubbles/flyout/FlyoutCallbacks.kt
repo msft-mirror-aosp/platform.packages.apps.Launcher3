@@ -13,19 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.quickstep.dagger;
 
-import com.android.launcher3.uioverrides.SystemApiWrapper;
-import com.android.launcher3.uioverrides.plugins.PluginManagerWrapperImpl;
-import com.android.launcher3.util.ApiWrapper;
-import com.android.launcher3.util.PluginManagerWrapper;
+package com.android.launcher3.taskbar.bubbles.flyout
 
-import dagger.Binds;
-import dagger.Module;
+/** Callbacks that the flyout uses to notify of events. */
+interface FlyoutCallbacks {
+    /** Requests to extend the top boundary of the parent to fully include the flyout. */
+    fun extendTopBoundary(space: Int)
 
-@Module
-public abstract class QuickStepModule {
+    /** Resets the top boundary of the parent. */
+    fun resetTopBoundary()
 
-    @Binds abstract PluginManagerWrapper bindPluginManagerWrapper(PluginManagerWrapperImpl impl);
-    @Binds abstract ApiWrapper bindApiWrapper(SystemApiWrapper systemApiWrapper);
+    /** The flyout was clicked. */
+    fun flyoutClicked()
 }

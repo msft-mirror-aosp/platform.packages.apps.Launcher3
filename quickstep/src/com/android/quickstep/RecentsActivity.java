@@ -196,6 +196,7 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
 
     @Override
     public void onHandleConfigurationChanged() {
+        Trace.instant(Trace.TRACE_TAG_APP, "recentsActivity_onHandleConfigurationChanged");
         initDeviceProfile();
 
         AbstractFloatingView.closeOpenViews(this, true,

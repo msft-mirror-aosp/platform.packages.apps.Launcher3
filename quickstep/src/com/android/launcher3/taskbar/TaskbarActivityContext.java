@@ -29,7 +29,6 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_ON_BOARD_POPUP;
 import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_OVERLAY_PROXY;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
-import static com.android.launcher3.Flags.taskbarOverflow;
 import static com.android.launcher3.Utilities.calculateTextHeight;
 import static com.android.launcher3.Utilities.isRunningInTestHarness;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
@@ -297,6 +296,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             BubbleStashController bubbleStashController = isTransientTaskbar
                     ? new TransientBubbleStashController(dimensionsProvider, this)
                     : new PersistentBubbleStashController(dimensionsProvider);
+            bubbleStashController.setHotseatVerticalCenter(launcherDp.getHotseatVerticalCenter());
             bubbleControllersOptional = Optional.of(new BubbleControllers(
                     new BubbleBarController(this, bubbleBarView),
                     new BubbleBarViewController(this, bubbleBarView, bubbleBarContainer),
@@ -362,8 +362,11 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     /** Updates {@link DeviceProfile} instances for any Taskbar windows. */
     public void updateDeviceProfile(DeviceProfile launcherDp) {
         applyDeviceProfile(launcherDp);
-
         mControllers.taskbarOverlayController.updateLauncherDeviceProfile(launcherDp);
+        mControllers.bubbleControllers.ifPresent(bubbleControllers -> {
+            int hotseatVertCenter = launcherDp.getHotseatVerticalCenter();
+            bubbleControllers.bubbleStashController.setHotseatVerticalCenter(hotseatVertCenter);
+        });
         AbstractFloatingView.closeAllOpenViewsExcept(this, false, TYPE_REBIND_SAFE);
         // Reapply fullscreen to take potential new screen size into account.
         setTaskbarWindowFullscreen(mIsFullscreen);
@@ -1213,9 +1216,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         boolean shouldCloseAllOpenViews = true;
         Object tag = view.getTag();
 
-        if (taskbarOverflow()) {
-            mControllers.keyboardQuickSwitchController.closeQuickSwitchView(false);
-        }
+        mControllers.keyboardQuickSwitchController.closeQuickSwitchView(false);
 
         if (tag instanceof GroupTask groupTask) {
             handleGroupTaskLaunch(

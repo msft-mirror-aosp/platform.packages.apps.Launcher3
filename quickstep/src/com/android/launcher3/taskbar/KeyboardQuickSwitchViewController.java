@@ -20,6 +20,7 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
+import android.content.res.Resources;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -30,6 +31,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.internal.jank.Cuj;
+import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.desktop.DesktopAppLaunchTransition;
@@ -67,6 +69,8 @@ public class KeyboardQuickSwitchViewController {
 
     private boolean mOnDesktop;
     private boolean mWasDesktopTaskFilteredOut;
+
+    private boolean mDetachingFromWindow = false;
 
     protected KeyboardQuickSwitchViewController(
             @NonNull TaskbarControllers controllers,
@@ -115,6 +119,12 @@ public class KeyboardQuickSwitchViewController {
 
         BaseDragLayer.LayoutParams lp = new BaseDragLayer.LayoutParams(
                 mKeyboardQuickSwitchView.getLayoutParams());
+        final Resources resources = mKeyboardQuickSwitchView.getResources();
+        final int marginHorizontal = resources.getDimensionPixelSize(
+                R.dimen.keyboard_quick_switch_margin_ends);
+        final int marginBottom = resources.getDimensionPixelSize(
+                R.dimen.keyboard_quick_switch_margin_bottom);
+        lp.setMargins(marginHorizontal, 0, marginHorizontal, marginBottom);
         lp.width = BaseDragLayer.LayoutParams.WRAP_CONTENT;
         lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
         mKeyboardQuickSwitchView.setLayoutParams(lp);
@@ -229,7 +239,12 @@ public class KeyboardQuickSwitchViewController {
 
     private void onCloseComplete() {
         mCloseAnimation = null;
-        mOverlayContext.getDragLayer().removeView(mKeyboardQuickSwitchView);
+        // Reset the view callbacks to prevent `onDetachedFromWindow` getting called in response to
+        // the `removeView(mKeyboardQuickSwitchView)` call.
+        mKeyboardQuickSwitchView.resetViewCallbacks();
+        if (!mDetachingFromWindow) {
+            mOverlayContext.getDragLayer().removeView(mKeyboardQuickSwitchView);
+        }
         mControllerCallbacks.onCloseComplete();
         InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_CLOSE);
     }
@@ -318,6 +333,12 @@ public class KeyboardQuickSwitchViewController {
 
         boolean isAspectRatioSquare() {
             return mControllerCallbacks.isAspectRatioSquare();
+        }
+
+        void onViewDetchedFromWindow() {
+            mDetachingFromWindow = true;
+            closeQuickSwitchView(false);
+            mDetachingFromWindow = false;
         }
     }
 }
