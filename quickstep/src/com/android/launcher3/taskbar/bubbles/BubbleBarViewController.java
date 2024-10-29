@@ -324,6 +324,7 @@ public class BubbleBarViewController {
     }
 
     private void onBubbleClicked(BubbleView bubbleView) {
+        if (mBubbleBarPinning.isAnimating()) return;
         bubbleView.markSeen();
         BubbleBarItem bubble = bubbleView.getBubble();
         if (bubble == null) {
@@ -918,7 +919,7 @@ public class BubbleBarViewController {
      * from Launcher.
      */
     public void setExpanded(boolean isExpanded) {
-        if (isExpanded != mBarView.isExpanded()) {
+        if (!mBubbleBarPinning.isAnimating() && isExpanded != mBarView.isExpanded()) {
             mBarView.setExpanded(isExpanded);
             adjustTaskbarAndHotseatToBubbleBarState(isExpanded);
             if (!isExpanded) {
@@ -1058,6 +1059,16 @@ public class BubbleBarViewController {
      */
     public void onDismissAllBubbles() {
         mSystemUiProxy.removeAllBubbles();
+    }
+
+    /** Removes all existing bubble views */
+    public void removeAllBubbles() {
+        mBarView.removeAllViews();
+    }
+
+    /** Returns the view index of the existing bubble */
+    public int bubbleViewIndex(View bubbleView) {
+        return mBarView.indexOfChild(bubbleView);
     }
 
     /**
