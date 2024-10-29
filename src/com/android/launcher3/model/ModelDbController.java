@@ -325,7 +325,7 @@ public class ModelDbController {
     private boolean isThereExistingDb() {
         if (LauncherPrefs.get(mContext).get(getEmptyDbCreatedKey())) {
             // If we already have a new DB, ignore migration
-            Log.d(TAG, "migrateGridIfNeeded: new DB already created, skipping migration");
+            FileLog.d(TAG, "migrateGridIfNeeded: new DB already created, skipping migration");
             return true;
         }
         return false;
@@ -336,7 +336,7 @@ public class ModelDbController {
         if (GridSizeMigrationDBController.needsToMigrate(mContext, idp)) {
             return true;
         }
-        Log.d(TAG, "migrateGridIfNeeded: no grid migration needed");
+        FileLog.d(TAG, "migrateGridIfNeeded: no grid migration needed");
         return false;
     }
 
@@ -344,7 +344,7 @@ public class ModelDbController {
         InvariantDeviceProfile idp = LauncherAppState.getIDP(mContext);
         String targetDbName = new DeviceGridState(idp).getDbFile();
         if (TextUtils.equals(targetDbName, mOpenHelper.getDatabaseName())) {
-            Log.e(TAG, "migrateGridIfNeeded: target db is same as current: " + targetDbName);
+            FileLog.e(TAG, "migrateGridIfNeeded: target db is same as current: " + targetDbName);
             return true;
         }
         return false;
@@ -428,7 +428,7 @@ public class ModelDbController {
         }
         InvariantDeviceProfile idp = LauncherAppState.getIDP(mContext);
         if (!GridSizeMigrationDBController.needsToMigrate(mContext, idp)) {
-            Log.d(TAG, "migrateGridIfNeeded: no grid migration needed");
+            FileLog.d(TAG, "migrateGridIfNeeded: no grid migration needed");
             return true;
         }
         String targetDbName = new DeviceGridState(idp).getDbFile();

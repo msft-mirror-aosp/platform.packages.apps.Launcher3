@@ -35,6 +35,7 @@ import android.graphics.Point;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherPrefs;
@@ -95,10 +96,17 @@ public class GridSizeMigrationLogic {
                             t.getDb(), TABLE_NAME, context);
 
             Point targetSize = new Point(destDeviceState.getColumns(), destDeviceState.getRows());
+
+            // Here we keep all the DB ids we have in the destination DB such that we don't assign
+            // an item that we want to add to the destination DB the same id as an already existing
+            // item.
+            List<Integer> idsInUse = new ArrayList<>();
+
             // Migrate hotseat.
-            migrateHotseat(destDeviceState.getNumHotseat(), srcReader, destReader, target);
+            migrateHotseat(destDeviceState.getNumHotseat(), srcReader, destReader, target,
+                    idsInUse);
             // Migrate workspace.
-            migrateWorkspace(srcReader, destReader, target, targetSize);
+            migrateWorkspace(srcReader, destReader, target, targetSize, idsInUse);
 
             dropTable(t.getDb(), TMP_TABLE);
             t.commit();
@@ -113,17 +121,22 @@ public class GridSizeMigrationLogic {
         }
     }
 
-    private void migrateHotseat(int destHotseatSize,
+    /**
+     * Handles hotseat migration.
+     */
+    @VisibleForTesting
+    public void migrateHotseat(int destHotseatSize,
             GridSizeMigrationDBController.DbReader srcReader,
-            GridSizeMigrationDBController.DbReader destReader, DatabaseHelper helper) {
+            GridSizeMigrationDBController.DbReader destReader,
+            DatabaseHelper helper, List<Integer> idsInUse) {
         final List<DbEntry> srcHotseatItems =
                 srcReader.loadHotseatEntries();
         final List<DbEntry> dstHotseatItems =
                 destReader.loadHotseatEntries();
 
-
         final List<DbEntry> hotseatToBeAdded =
                 getItemsToBeAdded(srcHotseatItems, dstHotseatItems);
+
         final IntArray toBeRemoved = new IntArray();
         toBeRemoved.addAll(getItemsToBeRemoved(srcHotseatItems, dstHotseatItems));
 
@@ -144,19 +157,19 @@ public class GridSizeMigrationLogic {
             removeEntryFromDb(destReader.mDb, destReader.mTableName, toBeRemoved);
         }
 
-        placeHotseatItems(
-                hotseatToBeAdded, dstHotseatItems, destHotseatSize, helper, srcReader, destReader);
+        placeHotseatItems(hotseatToBeAdded, dstHotseatItems, destHotseatSize, helper, srcReader,
+                destReader, idsInUse);
     }
 
     private void placeHotseatItems(List<DbEntry> hotseatToBeAdded,
             List<DbEntry> dstHotseatItems, int destHotseatSize,
             DatabaseHelper helper, GridSizeMigrationDBController.DbReader srcReader,
-            GridSizeMigrationDBController.DbReader destReader) {
+            GridSizeMigrationDBController.DbReader destReader, List<Integer> idsInUse) {
         if (hotseatToBeAdded.isEmpty()) {
             return;
         }
 
-        List<Integer> idsInUse = dstHotseatItems.stream().map(entry -> entry.id).toList();
+        idsInUse.addAll(dstHotseatItems.stream().map(entry -> entry.id).toList());
 
         Collections.sort(hotseatToBeAdded);
 
@@ -168,11 +181,14 @@ public class GridSizeMigrationLogic {
         }
     }
 
-    private void migrateWorkspace(GridSizeMigrationDBController.DbReader srcReader,
+
+    /**
+     * Handles workspace migration.
+     */
+    @VisibleForTesting
+    public void migrateWorkspace(GridSizeMigrationDBController.DbReader srcReader,
             GridSizeMigrationDBController.DbReader destReader, DatabaseHelper helper,
-            Point targetSize) {
-
-
+            Point targetSize, List<Integer> idsInUse) {
         final List<DbEntry> srcWorkspaceItems =
                 srcReader.loadAllWorkspaceEntries();
 
@@ -213,7 +229,7 @@ public class GridSizeMigrationLogic {
         }
 
         placeWorkspaceItems(workspaceToBeAdded, dstWorkspaceItems, targetSize.x, targetSize.y,
-                helper, srcReader, destReader);
+                helper, srcReader, destReader, idsInUse);
     }
 
     private void placeWorkspaceItems(
@@ -221,13 +237,12 @@ public class GridSizeMigrationLogic {
             List<DbEntry> dstWorkspaceItems,
             int trgX, int trgY, DatabaseHelper helper,
             GridSizeMigrationDBController.DbReader srcReader,
-            GridSizeMigrationDBController.DbReader destReader) {
+            GridSizeMigrationDBController.DbReader destReader, List<Integer> idsInUse) {
         if (workspaceToBeAdded.isEmpty()) {
             return;
         }
 
-        List<Integer> idsInUse = dstWorkspaceItems.stream().map(entry -> entry.id).collect(
-                Collectors.toList());
+        idsInUse.addAll(dstWorkspaceItems.stream().map(entry -> entry.id).toList());
 
         Collections.sort(workspaceToBeAdded);
 
