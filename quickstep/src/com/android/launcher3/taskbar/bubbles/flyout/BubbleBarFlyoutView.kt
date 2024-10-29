@@ -198,6 +198,8 @@ class BubbleBarFlyoutView(
             } else {
                 -positioner.distanceToCollapsedPosition.x
             }
+        // TODO: b/277815200 - before collapsing, recalculate translationToCollapsedPosition because
+        // the collapsed position may have changed
         val tyToCollapsedPosition =
             positioner.distanceToCollapsedPosition.y + triangleHeight - triangleOverlap
         translationToCollapsedPosition = PointF(txToCollapsedPosition, tyToCollapsedPosition)
@@ -215,6 +217,12 @@ class BubbleBarFlyoutView(
         // post the request to start the expand animation to the looper so the view can measure
         // itself
         scheduler.runAfterLayout(expandAnimation)
+    }
+
+    /** Updates the content of the flyout and schedules [afterLayout] to run after a layout pass. */
+    fun updateData(flyoutMessage: BubbleBarFlyoutMessage, afterLayout: () -> Unit) {
+        setData(flyoutMessage)
+        scheduler.runAfterLayout(afterLayout)
     }
 
     private fun setData(flyoutMessage: BubbleBarFlyoutMessage) {

@@ -675,7 +675,7 @@ public class TouchInteractionService extends Service {
         mDesktopVisibilityController = new DesktopVisibilityController(this);
         mTaskbarManager = new TaskbarManager(
                 this, mAllAppsActionManager, mNavCallbacks, mDesktopVisibilityController);
-        if(Flags.enableFallbackOverviewInWindow()) {
+        if (Flags.enableLauncherOverviewInWindow() || Flags.enableFallbackOverviewInWindow()) {
             mRecentsWindowManager = new RecentsWindowManager(this);
         }
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
@@ -1410,8 +1410,10 @@ public class TouchInteractionService extends Service {
     }
 
     public AbsSwipeUpHandler.Factory getSwipeUpHandlerFactory() {
+        boolean recentsInWindow =
+                Flags.enableFallbackOverviewInWindow() || Flags.enableLauncherOverviewInWindow();
         return mOverviewComponentObserver.isHomeAndOverviewSame()
-                ? mLauncherSwipeHandlerFactory : (Flags.enableFallbackOverviewInWindow()
+                ? mLauncherSwipeHandlerFactory : (recentsInWindow
                 ? mRecentsWindowSwipeHandlerFactory : mFallbackSwipeHandlerFactory);
     }
 
