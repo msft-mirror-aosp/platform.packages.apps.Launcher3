@@ -328,10 +328,9 @@ public class GridSizeMigrationDBController {
             } else {
                 values.put(LauncherSettings.Favorites.CONTAINER, folderId);
             }
-            newId = helper.generateNewItemId();
-            while (idsInUse.contains(newId)) {
+            do {
                 newId = helper.generateNewItemId();
-            }
+            } while (idsInUse.contains(newId));
             values.put(LauncherSettings.Favorites._ID, newId);
             helper.getWritableDatabase().insert(destTableName, null, values);
         }
