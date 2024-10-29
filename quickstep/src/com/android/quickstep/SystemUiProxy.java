@@ -43,6 +43,7 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.Log;
 import android.view.IRemoteAnimationRunner;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
@@ -210,10 +211,10 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle {
     }
 
     @Override
-    public void onBackPressed() {
+    public void onBackEvent(KeyEvent backEvent) {
         if (mSystemUiProxy != null) {
             try {
-                mSystemUiProxy.onBackPressed();
+                mSystemUiProxy.onBackEvent(backEvent);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call onBackPressed", e);
             }
