@@ -927,9 +927,6 @@ public class TouchInteractionService extends Service {
             BubbleControllers bubbleControllers = tac != null ? tac.getBubbleControllers() : null;
             boolean isOnBubbles = bubbleControllers != null
                     && BubbleBarInputConsumer.isEventOnBubbles(tac, event);
-            if (isInSwipeUpTouchRegion && tac != null) {
-                tac.closeKeyboardQuickSwitchView();
-            }
             if (mDeviceState.isButtonNavMode()
                     && mDeviceState.supportsAssistantGestureInButtonNav()) {
                 reasonString.append("in three button mode which supports Assistant gesture");
