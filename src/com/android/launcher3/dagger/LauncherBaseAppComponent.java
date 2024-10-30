@@ -21,6 +21,7 @@ import android.content.Context;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.DaggerSingletonTracker;
+import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.SettingsCache;
@@ -46,6 +47,7 @@ public interface LauncherBaseAppComponent {
     SettingsCache getSettingsCache();
     CustomWidgetManager getCustomWidgetManager();
     PluginManagerWrapper getPluginManagerWrapper();
+    PackageManagerHelper getPackageManagerHelper();
 
     /** Builder for LauncherBaseAppComponent. */
     interface Builder {
