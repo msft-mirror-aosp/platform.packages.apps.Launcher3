@@ -36,24 +36,18 @@ import android.os.Messenger;
 import android.text.TextUtils;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile.GridOption;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.model.BgDataModel;
-import com.android.launcher3.shapes.AppShape;
-import com.android.launcher3.shapes.AppShapesProvider;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.RunnableList;
 import com.android.systemui.shared.Flags;
 
 import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ExecutionException;
@@ -61,44 +55,31 @@ import java.util.concurrent.ExecutionException;
 /**
  * Exposes various launcher grid options and allows the caller to change them.
  * APIs:
- *      /shape_options: List of various available shape options, where each has following fields
- *          shape_key: key of the shape option
- *          title: translated title of the shape option
- *          path: path of the shape, assuming drawn on 100x100 view port
- *          is_default: true if this shape option is currently set to the system
- *
- *      /grid_options: List the various available grid options, where each has following fields
- *          name: key of the grid option
+ *      /list_options: List the various available grip options, has following columns
+ *          name: name of the grid
  *          rows: number of rows in the grid
  *          cols: number of columns in the grid
  *          preview_count: number of previews available for this grid option. The preview uri
  *                         looks like /preview/<grid-name>/<preview index starting with 0>
- *          is_default: true if this grid option is currently set to the system
+ *          is_default: true if this grid is currently active
  *
- *     /get_preview: Open a file stream for the grid preview
+ *     /preview: Opens a file stream for the grid preview
  *
- *     /default_grid: Call update to set the current shape and grid, with values
- *          shape_key: key of the shape to apply
- *          name: key of the grid to apply
+ *     /default_grid: Call update to set the current grid, with values
+ *          name: name of the grid to apply
  */
 public class GridCustomizationsProvider extends ContentProvider {
 
     private static final String TAG = "GridCustomizationsProvider";
 
-    private static final String KEY_SHAPE_KEY = "shape_key";
-    private static final String KEY_TITLE = "title";
-    private static final String KEY_PATH = "path";
-    // is_default means if a certain option is currently set to the system
-    private static final String KEY_IS_DEFAULT = "is_default";
-    // Key of grid option. We do not change the name to grid_key for backward compatibility
-    private static final String KEY_GRID_KEY = "name";
+    private static final String KEY_NAME = "name";
     private static final String KEY_ROWS = "rows";
     private static final String KEY_COLS = "cols";
     private static final String KEY_PREVIEW_COUNT = "preview_count";
+    private static final String KEY_IS_DEFAULT = "is_default";
 
-    private static final String KEY_SHAPE_OPTIONS = "/shape_options";
-    private static final String KEY_GRID_OPTIONS = "/grid_options";
-    private static final String KEY_SHAPE_GRID = "/default_grid";
+    private static final String KEY_LIST_OPTIONS = "/list_options";
+    private static final String KEY_DEFAULT_GRID = "/default_grid";
 
     private static final String METHOD_GET_PREVIEW = "get_preview";
 
@@ -110,9 +91,9 @@ public class GridCustomizationsProvider extends ContentProvider {
     private static final String KEY_SURFACE_PACKAGE = "surface_package";
     private static final String KEY_CALLBACK = "callback";
     public static final String KEY_HIDE_BOTTOM_ROW = "hide_bottom_row";
+    public static final String KEY_GRID_NAME = "grid_name";
 
     private static final int MESSAGE_ID_UPDATE_PREVIEW = 1337;
-    private static final int MESSAGE_ID_UPDATE_SHAPE = 2586;
     private static final int MESSAGE_ID_UPDATE_GRID = 7414;
     private static final int MESSAGE_ID_UPDATE_COLOR = 856;
 
@@ -128,39 +109,14 @@ public class GridCustomizationsProvider extends ContentProvider {
     @Override
     public Cursor query(Uri uri, String[] projection, String selection,
             String[] selectionArgs, String sortOrder) {
-        Context context = getContext();
-        String path = uri.getPath();
-        if (context == null || path == null) {
-            return null;
-        }
-        switch (path) {
-            case KEY_SHAPE_OPTIONS: {
-                if (Flags.newCustomizationPickerUi()) {
-                    MatrixCursor cursor = new MatrixCursor(new String[]{
-                            KEY_SHAPE_KEY, KEY_TITLE, KEY_PATH, KEY_IS_DEFAULT});
-                    List<AppShape> shapes =  AppShapesProvider.INSTANCE.getShapes();
-                    for (int i = 0; i < shapes.size(); i++) {
-                        AppShape shape = shapes.get(i);
-                        cursor.newRow()
-                                .add(KEY_SHAPE_KEY, shape.getKey())
-                                .add(KEY_TITLE, shape.getTitle())
-                                .add(KEY_PATH, shape.getPath())
-                                // TODO (b/348664593): We should fetch the currently-set shape
-                                //  option from the preferences.
-                                .add(KEY_IS_DEFAULT, i == 0);
-                    }
-                    return cursor;
-                } else  {
-                    return null;
-                }
-            }
-            case KEY_GRID_OPTIONS: {
+        switch (uri.getPath()) {
+            case KEY_LIST_OPTIONS: {
                 MatrixCursor cursor = new MatrixCursor(new String[]{
-                        KEY_GRID_KEY, KEY_ROWS, KEY_COLS, KEY_PREVIEW_COUNT, KEY_IS_DEFAULT});
-                InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(context);
-                for (GridOption gridOption : idp.parseAllGridOptions(context)) {
+                        KEY_NAME, KEY_ROWS, KEY_COLS, KEY_PREVIEW_COUNT, KEY_IS_DEFAULT});
+                InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(getContext());
+                for (GridOption gridOption : idp.parseAllGridOptions(getContext())) {
                     cursor.newRow()
-                            .add(KEY_GRID_KEY, gridOption.name)
+                            .add(KEY_NAME, gridOption.name)
                             .add(KEY_ROWS, gridOption.numRows)
                             .add(KEY_COLS, gridOption.numColumns)
                             .add(KEY_PREVIEW_COUNT, 1)
@@ -203,22 +159,14 @@ public class GridCustomizationsProvider extends ContentProvider {
             return 0;
         }
         switch (path) {
-            case KEY_SHAPE_GRID: {
-                if (Flags.newCustomizationPickerUi()) {
-                    String shapeKey = values.getAsString(KEY_SHAPE_KEY);
-                    Optional<AppShape> optionalShape = AppShapesProvider.INSTANCE.getShapes()
-                            .stream().filter(shape -> shape.getKey().equals(shapeKey)).findFirst();
-                    String pathToSet = optionalShape.map(AppShape::getPath).orElse(null);
-                    // TODO (b/348664593): Apply shapeName to the system. This needs to be a
-                    //  synchronous call.
-                }
-                String gridKey = values.getAsString(KEY_GRID_KEY);
+            case KEY_DEFAULT_GRID: {
+                String gridName = values.getAsString(KEY_NAME);
                 InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(context);
                 // Verify that this is a valid grid option
                 GridOption match = null;
                 for (GridOption option : idp.parseAllGridOptions(context)) {
                     String name = option.name;
-                    if (name != null && name.equals(gridKey)) {
+                    if (name != null && name.equals(gridName)) {
                         match = option;
                         break;
                     }
@@ -227,7 +175,7 @@ public class GridCustomizationsProvider extends ContentProvider {
                     return 0;
                 }
 
-                idp.setCurrentGrid(context, gridKey);
+                idp.setCurrentGrid(context, gridName);
                 if (Flags.newCustomizationPickerUi()) {
                     try {
                         // Wait for device profile to be fully reloaded and applied to the launcher
@@ -269,30 +217,20 @@ public class GridCustomizationsProvider extends ContentProvider {
     }
 
     @Override
-    public Bundle call(@NonNull String method, String arg, Bundle extras) {
-        Context context = getContext();
-        if (context == null) {
-            return null;
-        }
-
-        if (context.checkPermission("android.permission.BIND_WALLPAPER",
+    public Bundle call(String method, String arg, Bundle extras) {
+        if (getContext().checkPermission("android.permission.BIND_WALLPAPER",
                 Binder.getCallingPid(), Binder.getCallingUid())
                 != PackageManager.PERMISSION_GRANTED) {
             return null;
         }
 
-        if (METHOD_GET_PREVIEW.equals(method)) {
-            return getPreview(extras);
-        } else {
+        if (!METHOD_GET_PREVIEW.equals(method)) {
             return null;
         }
+        return getPreview(extras);
     }
 
     private synchronized Bundle getPreview(Bundle request) {
-        Context context = getContext();
-        if (context == null) {
-            return null;
-        }
         RunnableList lifeCycleTracker = new RunnableList();
         try {
             PreviewSurfaceRenderer renderer = new PreviewSurfaceRenderer(
@@ -330,9 +268,7 @@ public class GridCustomizationsProvider extends ContentProvider {
         public final PreviewSurfaceRenderer renderer;
         public boolean destroyed = false;
 
-        PreviewLifecycleObserver(
-                RunnableList lifeCycleTracker,
-                PreviewSurfaceRenderer renderer) {
+        PreviewLifecycleObserver(RunnableList lifeCycleTracker, PreviewSurfaceRenderer renderer) {
             this.lifeCycleTracker = lifeCycleTracker;
             this.renderer = renderer;
             lifeCycleTracker.add(() -> destroyed = true);
@@ -348,21 +284,10 @@ public class GridCustomizationsProvider extends ContentProvider {
                 case MESSAGE_ID_UPDATE_PREVIEW:
                     renderer.hideBottomRow(message.getData().getBoolean(KEY_HIDE_BOTTOM_ROW));
                     break;
-                case MESSAGE_ID_UPDATE_SHAPE:
-                    if (Flags.newCustomizationPickerUi()) {
-                        String shapeKey = message.getData().getString(KEY_SHAPE_KEY);
-                        Optional<AppShape> optionalShape = AppShapesProvider.INSTANCE.getShapes()
-                                .stream()
-                                .filter(shape -> shape.getKey().equals(shapeKey))
-                                .findFirst();
-                        String pathToSet = optionalShape.map(AppShape::getPath).orElse(null);
-                        // TODO (b/348664593): Update launcher preview with the given shape
-                    }
-                    break;
                 case MESSAGE_ID_UPDATE_GRID:
-                    String gridKey = message.getData().getString(KEY_GRID_KEY);
-                    if (!TextUtils.isEmpty(gridKey)) {
-                        renderer.updateGrid(gridKey);
+                    String gridName = message.getData().getString(KEY_GRID_NAME);
+                    if (!TextUtils.isEmpty(gridName)) {
+                        renderer.updateGrid(gridName);
                     }
                     break;
                 case MESSAGE_ID_UPDATE_COLOR:
