@@ -675,7 +675,7 @@ public class TouchInteractionService extends Service {
         mDesktopVisibilityController = new DesktopVisibilityController(this);
         mTaskbarManager = new TaskbarManager(
                 this, mAllAppsActionManager, mNavCallbacks, mDesktopVisibilityController);
-        if(Flags.enableFallbackOverviewInWindow()) {
+        if (Flags.enableLauncherOverviewInWindow() || Flags.enableFallbackOverviewInWindow()) {
             mRecentsWindowManager = new RecentsWindowManager(this);
         }
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
@@ -927,9 +927,6 @@ public class TouchInteractionService extends Service {
             BubbleControllers bubbleControllers = tac != null ? tac.getBubbleControllers() : null;
             boolean isOnBubbles = bubbleControllers != null
                     && BubbleBarInputConsumer.isEventOnBubbles(tac, event);
-            if (isInSwipeUpTouchRegion && tac != null) {
-                tac.closeKeyboardQuickSwitchView();
-            }
             if (mDeviceState.isButtonNavMode()
                     && mDeviceState.supportsAssistantGestureInButtonNav()) {
                 reasonString.append("in three button mode which supports Assistant gesture");
@@ -1410,8 +1407,10 @@ public class TouchInteractionService extends Service {
     }
 
     public AbsSwipeUpHandler.Factory getSwipeUpHandlerFactory() {
+        boolean recentsInWindow =
+                Flags.enableFallbackOverviewInWindow() || Flags.enableLauncherOverviewInWindow();
         return mOverviewComponentObserver.isHomeAndOverviewSame()
-                ? mLauncherSwipeHandlerFactory : (Flags.enableFallbackOverviewInWindow()
+                ? mLauncherSwipeHandlerFactory : (recentsInWindow
                 ? mRecentsWindowSwipeHandlerFactory : mFallbackSwipeHandlerFactory);
     }
 

@@ -69,6 +69,9 @@ public class KeyboardQuickSwitchViewController {
 
     private boolean mOnDesktop;
     private boolean mWasDesktopTaskFilteredOut;
+    private boolean mWasOpenedFromTaskbar;
+
+    private boolean mDetachingFromWindow = false;
 
     protected KeyboardQuickSwitchViewController(
             @NonNull TaskbarControllers controllers,
@@ -85,6 +88,10 @@ public class KeyboardQuickSwitchViewController {
         return mCurrentFocusIndex;
     }
 
+    protected boolean wasOpenedFromTaskbar() {
+        return mWasOpenedFromTaskbar;
+    }
+
     protected void openQuickSwitchView(
             @NonNull List<GroupTask> tasks,
             int numHiddenTasks,
@@ -98,6 +105,7 @@ public class KeyboardQuickSwitchViewController {
         mOverlayContext.getDragLayer().addView(mKeyboardQuickSwitchView);
         mOnDesktop = onDesktop;
         mWasDesktopTaskFilteredOut = wasDesktopTaskFilteredOut;
+        mWasOpenedFromTaskbar = wasOpenedFromTaskbar;
 
         mKeyboardQuickSwitchView.applyLoadPlan(
                 mOverlayContext,
@@ -237,7 +245,12 @@ public class KeyboardQuickSwitchViewController {
 
     private void onCloseComplete() {
         mCloseAnimation = null;
-        mOverlayContext.getDragLayer().removeView(mKeyboardQuickSwitchView);
+        // Reset the view callbacks to prevent `onDetachedFromWindow` getting called in response to
+        // the `removeView(mKeyboardQuickSwitchView)` call.
+        mKeyboardQuickSwitchView.resetViewCallbacks();
+        if (!mDetachingFromWindow) {
+            mOverlayContext.getDragLayer().removeView(mKeyboardQuickSwitchView);
+        }
         mControllerCallbacks.onCloseComplete();
         InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_CLOSE);
     }
@@ -254,6 +267,7 @@ public class KeyboardQuickSwitchViewController {
         pw.println(prefix + "\tmCurrentFocusIndex=" + mCurrentFocusIndex);
         pw.println(prefix + "\tmOnDesktop=" + mOnDesktop);
         pw.println(prefix + "\tmWasDesktopTaskFilteredOut=" + mWasDesktopTaskFilteredOut);
+        pw.println(prefix + "\tmWasOpenedFromTaskbar=" + mWasOpenedFromTaskbar);
     }
 
     /**
@@ -326,6 +340,12 @@ public class KeyboardQuickSwitchViewController {
 
         boolean isAspectRatioSquare() {
             return mControllerCallbacks.isAspectRatioSquare();
+        }
+
+        void onViewDetchedFromWindow() {
+            mDetachingFromWindow = true;
+            closeQuickSwitchView(false);
+            mDetachingFromWindow = false;
         }
     }
 }
