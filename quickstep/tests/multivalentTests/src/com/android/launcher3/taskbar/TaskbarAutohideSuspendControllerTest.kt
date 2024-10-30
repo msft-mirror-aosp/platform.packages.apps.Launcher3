@@ -24,7 +24,6 @@ import com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOH
 import com.android.launcher3.taskbar.rules.TaskbarModeRule
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.TRANSIENT
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.TaskbarMode
-import com.android.launcher3.taskbar.rules.TaskbarSandboxComponent
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.InjectController
 import com.android.launcher3.taskbar.rules.TaskbarWindowSandboxContext
@@ -42,12 +41,11 @@ class TaskbarAutohideSuspendControllerTest {
 
     @get:Rule(order = 0)
     val context =
-        TaskbarWindowSandboxContext.create {
-            builder: TaskbarSandboxComponent.Builder,
-            sandboxContext: TaskbarWindowSandboxContext ->
+        TaskbarWindowSandboxContext.create { builder ->
             builder.bindSystemUiProxy(
-                object : SystemUiProxy(sandboxContext) {
+                object : SystemUiProxy(this) {
                     override fun notifyTaskbarAutohideSuspend(suspend: Boolean) {
+                        super.notifyTaskbarAutohideSuspend(suspend)
                         latestSuspendNotification = suspend
                     }
                 }
