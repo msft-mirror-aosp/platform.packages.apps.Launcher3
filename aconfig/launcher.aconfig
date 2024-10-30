@@ -369,6 +369,13 @@ flag {
 }
 
 flag {
+    name: "work_scheduler_in_work_profile"
+    namespace: "launcher"
+    description: "Enables work scheduler view above the work pause button in work profile."
+    bug: "361589193"
+}
+
+flag {
     name: "one_grid_specs"
     namespace: "launcher"
     description: "Defines the new specs for grids based on OneGrid"
@@ -491,11 +498,4 @@ flag {
    namespace: "launcher"
    description: "Enforce system radius for widget corners instead of a separate 16.dp value"
    bug: "370950552"
-}
-
-flag {
-    name: "enable_launcher_pill"
-    namespace: "launcher"
-    description: "Enable Workspace Launcher Pill in Simple Mode View."
-    bug: "341217082"
 }
