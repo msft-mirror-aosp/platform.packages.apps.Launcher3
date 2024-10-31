@@ -16,6 +16,21 @@
 
 package com.android.launcher3.dagger;
 
+import android.content.Context;
+
+import com.android.launcher3.graphics.IconShape;
+import com.android.launcher3.pm.InstallSessionHelper;
+import com.android.launcher3.util.ApiWrapper;
+import com.android.launcher3.util.DaggerSingletonTracker;
+import com.android.launcher3.util.PackageManagerHelper;
+import com.android.launcher3.util.PluginManagerWrapper;
+import com.android.launcher3.util.ScreenOnTracker;
+import com.android.launcher3.util.SettingsCache;
+import com.android.launcher3.util.window.RefreshRateTracker;
+import com.android.launcher3.widget.custom.CustomWidgetManager;
+
+import dagger.BindsInstance;
+
 /**
  * Launcher base component for Dagger injection.
  *
@@ -25,8 +40,20 @@ package com.android.launcher3.dagger;
  * See {@link LauncherAppComponent} for the one actually used by AOSP.
  */
 public interface LauncherBaseAppComponent {
+    DaggerSingletonTracker getDaggerSingletonTracker();
+    ApiWrapper getApiWrapper();
+    CustomWidgetManager getCustomWidgetManager();
+    IconShape getIconShape();
+    InstallSessionHelper getInstallSessionHelper();
+    RefreshRateTracker getRefreshRateTracker();
+    ScreenOnTracker getScreenOnTracker();
+    SettingsCache getSettingsCache();
+    PluginManagerWrapper getPluginManagerWrapper();
+    PackageManagerHelper getPackageManagerHelper();
+
     /** Builder for LauncherBaseAppComponent. */
     interface Builder {
+        @BindsInstance Builder appContext(@ApplicationContext Context context);
         LauncherBaseAppComponent build();
     }
 }

@@ -52,18 +52,19 @@ import android.text.style.ImageSpan;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Property;
-import android.util.Size;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewDebug;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.TextView;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 
 import com.android.launcher3.accessibility.BaseAccessibilityDelegate;
 import com.android.launcher3.dot.DotInfo;
@@ -187,20 +188,22 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     @ViewDebug.ExportedProperty(category = "launcher")
     private DotInfo mDotInfo;
     private DotRenderer mDotRenderer;
-    private Locale mCurrentLocale;
+    private String mCurrentLanguage;
     @ViewDebug.ExportedProperty(category = "launcher", deepExport = true)
     protected DotRenderer.DrawParams mDotParams;
     private Animator mDotScaleAnim;
     private boolean mForceHideDot;
 
     // These fields, related to showing running apps, are only used for Taskbar.
-    private final Size mRunningAppIndicatorSize;
+    private final int mRunningAppIndicatorWidth;
+    private final int mMinimizedAppIndicatorWidth;
+    private final int mRunningAppIndicatorHeight;
     private final int mRunningAppIndicatorTopMargin;
-    private final Size mMinimizedAppIndicatorSize;
-    private final int mMinimizedAppIndicatorTopMargin;
     private final Paint mRunningAppIndicatorPaint;
     private final Rect mRunningAppIconBounds = new Rect();
     private RunningAppState mRunningAppState;
+    private final int mRunningAppIndicatorColor;
+    private final int mMinimizedAppIndicatorColor;
 
     /**
      * Various options for the running state of an app.
@@ -220,7 +223,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     private CancellableTask mIconLoadRequest;
 
-    private boolean mEnableIconUpdateAnimation = false;
+    private boolean mHighResUpdateInProgress = false;
 
     public BubbleTextView(Context context) {
         this(context, null, 0);
@@ -277,28 +280,27 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 defaultIconSize);
         a.recycle();
 
-        mRunningAppIndicatorSize = new Size(
-                getResources().getDimensionPixelSize(R.dimen.taskbar_running_app_indicator_width),
-                getResources().getDimensionPixelSize(R.dimen.taskbar_running_app_indicator_height));
-        mMinimizedAppIndicatorSize = new Size(
-                getResources().getDimensionPixelSize(R.dimen.taskbar_minimized_app_indicator_width),
-                getResources().getDimensionPixelSize(
-                        R.dimen.taskbar_minimized_app_indicator_height));
+        mRunningAppIndicatorWidth =
+                getResources().getDimensionPixelSize(R.dimen.taskbar_running_app_indicator_width);
+        mMinimizedAppIndicatorWidth =
+                getResources().getDimensionPixelSize(R.dimen.taskbar_minimized_app_indicator_width);
+        mRunningAppIndicatorHeight =
+                getResources().getDimensionPixelSize(R.dimen.taskbar_running_app_indicator_height);
         mRunningAppIndicatorTopMargin =
                 getResources().getDimensionPixelSize(
                         R.dimen.taskbar_running_app_indicator_top_margin);
-        mMinimizedAppIndicatorTopMargin =
-                getResources().getDimensionPixelSize(
-                        R.dimen.taskbar_minimized_app_indicator_top_margin);
+
         mRunningAppIndicatorPaint = new Paint();
-        mRunningAppIndicatorPaint.setColor(getResources().getColor(
-                R.color.taskbar_running_app_indicator_color, context.getTheme()));
+        mRunningAppIndicatorColor = getResources().getColor(
+                R.color.taskbar_running_app_indicator_color, context.getTheme());
+        mMinimizedAppIndicatorColor = getResources().getColor(
+                R.color.taskbar_minimized_app_indicator_color, context.getTheme());
 
         mLongPressHelper = new CheckLongPressHelper(this);
 
         mDotParams = new DotRenderer.DrawParams();
 
-        mCurrentLocale = context.getResources().getConfiguration().locale;
+        mCurrentLanguage = context.getResources().getConfiguration().locale.getLanguage();
         setEllipsize(TruncateAt.END);
         setAccessibilityDelegate(mActivity.getAccessibilityDelegate());
         setTextAlpha(1f);
@@ -494,7 +496,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     protected boolean isCurrentLanguageEnglish() {
-        return mCurrentLocale.equals(Locale.US);
+        return mCurrentLanguage.equals(Locale.ENGLISH.getLanguage());
     }
 
     @UiThread
@@ -516,6 +518,16 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             setContentDescription(info.isDisabled()
                     ? getContext().getString(R.string.disabled_app_label, info.contentDescription)
                     : info.contentDescription);
+        }
+    }
+
+    @Override
+    public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+        super.onInitializeAccessibilityNodeInfo(info);
+        if (getTag() instanceof ItemInfoWithIcon infoWithIcon && infoWithIcon.isInactiveArchive()) {
+            info.addAction(new AccessibilityNodeInfo.AccessibilityAction(
+                    AccessibilityNodeInfoCompat.ACTION_CLICK,
+                    getContext().getString(R.string.app_unarchiving_action)));
         }
     }
 
@@ -716,16 +728,26 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             return;
         }
         getIconBounds(mRunningAppIconBounds);
-        // TODO(b/333872717): update color, shape, and size of indicator
-        boolean isMinimized = mRunningAppState == RunningAppState.MINIMIZED;
-        int indicatorTop =
-                mRunningAppIconBounds.bottom + (isMinimized ? mMinimizedAppIndicatorTopMargin
-                        : mRunningAppIndicatorTopMargin);
-        final Size indicatorSize =
-                isMinimized ? mMinimizedAppIndicatorSize : mRunningAppIndicatorSize;
-        canvas.drawRect(mRunningAppIconBounds.centerX() - indicatorSize.getWidth() / 2,
-                indicatorTop, mRunningAppIconBounds.centerX() + indicatorSize.getWidth() / 2,
-                indicatorTop + indicatorSize.getHeight(), mRunningAppIndicatorPaint);
+        Utilities.scaleRectAboutCenter(
+                mRunningAppIconBounds,
+                IconShape.INSTANCE.get(getContext()).getNormalizationScale());
+
+        final boolean isMinimized = mRunningAppState == RunningAppState.MINIMIZED;
+        final int indicatorTop = mRunningAppIconBounds.bottom + mRunningAppIndicatorTopMargin;
+        final int indicatorWidth =
+                isMinimized ? mMinimizedAppIndicatorWidth : mRunningAppIndicatorWidth;
+        final float cornerRadius = mRunningAppIndicatorHeight / 2f;
+        mRunningAppIndicatorPaint.setColor(
+                isMinimized ? mMinimizedAppIndicatorColor : mRunningAppIndicatorColor);
+
+        canvas.drawRoundRect(
+                mRunningAppIconBounds.centerX() - indicatorWidth / 2f,
+                indicatorTop,
+                mRunningAppIconBounds.centerX() + indicatorWidth / 2f,
+                indicatorTop + mRunningAppIndicatorHeight,
+                cornerRadius,
+                cornerRadius,
+                mRunningAppIndicatorPaint);
     }
 
     @Override
@@ -1130,6 +1152,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 if (itemInfo.isDisabled()) {
                     setContentDescription(getContext().getString(R.string.disabled_app_label,
                             itemInfo.contentDescription));
+                } else if (itemInfo instanceof WorkspaceItemInfo wai && wai.isArchived()) {
+                    setContentDescription(
+                            getContext().getString(R.string.app_archived_title, itemInfo.title));
                 } else if (hasDot()) {
                     int count = mDotInfo.getNotificationCount();
                     setContentDescription(
@@ -1142,8 +1167,16 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     private void setDownloadStateContentDescription(ItemInfoWithIcon info, int progressLevel) {
-        if ((info.runtimeStatusFlags & ItemInfoWithIcon.FLAG_ARCHIVED) != 0 && progressLevel == 0) {
-            setContentDescription(getContext().getString(R.string.app_archived_title, info.title));
+        if ((info.runtimeStatusFlags & ItemInfoWithIcon.FLAG_ARCHIVED) != 0
+                && progressLevel == 0) {
+            if (mIcon instanceof PreloadIconDrawable) {
+                // Tell user that download is pending and not to tap to download again.
+                setContentDescription(getContext().getString(
+                        R.string.app_waiting_download_title, info.title));
+            } else {
+                setContentDescription(getContext().getString(
+                        R.string.app_archived_title, info.title));
+            }
         } else if ((info.runtimeStatusFlags & ItemInfoWithIcon.FLAG_SHOW_DOWNLOAD_PROGRESS_MASK)
                 != 0) {
             String percentageString = NumberFormat.getPercentInstance()
@@ -1195,10 +1228,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
     }
 
-    protected boolean iconUpdateAnimationEnabled() {
-        return mEnableIconUpdateAnimation;
-    }
-
     protected void applyCompoundDrawables(Drawable icon) {
         if (icon == null) {
             // Icon can be null when we use the BubbleTextView for text only.
@@ -1216,7 +1245,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         // If the current icon is a placeholder color, animate its update.
         if (mIcon != null
                 && mIcon instanceof PlaceHolderIconDrawable
-                && iconUpdateAnimationEnabled()) {
+                && mHighResUpdateInProgress) {
             ((PlaceHolderIconDrawable) mIcon).animateIconUpdate(icon);
         }
 
@@ -1238,7 +1267,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         if (getTag() == info) {
             mIconLoadRequest = null;
             mDisableRelayout = true;
-            mEnableIconUpdateAnimation = true;
+            mHighResUpdateInProgress = true;
 
             // Optimization: Starting in N, pre-uploads the bitmap to RenderThread.
             info.bitmap.icon.prepareToDraw();
@@ -1253,7 +1282,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             }
 
             mDisableRelayout = false;
-            mEnableIconUpdateAnimation = false;
+            mHighResUpdateInProgress = false;
         }
     }
 
@@ -1265,7 +1294,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             mIconLoadRequest.cancel();
             mIconLoadRequest = null;
         }
-        if (getTag() instanceof ItemInfoWithIcon) {
+        if (getTag() instanceof ItemInfoWithIcon && !mHighResUpdateInProgress) {
             ItemInfoWithIcon info = (ItemInfoWithIcon) getTag();
             if (info.usingLowResIcon()) {
                 mIconLoadRequest = LauncherAppState.getInstance(getContext()).getIconCache()

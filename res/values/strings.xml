@@ -45,6 +45,9 @@
     <string name="split_app_info_accessibility">App info for %1$s</string>
     <string name="split_app_usage_settings">Usage settings for %1$s</string>
 
+    <!-- Title for an option to open a new window for a given app   -->
+    <string name="new_window_option_taskbar">New Window</string>
+
     <!-- App pairs -->
     <string name="save_app_pair">Save app pair</string>
     <!-- App pair default title -->
@@ -352,8 +355,9 @@
     <!-- Title for an app whose download has been started. -->
     <string name="app_waiting_download_title"><xliff:g id="name" example="Messenger">%1$s</xliff:g> waiting to install</string>
     <!-- Title for an app which is archived. -->
-    <string name="app_archived_title"><xliff:g id="name" example="Messenger">%1$s</xliff:g> is archived. Tap to download and restore.</string>
-
+    <string name="app_archived_title"><xliff:g id="name" example="Messenger">%1$s</xliff:g> is archived.</string>
+    <!-- Accessibility Action for an app which is archived. -->
+    <string name="app_unarchiving_action">download and restore</string>
 
     <!-- Title shown on the alert dialog prompting the user to update the application in market
      in order to re-enable the disabled shortcuts -->

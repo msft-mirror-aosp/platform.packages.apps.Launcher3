@@ -26,8 +26,6 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.window.WindowManagerProxy.MIN_TABLET_WIDTH;
 
 import android.content.Context;
-import android.content.SharedPreferences;
-import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.os.Handler;
 import android.os.Message;
 
@@ -36,13 +34,15 @@ import androidx.annotation.WorkerThread;
 
 import com.android.launcher3.BaseActivity;
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.LauncherPrefChangeListener;
 import com.android.launcher3.LauncherPrefs;
+import com.android.launcher3.util.ContextTracker;
 import com.android.launcher3.util.DisplayController;
 
 /**
  * Utility class to manage launcher rotation
  */
-public class RotationHelper implements OnSharedPreferenceChangeListener,
+public class RotationHelper implements LauncherPrefChangeListener,
         DeviceProfile.OnDeviceProfileChangeListener,
         DisplayController.DisplayInfoChangeListener {
 
@@ -73,7 +73,7 @@ public class RotationHelper implements OnSharedPreferenceChangeListener,
 
     /**
      * Rotation request made by
-     * {@link com.android.launcher3.util.ActivityTracker.SchedulerCallback}.
+     * {@link ContextTracker.SchedulerCallback}.
      * This supersedes any other request.
      */
     private int mStateHandlerRequest = REQUEST_NONE;
@@ -112,7 +112,7 @@ public class RotationHelper implements OnSharedPreferenceChangeListener,
     }
 
     @Override
-    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String s) {
+    public void onPrefChanged(String s) {
         if (mDestroyed || mIgnoreAutoRotateSettings) return;
         boolean wasRotationEnabled = mHomeRotationEnabled;
         mHomeRotationEnabled = LauncherPrefs.get(mActivity).get(ALLOW_ROTATION);
