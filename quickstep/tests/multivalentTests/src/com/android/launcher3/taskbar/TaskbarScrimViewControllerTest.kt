@@ -24,7 +24,6 @@ import com.android.launcher3.taskbar.rules.TaskbarModeRule
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.PINNED
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.TRANSIENT
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.TaskbarMode
-import com.android.launcher3.taskbar.rules.TaskbarSandboxComponent
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.InjectController
 import com.android.launcher3.taskbar.rules.TaskbarWindowSandboxContext
@@ -45,11 +44,9 @@ import org.junit.runner.RunWith
 class TaskbarScrimViewControllerTest {
     @get:Rule(order = 0)
     val context =
-        TaskbarWindowSandboxContext.create {
-            builder: TaskbarSandboxComponent.Builder,
-            sandboxContext: TaskbarWindowSandboxContext ->
+        TaskbarWindowSandboxContext.create { builder ->
             builder.bindSystemUiProxy(
-                object : SystemUiProxy(sandboxContext) {
+                object : SystemUiProxy(this) {
                     override fun onBackPressed() {
                         super.onBackPressed()
                         backPressed = true

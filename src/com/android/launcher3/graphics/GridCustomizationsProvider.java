@@ -73,6 +73,7 @@ public class GridCustomizationsProvider extends ContentProvider {
     private static final String TAG = "GridCustomizationsProvider";
 
     private static final String KEY_NAME = "name";
+    private static final String KEY_GRID_TITLE = "grid_title";
     private static final String KEY_ROWS = "rows";
     private static final String KEY_COLS = "cols";
     private static final String KEY_PREVIEW_COUNT = "preview_count";
@@ -117,6 +118,7 @@ public class GridCustomizationsProvider extends ContentProvider {
                 for (GridOption gridOption : idp.parseAllGridOptions(getContext())) {
                     cursor.newRow()
                             .add(KEY_NAME, gridOption.name)
+                            .add(KEY_GRID_TITLE, gridOption.title)
                             .add(KEY_ROWS, gridOption.numRows)
                             .add(KEY_COLS, gridOption.numColumns)
                             .add(KEY_PREVIEW_COUNT, 1)
