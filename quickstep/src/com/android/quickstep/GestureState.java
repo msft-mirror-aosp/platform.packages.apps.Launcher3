@@ -24,7 +24,6 @@ import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKG
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_OVERVIEW;
 import static com.android.quickstep.MultiStateCallback.DEBUG_STATES;
-import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_ALL_APPS;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_HOME;
 import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.SET_END_TARGET_NEW_TASK;
@@ -37,10 +36,13 @@ import android.view.RemoteAnimationTarget;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.statemanager.BaseState;
+import com.android.launcher3.statemanager.StatefulContainer;
 import com.android.quickstep.TopTaskTracker.CachedTaskInfo;
 import com.android.quickstep.util.ActiveGestureErrorDetector;
 import com.android.quickstep.util.ActiveGestureLog;
+import com.android.quickstep.util.ActiveGestureProtoLogProxy;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 
@@ -179,7 +181,6 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     private RemoteAnimationTarget[] mLastAppearedTaskTargets;
     private Set<Integer> mPreviouslyAppearedTaskIds = new HashSet<>();
     private int[] mLastStartedTaskId = new int[]{INVALID_TASK_ID, INVALID_TASK_ID};
-    private RecentsAnimationController mRecentsAnimationController;
     private HashMap<Integer, ThumbnailData> mRecentsAnimationCanceledSnapshots;
 
     /** The time when the swipe up gesture is triggered. */
@@ -191,7 +192,7 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     public GestureState(OverviewComponentObserver componentObserver, int gestureId) {
         mHomeIntent = componentObserver.getHomeIntent();
         mOverviewIntent = componentObserver.getOverviewIntent();
-        mContainerInterface = componentObserver.getActivityInterface();
+        mContainerInterface = componentObserver.getContainerInterface();
         mStateCallback = new MultiStateCallback(
                 STATE_NAMES.toArray(new String[0]), GestureState::getTrackedEventForState);
         mGestureId = gestureId;
@@ -270,8 +271,8 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     /**
      * @return the interface to the activity handing the UI updates for this gesture.
      */
-    public <S extends BaseState<S>, T extends RecentsViewContainer>
-            BaseContainerInterface<S, T> getContainerInterface() {
+    public <S extends BaseState<S>, T extends RecentsViewContainer & StatefulContainer<S>>
+    BaseContainerInterface getContainerInterface() {
         return mContainerInterface;
     }
 
@@ -299,6 +300,18 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
 
     public boolean isFourFingerTrackpadGesture() {
         return mTrackpadGestureType == TrackpadGestureType.FOUR_FINGER;
+    }
+
+    /**
+     * Requests that handling for this gesture should use a synthetic transition, as in that it
+     * will need to start a recents transition that is not backed by a system transition.  This is
+     * generally only needed in scenarios where a system transition can not be created due to no
+     * changes in the WM hierarchy (ie. starting recents transition when you are already over home).
+     */
+    public boolean useSyntheticRecentsTransition() {
+        return mRunningTask.isHomeTask()
+                && (Flags.enableFallbackOverviewInWindow()
+                        || Flags.enableLauncherOverviewInWindow());
     }
 
     /**
@@ -411,10 +424,7 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     public void setEndTarget(GestureEndTarget target, boolean isAtomic) {
         mEndTarget = target;
         mStateCallback.setState(STATE_END_TARGET_SET);
-        ActiveGestureLog.INSTANCE.addLog(
-                new ActiveGestureLog.CompoundString("setEndTarget ")
-                        .append(mEndTarget.name()),
-                /* gestureEvent= */ SET_END_TARGET);
+        ActiveGestureProtoLogProxy.logSetEndTarget(mEndTarget.name());
         switch (mEndTarget) {
             case HOME:
                 ActiveGestureLog.INSTANCE.trackEvent(SET_END_TARGET_HOME);
@@ -470,7 +480,6 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     @Override
     public void onRecentsAnimationStart(RecentsAnimationController controller,
             RecentsAnimationTargets targets) {
-        mRecentsAnimationController = controller;
         mStateCallback.setState(STATE_RECENTS_ANIMATION_STARTED);
     }
 
@@ -480,10 +489,6 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
         mStateCallback.setState(STATE_RECENTS_ANIMATION_CANCELED);
         mStateCallback.setState(STATE_RECENTS_ANIMATION_ENDED);
         if (mRecentsAnimationCanceledSnapshots != null) {
-            // Clean up the screenshot to finalize the recents animation cancel
-            if (mRecentsAnimationController != null) {
-                mRecentsAnimationController.cleanupScreenshot();
-            }
             mRecentsAnimationCanceledSnapshots = null;
         }
     }
@@ -522,7 +527,7 @@ public class GestureState implements RecentsAnimationCallbacks.RecentsAnimationL
     HashMap<Integer, ThumbnailData> consumeRecentsAnimationCanceledSnapshot() {
         if (mRecentsAnimationCanceledSnapshots != null) {
             HashMap<Integer, ThumbnailData> data =
-                    new HashMap<Integer, ThumbnailData>(mRecentsAnimationCanceledSnapshots);
+                    new HashMap<>(mRecentsAnimationCanceledSnapshots);
             mRecentsAnimationCanceledSnapshots = null;
             return data;
         }

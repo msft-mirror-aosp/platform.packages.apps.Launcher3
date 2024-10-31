@@ -19,6 +19,7 @@ package com.android.launcher3.taskbar.bubbles.animation
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Path
+import android.graphics.PointF
 import android.graphics.drawable.ColorDrawable
 import android.view.LayoutInflater
 import android.view.View
@@ -36,6 +37,11 @@ import com.android.launcher3.taskbar.bubbles.BubbleBarBubble
 import com.android.launcher3.taskbar.bubbles.BubbleBarOverflow
 import com.android.launcher3.taskbar.bubbles.BubbleBarView
 import com.android.launcher3.taskbar.bubbles.BubbleView
+import com.android.launcher3.taskbar.bubbles.flyout.BubbleBarFlyoutController
+import com.android.launcher3.taskbar.bubbles.flyout.BubbleBarFlyoutMessage
+import com.android.launcher3.taskbar.bubbles.flyout.BubbleBarFlyoutPositioner
+import com.android.launcher3.taskbar.bubbles.flyout.FlyoutCallbacks
+import com.android.launcher3.taskbar.bubbles.flyout.FlyoutScheduler
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController
 import com.android.wm.shell.shared.animation.PhysicsAnimator
 import com.android.wm.shell.shared.animation.PhysicsAnimatorTestUtils
@@ -63,13 +69,19 @@ class BubbleBarViewAnimatorTest {
     private lateinit var bubbleView: BubbleView
     private lateinit var bubble: BubbleBarBubble
     private lateinit var bubbleBarView: BubbleBarView
+    private lateinit var flyoutContainer: FrameLayout
     private lateinit var bubbleStashController: BubbleStashController
+    private lateinit var flyoutController: BubbleBarFlyoutController
     private val onExpandedNoOp = Runnable {}
+
+    private val flyoutView: View?
+        get() = flyoutContainer.findViewById(R.id.bubble_bar_flyout_view)
 
     @Before
     fun setUp() {
         animatorScheduler = TestBubbleBarViewAnimatorScheduler()
         PhysicsAnimatorTestUtils.prepareForTest()
+        setupFlyoutController()
     }
 
     @Test
@@ -85,8 +97,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpandedNoOp,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -106,9 +119,13 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
         assertThat(animator.isAnimating).isTrue()
 
+        waitForFlyoutToShow()
+
         // execute the hide bubble animation
         assertThat(animatorScheduler.delayedBlock).isNotNull()
         InstrumentationRegistry.getInstrumentation().runOnMainSync(animatorScheduler.delayedBlock!!)
+
+        waitForFlyoutToHide()
 
         // let the animation start and wait for it to complete
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
@@ -134,8 +151,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpandedNoOp,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -157,10 +175,14 @@ class BubbleBarViewAnimatorTest {
 
         verify(bubbleStashController, atLeastOnce()).updateTaskbarTouchRegion()
 
+        waitForFlyoutToShow()
+
         // verify the hide bubble animation is pending
         assertThat(animatorScheduler.delayedBlock).isNotNull()
 
-        animator.onBubbleBarTouchedWhileAnimating()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { animator.interruptForTouch() }
+
+        waitForFlyoutToHide()
 
         assertThat(animatorScheduler.delayedBlock).isNull()
         assertThat(bubbleBarView.alpha).isEqualTo(1)
@@ -182,8 +204,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpandedNoOp,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -227,8 +250,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpandedNoOp,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -239,9 +263,13 @@ class BubbleBarViewAnimatorTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
+        waitForFlyoutToShow()
+
         // execute the hide bubble animation
         assertThat(animatorScheduler.delayedBlock).isNotNull()
         InstrumentationRegistry.getInstrumentation().runOnMainSync(animatorScheduler.delayedBlock!!)
+
+        waitForFlyoutToHide()
 
         // wait for the hide animation to start
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
@@ -273,8 +301,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpandedNoOp,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -310,8 +339,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpanded,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -354,8 +384,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpanded,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -404,8 +435,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpanded,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -418,6 +450,9 @@ class BubbleBarViewAnimatorTest {
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
         assertThat(animator.isAnimating).isTrue()
+
+        waitForFlyoutToShow()
+
         // verify the hide bubble animation is pending
         assertThat(animatorScheduler.delayedBlock).isNotNull()
 
@@ -427,6 +462,8 @@ class BubbleBarViewAnimatorTest {
 
         // verify that the hide animation was canceled
         assertThat(animatorScheduler.delayedBlock).isNull()
+
+        waitForFlyoutToHide()
 
         assertThat(handle.alpha).isEqualTo(0)
         assertThat(handle.translationY)
@@ -453,8 +490,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpandedNoOp,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -469,8 +507,12 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.alpha).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
 
+        waitForFlyoutToShow()
+
         assertThat(animatorScheduler.delayedBlock).isNotNull()
         InstrumentationRegistry.getInstrumentation().runOnMainSync(animatorScheduler.delayedBlock!!)
+
+        waitForFlyoutToHide()
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
@@ -503,8 +545,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpanded,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -537,8 +580,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpandedNoOp,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -553,8 +597,12 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.alpha).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
 
+        waitForFlyoutToShow()
+
         assertThat(animatorScheduler.delayedBlock).isNotNull()
         InstrumentationRegistry.getInstrumentation().runOnMainSync(animatorScheduler.delayedBlock!!)
+
+        waitForFlyoutToHide()
 
         assertThat(animator.isAnimating).isFalse()
         assertThat(bubbleBarView.alpha).isEqualTo(1)
@@ -576,8 +624,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpanded,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -624,8 +673,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpanded,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -636,6 +686,8 @@ class BubbleBarViewAnimatorTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
+        waitForFlyoutToShow()
+
         assertThat(animator.isAnimating).isTrue()
         // verify the hide bubble animation is pending
         assertThat(animatorScheduler.delayedBlock).isNotNull()
@@ -643,6 +695,8 @@ class BubbleBarViewAnimatorTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.expandedWhileAnimating()
         }
+
+        waitForFlyoutToHide()
 
         // verify that the hide animation was canceled
         assertThat(animatorScheduler.delayedBlock).isNull()
@@ -665,8 +719,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpandedNoOp,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -687,8 +742,12 @@ class BubbleBarViewAnimatorTest {
         barAnimator.assertIsRunning()
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
+        waitForFlyoutToShow()
+
         assertThat(animatorScheduler.delayedBlock).isNotNull()
         InstrumentationRegistry.getInstrumentation().runOnMainSync(animatorScheduler.delayedBlock!!)
+
+        waitForFlyoutToHide()
 
         assertThat(animator.isAnimating).isFalse()
         // the bubble bar translation y should be back to its initial value
@@ -712,8 +771,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpanded,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -759,8 +819,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpanded,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -817,8 +878,9 @@ class BubbleBarViewAnimatorTest {
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
+                flyoutController,
                 onExpanded,
-                animatorScheduler
+                animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -843,12 +905,16 @@ class BubbleBarViewAnimatorTest {
         assertThat(animatorScheduler.delayedBlock).isNotNull()
         assertThat(animator.isAnimating).isTrue()
 
+        waitForFlyoutToShow()
+
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.expandedWhileAnimating()
         }
 
         // verify that the hide animation was canceled
         assertThat(animatorScheduler.delayedBlock).isNull()
+
+        waitForFlyoutToHide()
 
         assertThat(animator.isAnimating).isFalse()
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
@@ -870,11 +936,32 @@ class BubbleBarViewAnimatorTest {
             bubbleBarView.addView(overflowView)
 
             val bubbleInfo =
-                BubbleInfo("key", 0, null, null, 0, context.packageName, null, null, false, true)
+                BubbleInfo(
+                    "key",
+                    0,
+                    null,
+                    null,
+                    0,
+                    context.packageName,
+                    null,
+                    null,
+                    false,
+                    true,
+                    null,
+                )
             bubbleView =
                 inflater.inflate(R.layout.bubblebar_item_view, bubbleBarView, false) as BubbleView
             bubble =
-                BubbleBarBubble(bubbleInfo, bubbleView, bitmap, bitmap, Color.WHITE, Path(), "")
+                BubbleBarBubble(
+                    bubbleInfo,
+                    bubbleView,
+                    bitmap,
+                    bitmap,
+                    Color.WHITE,
+                    Path(),
+                    "",
+                    BubbleBarFlyoutMessage(icon = null, title = "title", message = "message"),
+                )
             bubbleView.setBubble(bubble)
             bubbleBarView.addView(bubbleView)
         }
@@ -892,12 +979,56 @@ class BubbleBarViewAnimatorTest {
             .thenReturn(BAR_TRANSLATION_Y_FOR_TASKBAR)
     }
 
+    private fun setupFlyoutController() {
+        flyoutContainer = FrameLayout(context)
+        val flyoutPositioner =
+            object : BubbleBarFlyoutPositioner {
+                override val isOnLeft = true
+                override val targetTy = 100f
+                override val distanceToCollapsedPosition = PointF(0f, 0f)
+                override val collapsedSize = 30f
+                override val collapsedColor = Color.BLUE
+                override val collapsedElevation = 1f
+                override val distanceToRevealTriangle = 10f
+            }
+        val flyoutCallbacks =
+            object : FlyoutCallbacks {
+                override fun extendTopBoundary(space: Int) {}
+
+                override fun resetTopBoundary() {}
+
+                override fun flyoutClicked() {}
+            }
+        val flyoutScheduler = FlyoutScheduler { block -> block.invoke() }
+        flyoutController =
+            BubbleBarFlyoutController(
+                flyoutContainer,
+                flyoutPositioner,
+                flyoutCallbacks,
+                flyoutScheduler,
+            )
+    }
+
     private fun verifyBubbleBarIsExpandedWithTranslation(ty: Float) {
         assertThat(bubbleBarView.visibility).isEqualTo(VISIBLE)
         assertThat(bubbleBarView.scaleX).isEqualTo(1)
         assertThat(bubbleBarView.scaleY).isEqualTo(1)
         assertThat(bubbleBarView.translationY).isEqualTo(ty)
         assertThat(bubbleBarView.isExpanded).isTrue()
+    }
+
+    private fun waitForFlyoutToShow() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animatorTestRule.advanceTimeBy(300)
+        }
+        assertThat(flyoutView).isNotNull()
+    }
+
+    private fun waitForFlyoutToHide() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animatorTestRule.advanceTimeBy(300)
+        }
+        assertThat(flyoutView).isNull()
     }
 
     private fun <T> PhysicsAnimator<T>.assertIsRunning() {

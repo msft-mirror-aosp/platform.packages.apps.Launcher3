@@ -24,14 +24,14 @@ import kotlinx.coroutines.flow.first
 
 class RecentsViewModel(
     private val recentsTasksRepository: RecentTasksRepository,
-    private val recentsViewData: RecentsViewData
+    private val recentsViewData: RecentsViewData,
 ) {
     fun refreshAllTaskData() {
         recentsTasksRepository.getAllTaskData(true)
     }
 
     fun updateVisibleTasks(visibleTaskIdList: List<Int>) {
-        recentsTasksRepository.setVisibleTasks(visibleTaskIdList)
+        recentsTasksRepository.setVisibleTasks(visibleTaskIdList.toSet())
     }
 
     fun updateScale(scale: Float) {
@@ -58,7 +58,8 @@ class RecentsViewModel(
         recentsViewData.thumbnailSplashProgress.value = taskThumbnailSplashAlpha
     }
 
-    suspend fun waitForThumbnailsToUpdate(updatedThumbnails: Map<Int, ThumbnailData>) {
+    suspend fun waitForThumbnailsToUpdate(updatedThumbnails: Map<Int, ThumbnailData>?) {
+        if (updatedThumbnails.isNullOrEmpty()) return
         combine(
                 updatedThumbnails.map {
                     recentsTasksRepository.getThumbnailById(it.key).filter { thumbnailData ->

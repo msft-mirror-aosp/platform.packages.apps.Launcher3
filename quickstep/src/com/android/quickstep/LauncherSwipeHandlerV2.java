@@ -20,7 +20,6 @@ import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.Utilities.mapBoundToRange;
-import static com.android.launcher3.model.data.ItemInfo.NO_MATCHING_ID;
 import static com.android.launcher3.views.FloatingIconView.SHAPE_PROGRESS_DURATION;
 import static com.android.launcher3.views.FloatingIconView.getFloatingIconView;
 
@@ -42,11 +41,12 @@ import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
-import com.android.launcher3.util.ObjectWrapper;
+import com.android.launcher3.util.StableViewInfo;
 import com.android.launcher3.views.ClipIconView;
 import com.android.launcher3.views.FloatingIconView;
 import com.android.launcher3.views.FloatingView;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
+import com.android.quickstep.fallback.window.RecentsWindowManager;
 import com.android.quickstep.util.RectFSpringAnim;
 import com.android.quickstep.util.ScalingWorkspaceRevealAnim;
 import com.android.quickstep.util.StaggeredWorkspaceAnim;
@@ -69,7 +69,7 @@ public class LauncherSwipeHandlerV2 extends AbsSwipeUpHandler<
             TaskAnimationManager taskAnimationManager, GestureState gestureState, long touchTimeMs,
             boolean continuingLastGesture, InputConsumerController inputConsumer) {
         super(context, deviceState, taskAnimationManager, gestureState, touchTimeMs,
-                continuingLastGesture, inputConsumer);
+                continuingLastGesture, inputConsumer, null);
     }
 
 
@@ -301,18 +301,7 @@ public class LauncherSwipeHandlerV2 extends AbsSwipeUpHandler<
             return null;
         }
 
-        // Find the associated item info for the launch cookie (if available), note that predicted
-        // apps actually have an id of -1, so use another default id here
-        int launchCookieItemId = NO_MATCHING_ID;
-        for (IBinder cookie : launchCookies) {
-            Integer itemId = ObjectWrapper.unwrap(cookie);
-            if (itemId != null) {
-                launchCookieItemId = itemId;
-                break;
-            }
-        }
-
-        return mContainer.getFirstMatchForAppClose(launchCookieItemId,
+        return mContainer.getFirstMatchForAppClose(StableViewInfo.fromLaunchCookies(launchCookies),
                 sourceTaskView.getFirstTask().key.getComponent().getPackageName(),
                 UserHandle.of(sourceTaskView.getFirstTask().key.userId),
                 false /* supportsAllAppsState */);

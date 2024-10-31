@@ -45,7 +45,6 @@ import com.android.launcher3.allapps.WorkPausedCard;
 import com.android.launcher3.allapps.WorkProfileManager;
 import com.android.launcher3.tapl.LauncherInstrumentation;
 import com.android.launcher3.util.TestUtil;
-import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 import com.android.launcher3.util.rule.TestStabilityRule.Stability;
 
 import org.junit.After;
@@ -71,7 +70,6 @@ public class TaplWorkProfileTest extends AbstractLauncherUiTest<Launcher> {
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        initialize(this);
         String output =
                 mDevice.executeShellCommand(
                         "pm create-user --profileOf 0 --managed TestProfile");
@@ -147,7 +145,6 @@ public class TaplWorkProfileTest extends AbstractLauncherUiTest<Launcher> {
 
     // Staging; will be promoted to presubmit if stable
     @Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT)
-    @ScreenRecord
     @Test
     public void toggleWorks() {
         assumeTrue(mWorkProfileSetupSuccessful);
@@ -195,7 +192,6 @@ public class TaplWorkProfileTest extends AbstractLauncherUiTest<Launcher> {
 
     }
 
-    @ScreenRecord // b/322823478
     @Test
     public void testEdu() {
         assumeTrue(mWorkProfileSetupSuccessful);
