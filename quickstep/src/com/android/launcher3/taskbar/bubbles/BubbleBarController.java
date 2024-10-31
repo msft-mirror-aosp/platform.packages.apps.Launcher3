@@ -118,6 +118,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
     private Optional<BubbleStashedHandleViewController> mBubbleStashedHandleViewController;
     private BubblePinController mBubblePinController;
     private BubbleCreator mBubbleCreator;
+    private BubbleBarLocationListener mBubbleBarLocationListener;
 
     // Cache last sent top coordinate to avoid sending duplicate updates to shell
     private int mLastSentBubbleBarTop;
@@ -176,6 +177,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
     /** Initializes controllers. */
     public void init(BubbleControllers bubbleControllers,
+            BubbleBarLocationListener bubbleBarLocationListener,
             ImeVisibilityChecker imeVisibilityChecker) {
         mImeVisibilityChecker = imeVisibilityChecker;
         mBubbleBarViewController = bubbleControllers.bubbleBarViewController;
@@ -183,6 +185,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
         mBubbleStashedHandleViewController = bubbleControllers.bubbleStashedHandleViewController;
         mBubblePinController = bubbleControllers.bubblePinController;
         mBubbleCreator = bubbleControllers.bubbleCreator;
+        mBubbleBarLocationListener = bubbleBarLocationListener;
 
         bubbleControllers.runAfterInit(() -> {
             mBubbleBarViewController.setHiddenForBubbles(
@@ -193,7 +196,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
             mBubbleBarViewController.setUpdateSelectedBubbleAfterCollapse(
                     key -> setSelectedBubbleInternal(mBubbles.get(key)));
             mBubbleBarViewController.setBoundsChangeListener(this::onBubbleBarBoundsChanged);
-
+            mBubbleBarLocationListener.onBubbleBarLocationUpdated(
+                    mBubbleBarViewController.getBubbleBarLocation());
             if (sBubbleBarEnabled) {
                 mSystemUiProxy.setBubblesListener(this);
             }
@@ -373,8 +377,6 @@ public class BubbleBarController extends IBubblesListener.Stub {
             // Updates mean the dot state may have changed; any other changes were updated in
             // the populateBubble step.
             BubbleBarBubble bb = mBubbles.get(update.updatedBubble.getKey());
-            // If we're not stashed, we're visible so animate
-            bb.getView().updateDotVisibility(!mBubbleStashController.isStashed() /* animate */);
             mBubbleBarViewController.animateBubbleNotification(
                     bb, /* isExpanding= */ false, /* isUpdate= */ true);
         }
@@ -488,12 +490,16 @@ public class BubbleBarController extends IBubblesListener.Stub {
     private void updateBubbleBarLocationInternal(BubbleBarLocation location) {
         mBubbleBarViewController.setBubbleBarLocation(location);
         mBubbleStashController.setBubbleBarLocation(location);
+        mBubbleBarLocationListener.onBubbleBarLocationUpdated(location);
     }
 
     @Override
     public void animateBubbleBarLocation(BubbleBarLocation bubbleBarLocation) {
         MAIN_EXECUTOR.execute(
-                () -> mBubbleBarViewController.animateBubbleBarLocation(bubbleBarLocation));
+                () -> {
+                    mBubbleBarViewController.animateBubbleBarLocation(bubbleBarLocation);
+                    mBubbleBarLocationListener.onBubbleBarLocationAnimated(bubbleBarLocation);
+                });
     }
 
     /** Notifies WMShell to show the expanded view. */
@@ -517,5 +523,15 @@ public class BubbleBarController extends IBubblesListener.Stub {
     public interface ImeVisibilityChecker {
         /** Whether the IME is visible. */
         boolean isImeVisible();
+    }
+
+    /** Listener of {@link BubbleBarLocation} updates. */
+    public interface BubbleBarLocationListener {
+
+        /** Called when {@link BubbleBarLocation} is animated, but change is not yet final. */
+        void onBubbleBarLocationAnimated(BubbleBarLocation location);
+
+        /** Called when {@link BubbleBarLocation} is updated permanently. */
+        void onBubbleBarLocationUpdated(BubbleBarLocation location);
     }
 }

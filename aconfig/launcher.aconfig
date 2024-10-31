@@ -1,5 +1,5 @@
 package: "com.android.launcher3"
-container: "system_ext"
+container: "system"
 
 flag {
     name: "enable_expanding_pause_work_button"
@@ -62,6 +62,13 @@ flag {
     namespace: "launcher"
     description: "Enables taskbar pinning to allow user to switch between transient and persistent taskbar flavors."
     bug: "296231746"
+}
+
+flag {
+    name: "enable_taskbar_connected_displays"
+    namespace: "launcher"
+    description: "Enables connected displays in taskbar."
+    bug: "362720616"
 }
 
 flag {
@@ -362,6 +369,13 @@ flag {
 }
 
 flag {
+    name: "work_scheduler_in_work_profile"
+    namespace: "launcher"
+    description: "Enables work scheduler view above the work pause button in work profile."
+    bug: "361589193"
+}
+
+flag {
     name: "one_grid_specs"
     namespace: "launcher"
     description: "Defines the new specs for grids based on OneGrid"
@@ -387,4 +401,108 @@ flag {
     namespace: "launcher"
     description: "Refactor grid migration such that the code is simpler to understand and update"
     bug: "358399271"
+}
+
+flag {
+    name: "accessibility_scroll_on_allapps"
+    namespace: "launcher"
+    description: "Scroll to item position if accessibility focused"
+    bug: "265392261"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_dismiss_prediction_undo"
+    namespace: "launcher"
+    description: "Show an 'Undo' snackbar when users dismiss a predicted hotseat item"
+    bug: "270394476"
+}
+
+flag {
+    name: "enable_all_apps_button_in_hotseat"
+    namespace: "launcher"
+    description: "Enables displaying the all apps button in the hotseat."
+    bug: "270393897"
+}
+
+flag {
+    name: "taskbar_quiet_mode_change_support"
+    namespace: "launcher"
+    description: "Support changing quiet mode for user profiles in taskbar."
+    bug: "345760034"
+}
+
+flag {
+    name: "taskbar_overflow"
+    namespace: "launcher"
+    description: "Show recent apps in the taskbar overflow."
+    bug: "368119679"
+}
+
+flag {
+    name: "enable_active_gesture_proto_log"
+    namespace: "launcher"
+    description: "Enables tracking active gesture logs in ProtoLog"
+    bug: "293182501"
+}
+
+flag {
+    name: "enable_recents_window_proto_log"
+    namespace: "launcher"
+    description: "Enables tracking recents window logs in ProtoLog"
+    bug: "292269949"
+}
+
+flag {
+    name: "enable_state_manager_proto_log"
+    namespace: "launcher"
+    description: "Enables tracking state manager logs in ProtoLog"
+    bug: "292269949"
+}
+
+flag {
+    name: "coordinate_workspace_scale"
+    namespace: "launcher"
+    description: "Ensure that the workspace and hotseat scale doesn't conflict and transitions smoothly between launching and closing apps"
+    bug: "366403487"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_tiered_widgets_by_default_in_picker"
+    namespace: "launcher"
+    description: "Shows filtered set of widgets by default and an option to show all widgets in the widget picker"
+    bug: "356127021"
+}
+
+flag {
+    name: "show_taskbar_pinning_popup_from_anywhere"
+    namespace: "launcher"
+    description: "Shows the pinning popup view after long-pressing or right-clicking anywhere on the pinned taskbar"
+    bug: "297325541"
+}
+
+flag {
+    name: "enable_launcher_overview_in_window"
+    namespace: "launcher"
+    description: "Enables launcher recents opening inside of a window instead of being hosted in launcher activity."
+    bug: "292269949"
+}
+
+flag {
+   name: "enforce_system_radius_for_app_widgets"
+   namespace: "launcher"
+   description: "Enforce system radius for widget corners instead of a separate 16.dp value"
+   bug: "370950552"
+}
+
+flag {
+    name: "enable_contrast_tiles"
+    namespace: "launcher"
+    description: "Enable launcher app contrast tiles."
+    bug: "341217082"
 }

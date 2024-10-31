@@ -35,7 +35,7 @@ import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_TASK_PENDIN
 import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_TASK_SHORTCUT;
 import static com.android.quickstep.util.SplitSelectDataHolder.SPLIT_TASK_TASK;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.KEY_EXTRA_WIDGET_INTENT;
-import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_50_50;
+import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_2_50_50;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -52,7 +52,6 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.UserHandle;
@@ -78,6 +77,7 @@ import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.statehandlers.DepthController;
 import com.android.launcher3.statemanager.StateManager;
+import com.android.launcher3.taskbar.LauncherTaskbarUIController;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
@@ -116,7 +116,6 @@ public class SplitSelectStateController {
     private static final String TAG = "SplitSelectStateCtor";
 
     private RecentsViewContainer mContainer;
-    private final Handler mHandler;
     private final RecentsModel mRecentTasksModel;
     @Nullable
     private Runnable mActivityBackCallback;
@@ -182,12 +181,11 @@ public class SplitSelectStateController {
         }
     };
 
-    public SplitSelectStateController(RecentsViewContainer container, Handler handler,
+    public SplitSelectStateController(RecentsViewContainer container,
             StateManager stateManager, DepthController depthController,
             StatsLogManager statsLogManager, SystemUiProxy systemUiProxy, RecentsModel recentsModel,
             Runnable activityBackCallback) {
         mContainer = container;
-        mHandler = handler;
         mStatsLogManager = statsLogManager;
         mSystemUiProxy = systemUiProxy;
         mStateManager = stateManager;
@@ -366,7 +364,7 @@ public class SplitSelectStateController {
      * A version of {@link #launchSplitTasks(int, Consumer)} that launches with default split ratio.
      */
     public void launchSplitTasks(@Nullable Consumer<Boolean> callback) {
-        launchSplitTasks(SNAP_TO_50_50, callback);
+        launchSplitTasks(SNAP_TO_2_50_50, callback);
     }
 
     /**
@@ -374,7 +372,7 @@ public class SplitSelectStateController {
      * ratio and no callback.
      */
     public void launchSplitTasks() {
-        launchSplitTasks(SNAP_TO_50_50, null);
+        launchSplitTasks(SNAP_TO_2_50_50, null);
     }
 
     /**
@@ -568,13 +566,13 @@ public class SplitSelectStateController {
         switch (launchData.getSplitLaunchType()) {
             case SPLIT_SINGLE_TASK_FULLSCREEN -> mSystemUiProxy.startTasks(firstTaskId,
                     optionsBundle, secondTaskId, null /* options2 */, initialStagePosition,
-                    SNAP_TO_50_50, remoteTransition, instanceId);
+                    SNAP_TO_2_50_50, remoteTransition, instanceId);
             case SPLIT_SINGLE_INTENT_FULLSCREEN -> mSystemUiProxy.startIntentAndTask(firstPI,
                     firstUserId, optionsBundle, secondTaskId, null /*options2*/,
-                    initialStagePosition, SNAP_TO_50_50, remoteTransition, instanceId);
+                    initialStagePosition, SNAP_TO_2_50_50, remoteTransition, instanceId);
             case SPLIT_SINGLE_SHORTCUT_FULLSCREEN -> mSystemUiProxy.startShortcutAndTask(
                     initialShortcut, optionsBundle, firstTaskId, null /* options2 */,
-                    initialStagePosition, SNAP_TO_50_50, remoteTransition, instanceId);
+                    initialStagePosition, SNAP_TO_2_50_50, remoteTransition, instanceId);
         }
     }
 
@@ -746,6 +744,7 @@ public class SplitSelectStateController {
      */
     public void resetState() {
         mSplitSelectDataHolder.resetState();
+        mContainer.<RecentsView>getOverviewPanel().resetDesktopTaskFromSplitSelectState();
         dispatchOnSplitSelectionExit();
         mRecentsAnimationRunning = false;
         mLaunchingTaskView = null;
@@ -901,7 +900,7 @@ public class SplitSelectStateController {
                 SystemUiProxy.INSTANCE.get(mLauncher.getApplicationContext())
                         .startRecentsActivity(
                                 mOverviewComponentObserver.getOverviewIntent(), options,
-                                callbacks);
+                                callbacks, false /* useSyntheticRecentsTransition */);
             });
         }
 
@@ -945,7 +944,16 @@ public class SplitSelectStateController {
                 anim.addListener(new AnimatorListenerAdapter() {
                     @Override
                     public void onAnimationStart(Animator animation) {
-                        controller.finish(true /* toRecents */, null /* onFinishComplete */,
+                        controller.finish(
+                                true /* toRecents */,
+                                () -> {
+                                    LauncherTaskbarUIController controller =
+                                            mLauncher.getTaskbarUIController();
+                                    if (controller != null) {
+                                        controller.updateTaskbarLauncherStateGoingHome();
+                                    }
+
+                                },
                                 false /* sendUserLeaveHint */);
                     }
                     @Override
@@ -953,7 +961,16 @@ public class SplitSelectStateController {
                         SystemUiProxy.INSTANCE.get(mLauncher.getApplicationContext())
                                 .onDesktopSplitSelectAnimComplete(mTaskInfo);
                     }
+                    @Override
+                    public void onAnimationCancel(Animator animation) {
+                        mLauncher.getDragLayer().removeView(floatingTaskView);
+                        getSplitAnimationController()
+                                .removeSplitInstructionsView(mLauncher);
+                        resetState();
+                    }
                 });
+                anim.add(getSplitAnimationController()
+                        .getShowSplitInstructionsAnim(mLauncher).buildAnim());
                 anim.buildAnim().start();
             }
         }

@@ -16,16 +16,18 @@
 
 package com.android.launcher3.dagger;
 
-import dagger.Component;
 
-import javax.inject.Singleton;
+import com.android.quickstep.dagger.QuickStepModule;
+import com.android.quickstep.dagger.QuickstepBaseAppComponent;
+
+import dagger.Component;
 
 /**
  * Root component for Dagger injection for Launcher Quickstep.
  */
-@Singleton
-@Component
-public interface LauncherAppComponent extends LauncherBaseAppComponent {
+@LauncherAppSingleton
+@Component(modules = QuickStepModule.class)
+public interface LauncherAppComponent extends QuickstepBaseAppComponent {
     /** Builder for quickstep LauncherAppComponent. */
     @Component.Builder
     interface Builder extends LauncherBaseAppComponent.Builder {

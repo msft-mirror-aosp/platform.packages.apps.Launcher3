@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.uioverrides.states;
 
+import static com.android.launcher3.Flags.enableDesktopWindowingCarouselDetach;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 
@@ -50,9 +51,11 @@ public class BackgroundAppState extends OverviewState {
             return super.getVerticalProgress(launcher);
         }
         RecentsView recentsView = launcher.getOverviewPanel();
-        int transitionLength = LayoutUtils.getShelfTrackingDistance(launcher,
+        int transitionLength = LayoutUtils.getShelfTrackingDistance(
+                launcher,
                 launcher.getDeviceProfile(),
-                recentsView.getPagedOrientationHandler());
+                recentsView.getPagedOrientationHandler(),
+                recentsView.getSizeStrategy());
         AllAppsTransitionController controller = launcher.getAllAppsController();
         float scrollRange = Math.max(controller.getShiftRange(), 1);
         float progressDelta = (transitionLength / scrollRange);
@@ -85,6 +88,11 @@ public class BackgroundAppState extends OverviewState {
     @Override
     public boolean showTaskThumbnailSplash() {
         return true;
+    }
+
+    @Override
+    public boolean detachDesktopCarousel() {
+        return enableDesktopWindowingCarouselDetach();
     }
 
     @Override

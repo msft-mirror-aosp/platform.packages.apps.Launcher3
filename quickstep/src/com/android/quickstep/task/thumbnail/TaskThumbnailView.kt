@@ -22,6 +22,7 @@ import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.Rect
 import android.util.AttributeSet
+import android.util.Log
 import android.view.View
 import android.view.ViewOutlineProvider
 import androidx.annotation.ColorInt
@@ -31,6 +32,7 @@ import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.util.ViewPool
 import com.android.quickstep.recents.di.RecentsDependencies
+import com.android.quickstep.recents.di.get
 import com.android.quickstep.recents.di.inject
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.BackgroundOnly
 import com.android.quickstep.task.thumbnail.TaskThumbnailUiState.LiveTile
@@ -53,7 +55,7 @@ import kotlinx.coroutines.flow.onEach
 class TaskThumbnailView : ConstraintLayout, ViewPool.Reusable {
 
     private val viewData: TaskThumbnailViewData by RecentsDependencies.inject(this)
-    private val viewModel: TaskThumbnailViewModel by RecentsDependencies.inject(this)
+    private lateinit var viewModel: TaskThumbnailViewModel
 
     private lateinit var viewAttachedScope: CoroutineScope
 
@@ -90,8 +92,10 @@ class TaskThumbnailView : ConstraintLayout, ViewPool.Reusable {
         super.onAttachedToWindow()
         viewAttachedScope =
             CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("TaskThumbnailView"))
+        viewModel = RecentsDependencies.get(this)
         viewModel.uiState
             .onEach { viewModelUiState ->
+                Log.d(TAG, "viewModelUiState changed from $uiState to: $viewModelUiState")
                 uiState = viewModelUiState
                 resetViews()
                 when (viewModelUiState) {
@@ -211,6 +215,10 @@ class TaskThumbnailView : ConstraintLayout, ViewPool.Reusable {
         Utilities.mapRange(
             viewModel.cornerRadiusProgress.value,
             overviewCornerRadius,
-            fullscreenCornerRadius
+            fullscreenCornerRadius,
         ) / inheritedScale
+
+    private companion object {
+        const val TAG = "TaskThumbnailView"
+    }
 }
