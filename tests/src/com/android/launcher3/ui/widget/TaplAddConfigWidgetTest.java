@@ -93,7 +93,7 @@ public class TaplAddConfigWidgetTest extends AbstractLauncherUiTest<Launcher> {
         WidgetConfigStartupMonitor monitor = new WidgetConfigStartupMonitor();
         mLauncher.getWorkspace()
                 .openAllWidgets()
-                .getWidget(mWidgetInfo.getLabel(mTargetContext.getPackageManager()))
+                .getWidget(mWidgetInfo.getLabel())
                 .dragToWorkspace(true, false);
         // Widget id for which the config activity was opened
         mWidgetId = monitor.getWidgetId();
@@ -136,7 +136,7 @@ public class TaplAddConfigWidgetTest extends AbstractLauncherUiTest<Launcher> {
         @Override
         public boolean isTrue() throws Throwable {
             return mMainThreadExecutor.submit(() -> {
-                Launcher l = Launcher.ACTIVITY_TRACKER.getCreatedActivity();
+                Launcher l = Launcher.ACTIVITY_TRACKER.getCreatedContext();
                 return l != null && l.getWorkspace().getFirstMatch(this) != null;
             }).get();
         }
