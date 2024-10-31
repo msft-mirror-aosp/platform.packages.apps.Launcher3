@@ -15,17 +15,16 @@
  */
 package com.android.launcher3.util;
 
-import static android.util.Base64.NO_PADDING;
-import static android.util.Base64.NO_WRAP;
-
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
-import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_DIGEST_KEY;
 import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_DIGEST_LABEL;
 import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_DIGEST_TAG;
+import static com.android.launcher3.LauncherSettings.Settings.LAYOUT_PROVIDER_KEY;
+import static com.android.launcher3.LauncherSettings.Settings.createBlobProviderKey;
 
 import static org.junit.Assert.assertTrue;
 
+import android.Manifest;
 import android.app.Instrumentation;
 import android.app.blob.BlobHandle;
 import android.app.blob.BlobStoreManager;
@@ -41,7 +40,6 @@ import android.os.Process;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.system.OsConstants;
-import android.util.Base64;
 import android.util.Log;
 
 import androidx.test.uiautomator.UiDevice;
@@ -168,11 +166,12 @@ public class TestUtil {
             session.commit(AsyncTask.THREAD_POOL_EXECUTOR, i -> wait.countDown());
         }
 
-        String key = Base64.encodeToString(digest, NO_WRAP | NO_PADDING);
-        Settings.Secure.putString(context.getContentResolver(), LAYOUT_DIGEST_KEY, key);
+        grantWriteSecurePermission();
+        Settings.Secure.putString(
+                context.getContentResolver(), LAYOUT_PROVIDER_KEY, createBlobProviderKey(digest));
         wait.await();
         return () ->
-            Settings.Secure.putString(context.getContentResolver(), LAYOUT_DIGEST_KEY, null);
+            Settings.Secure.putString(context.getContentResolver(), LAYOUT_PROVIDER_KEY, null);
     }
 
     /**
@@ -222,6 +221,14 @@ public class TestUtil {
             failed = true;
         }
         assertTrue(message, failed);
+    }
+
+    /**
+     * Grants [WRITE_SECURE_SETTINGS] permission in runtime.
+     */
+    public static void grantWriteSecurePermission() {
+        getInstrumentation().getUiAutomation()
+                .adoptShellPermissionIdentity(Manifest.permission.WRITE_SECURE_SETTINGS);
     }
 
     /** Interface to indicate a runnable which can throw any exception. */

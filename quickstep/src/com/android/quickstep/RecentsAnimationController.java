@@ -17,13 +17,10 @@ package com.android.quickstep;
 
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-import static com.android.quickstep.util.ActiveGestureErrorDetector.GestureEvent.FINISH_RECENTS_ANIMATION;
 
-import android.content.Context;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.util.Log;
-import android.view.IRecentsAnimationController;
 import android.view.SurfaceControl;
 import android.view.WindowManagerGlobal;
 import android.window.PictureInPictureSurfaceTransaction;
@@ -34,11 +31,11 @@ import com.android.internal.jank.Cuj;
 import com.android.internal.os.IResultReceiver;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.RunnableList;
-import com.android.quickstep.util.ActiveGestureErrorDetector;
-import com.android.quickstep.util.ActiveGestureLog;
+import com.android.quickstep.util.ActiveGestureProtoLogProxy;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.RecentsAnimationControllerCompat;
+import com.android.wm.shell.recents.IRecentsAnimationController;
 
 import java.io.PrintWriter;
 import java.util.function.Consumer;
@@ -90,15 +87,6 @@ public class RecentsAnimationController {
         }
     }
 
-    /**
-     * Remove task remote animation target from
-     * {@link RecentsAnimationCallbacks#onTasksAppeared}}.
-     */
-    @UiThread
-    public void removeTaskTarget(int targetTaskId) {
-        UI_HELPER_EXECUTOR.execute(() -> mController.removeTask(targetTaskId));
-    }
-
     @UiThread
     public void finishAnimationToHome() {
         finishController(true /* toRecents */, null, false /* sendUserLeaveHint */);
@@ -143,10 +131,7 @@ public class RecentsAnimationController {
             // trigger the callback to be called immediately
             return;
         }
-        ActiveGestureLog.INSTANCE.addLog(
-                /* event= */ "finishRecentsAnimation",
-                /* extras= */ toRecents,
-                /* gestureEvent= */ FINISH_RECENTS_ANIMATION);
+        ActiveGestureProtoLogProxy.logFinishRecentsAnimation(toRecents);
         // Finish not yet requested
         mFinishRequested = true;
         mFinishTargetIsLauncher = toRecents;
@@ -155,7 +140,7 @@ public class RecentsAnimationController {
             mController.finish(toRecents, sendUserLeaveHint, new IResultReceiver.Stub() {
                 @Override
                 public void send(int i, Bundle bundle) throws RemoteException {
-                    ActiveGestureLog.INSTANCE.addLog("finishRecentsAnimation-callback");
+                    ActiveGestureProtoLogProxy.logFinishRecentsAnimationCallback();
                     MAIN_EXECUTOR.execute(() -> {
                         mPendingFinishCallbacks.executeAllAndDestroy();
                     });
@@ -173,32 +158,11 @@ public class RecentsAnimationController {
     }
 
     /**
-     * @see IRecentsAnimationController#cleanupScreenshot()
-     */
-    @UiThread
-    public void cleanupScreenshot() {
-        UI_HELPER_EXECUTOR.execute(() -> {
-            ActiveGestureLog.INSTANCE.addLog(
-                    "cleanupScreenshot",
-                    ActiveGestureErrorDetector.GestureEvent.CLEANUP_SCREENSHOT);
-            mController.cleanupScreenshot();
-        });
-    }
-
-    /**
      * @see RecentsAnimationControllerCompat#detachNavigationBarFromApp
      */
     @UiThread
     public void detachNavigationBarFromApp(boolean moveHomeToTop) {
         UI_HELPER_EXECUTOR.execute(() -> mController.detachNavigationBarFromApp(moveHomeToTop));
-    }
-
-    /**
-     * @see IRecentsAnimationController#animateNavigationBarToApp(long)
-     */
-    @UiThread
-    public void animateNavigationBarToApp(long duration) {
-        UI_HELPER_EXECUTOR.execute(() -> mController.animateNavigationBarToApp(duration));
     }
 
     /**

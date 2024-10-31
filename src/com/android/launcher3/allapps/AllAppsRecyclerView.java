@@ -18,8 +18,6 @@ package com.android.launcher3.allapps;
 import static androidx.constraintlayout.widget.ConstraintSet.MATCH_CONSTRAINT;
 import static androidx.constraintlayout.widget.ConstraintSet.WRAP_CONTENT;
 
-import static com.android.launcher3.config.FeatureFlags.ALL_APPS_GONE_VISIBILITY;
-import static com.android.launcher3.config.FeatureFlags.ENABLE_ALL_APPS_RV_PREINFLATION;
 import static com.android.launcher3.logger.LauncherAtom.ContainerInfo;
 import static com.android.launcher3.logger.LauncherAtom.SearchResultContainer;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_PERSONAL_SCROLLED_DOWN;
@@ -124,13 +122,11 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
         // all apps.
         int maxPoolSizeForAppIcons = grid.getMaxAllAppsRowCount()
                 * grid.numShownAllAppsColumns;
-        if (ALL_APPS_GONE_VISIBILITY.get() && ENABLE_ALL_APPS_RV_PREINFLATION.get()) {
-            // If we set all apps' hidden visibility to GONE and enable pre-inflation, we want to
-            // preinflate one page of all apps icons plus [PREINFLATE_ICONS_ROW_COUNT] rows +
-            // [EXTRA_ICONS_COUNT]. Thus we need to bump the max pool size of app icons accordingly.
-            maxPoolSizeForAppIcons +=
-                    PREINFLATE_ICONS_ROW_COUNT * grid.numShownAllAppsColumns + EXTRA_ICONS_COUNT;
-        }
+        // If we set all apps' hidden visibility to GONE and enable pre-inflation, we want to
+        // preinflate one page of all apps icons plus [PREINFLATE_ICONS_ROW_COUNT] rows +
+        // [EXTRA_ICONS_COUNT]. Thus we need to bump the max pool size of app icons accordingly.
+        maxPoolSizeForAppIcons +=
+                PREINFLATE_ICONS_ROW_COUNT * grid.numShownAllAppsColumns + EXTRA_ICONS_COUNT;
         if (hasWorkProfile) {
             maxPoolSizeForAppIcons *= 2;
         }
@@ -335,6 +331,9 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
 
     public void setLettersToScrollLayout(
             List<AlphabeticalAppsList.FastScrollSectionInfo> fastScrollSections) {
+        if (fastScrollSections.isEmpty()) {
+            return;
+        }
         if (mLetterList != null) {
             mLetterList.removeAllViews();
         }
@@ -350,17 +349,12 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
                     (LetterListTextView) LayoutInflater.from(context).inflate(
                             R.layout.fast_scroller_letter_list_text_view, mLetterList, false);
             int viewId = View.generateViewId();
-            textView.setId(viewId);
+            textView.apply(sectionInfo /* FastScrollSectionInfo */, viewId /* viewId */);
             sectionInfo.setId(viewId);
-            textView.setText(sectionInfo.sectionName);
             if (i == fastScrollSections.size() - 1) {
                 // The last section info is just a duplicate so that user can scroll to the bottom.
                 textView.setVisibility(INVISIBLE);
             }
-            ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
-                    MATCH_CONSTRAINT, WRAP_CONTENT);
-            lp.dimensionRatio = "v,1:1";
-            textView.setLayoutParams(lp);
             textViews.add(textView);
             mLetterList.addView(textView);
         }
@@ -373,6 +367,8 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
         mLetterList.addView(lastLetterListTextView);
         constraintTextViewsVertically(mLetterList, textViews);
         mLetterList.setVisibility(VISIBLE);
+        // Set the alpha to 0 to avoid the letter list being shown when it shouldn't be.
+        mLetterList.setAlpha(0);
     }
 
     private void constraintTextViewsVertically(ConstraintLayout constraintLayout,

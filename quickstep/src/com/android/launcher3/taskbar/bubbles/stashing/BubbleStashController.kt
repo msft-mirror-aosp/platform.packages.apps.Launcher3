@@ -16,6 +16,7 @@
 
 package com.android.launcher3.taskbar.bubbles.stashing
 
+import android.graphics.Rect
 import android.view.InsetsController
 import android.view.MotionEvent
 import android.view.View
@@ -41,12 +42,6 @@ interface BubbleStashController {
 
         /** Provides taskbar height in pixels. */
         fun getTaskbarHeight(): Int
-
-        /** Provides hotseat bottom space in pixels. */
-        fun getHotseatBottomSpace(): Int
-
-        /** Provides hotseat height in pixels. */
-        fun getHotseatHeight(): Int
     }
 
     /** Execute passed action only after controllers are initiated. */
@@ -55,14 +50,29 @@ interface BubbleStashController {
         fun runAfterInit(action: Runnable)
     }
 
+    /** Launcher states bubbles cares about */
+    enum class BubbleLauncherState {
+        /* When launcher is in overview */
+        OVERVIEW,
+        /* When launcher is on home */
+        HOME,
+        /* We're in an app */
+        IN_APP,
+    }
+
+    /** The current launcher state */
+    var launcherState: BubbleLauncherState
+
     /** Whether bubble bar is currently stashed */
     val isStashed: Boolean
 
     /** Whether launcher enters or exits the home page. */
-    var isBubblesShowingOnHome: Boolean
+    val isBubblesShowingOnHome: Boolean
+        get() = launcherState == BubbleLauncherState.HOME
 
     /** Whether launcher enters or exits the overview page. */
-    var isBubblesShowingOnOverview: Boolean
+    val isBubblesShowingOnOverview: Boolean
+        get() = launcherState == BubbleLauncherState.OVERVIEW
 
     /** Updated when sysui locked state changes, when locked, bubble bar is not shown. */
     var isSysuiLocked: Boolean
@@ -78,7 +88,7 @@ interface BubbleStashController {
         taskbarInsetsController: TaskbarInsetsController,
         bubbleBarViewController: BubbleBarViewController,
         bubbleStashedHandleViewController: BubbleStashedHandleViewController?,
-        controllersAfterInitAction: ControllersAfterInitAction
+        controllersAfterInitAction: ControllersAfterInitAction,
     )
 
     /** Shows the bubble bar at [bubbleBarTranslationY] position immediately without animation. */
@@ -110,6 +120,9 @@ interface BubbleStashController {
 
     /** Set a bubble bar location */
     fun setBubbleBarLocation(bubbleBarLocation: BubbleBarLocation)
+
+    /** Set the hotseat vertical center that bubble bar will align with. */
+    fun setHotseatVerticalCenter(hotseatVerticalCenter: Int)
 
     /**
      * Stashes the bubble bar (transform to the handle view), or just shrink width of the expanded
@@ -145,6 +158,9 @@ interface BubbleStashController {
 
     /** Returns the translation of the handle. */
     fun getHandleTranslationY(): Float?
+
+    /** Returns bounds of the handle */
+    fun getHandleBounds(bounds: Rect)
 
     /**
      * Returns bubble bar Y position according to [isBubblesShowingOnHome] and

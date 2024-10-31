@@ -76,7 +76,6 @@ import static com.android.launcher3.logging.KeyboardStateManager.KeyboardState.S
 import static com.android.launcher3.logging.StatsLogManager.EventEnum;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_HOME;
-import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_ENTRY;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_ENTRY_WITH_DEVICE_SEARCH;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ALLAPPS_EXIT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_ONRESUME;
@@ -225,10 +224,10 @@ import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.AllAppsSwipeController;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.ActivityResultInfo;
-import com.android.launcher3.util.ActivityTracker;
 import com.android.launcher3.util.BackPressHandler;
 import com.android.launcher3.util.CannedAnimationCoordinator;
 import com.android.launcher3.util.ComponentKey;
+import com.android.launcher3.util.ContextTracker;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInflater;
@@ -293,7 +292,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         PluginListener<LauncherOverlayPlugin> {
     public static final String TAG = "Launcher";
 
-    public static final ActivityTracker<Launcher> ACTIVITY_TRACKER = new ActivityTracker<>();
+    public static final ContextTracker.ActivityTracker<Launcher> ACTIVITY_TRACKER =
+            new ContextTracker.ActivityTracker<>();
 
     static final boolean LOGD = false;
 
@@ -413,6 +413,7 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     private final List<BackPressHandler> mBackPressedHandlers = new ArrayList<>();
     private boolean mIsColdStartupAfterReboot;
+    private boolean mForceConfigUpdate;
 
     private boolean mIsNaturalScrollingEnabled;
 
@@ -449,12 +450,10 @@ public class Launcher extends StatefulActivity<LauncherState>
                 .logStart(LAUNCHER_LATENCY_STARTUP_TOTAL_DURATION)
                 .logStart(LAUNCHER_LATENCY_STARTUP_ACTIVITY_ON_CREATE);
         // Only use a hard-coded cookie since we only want to trace this once.
-        if (Utilities.ATLEAST_S) {
-            Trace.beginAsyncSection(
-                    DISPLAY_WORKSPACE_TRACE_METHOD_NAME, DISPLAY_WORKSPACE_TRACE_COOKIE);
-            Trace.beginAsyncSection(DISPLAY_ALL_APPS_TRACE_METHOD_NAME,
-                    DISPLAY_ALL_APPS_TRACE_COOKIE);
-        }
+        Trace.beginAsyncSection(
+                DISPLAY_WORKSPACE_TRACE_METHOD_NAME, DISPLAY_WORKSPACE_TRACE_COOKIE);
+        Trace.beginAsyncSection(DISPLAY_ALL_APPS_TRACE_METHOD_NAME,
+                DISPLAY_ALL_APPS_TRACE_COOKIE);
         TraceHelper.INSTANCE.beginSection(ON_CREATE_EVT);
         if (DEBUG_STRICT_MODE) {
             StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
@@ -733,13 +732,6 @@ public class Launcher extends StatefulActivity<LauncherState>
     public void onEnterAnimationComplete() {
         super.onEnterAnimationComplete();
         mRotationHelper.setCurrentTransitionRequest(REQUEST_NONE);
-        // Starting with Android S, onEnterAnimationComplete is sent immediately
-        // causing the surface to get removed before the animation completed (b/175345344).
-        // Instead we rely on next user touch event to remove the view and optionally a callback
-        // from system from Android T onwards.
-        if (!Utilities.ATLEAST_S) {
-            AbstractFloatingView.closeOpenViews(this, false, TYPE_ICON_SURFACE);
-        }
     }
 
     @Override
@@ -766,7 +758,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     protected void onHandleConfigurationChanged() {
         Trace.beginSection("Launcher#onHandleconfigurationChanged");
         try {
-            if (!initDeviceProfile(mDeviceProfile.inv)) {
+            if (!initDeviceProfile(mDeviceProfile.inv) && !mForceConfigUpdate) {
                 return;
             }
 
@@ -780,6 +772,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             mModel.rebindCallbacks();
             updateDisallowBack();
         } finally {
+            mForceConfigUpdate = false;
             Trace.endSection();
         }
     }
@@ -1251,9 +1244,7 @@ public class Launcher extends StatefulActivity<LauncherState>
      * Returns {@link EventEnum} that should be logged when Launcher enters into AllApps state.
      */
     protected Optional<EventEnum> getAllAppsEntryEvent() {
-        return Optional.of(FeatureFlags.ENABLE_DEVICE_SEARCH.get()
-                ? LAUNCHER_ALLAPPS_ENTRY_WITH_DEVICE_SEARCH
-                : LAUNCHER_ALLAPPS_ENTRY);
+        return Optional.of(LAUNCHER_ALLAPPS_ENTRY_WITH_DEVICE_SEARCH);
     }
 
     @Override
@@ -1354,7 +1345,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (requestArgs != null) {
             setWaitingForResult(requestArgs);
         }
-        mPendingActivityRequestCode = savedState.getInt(RUNTIME_STATE_PENDING_REQUEST_CODE);
+        mPendingActivityRequestCode = savedState.getInt(
+                RUNTIME_STATE_PENDING_REQUEST_CODE, mPendingActivityRequestCode);
 
         mPendingActivityResult = savedState.getParcelable(RUNTIME_STATE_PENDING_ACTIVITY_RESULT);
 
@@ -1788,7 +1780,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Override
     public void onDestroy() {
         super.onDestroy();
-        ACTIVITY_TRACKER.onActivityDestroyed(this);
+        ACTIVITY_TRACKER.onContextDestroyed(this);
 
         SettingsCache.INSTANCE.get(this).unregister(TOUCHPAD_NATURAL_SCROLLING,
                 mNaturalScrollingChangedListener);
@@ -1884,13 +1876,18 @@ public class Launcher extends StatefulActivity<LauncherState>
             }
         }
 
-        // Exit spring loaded mode if necessary after adding the widget
-        Runnable onComplete = MULTI_SELECT_EDIT_MODE.get() ? null
-                : () -> mStateManager.goToState(NORMAL, SPRING_LOADED_EXIT_DELAY);
+        // Exit spring loaded mode if necessary after adding the widget; unless config activity was
+        // started.
+        Runnable onComplete = MULTI_SELECT_EDIT_MODE.get() ? null : () -> mStateManager.goToState(
+                NORMAL, SPRING_LOADED_EXIT_DELAY);
         completeAddAppWidget(appWidgetId, info, boundWidget,
                 addFlowHandler.getProviderInfo(this), addFlowHandler.needsConfigure(),
                 false, widgetPreviewBitmap);
-        mWorkspace.removeExtraEmptyScreenDelayed(delay, false, onComplete);
+        // Remove extra screen if widget drop concluded. If a config activity was started, extra
+        // screen will be removed when we get back its result.
+        if (!isActivityStarted) {
+            mWorkspace.removeExtraEmptyScreenDelayed(delay, false, onComplete);
+        }
     }
 
     public void addPendingItem(PendingAddItemInfo info, int container, int screenId,
@@ -2582,10 +2579,8 @@ public class Launcher extends StatefulActivity<LauncherState>
     public void bindAllApplications(AppInfo[] apps, int flags,
             Map<PackageUserKey, Integer> packageUserKeytoUidMap) {
         mModelCallbacks.bindAllApplications(apps, flags, packageUserKeytoUidMap);
-        if (Utilities.ATLEAST_S) {
-            Trace.endAsyncSection(DISPLAY_ALL_APPS_TRACE_METHOD_NAME,
-                    DISPLAY_ALL_APPS_TRACE_COOKIE);
-        }
+        Trace.endAsyncSection(DISPLAY_ALL_APPS_TRACE_METHOD_NAME,
+                DISPLAY_ALL_APPS_TRACE_COOKIE);
     }
 
     /**
@@ -2678,6 +2673,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             }
 
             writer.println(prefix + "  Hotseat");
+            mHotseat.dump(prefix, writer);
             ViewGroup layout = mHotseat.getShortcutsAndWidgets();
             for (int j = 0; j < layout.getChildCount(); j++) {
                 Object tag = layout.getChildAt(j).getTag();
@@ -3039,6 +3035,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         return mPopupDataProvider.getDotInfoForItem(info);
     }
 
+    @NonNull
     public LauncherOverlayManager getOverlayManager() {
         return mOverlayManager;
     }
@@ -3156,6 +3153,13 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     public CannedAnimationCoordinator getAnimationCoordinator() {
         return mAnimationCoordinator;
+    }
+
+    /**
+     * Set to force config update when set to true next time onHandleConfigurationChanged is called.
+     */
+    public void setForceConfigUpdate(boolean forceConfigUpdate) {
+        mForceConfigUpdate = forceConfigUpdate;
     }
 
     @Override

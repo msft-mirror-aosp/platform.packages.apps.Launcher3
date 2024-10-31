@@ -34,6 +34,7 @@ import com.android.quickstep.task.thumbnail.TaskThumbnailViewData
 import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskOverlayViewModel
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
+import com.android.quickstep.task.viewmodel.TaskThumbnailViewModelImpl
 import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.quickstep.task.viewmodel.TaskViewModel
 import com.android.quickstep.views.TaskViewType
@@ -66,7 +67,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
             val taskVisualsChangedDelegate =
                 TaskVisualsChangedDelegateImpl(
                     recentsModel,
-                    recentsModel.thumbnailCache.highResLoadingState
+                    recentsModel.thumbnailCache.highResLoadingState,
                 )
             set(TaskVisualsChangedDelegate::class.java.simpleName, taskVisualsChangedDelegate)
 
@@ -79,7 +80,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                         iconCache,
                         taskVisualsChangedDelegate,
                         recentsCoroutineScope,
-                        ProductionDispatchers
+                        ProductionDispatchers,
                     )
                 }
             set(RecentTasksRepository::class.java.simpleName, recentTasksRepository)
@@ -112,6 +113,10 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                 instance =
                     factory?.invoke(extras) as T ?: createDependency(modelClass, scopeId, extras)
                 scope[modelClass.simpleName] = instance!!
+                log(
+                    "instance of $modelClass" +
+                        " (${instance.hashCode()}) added to scope ${scope.scopeId}"
+                )
             }
         }
         return instance!!
@@ -147,6 +152,13 @@ class RecentsDependencies private constructor(private val appContext: Context) {
     fun getScope(scopeId: RecentsScopeId): RecentsDependenciesScope =
         scopes[scopeId] ?: createScope(scopeId)
 
+    fun removeScope(scope: Any) {
+        val scopeId: RecentsScopeId = scope as? RecentsScopeId ?: scope.hashCode().toString()
+        scopes[scopeId]?.close()
+        scopes.remove(scopeId)
+        log("Scope $scopeId removed")
+    }
+
     // TODO(b/353912757): Create a factory so we can prevent this method of growing indefinitely.
     //  Each class should be responsible for providing a factory function to create a new instance.
     @Suppress("UNCHECKED_CAST")
@@ -155,7 +167,8 @@ class RecentsDependencies private constructor(private val appContext: Context) {
         scopeId: RecentsScopeId,
         extras: RecentsDependenciesExtras,
     ): T {
-        log("createDependency ${modelClass.simpleName} with $scopeId and $extras", Log.WARN)
+        log("createDependency ${modelClass.simpleName} with $scopeId and $extras started", Log.WARN)
+        log("linked scopes: ${getScope(scopeId).scopeIdsLinked}")
         val instance: Any =
             when (modelClass) {
                 RecentTasksRepository::class.java -> {
@@ -166,7 +179,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                             iconCache,
                             get(),
                             get(),
-                            ProductionDispatchers
+                            ProductionDispatchers,
                         )
                     }
                 }
@@ -179,7 +192,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                 TaskContainerData::class.java -> TaskContainerData()
                 TaskThumbnailViewData::class.java -> TaskThumbnailViewData()
                 TaskThumbnailViewModel::class.java ->
-                    TaskThumbnailViewModel(
+                    TaskThumbnailViewModelImpl(
                         recentsViewData = inject(),
                         taskViewData = inject(scopeId, extras),
                         taskContainerData = inject(scopeId),
@@ -193,7 +206,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                         task = task,
                         recentsViewData = inject(),
                         recentTasksRepository = inject(),
-                        getThumbnailPositionUseCase = inject()
+                        getThumbnailPositionUseCase = inject(),
                     )
                 }
                 GetThumbnailUseCase::class.java -> GetThumbnailUseCase(taskRepository = inject())
@@ -203,7 +216,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                     GetThumbnailPositionUseCase(
                         deviceProfileRepository = inject(),
                         rotationStateRepository = inject(),
-                        tasksRepository = inject()
+                        tasksRepository = inject(),
                     )
                 SplashAlphaUseCase::class.java ->
                     SplashAlphaUseCase(
@@ -218,7 +231,12 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                     error("Factory for ${modelClass.simpleName} not defined!")
                 }
             }
-        return instance as T
+        return (instance as T).also {
+            log(
+                "createDependency ${modelClass.simpleName} with $scopeId and $extras completed",
+                Log.WARN,
+            )
+        }
     }
 
     private fun createScope(scopeId: RecentsScopeId): RecentsDependenciesScope {
@@ -247,11 +265,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
         fun initialize(view: View): RecentsDependencies = initialize(view.context)
 
         fun initialize(context: Context): RecentsDependencies {
-            synchronized(this) {
-                if (!Companion::instance.isInitialized) {
-                    instance = RecentsDependencies(context.applicationContext)
-                }
-            }
+            synchronized(this) { instance = RecentsDependencies(context.applicationContext) }
             return instance
         }
 

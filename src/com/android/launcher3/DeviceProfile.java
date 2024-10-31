@@ -24,6 +24,7 @@ import static com.android.launcher3.InvariantDeviceProfile.INDEX_LANDSCAPE;
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_LANDSCAPE;
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_PORTRAIT;
 import static com.android.launcher3.Utilities.dpiFromPx;
+import static com.android.launcher3.Utilities.isEnglishLanguage;
 import static com.android.launcher3.Utilities.pxFromSp;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.icons.GraphicsUtils.getShapePath;
@@ -31,6 +32,8 @@ import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTO
 import static com.android.launcher3.testing.shared.ResourceUtils.INVALID_RESOURCE_HANDLE;
 import static com.android.launcher3.testing.shared.ResourceUtils.pxFromDp;
 import static com.android.launcher3.testing.shared.ResourceUtils.roundPxValueFromFloat;
+import static com.android.wm.shell.Flags.enableBubbleBar;
+import static com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar;
 import static com.android.wm.shell.Flags.enableTinyTaskbar;
 
 import android.annotation.SuppressLint;
@@ -64,6 +67,7 @@ import com.android.launcher3.responsive.ResponsiveSpec.Companion.ResponsiveSpecT
 import com.android.launcher3.responsive.ResponsiveSpec.DimensionType;
 import com.android.launcher3.responsive.ResponsiveSpecsProvider;
 import com.android.launcher3.util.CellContentDimensions;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.IconSizeSteps;
 import com.android.launcher3.util.ResourceHelper;
@@ -219,6 +223,8 @@ public class DeviceProfile {
     public int hotseatBarBottomSpacePx;
     public int hotseatBarEndOffset;
     public int hotseatQsbSpace;
+    public int inlineNavButtonsEndSpacingPx;
+    public int navButtonsLayoutWidthPx;
     public int springLoadedHotseatBarTopMarginPx;
     // These 2 values are only used for isVerticalBar
     // Padding between edge of screen and hotseat
@@ -233,7 +239,6 @@ public class DeviceProfile {
     private final int mMinHotseatIconSpacePx;
     private final int mMinHotseatQsbWidthPx;
     private final int mMaxHotseatIconSpacePx;
-    public final int inlineNavButtonsEndSpacingPx;
     // Space required for the bubble bar between the hotseat and the edge of the screen. If there's
     // not enough space, the hotseat will adjust itself for the bubble bar.
     private final int mBubbleBarSpaceThresholdPx;
@@ -692,17 +697,12 @@ public class DeviceProfile {
         if (areNavButtonsInline && !isPhone) {
             inlineNavButtonsEndSpacingPx =
                     res.getDimensionPixelSize(inv.inlineNavButtonsEndSpacing);
-            /*
-             * 3 nav buttons +
-             * Spacing between nav buttons +
-             * Space at the end for contextual buttons
-             */
-            hotseatBarEndOffset = 3 * res.getDimensionPixelSize(R.dimen.taskbar_nav_buttons_size)
-                    + 2 * res.getDimensionPixelSize(R.dimen.taskbar_button_space_inbetween)
-                    + inlineNavButtonsEndSpacingPx;
-        } else {
-            inlineNavButtonsEndSpacingPx = 0;
-            hotseatBarEndOffset = 0;
+            /* 3 nav buttons + Spacing between nav buttons */
+            navButtonsLayoutWidthPx = 3 * res.getDimensionPixelSize(
+                    R.dimen.taskbar_nav_buttons_size)
+                    + 2 * res.getDimensionPixelSize(R.dimen.taskbar_button_space_inbetween);
+            /* nav buttons layout width + Space at the end for contextual buttons */
+            hotseatBarEndOffset = navButtonsLayoutWidthPx + inlineNavButtonsEndSpacingPx;
         }
 
         mBubbleBarSpaceThresholdPx =
@@ -1056,6 +1056,7 @@ public class DeviceProfile {
         return mHotseatColumnSpan;
     }
 
+    @VisibleForTesting
     public int getHotseatWidthPx() {
         return mHotseatWidthPx;
     }
@@ -1344,8 +1345,14 @@ public class DeviceProfile {
         }
         if ((Flags.enableTwolineToggle()
                 && LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE.get(context))) {
-            // Add extra textHeight to the existing allAppsCellHeight.
-            allAppsCellHeightPx += Utilities.calculateTextHeight(allAppsIconTextSizePx);
+            if (!isEnglishLanguage(context)) {
+                // Set toggle preference value to false if not english here as it's possible the
+                // preference is stale after language change.
+                LauncherPrefs.get(context).put(LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE, false);
+            } else {
+                // Add extra textHeight to the existing allAppsCellHeight.
+                allAppsCellHeightPx += Utilities.calculateTextHeight(allAppsIconTextSizePx);
+            }
         }
 
         updateHotseatSizes(iconSizePx);
@@ -1829,25 +1836,47 @@ public class DeviceProfile {
      * Returns the new border space that should be used between hotseat icons after adjusting it to
      * the bubble bar.
      *
+     * <p>Does not check for visible bubbles persistence, so caller should call
+     * {@link #shouldAdjustHotseatForBubbleBar} first.
+     *
      * <p>If there's no adjustment needed, this method returns {@code 0}.
+     * @see #shouldAdjustHotseatForBubbleBar(Context, boolean)
      */
     public float getHotseatAdjustedBorderSpaceForBubbleBar(Context context) {
-        // only need to adjust when QSB is on top of the hotseat.
-        if (isQsbInline) {
-            return 0;
-        }
-
-        // no need to adjust if there's enough space for the bubble bar to the right of the hotseat.
-        if (getHotseatLayoutPadding(context).right > mBubbleBarSpaceThresholdPx) {
-            return 0;
-        }
-
+        if (!shouldAdjustHotseatForBubbleBar(context)) return 0;
         // The adjustment is shrinking the hotseat's width by 1 icon on either side.
         int iconsWidth =
                 iconSizePx * numShownHotseatIcons + hotseatBorderSpace * (numShownHotseatIcons - 1);
         int newWidth = iconsWidth - 2 * iconSizePx;
         // Evenly space the icons within the boundaries of the new width.
         return (float) (newWidth - iconSizePx * numShownHotseatIcons) / (numShownHotseatIcons - 1);
+    }
+
+    /**
+     * Returns the hotseat icon translation X for the cellX index.
+     *
+     * <p>Does not check for visible bubbles persistence, so caller should call
+     * {@link #shouldAdjustHotseatForBubbleBar} first.
+     *
+     * <p>If there's no adjustment needed, this method returns {@code 0}.
+     * @see #shouldAdjustHotseatForBubbleBar(Context, boolean)
+     */
+    public float getHotseatAdjustedTranslation(Context context, int cellX) {
+        if (!shouldAdjustHotseatForBubbleBar(context)) return 0;
+        float borderSpace = getHotseatAdjustedBorderSpaceForBubbleBar(context);
+        float borderSpaceDelta = borderSpace - hotseatBorderSpace;
+        return iconSizePx + cellX * borderSpaceDelta;
+    }
+
+    /** Returns whether hotseat should be adjusted for the bubble bar. */
+    public boolean shouldAdjustHotseatForBubbleBar(Context context, boolean hasBubbles) {
+        return hasBubbles && shouldAdjustHotseatForBubbleBar(context);
+    }
+
+    private boolean shouldAdjustHotseatForBubbleBar(Context context) {
+        // only need to adjust if bubble bar is enabled, when QSB is on top of the hotseat and
+        // there's not enough space for the bubble bar to the right of the hotseat.
+        return !isQsbInline && getHotseatLayoutPadding(context).right <= mBubbleBarSpaceThresholdPx;
     }
 
     /**
@@ -1994,6 +2023,18 @@ public class DeviceProfile {
         } else {
             return hotseatBarSizePx - hotseatCellHeightPx;
         }
+    }
+
+    /**
+     * Returns the number of pixels the hotseat icons vertical center is translated from the bottom
+     * of the screen.
+     */
+    public int getHotseatVerticalCenter() {
+        return hotseatBarSizePx
+                - (isQsbInline ? 0 : hotseatQsbVisualHeight)
+                - hotseatQsbSpace
+                - (hotseatCellHeightPx / 2)
+                + ((hotseatCellHeightPx - iconSizePx) / 2);
     }
 
     /**
@@ -2213,6 +2254,10 @@ public class DeviceProfile {
                 mHotseatBarEdgePaddingPx));
         writer.println(prefix + pxToDpStr("mHotseatBarWorkspaceSpacePx",
                 mHotseatBarWorkspaceSpacePx));
+        writer.println(prefix
+                + pxToDpStr("inlineNavButtonsEndSpacingPx", inlineNavButtonsEndSpacingPx));
+        writer.println(prefix
+                + pxToDpStr("navButtonsLayoutWidthPx", navButtonsLayoutWidthPx));
         writer.println(prefix + pxToDpStr("hotseatBarEndOffset", hotseatBarEndOffset));
         writer.println(prefix + pxToDpStr("hotseatQsbSpace", hotseatQsbSpace));
         writer.println(prefix + pxToDpStr("hotseatQsbHeight", hotseatQsbHeight));
@@ -2324,6 +2369,29 @@ public class DeviceProfile {
         config.densityDpi = info.getDensityDpi();
         config.smallestScreenWidthDp = (int) info.smallestSizeDp(bounds);
         return c.createConfigurationContext(config);
+    }
+
+    /**
+     * Returns whether Taskbar and Hotseat should adjust horizontally on bubble bar location update.
+     */
+    public boolean shouldAdjustHotseatOnNavBarLocationUpdate(Context context) {
+        return enableBubbleBar()
+                && enableBubbleBarInPersistentTaskBar()
+                && !DisplayController.getNavigationMode(context).hasGestures;
+    }
+
+    /** Returns hotseat translation X for the bubble bar position. */
+    public int getHotseatTranslationXForNavBar(Context context, boolean isBubblesOnLeft) {
+        if (shouldAdjustHotseatOnNavBarLocationUpdate(context)) {
+            boolean isRtl = Utilities.isRtl(context.getResources());
+            if (isBubblesOnLeft) {
+                return isRtl ? -navButtonsLayoutWidthPx : 0;
+            } else {
+                return isRtl ? 0 : navButtonsLayoutWidthPx;
+            }
+        } else {
+            return 0;
+        }
     }
 
     /**

@@ -16,7 +16,6 @@
 package com.android.launcher3.taskbar;
 
 import static android.content.Context.RECEIVER_NOT_EXPORTED;
-import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
@@ -60,6 +59,8 @@ import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.anim.AnimatorPlaybackController;
+import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
+import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StatefulActivity;
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarNavButtonCallbacks;
 import com.android.launcher3.taskbar.unfold.NonDestroyableScopedUnfoldTransitionProgressProvider;
@@ -70,7 +71,7 @@ import com.android.launcher3.util.SimpleBroadcastReceiver;
 import com.android.quickstep.AllAppsActionManager;
 import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.SystemUiProxy;
-import com.android.quickstep.util.AssistUtils;
+import com.android.quickstep.util.ContextualSearchInvoker;
 import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
@@ -114,7 +115,6 @@ public class TaskbarManager {
     private WindowManager mWindowManager;
     private FrameLayout mTaskbarRootLayout;
     private boolean mAddedWindow;
-    private boolean mIsSuspended;
     private final TaskbarNavButtonController mNavButtonController;
     private final ComponentCallbacks mComponentCallbacks;
 
@@ -209,14 +209,16 @@ public class TaskbarManager {
                 }
             };
 
+    @NonNull private final DesktopVisibilityController mDesktopVisibilityController;
+
     @SuppressLint("WrongConstant")
     public TaskbarManager(
             Context context,
             AllAppsActionManager allAppsActionManager,
-            TaskbarNavButtonCallbacks navCallbacks) {
-
+            TaskbarNavButtonCallbacks navCallbacks,
+            @NonNull DesktopVisibilityController desktopVisibilityController) {
         Display display =
-                context.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY);
+                context.getSystemService(DisplayManager.class).getDisplay(context.getDisplayId());
         mContext = context.createWindowContext(display,
                 ENABLE_TASKBAR_NAVBAR_UNIFICATION ? TYPE_NAVIGATION_BAR : TYPE_NAVIGATION_BAR_PANEL,
                 null);
@@ -224,6 +226,7 @@ public class TaskbarManager {
         mNavigationBarPanelContext = ENABLE_TASKBAR_NAVBAR_UNIFICATION
                 ? context.createWindowContext(display, TYPE_NAVIGATION_BAR_PANEL, null)
                 : null;
+        mDesktopVisibilityController = desktopVisibilityController;
         if (enableTaskbarNoRecreate()) {
             mWindowManager = mContext.getSystemService(WindowManager.class);
             mTaskbarRootLayout = new FrameLayout(mContext) {
@@ -243,8 +246,9 @@ public class TaskbarManager {
                 context,
                 navCallbacks,
                 SystemUiProxy.INSTANCE.get(mContext),
+                ContextualEduStatsManager.INSTANCE.get(mContext),
                 new Handler(),
-                AssistUtils.newInstance(mContext));
+                ContextualSearchInvoker.newInstance(mContext));
         mComponentCallbacks = new ComponentCallbacks() {
             private Configuration mOldConfig = mContext.getResources().getConfiguration();
 
@@ -441,8 +445,6 @@ public class TaskbarManager {
      */
     @VisibleForTesting
     public synchronized void recreateTaskbar() {
-        if (mIsSuspended) return;
-
         Trace.beginSection("recreateTaskbar");
         try {
             DeviceProfile dp = mUserUnlocked ?
@@ -470,7 +472,7 @@ public class TaskbarManager {
             if (enableTaskbarNoRecreate() || mTaskbarActivityContext == null) {
                 mTaskbarActivityContext = new TaskbarActivityContext(mContext,
                         mNavigationBarPanelContext, dp, mNavButtonController,
-                        mUnfoldProgressProvider);
+                        mUnfoldProgressProvider, mDesktopVisibilityController);
             } else {
                 mTaskbarActivityContext.updateDeviceProfile(dp);
             }
@@ -655,21 +657,6 @@ public class TaskbarManager {
             pw.println(prefix + "\tTaskbarActivityContext: null");
         } else {
             mTaskbarActivityContext.dumpLogs(prefix + "\t", pw);
-        }
-    }
-
-    /**
-     * Removes Taskbar from the window manager and prevents recreation if {@code true}.
-     * <p>
-     * Suspending is for testing purposes only; avoid calling this method in production.
-     */
-    @VisibleForTesting
-    public void setSuspended(boolean isSuspended) {
-        mIsSuspended = isSuspended;
-        if (mIsSuspended) {
-            removeTaskbarRootViewFromWindow();
-        } else {
-            addTaskbarRootViewToWindow();
         }
     }
 

@@ -18,19 +18,18 @@ package com.android.launcher3.model
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.launcher3.LauncherAppState
+import com.android.launcher3.icons.BitmapInfo
+import com.android.launcher3.icons.waitForUpdateHandlerToFinish
 import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.LauncherLayoutBuilder
 import com.android.launcher3.util.LauncherModelHelper
 import com.android.launcher3.util.LauncherModelHelper.*
-import com.android.launcher3.util.RoboApiWrapper
 import com.android.launcher3.util.TestUtil
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
-import java.util.concurrent.CountDownLatch
 import org.junit.After
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -38,8 +37,6 @@ import org.junit.runner.RunWith
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class FolderIconLoadTest {
-
-    @get:Rule(order = 0) val modelTestRule = ModelTestRule()
 
     private lateinit var modelHelper: LauncherModelHelper
 
@@ -58,7 +55,7 @@ class FolderIconLoadTest {
             TEST_ACTIVITY11,
             TEST_ACTIVITY12,
             TEST_ACTIVITY13,
-            TEST_ACTIVITY14
+            TEST_ACTIVITY14,
         )
 
     @Before
@@ -146,14 +143,9 @@ class FolderIconLoadTest {
         // The first load initializes the DB, load again so that icons are now used from the DB
         // Wait for the icon cache to be updated and then reload
         val app = LauncherAppState.getInstance(modelHelper.sandboxContext)
-        val cache = app.iconCache
-        while (cache.isIconUpdateInProgress) {
-            val wait = CountDownLatch(1)
-            Executors.MODEL_EXECUTOR.handler.postDelayed({ wait.countDown() }, 10)
-            RoboApiWrapper.waitForLooperSync(Executors.MODEL_EXECUTOR.handler.looper)
-            wait.await()
-        }
-        TestUtil.runOnExecutorSync(Executors.MODEL_EXECUTOR) { cache.clearMemoryCache() }
+        app.iconCache.waitForUpdateHandlerToFinish()
+
+        TestUtil.runOnExecutorSync(Executors.MODEL_EXECUTOR) { app.iconCache.clearMemoryCache() }
         // Reload again with correct icon state
         app.model.forceReload()
         modelHelper.loadModelSync()
@@ -169,6 +161,9 @@ class FolderIconLoadTest {
             assertWithMessage("Index $index was not highRes")
                 .that(items[index].bitmap.isNullOrLowRes)
                 .isFalse()
+            assertWithMessage("Index $index was the default icon")
+                .that(isDefaultIcon(items[index].bitmap))
+                .isFalse()
         }
     }
 
@@ -177,8 +172,16 @@ class FolderIconLoadTest {
             assertWithMessage("Index $index was not lowRes")
                 .that(items[index].bitmap.isNullOrLowRes)
                 .isTrue()
+            assertWithMessage("Index $index was the default icon")
+                .that(isDefaultIcon(items[index].bitmap))
+                .isFalse()
         }
     }
+
+    private fun isDefaultIcon(bitmap: BitmapInfo) =
+        LauncherAppState.getInstance(modelHelper.sandboxContext)
+            .iconCache
+            .isDefaultIcon(bitmap, modelHelper.sandboxContext.user)
 
     /** Recreate DeviceProfiles after changing InvariantDeviceProfile */
     private fun recreateSupportedDeviceProfiles() {

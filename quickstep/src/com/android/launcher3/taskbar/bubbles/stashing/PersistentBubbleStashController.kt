@@ -19,12 +19,14 @@ package com.android.launcher3.taskbar.bubbles.stashing
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.AnimatorSet
+import android.graphics.Rect
 import android.view.MotionEvent
 import android.view.View
 import com.android.launcher3.anim.AnimatedFloat
 import com.android.launcher3.taskbar.TaskbarInsetsController
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController
 import com.android.launcher3.taskbar.bubbles.BubbleStashedHandleViewController
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.BubbleLauncherState
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Companion.BAR_STASH_DURATION
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Companion.BAR_TRANSLATION_DURATION
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.ControllersAfterInitAction
@@ -34,7 +36,7 @@ import com.android.wm.shell.shared.animation.PhysicsAnimator
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 
 class PersistentBubbleStashController(
-    private val taskbarHotseatDimensionsProvider: TaskbarHotseatDimensionsProvider,
+    private val taskbarHotseatDimensionsProvider: TaskbarHotseatDimensionsProvider
 ) : BubbleStashController {
 
     private lateinit var taskbarInsetsController: TaskbarInsetsController
@@ -43,30 +45,23 @@ class PersistentBubbleStashController(
     private lateinit var bubbleBarAlphaAnimator: MultiPropertyFactory<View>.MultiProperty
     private lateinit var bubbleBarScaleAnimator: AnimatedFloat
     private lateinit var controllersAfterInitAction: ControllersAfterInitAction
+    private var hotseatVerticalCenter: Int = 0
 
-    override var isBubblesShowingOnHome: Boolean = false
-        set(onHome) {
-            if (field == onHome) return
-            field = onHome
+    override var launcherState: BubbleLauncherState = BubbleLauncherState.IN_APP
+        set(state) {
+            if (field == state) return
+            val transitionFromHome = field == BubbleLauncherState.HOME
+            field = state
             if (!bubbleBarViewController.hasBubbles()) {
                 // if there are no bubbles, there's nothing to show, so just return.
                 return
             }
-            if (onHome) {
-                // When transition to home we should show collapse the bubble bar
-                updateExpandedState(expand = false)
-            }
-            animateBubbleBarY()
-            bubbleBarViewController.onBubbleBarConfigurationChanged(/* animate= */ true)
-        }
-
-    override var isBubblesShowingOnOverview: Boolean = false
-        set(onOverview) {
-            if (field == onOverview) return
-            field = onOverview
-            if (!onOverview) {
-                // When transition from overview we should show collapse the bubble bar
-                updateExpandedState(expand = false)
+            // If we're transitioning anywhere, bubble bar should be collapsed
+            updateExpandedState(expand = false)
+            if (transitionFromHome || field == BubbleLauncherState.HOME) {
+                // If we're transitioning to or from home, animate the Y because we're in hotseat
+                // on home but in persistent taskbar elsewhere so the position is different.
+                animateBubbleBarY()
             }
             bubbleBarViewController.onBubbleBarConfigurationChanged(/* animate= */ true)
         }
@@ -98,17 +93,15 @@ class PersistentBubbleStashController(
 
     override val bubbleBarTranslationYForHotseat: Float
         get() {
-            val hotseatBottomSpace = taskbarHotseatDimensionsProvider.getHotseatBottomSpace()
-            val hotseatCellHeight = taskbarHotseatDimensionsProvider.getHotseatHeight()
-            val bubbleBarHeight: Float = bubbleBarViewController.bubbleBarCollapsedHeight
-            return -hotseatBottomSpace - (hotseatCellHeight - bubbleBarHeight) / 2
+            val bubbleBarHeight = bubbleBarViewController.bubbleBarCollapsedHeight
+            return -hotseatVerticalCenter + bubbleBarHeight / 2
         }
 
     override fun init(
         taskbarInsetsController: TaskbarInsetsController,
         bubbleBarViewController: BubbleBarViewController,
         bubbleStashedHandleViewController: BubbleStashedHandleViewController?,
-        controllersAfterInitAction: ControllersAfterInitAction
+        controllersAfterInitAction: ControllersAfterInitAction,
     ) {
         this.taskbarInsetsController = taskbarInsetsController
         this.bubbleBarViewController = bubbleBarViewController
@@ -125,11 +118,15 @@ class PersistentBubbleStashController(
             animatorSet.playTogether(
                 bubbleBarScaleAnimator.animateToValue(1f),
                 bubbleBarTranslationYAnimator.animateToValue(bubbleBarTranslationY),
-                bubbleBarAlphaAnimator.animateToValue(1f)
+                bubbleBarAlphaAnimator.animateToValue(1f),
             )
         }
         updateTouchRegionOnAnimationEnd(animatorSet)
         animatorSet.setDuration(BAR_STASH_DURATION).start()
+    }
+
+    override fun setHotseatVerticalCenter(hotseatVerticalCenter: Int) {
+        this.hotseatVerticalCenter = hotseatVerticalCenter
     }
 
     override fun showBubbleBarImmediate() = showBubbleBarImmediate(bubbleBarTranslationY)
@@ -199,6 +196,10 @@ class PersistentBubbleStashController(
     }
 
     override fun getHandleTranslationY(): Float? = null
+
+    override fun getHandleBounds(bounds: Rect) {
+        // no op since does not have a handle view
+    }
 
     private fun updateExpandedState(expand: Boolean) {
         if (bubbleBarViewController.isHiddenForNoBubbles) {
