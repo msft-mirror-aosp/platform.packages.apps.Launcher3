@@ -452,7 +452,7 @@ public class GridSizeMigrationDBController {
         final Context mContext;
         int mLastScreenId = -1;
 
-        final Map<Integer, ArrayList<DbEntry>> mWorkspaceEntriesByScreenId =
+        final Map<Integer, List<DbEntry>> mWorkspaceEntriesByScreenId =
                 new ArrayMap<>();
 
         public DbReader(SQLiteDatabase db, String tableName, Context context) {

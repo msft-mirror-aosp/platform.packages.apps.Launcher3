@@ -501,8 +501,8 @@ flag {
 }
 
 flag {
-    name: "enable_launcher_pill"
+    name: "enable_contrast_tiles"
     namespace: "launcher"
-    description: "Enable Workspace Launcher Pill in Simple Mode View."
+    description: "Enable launcher app contrast tiles."
     bug: "341217082"
 }
