@@ -59,7 +59,7 @@ constructor(
 
     private companion object {
         /** The time to show the flyout. */
-        const val FLYOUT_DELAY_MS: Long = 10000
+        const val FLYOUT_DELAY_MS: Long = 3000
         /** The initial scale Y value that the new bubble is set to before the animation starts. */
         const val BUBBLE_ANIMATION_INITIAL_SCALE_Y = 0.3f
         /** The minimum alpha value to make the bubble bar touchable. */
@@ -484,13 +484,14 @@ constructor(
         val bubble = bubbleView?.bubble as? BubbleBarBubble
         val flyout = bubble?.flyoutMessage
         if (flyout != null) {
-            bubbleView.suppressDotForBubbleUpdate(true)
             bubbleBarFlyoutController.setUpAndShowFlyout(
-                BubbleBarFlyoutMessage(flyout.icon, flyout.title, flyout.message)
-            ) {
-                moveToState(AnimatingBubble.State.IN)
-                bubbleStashController.updateTaskbarTouchRegion()
-            }
+                BubbleBarFlyoutMessage(flyout.icon, flyout.title, flyout.message),
+                onInit = { bubbleView.suppressDotForBubbleUpdate(true) },
+                onEnd = {
+                    moveToState(AnimatingBubble.State.IN)
+                    bubbleStashController.updateTaskbarTouchRegion()
+                },
+            )
         } else {
             moveToState(AnimatingBubble.State.IN)
         }
@@ -563,7 +564,8 @@ constructor(
         if (!bubbleBarFlyoutController.hasFlyout()) {
             // if the flyout does not yet exist, then we're only animating the bubble bar.
             // the animating bubble has been updated, so the when the flyout expands it will
-            // show the right message.
+            // show the right message. we only need to update the dot visibility.
+            bubbleView.updateDotVisibility(/* animate= */ !bubbleStashController.isStashed)
             return
         }
 
