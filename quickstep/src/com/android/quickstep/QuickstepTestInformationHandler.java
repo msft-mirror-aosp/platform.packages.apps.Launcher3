@@ -3,10 +3,10 @@ package com.android.quickstep;
 import static com.android.launcher3.taskbar.TaskbarThresholdUtils.getFromNavThreshold;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.view.WindowInsets;
 
 import androidx.annotation.Nullable;
 
@@ -203,11 +203,13 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
     }
 
     @Override
-    protected Activity getCurrentActivity() {
+    protected WindowInsets getWindowInsets() {
         RecentsAnimationDeviceState rads = new RecentsAnimationDeviceState(mContext);
         OverviewComponentObserver observer = new OverviewComponentObserver(mContext, rads);
         try {
-            return observer.getActivityInterface().getCreatedContainer();
+            RecentsViewContainer container = observer.getContainerInterface().getCreatedContainer();
+
+            return container == null ? null : container.getRootView().getRootWindowInsets();
         } finally {
             observer.onDestroy();
             rads.destroy();

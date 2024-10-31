@@ -65,31 +65,18 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         val heightSize = MeasureSpec.getSize(heightMeasureSpec)
         setMeasuredDimension(widthSize, heightSize)
         val splitBoundsConfig = splitBoundsConfig ?: return
-        val initSplitTaskId = getThisTaskCurrentlyInSplitSelection()
-        if (initSplitTaskId == INVALID_TASK_ID) {
-            pagedOrientationHandler.measureGroupedTaskViewThumbnailBounds(
-                taskContainers[0].snapshotView,
-                taskContainers[1].snapshotView,
-                widthSize,
-                heightSize,
-                splitBoundsConfig,
-                container.deviceProfile,
-                layoutDirection == LAYOUT_DIRECTION_RTL
-            )
-        } else {
-            // Currently being split with this taskView, let the non-split selected thumbnail
-            // take up full thumbnail area
-            taskContainers
-                .firstOrNull { it.task.key.id != initSplitTaskId }
-                ?.snapshotView
-                ?.measure(
-                    widthMeasureSpec,
-                    MeasureSpec.makeMeasureSpec(
-                        heightSize - container.deviceProfile.overviewTaskThumbnailTopMarginPx,
-                        MeasureSpec.EXACTLY
-                    )
-                )
-        }
+        val inSplitSelection = getThisTaskCurrentlyInSplitSelection() != INVALID_TASK_ID
+        pagedOrientationHandler.measureGroupedTaskViewThumbnailBounds(
+            taskContainers[0].snapshotView,
+            taskContainers[1].snapshotView,
+            widthSize,
+            heightSize,
+            splitBoundsConfig,
+            container.deviceProfile,
+            layoutDirection == LAYOUT_DIRECTION_RTL,
+            inSplitSelection,
+        )
+
         if (!enableOverviewIconMenu()) {
             updateIconPlacement()
         }
@@ -173,6 +160,8 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         val splitBoundsConfig = splitBoundsConfig ?: return
         val taskIconHeight = container.deviceProfile.overviewTaskIconSizePx
         val isRtl = layoutDirection == LAYOUT_DIRECTION_RTL
+        val inSplitSelection = getThisTaskCurrentlyInSplitSelection() != INVALID_TASK_ID
+
         if (enableOverviewIconMenu()) {
             val groupedTaskViewSizes =
                 pagedOrientationHandler.getGroupedTaskViewSizes(
@@ -191,7 +180,8 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 layoutParams.width,
                 isRtl,
                 container.deviceProfile,
-                splitBoundsConfig
+                splitBoundsConfig,
+                inSplitSelection
             )
         } else {
             pagedOrientationHandler.setSplitIconParams(
@@ -204,7 +194,8 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 measuredWidth,
                 isRtl,
                 container.deviceProfile,
-                splitBoundsConfig
+                splitBoundsConfig,
+                inSplitSelection
             )
         }
     }
@@ -218,11 +209,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         invalidate()
     }
 
-    override fun launchTaskAnimated(): RunnableList? {
-        if (taskContainers.isEmpty()) {
-            Log.d(TAG, "launchTaskAnimated - task is not bound")
-            return null
-        }
+    override fun launchAsStaticTile(): RunnableList? {
         val recentsView = recentsView ?: return null
         val endCallback = RunnableList()
         // Callbacks run from remote animation when recents animation not currently running
@@ -241,8 +228,11 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         return endCallback
     }
 
-    override fun launchTask(callback: (launched: Boolean) -> Unit, isQuickSwitch: Boolean) {
-        launchTaskInternal(isQuickSwitch, false, callback /*launchingExistingTaskview*/)
+    override fun launchWithoutAnimation(
+        isQuickSwitch: Boolean,
+        callback: (launched: Boolean) -> Unit
+    ) {
+        launchTaskInternal(isQuickSwitch, launchingExistingTaskView = false, callback)
     }
 
     /**
@@ -266,7 +256,10 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 isQuickSwitch,
                 snapPosition
             )
-            Log.d(TAG, "launchTaskInternal - launchExistingSplitPair: ${taskIds.contentToString()}")
+            Log.d(
+                TAG,
+                "launchTaskInternal - launchExistingSplitPair: ${taskIds.contentToString()}, launchingExistingTaskView: $launchingExistingTaskView"
+            )
         }
     }
 

@@ -66,6 +66,7 @@ import com.android.launcher3.BuildConfig;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
 import com.android.launcher3.R;
+import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedPropertySetter;
 import com.android.launcher3.anim.PropertySetter;
 import com.android.launcher3.icons.BitmapInfo;
@@ -219,7 +220,7 @@ public class PrivateProfileManager extends UserProfileManager {
      * when animation is not running.
      */
     public void reset() {
-        // Ensure the state of the header views is what it should be before animating.
+        // Ensure the state of the header view is what it should be before animating.
         updateView();
         getMainRecyclerView().setChildAttachedConsumer(null);
         int previousState = getCurrentState();
@@ -434,6 +435,7 @@ public class PrivateProfileManager extends UserProfileManager {
                 lockPill.setVisibility(GONE);
             }
         }
+        mPSHeader.invalidate();
     }
 
     /** Sets the enablement of the profile when header or button is clicked. */
@@ -473,7 +475,8 @@ public class PrivateProfileManager extends UserProfileManager {
                 break;
             }
             // Make the private space apps gone to "collapse".
-            if (mFloatingMaskView == null && isPrivateSpaceItem(currentItem)) {
+            if ((mFloatingMaskView == null && isPrivateSpaceItem(currentItem)) ||
+                    currentItem.viewType == VIEW_TYPE_PRIVATE_SPACE_SYS_APPS_DIVIDER) {
                 RecyclerView.ViewHolder viewHolder =
                         allAppsRecyclerView.findViewHolderForAdapterPosition(i);
                 if (viewHolder != null) {
@@ -699,7 +702,9 @@ public class PrivateProfileManager extends UserProfileManager {
                 mAllApps.mAH.get(MAIN).mRecyclerView.removeItemDecoration(
                         mPrivateAppsSectionDecorator);
                 // Call onAppsUpdated() because it may be canceled when this animation occurs.
-                mAllApps.getPersonalAppList().onAppsUpdated();
+                if (!Utilities.isRunningInTestHarness()) {
+                    mAllApps.getPersonalAppList().onAppsUpdated();
+                }
                 if (isPrivateSpaceHidden()) {
                     // TODO (b/325455879): Figure out if we can avoid this.
                     getMainRecyclerView().getAdapter().notifyDataSetChanged();

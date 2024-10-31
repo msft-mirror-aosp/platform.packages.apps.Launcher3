@@ -68,7 +68,7 @@ public class RemoteTargetGluer {
      */
     public RemoteTargetGluer(Context context, BaseContainerInterface sizingStrategy) {
         DesktopVisibilityController desktopVisibilityController =
-                LauncherActivityInterface.INSTANCE.getDesktopVisibilityController();
+                sizingStrategy.getDesktopVisibilityController();
         if (desktopVisibilityController != null) {
             int visibleTasksCount = desktopVisibilityController.getVisibleDesktopTasksCount();
             if (visibleTasksCount > 0) {
@@ -94,7 +94,7 @@ public class RemoteTargetGluer {
         RemoteTargetHandle[] handles = new RemoteTargetHandle[numHandles];
         for (int i = 0; i < numHandles; i++) {
             TaskViewSimulator tvs = new TaskViewSimulator(context, sizingStrategy);
-            tvs.setIsDesktopTask(forDesktop);
+            tvs.setIsDesktopTask(forDesktop , i);
             TransformParams transformParams = new TransformParams();
             handles[i] = new RemoteTargetHandle(tvs, transformParams);
         }
