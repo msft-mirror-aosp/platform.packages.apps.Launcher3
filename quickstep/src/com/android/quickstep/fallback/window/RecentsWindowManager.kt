@@ -18,6 +18,7 @@ package com.android.quickstep.fallback.window
 
 import android.animation.AnimatorSet
 import android.app.ActivityOptions
+import android.content.ComponentName
 import android.content.Context
 import android.content.LocusId
 import android.os.Bundle
@@ -274,6 +275,10 @@ class RecentsWindowManager(context: Context) :
         if (isInState(BACKGROUND_APP)) {
             cleanupRecentsWindow()
         }
+    }
+
+    override fun getComponentName(): ComponentName {
+        return ComponentName(this, RecentsWindowManager::class.java)
     }
 
     override fun canStartHomeSafely(): Boolean {
