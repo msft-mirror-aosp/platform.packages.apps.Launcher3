@@ -57,6 +57,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiValueAlpha;
 import com.android.quickstep.SystemUiProxy;
+import com.android.wm.shell.Flags;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.io.PrintWriter;
@@ -177,6 +178,9 @@ public class BubbleBarViewController {
         mBubbleBarClickListener = v -> expandBubbleBar();
         mBubbleDragController.setupBubbleBarView(mBarView);
         mOverflowBubble = bubbleControllers.bubbleCreator.createOverflow(mBarView);
+        if (!Flags.enableOptionalBubbleOverflow()) {
+            showOverflow(true);
+        }
         mBarView.setOnClickListener(mBubbleBarClickListener);
         mBarView.addOnLayoutChangeListener(
                 (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
@@ -324,6 +328,7 @@ public class BubbleBarViewController {
     }
 
     private void onBubbleClicked(BubbleView bubbleView) {
+        if (mBubbleBarPinning.isAnimating()) return;
         bubbleView.markSeen();
         BubbleBarItem bubble = bubbleView.getBubble();
         if (bubble == null) {
@@ -918,7 +923,7 @@ public class BubbleBarViewController {
      * from Launcher.
      */
     public void setExpanded(boolean isExpanded) {
-        if (isExpanded != mBarView.isExpanded()) {
+        if (!mBubbleBarPinning.isAnimating() && isExpanded != mBarView.isExpanded()) {
             mBarView.setExpanded(isExpanded);
             adjustTaskbarAndHotseatToBubbleBarState(isExpanded);
             if (!isExpanded) {
@@ -1058,6 +1063,16 @@ public class BubbleBarViewController {
      */
     public void onDismissAllBubbles() {
         mSystemUiProxy.removeAllBubbles();
+    }
+
+    /** Removes all existing bubble views */
+    public void removeAllBubbles() {
+        mBarView.removeAllViews();
+    }
+
+    /** Returns the view index of the existing bubble */
+    public int bubbleViewIndex(View bubbleView) {
+        return mBarView.indexOfChild(bubbleView);
     }
 
     /**
