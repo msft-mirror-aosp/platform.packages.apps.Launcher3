@@ -188,8 +188,10 @@ public class WorkUtilityView extends LinearLayout implements Insettable,
                 WindowInsetsCompat.toWindowInsetsCompat(insets, this);
         if (windowInsetsCompat.isVisible(WindowInsetsCompat.Type.ime())) {
             setInsets(mImeInsets, windowInsetsCompat.getInsets(WindowInsetsCompat.Type.ime()));
+            shrink();
         } else {
             mImeInsets.setEmpty();
+            extend();
         }
         updateTranslationY();
         return super.onApplyWindowInsets(insets);
