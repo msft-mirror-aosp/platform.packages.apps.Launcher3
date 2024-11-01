@@ -246,6 +246,40 @@ class BubbleBarFlyoutControllerTest {
         assertThat(flyoutCallbacks.topBoundaryExtendedSpace).isEqualTo(50)
     }
 
+    @Test
+    fun updateFlyoutWhileCollapsing() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
+            animatorTestRule.advanceTimeBy(300)
+        }
+        assertThat(flyoutController.hasFlyout()).isTrue()
+
+        val newFlyoutMessage = flyoutMessage.copy(message = "new message")
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            var flyoutCollapsed = false
+            flyoutController.collapseFlyout { flyoutCollapsed = true }
+            // advance the fake timer so that the collapse animation runs for 125ms
+            animatorTestRule.advanceTimeBy(125)
+
+            // update the flyout in the middle of collapsing, which should start expanding it.
+            var flyoutReversed = false
+            flyoutController.updateFlyoutWhileCollapsing(newFlyoutMessage) { flyoutReversed = true }
+
+            // the collapse animation ran for 125ms when it was updated, so reversing it should only
+            // run for the same amount of time
+            animatorTestRule.advanceTimeBy(125)
+            val flyout = flyoutContainer.findViewById<View>(R.id.bubble_bar_flyout_view)
+            assertThat(flyout.alpha).isEqualTo(1)
+            assertThat(flyout.findViewById<TextView>(R.id.bubble_flyout_text).text)
+                .isEqualTo("new message")
+            // verify that we never called the end action on the collapse animation
+            assertThat(flyoutCollapsed).isFalse()
+            // verify that we called the end action on the reverse animation
+            assertThat(flyoutReversed).isTrue()
+        }
+        assertThat(flyoutController.hasFlyout()).isTrue()
+    }
+
     class FakeFlyoutCallbacks : FlyoutCallbacks {
 
         var topBoundaryExtendedSpace = 0
