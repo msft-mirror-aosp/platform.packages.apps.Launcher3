@@ -192,18 +192,8 @@ class BubbleBarFlyoutView(
         title.alpha = 0f
         message.alpha = 0f
         setData(flyoutMessage)
-        val txToCollapsedPosition =
-            if (positioner.isOnLeft) {
-                positioner.distanceToCollapsedPosition.x
-            } else {
-                -positioner.distanceToCollapsedPosition.x
-            }
-        // TODO: b/277815200 - before collapsing, recalculate translationToCollapsedPosition because
-        // the collapsed position may have changed
-        val tyToCollapsedPosition =
-            positioner.distanceToCollapsedPosition.y + triangleHeight - triangleOverlap
-        translationToCollapsedPosition = PointF(txToCollapsedPosition, tyToCollapsedPosition)
 
+        updateTranslationToCollapsedPosition()
         collapsedSize = positioner.collapsedSize
         collapsedCornerRadius = collapsedSize / 2
         collapsedColor = positioner.collapsedColor
@@ -212,7 +202,7 @@ class BubbleBarFlyoutView(
         // calculate the expansion progress required before we start showing the triangle as part of
         // the expansion animation
         minExpansionProgressForTriangle =
-            positioner.distanceToRevealTriangle / tyToCollapsedPosition
+            positioner.distanceToRevealTriangle / translationToCollapsedPosition.y
 
         // post the request to start the expand animation to the looper so the view can measure
         // itself
@@ -257,6 +247,22 @@ class BubbleBarFlyoutView(
         message.minWidth = minTextViewWidth
         message.maxWidth = maxTextViewWidth
         message.text = flyoutMessage.message
+    }
+
+    /**
+     * This should be called to update [translationToCollapsedPosition] before we start expanding or
+     * collapsing to make sure that we're animating the flyout to and from the correct position.
+     */
+    fun updateTranslationToCollapsedPosition() {
+        val txToCollapsedPosition =
+            if (positioner.isOnLeft) {
+                positioner.distanceToCollapsedPosition.x
+            } else {
+                -positioner.distanceToCollapsedPosition.x
+            }
+        val tyToCollapsedPosition =
+            positioner.distanceToCollapsedPosition.y + triangleHeight - triangleOverlap
+        translationToCollapsedPosition = PointF(txToCollapsedPosition, tyToCollapsedPosition)
     }
 
     /** Updates the flyout view with the progress of the animation. */
