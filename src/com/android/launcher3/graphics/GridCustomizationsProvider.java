@@ -113,7 +113,8 @@ public class GridCustomizationsProvider extends ContentProvider {
         switch (uri.getPath()) {
             case KEY_LIST_OPTIONS: {
                 MatrixCursor cursor = new MatrixCursor(new String[]{
-                        KEY_NAME, KEY_ROWS, KEY_COLS, KEY_PREVIEW_COUNT, KEY_IS_DEFAULT});
+                        KEY_NAME, KEY_GRID_TITLE, KEY_ROWS, KEY_COLS, KEY_PREVIEW_COUNT,
+                        KEY_IS_DEFAULT});
                 InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(getContext());
                 for (GridOption gridOption : idp.parseAllGridOptions(getContext())) {
                     cursor.newRow()
