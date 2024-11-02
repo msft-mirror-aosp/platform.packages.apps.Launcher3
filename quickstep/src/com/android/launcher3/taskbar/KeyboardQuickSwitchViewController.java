@@ -31,12 +31,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.internal.jank.Cuj;
+import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.desktop.DesktopAppLaunchTransition;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayDragLayer;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.views.BaseDragLayer;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.GroupTask;
@@ -101,7 +103,16 @@ public class KeyboardQuickSwitchViewController {
             boolean hasDesktopTask,
             boolean wasDesktopTaskFilteredOut,
             boolean wasOpenedFromTaskbar) {
-        positionView(wasOpenedFromTaskbar);
+        final boolean isTransientTaskBar = DisplayController.isTransientTaskbar(
+                mControllers.taskbarActivityContext);
+        positionView(wasOpenedFromTaskbar, isTransientTaskBar);
+
+        // Keep the taskbar unstashed if the KQS is opened.
+        if (wasOpenedFromTaskbar && isTransientTaskBar) {
+            mControllers.taskbarStashController.updateTaskbarTimeout(/* isAutohideSuspended= */
+                    true);
+        }
+
         mOverlayContext.getDragLayer().addView(mKeyboardQuickSwitchView);
         mOnDesktop = onDesktop;
         mWasDesktopTaskFilteredOut = wasDesktopTaskFilteredOut;
@@ -117,7 +128,7 @@ public class KeyboardQuickSwitchViewController {
                 /* useDesktopTaskView= */ !onDesktop && hasDesktopTask);
     }
 
-    protected void positionView(boolean wasOpenedFromTaskbar) {
+    protected void positionView(boolean wasOpenedFromTaskbar, boolean isTransientTaskbar) {
         if (!wasOpenedFromTaskbar) {
             // Keep the default positioning.
             return;
@@ -128,8 +139,16 @@ public class KeyboardQuickSwitchViewController {
         final Resources resources = mKeyboardQuickSwitchView.getResources();
         final int marginHorizontal = resources.getDimensionPixelSize(
                 R.dimen.keyboard_quick_switch_margin_ends);
-        final int marginBottom = resources.getDimensionPixelSize(
+
+        final DeviceProfile dp = mControllers.taskbarActivityContext.getDeviceProfile();
+        // Calculate the additional margin space that the KQS should move up for the transient
+        // taskbar. The value of spaceForTaskbar is the distance between the bottom of the KQS
+        // view with 0 bottom margin to the top of the transient taskbar view.
+        final int spaceForTaskbar = isTransientTaskbar ? dp.taskbarHeight + dp.taskbarBottomMargin
+                - dp.stashedTaskbarHeight : 0;
+        final int marginBottom = spaceForTaskbar + resources.getDimensionPixelSize(
                 R.dimen.keyboard_quick_switch_margin_bottom);
+
         lp.setMargins(marginHorizontal, 0, marginHorizontal, marginBottom);
         lp.width = BaseDragLayer.LayoutParams.WRAP_CONTENT;
         lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
