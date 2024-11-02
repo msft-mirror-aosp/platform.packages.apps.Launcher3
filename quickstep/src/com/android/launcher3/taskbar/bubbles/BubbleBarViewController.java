@@ -328,6 +328,7 @@ public class BubbleBarViewController {
     }
 
     private void onBubbleClicked(BubbleView bubbleView) {
+        if (mBubbleBarPinning.isAnimating()) return;
         bubbleView.markSeen();
         BubbleBarItem bubble = bubbleView.getBubble();
         if (bubble == null) {
@@ -876,9 +877,14 @@ public class BubbleBarViewController {
     /** Animates the bubble bar to notify the user about a bubble change. */
     public void animateBubbleNotification(BubbleBarBubble bubble, boolean isExpanding,
             boolean isUpdate) {
-        // if we're expanded, don't animate the bubble bar. just show the notification dot.
+        // if we're not already animating another bubble, update the dot visibility. otherwise the
+        // the dot will be handled as part of the animation.
+        if (!mBubbleBarViewAnimator.isAnimating()) {
+            bubble.getView().updateDotVisibility(
+                    /* animate= */ !mBubbleStashController.isStashed());
+        }
+        // if we're expanded, don't animate the bubble bar.
         if (isExpanded()) {
-            bubble.getView().updateDotVisibility(/* animate= */ true);
             return;
         }
         boolean isInApp = mTaskbarStashController.isInApp();
@@ -922,7 +928,7 @@ public class BubbleBarViewController {
      * from Launcher.
      */
     public void setExpanded(boolean isExpanded) {
-        if (isExpanded != mBarView.isExpanded()) {
+        if (!mBubbleBarPinning.isAnimating() && isExpanded != mBarView.isExpanded()) {
             mBarView.setExpanded(isExpanded);
             adjustTaskbarAndHotseatToBubbleBarState(isExpanded);
             if (!isExpanded) {
@@ -1062,6 +1068,16 @@ public class BubbleBarViewController {
      */
     public void onDismissAllBubbles() {
         mSystemUiProxy.removeAllBubbles();
+    }
+
+    /** Removes all existing bubble views */
+    public void removeAllBubbles() {
+        mBarView.removeAllViews();
+    }
+
+    /** Returns the view index of the existing bubble */
+    public int bubbleViewIndex(View bubbleView) {
+        return mBarView.indexOfChild(bubbleView);
     }
 
     /**

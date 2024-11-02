@@ -59,7 +59,7 @@ constructor(
             return rect
         }
 
-    fun setUpAndShowFlyout(message: BubbleBarFlyoutMessage, onEnd: () -> Unit) {
+    fun setUpAndShowFlyout(message: BubbleBarFlyoutMessage, onInit: () -> Unit, onEnd: () -> Unit) {
         flyout?.let(container::removeView)
         val flyout = BubbleBarFlyoutView(container.context, positioner, flyoutScheduler)
 
@@ -76,7 +76,11 @@ constructor(
         container.addView(flyout, lp)
 
         this.flyout = flyout
-        flyout.showFromCollapsed(message) { showFlyout(AnimationType.MORPH, onEnd) }
+        flyout.showFromCollapsed(message) {
+            flyout.updateExpansionProgress(0f)
+            onInit()
+            showFlyout(AnimationType.MORPH, onEnd)
+        }
     }
 
     private fun showFlyout(animationType: AnimationType, endAction: () -> Unit) {
@@ -160,7 +164,15 @@ constructor(
                     flyout.updateExpansionProgress(animator.animatedValue as Float)
                 }
         }
-        animator.addListener(onStart = { flyout.setOnClickListener(null) }, onEnd = { endAction() })
+        animator.addListener(
+            onStart = {
+                flyout.setOnClickListener(null)
+                if (animationType == AnimationType.MORPH) {
+                    flyout.updateTranslationToCollapsedPosition()
+                }
+            },
+            onEnd = { endAction() },
+        )
         animator.start()
     }
 
