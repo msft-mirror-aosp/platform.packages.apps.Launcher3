@@ -67,7 +67,7 @@ import java.util.concurrent.ExecutionException;
  *          path: path of the shape, assuming drawn on 100x100 view port
  *          is_default: true if this shape option is currently set to the system
  *
- *      /grid_options: List the various available grid options, where each has following fields
+ *      /list_options: List the various available grid options, where each has following fields
  *          name: key of the grid option
  *          rows: number of rows in the grid
  *          cols: number of columns in the grid
@@ -85,20 +85,22 @@ public class GridCustomizationsProvider extends ContentProvider {
 
     private static final String TAG = "GridCustomizationsProvider";
 
-    private static final String KEY_SHAPE_KEY = "shape_key";
-    private static final String KEY_TITLE = "title";
-    private static final String KEY_PATH = "path";
-    // is_default means if a certain option is currently set to the system
-    private static final String KEY_IS_DEFAULT = "is_default";
-    // Key of grid option. We do not change the name to grid_key for backward compatibility
-    private static final String KEY_GRID_KEY = "name";
+    private static final String KEY_NAME = "name";
+    private static final String KEY_GRID_TITLE = "grid_title";
     private static final String KEY_ROWS = "rows";
     private static final String KEY_COLS = "cols";
     private static final String KEY_PREVIEW_COUNT = "preview_count";
+    // is_default means if a certain option is currently set to the system
+    private static final String KEY_IS_DEFAULT = "is_default";
+    private static final String KEY_SHAPE_KEY = "shape_key";
+    private static final String KEY_SHAPE_TITLE = "shape_title";
+    private static final String KEY_PATH = "path";
 
+    // list_options is the key for grid option list
+    private static final String KEY_LIST_OPTIONS = "/list_options";
     private static final String KEY_SHAPE_OPTIONS = "/shape_options";
-    private static final String KEY_GRID_OPTIONS = "/grid_options";
-    private static final String KEY_SHAPE_GRID = "/default_grid";
+    // default_grid is for setting grid and shape to system settings
+    private static final String KEY_DEFAULT_GRID = "/default_grid";
 
     private static final String METHOD_GET_PREVIEW = "get_preview";
 
@@ -110,6 +112,7 @@ public class GridCustomizationsProvider extends ContentProvider {
     private static final String KEY_SURFACE_PACKAGE = "surface_package";
     private static final String KEY_CALLBACK = "callback";
     public static final String KEY_HIDE_BOTTOM_ROW = "hide_bottom_row";
+    public static final String KEY_GRID_NAME = "grid_name";
 
     private static final int MESSAGE_ID_UPDATE_PREVIEW = 1337;
     private static final int MESSAGE_ID_UPDATE_SHAPE = 2586;
@@ -133,17 +136,18 @@ public class GridCustomizationsProvider extends ContentProvider {
         if (context == null || path == null) {
             return null;
         }
+
         switch (path) {
             case KEY_SHAPE_OPTIONS: {
                 if (Flags.newCustomizationPickerUi()) {
                     MatrixCursor cursor = new MatrixCursor(new String[]{
-                            KEY_SHAPE_KEY, KEY_TITLE, KEY_PATH, KEY_IS_DEFAULT});
+                            KEY_SHAPE_KEY, KEY_SHAPE_TITLE, KEY_PATH, KEY_IS_DEFAULT});
                     List<AppShape> shapes =  AppShapesProvider.INSTANCE.getShapes();
                     for (int i = 0; i < shapes.size(); i++) {
                         AppShape shape = shapes.get(i);
                         cursor.newRow()
                                 .add(KEY_SHAPE_KEY, shape.getKey())
-                                .add(KEY_TITLE, shape.getTitle())
+                                .add(KEY_SHAPE_TITLE, shape.getTitle())
                                 .add(KEY_PATH, shape.getPath())
                                 // TODO (b/348664593): We should fetch the currently-set shape
                                 //  option from the preferences.
@@ -154,13 +158,15 @@ public class GridCustomizationsProvider extends ContentProvider {
                     return null;
                 }
             }
-            case KEY_GRID_OPTIONS: {
+            case KEY_LIST_OPTIONS: {
                 MatrixCursor cursor = new MatrixCursor(new String[]{
-                        KEY_GRID_KEY, KEY_ROWS, KEY_COLS, KEY_PREVIEW_COUNT, KEY_IS_DEFAULT});
-                InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(context);
-                for (GridOption gridOption : idp.parseAllGridOptions(context)) {
+                        KEY_NAME, KEY_GRID_TITLE, KEY_ROWS, KEY_COLS, KEY_PREVIEW_COUNT,
+                        KEY_IS_DEFAULT});
+                InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(getContext());
+                for (GridOption gridOption : idp.parseAllGridOptions(getContext())) {
                     cursor.newRow()
-                            .add(KEY_GRID_KEY, gridOption.name)
+                            .add(KEY_NAME, gridOption.name)
+                            .add(KEY_GRID_TITLE, gridOption.title)
                             .add(KEY_ROWS, gridOption.numRows)
                             .add(KEY_COLS, gridOption.numColumns)
                             .add(KEY_PREVIEW_COUNT, 1)
@@ -203,7 +209,7 @@ public class GridCustomizationsProvider extends ContentProvider {
             return 0;
         }
         switch (path) {
-            case KEY_SHAPE_GRID: {
+            case KEY_DEFAULT_GRID: {
                 if (Flags.newCustomizationPickerUi()) {
                     String shapeKey = values.getAsString(KEY_SHAPE_KEY);
                     Optional<AppShape> optionalShape = AppShapesProvider.INSTANCE.getShapes()
@@ -212,13 +218,13 @@ public class GridCustomizationsProvider extends ContentProvider {
                     // TODO (b/348664593): Apply shapeName to the system. This needs to be a
                     //  synchronous call.
                 }
-                String gridKey = values.getAsString(KEY_GRID_KEY);
+                String gridName = values.getAsString(KEY_NAME);
                 InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(context);
                 // Verify that this is a valid grid option
                 GridOption match = null;
                 for (GridOption option : idp.parseAllGridOptions(context)) {
                     String name = option.name;
-                    if (name != null && name.equals(gridKey)) {
+                    if (name != null && name.equals(gridName)) {
                         match = option;
                         break;
                     }
@@ -227,7 +233,7 @@ public class GridCustomizationsProvider extends ContentProvider {
                     return 0;
                 }
 
-                idp.setCurrentGrid(context, gridKey);
+                idp.setCurrentGrid(context, gridName);
                 if (Flags.newCustomizationPickerUi()) {
                     try {
                         // Wait for device profile to be fully reloaded and applied to the launcher
@@ -360,9 +366,9 @@ public class GridCustomizationsProvider extends ContentProvider {
                     }
                     break;
                 case MESSAGE_ID_UPDATE_GRID:
-                    String gridKey = message.getData().getString(KEY_GRID_KEY);
-                    if (!TextUtils.isEmpty(gridKey)) {
-                        renderer.updateGrid(gridKey);
+                    String gridName = message.getData().getString(KEY_GRID_NAME);
+                    if (!TextUtils.isEmpty(gridName)) {
+                        renderer.updateGrid(gridName);
                     }
                     break;
                 case MESSAGE_ID_UPDATE_COLOR:
