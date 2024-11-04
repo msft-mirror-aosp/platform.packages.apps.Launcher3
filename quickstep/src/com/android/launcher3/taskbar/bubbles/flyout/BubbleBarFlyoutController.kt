@@ -164,7 +164,15 @@ constructor(
                     flyout.updateExpansionProgress(animator.animatedValue as Float)
                 }
         }
-        animator.addListener(onStart = { flyout.setOnClickListener(null) }, onEnd = { endAction() })
+        animator.addListener(
+            onStart = {
+                flyout.setOnClickListener(null)
+                if (animationType == AnimationType.MORPH) {
+                    flyout.updateTranslationToCollapsedPosition()
+                }
+            },
+            onEnd = { endAction() },
+        )
         animator.start()
     }
 
