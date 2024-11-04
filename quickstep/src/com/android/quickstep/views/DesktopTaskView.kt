@@ -26,6 +26,7 @@ import android.util.AttributeSet
 import android.util.Log
 import android.view.Gravity
 import android.view.View
+import android.widget.FrameLayout
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.updateLayoutParams
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
@@ -81,12 +82,12 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
     private val tempRect = Rect()
     private lateinit var backgroundView: View
     private lateinit var iconView: TaskViewIcon
-    private var childCountAtInflation = 0
+    private lateinit var contentView: FrameLayout
 
     override fun onFinishInflate() {
         super.onFinishInflate()
         backgroundView =
-            findViewById<View>(R.id.background)!!.apply {
+            findViewById<View>(R.id.background).apply {
                 updateLayoutParams<LayoutParams> {
                     topMargin = container.deviceProfile.overviewTaskThumbnailTopMarginPx
                 }
@@ -113,7 +114,12 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 )
                 setText(resources.getText(R.string.recent_task_desktop))
             }
-        childCountAtInflation = childCount
+        contentView =
+            findViewById<FrameLayout>(R.id.desktop_content).apply {
+                updateLayoutParams<LayoutParams> {
+                    topMargin = container.deviceProfile.overviewTaskThumbnailTopMarginPx
+                }
+            }
     }
 
     /** Updates this desktop task to the gives task list defined in `tasks` */
@@ -137,13 +143,8 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                     } else {
                         taskThumbnailViewDeprecatedPool!!.view
                     }
+                contentView.addView(snapshotView, 0)
 
-                addView(
-                    snapshotView,
-                    // Add snapshotView to the front after initial views e.g. icon and
-                    // background.
-                    childCountAtInflation,
-                )
                 TaskContainer(
                     this,
                     task,
@@ -164,7 +165,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         super.onRecycle()
         visibility = VISIBLE
         taskContainers.forEach {
-            removeView(it.snapshotView)
+            contentView.removeView(it.snapshotView)
             if (enableRefactorTaskThumbnail()) {
                 taskThumbnailViewPool!!.recycle(it.thumbnailView)
             } else {
@@ -227,9 +228,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 width = (taskSize.width() * scaleWidth).toInt()
                 height = (taskSize.height() * scaleHeight).toInt()
                 leftMargin = (positionInParent.x * scaleWidth).toInt()
-                topMargin =
-                    (positionInParent.y * scaleHeight).toInt() +
-                        container.deviceProfile.overviewTaskThumbnailTopMarginPx
+                topMargin = (positionInParent.y * scaleHeight).toInt()
             }
             if (DEBUG) {
                 with(it.snapshotView.layoutParams as LayoutParams) {
