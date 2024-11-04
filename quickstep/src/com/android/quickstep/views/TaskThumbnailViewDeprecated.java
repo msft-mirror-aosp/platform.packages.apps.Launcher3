@@ -110,7 +110,6 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
     private TaskView.FullscreenDrawParams mFullscreenParams;
     private ImageView mSplashView;
     private Drawable mSplashViewDrawable;
-    private TaskView mTaskView;
 
     @Nullable
     private Task mTask;
@@ -154,11 +153,10 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
     /**
      * Updates the thumbnail to draw the provided task
      */
-    public void bind(Task task, TaskOverlay<?> overlay, TaskView taskView) {
+    public void bind(Task task, TaskOverlay<?> overlay) {
         mOverlay = overlay;
         mOverlay.reset();
         mTask = task;
-        mTaskView = taskView;
         int color = task == null ? Color.BLACK : task.colorBackground | 0xFF000000;
         mPaint.setColor(color);
         mBackgroundPaint.setColor(color);
@@ -294,8 +292,8 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
 
     public void drawOnCanvas(Canvas canvas, float x, float y, float width, float height,
             float cornerRadius) {
-        if (mTask != null && mTaskView.isRunningTask()
-                && !mTaskView.getShouldShowScreenshot()) {
+        if (mTask != null && getTaskView().isRunningTask()
+                && !getTaskView().getShouldShowScreenshot()) {
             canvas.drawRoundRect(x, y, width, height, cornerRadius, cornerRadius, mClearPaint);
             canvas.drawRoundRect(x, y, width, height, cornerRadius, cornerRadius,
                     mDimmingPaintAfterClearing);
@@ -334,6 +332,10 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
                 mSplashView.draw(canvas);
             }
         }
+    }
+
+    public TaskView getTaskView() {
+        return (TaskView) getParent();
     }
 
     public void setOverlayEnabled(boolean overlayEnabled) {
@@ -388,9 +390,9 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
         float viewCenterY = viewHeight / 2f;
         float centeredDrawableLeft = (viewWidth - drawableWidth) / 2f;
         float centeredDrawableTop = (viewHeight - drawableHeight) / 2f;
-        float nonGridScale = mTaskView == null ? 1 : 1 / mTaskView.getNonGridScale();
-        float recentsMaxScale = mTaskView == null || mTaskView.getRecentsView() == null
-                ? 1 : 1 / mTaskView.getRecentsView().getMaxScaleForFullScreen();
+        float nonGridScale = getTaskView() == null ? 1 : 1 / getTaskView().getNonGridScale();
+        float recentsMaxScale = getTaskView() == null || getTaskView().getRecentsView() == null
+                ? 1 : 1 / getTaskView().getRecentsView().getMaxScaleForFullScreen();
         float scaleX = nonGridScale * recentsMaxScale * (1 / getScaleX());
         float scaleY = nonGridScale * recentsMaxScale * (1 / getScaleY());
 
@@ -417,7 +419,7 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
     }
 
     private boolean isThumbnailRotationDifferentFromTask() {
-        RecentsView recents = mTaskView.getRecentsView();
+        RecentsView recents = getTaskView().getRecentsView();
         if (recents == null || mThumbnailData == null) {
             return false;
         }
@@ -465,7 +467,7 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
         if (mBitmapShader != null && mThumbnailData != null) {
             mPreviewRect.set(0, 0, mThumbnailData.getThumbnail().getWidth(),
                     mThumbnailData.getThumbnail().getHeight());
-            int currentRotation = mTaskView.getOrientedState().getRecentsActivityRotation();
+            int currentRotation = getTaskView().getOrientedState().getRecentsActivityRotation();
             boolean isRtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
             mPreviewPositionHelper.updateThumbnailMatrix(mPreviewRect, mThumbnailData,
                     getMeasuredWidth(), getMeasuredHeight(), dp.isTablet, currentRotation, isRtl);
@@ -473,7 +475,7 @@ public class TaskThumbnailViewDeprecated extends View implements ViewPool.Reusab
             mBitmapShader.setLocalMatrix(mPreviewPositionHelper.getMatrix());
             mPaint.setShader(mBitmapShader);
         }
-        mTaskView.updateCurrentFullscreenParams();
+        getTaskView().updateCurrentFullscreenParams();
         invalidate();
     }
 
