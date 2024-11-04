@@ -183,19 +183,14 @@ public class DatabaseWidgetPreviewLoader {
 
                 // Draw horizontal and vertical lines to represent individual columns.
                 final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+                boxRect = new RectF(/* left= */ 0, /* top= */ 0, /* right= */
+                        previewWidthF, /* bottom= */ previewHeightF);
 
-                if (Utilities.ATLEAST_S) {
-                    boxRect = new RectF(/* left= */ 0, /* top= */ 0, /* right= */
-                            previewWidthF, /* bottom= */ previewHeightF);
-
-                    p.setStyle(Paint.Style.FILL);
-                    p.setColor(Color.WHITE);
-                    float roundedCorner = mContext.getResources().getDimension(
-                            android.R.dimen.system_app_widget_background_radius);
-                    c.drawRoundRect(boxRect, roundedCorner, roundedCorner, p);
-                } else {
-                    boxRect = drawBoxWithShadow(c, previewWidthF, previewHeightF);
-                }
+                p.setStyle(Paint.Style.FILL);
+                p.setColor(Color.WHITE);
+                float roundedCorner = mContext.getResources().getDimension(
+                        android.R.dimen.system_app_widget_background_radius);
+                c.drawRoundRect(boxRect, roundedCorner, roundedCorner, p);
 
                 p.setStyle(Paint.Style.STROKE);
                 p.setStrokeWidth(mContext.getResources()
@@ -218,8 +213,8 @@ public class DatabaseWidgetPreviewLoader {
 
                 // Draw icon in the center.
                 try {
-                    Drawable icon = LauncherAppState.getInstance(mContext).getIconCache()
-                            .getFullResIcon(info.provider.getPackageName(), info.icon);
+                    Drawable icon = info.getFullResIcon(
+                            LauncherAppState.getInstance(mContext).getIconCache());
                     if (icon != null) {
                         int appIconSize = dp.iconSizePx;
                         int iconSize = (int) Math.min(appIconSize * scale,

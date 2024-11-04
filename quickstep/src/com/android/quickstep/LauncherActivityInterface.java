@@ -40,7 +40,6 @@ import com.android.launcher3.LauncherInitListener;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.statehandlers.DepthController;
-import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.taskbar.LauncherTaskbarUIController;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
@@ -48,7 +47,6 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.quickstep.GestureState.GestureEndTarget;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
-import com.android.quickstep.util.ActivityInitListener;
 import com.android.quickstep.util.AnimatorControllerWithResistance;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.views.RecentsView;
@@ -77,7 +75,7 @@ public final class LauncherActivityInterface extends
                 && DisplayController.getNavigationMode(context) != NavigationMode.NO_BUTTON) {
             return dp.isSeascape() ? outRect.left : (dp.widthPx - outRect.right);
         } else {
-            return LayoutUtils.getShelfTrackingDistance(context, dp, orientationHandler);
+            return LayoutUtils.getShelfTrackingDistance(context, dp, orientationHandler, this);
         }
     }
 
@@ -135,7 +133,7 @@ public final class LauncherActivityInterface extends
     }
 
     @Override
-    public ActivityInitListener createActivityInitListener(Predicate<Boolean> onInitListener) {
+    public LauncherInitListener createActivityInitListener(Predicate<Boolean> onInitListener) {
         return new LauncherInitListener((activity, alreadyOnHome) ->
                 onInitListener.test(alreadyOnHome));
     }
@@ -152,7 +150,7 @@ public final class LauncherActivityInterface extends
     @Nullable
     @Override
     public QuickstepLauncher getCreatedContainer() {
-        return QuickstepLauncher.ACTIVITY_TRACKER.getCreatedActivity();
+        return QuickstepLauncher.ACTIVITY_TRACKER.getCreatedContext();
     }
 
     @Nullable
@@ -163,16 +161,6 @@ public final class LauncherActivityInterface extends
             return null;
         }
         return launcher.getDepthController();
-    }
-
-    @Nullable
-    @Override
-    public DesktopVisibilityController getDesktopVisibilityController() {
-        QuickstepLauncher launcher = getCreatedContainer();
-        if (launcher == null) {
-            return null;
-        }
-        return launcher.getDesktopVisibilityController();
     }
 
     @Nullable

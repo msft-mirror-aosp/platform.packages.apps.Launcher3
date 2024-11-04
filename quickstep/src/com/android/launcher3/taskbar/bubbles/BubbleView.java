@@ -22,12 +22,12 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Path;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.AttributeSet;
-import android.util.FloatProperty;
 import android.view.LayoutInflater;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.ImageView;
@@ -50,27 +50,12 @@ public class BubbleView extends ConstraintLayout {
 
     public static final int DEFAULT_PATH_SIZE = 100;
 
-    public static FloatProperty<BubbleView> STASH_TRANSLATION_Y = new FloatProperty<>(
-            "stashTranslationY") {
-        @Override
-        public void setValue(BubbleView bubbleView, float transY) {
-            bubbleView.setStashTranslationY(transY);
-        }
-
-        @Override
-        public Float get(BubbleView bubbleView) {
-            return bubbleView.mStashTranslationY;
-        }
-    };
-
     private final ImageView mBubbleIcon;
     private final ImageView mAppIcon;
     private int mBubbleSize;
 
     private float mDragTranslationX;
     private float mOffsetX;
-    private float mTranslationY;
-    private float mStashTranslationY;
 
     private DotRenderer mDotRenderer;
     private DotRenderer.DrawParams mDrawParams;
@@ -83,8 +68,7 @@ public class BubbleView extends ConstraintLayout {
     private float mAnimatingToDotScale;
     // The current scale value of the dot
     private float mDotScale;
-
-    private boolean mProvideShadowOutline = true;
+    private boolean mDotSuppressedForBubbleUpdate = false;
 
     // TODO: (b/273310265) handle RTL
     // Whether the bubbles are positioned on the left or right side of the screen
@@ -175,24 +159,6 @@ public class BubbleView extends ConstraintLayout {
 
     private void applyDragTranslation() {
         setTranslationX(mDragTranslationX + mOffsetX);
-    }
-
-    /**
-     * Set translation in y direction during stash and unstash from handle
-     */
-    public void setStashTranslationY(float translationY) {
-        mStashTranslationY = translationY;
-        applyTranslationY();
-    }
-
-    @Override
-    public void setTranslationY(float translationY) {
-        mTranslationY = translationY;
-        applyTranslationY();
-    }
-
-    private void applyTranslationY() {
-        super.setTranslationY(mTranslationY + mStashTranslationY);
     }
 
     @Override
@@ -333,7 +299,12 @@ public class BubbleView extends ConstraintLayout {
         return mBubble;
     }
 
-    void updateDotVisibility(boolean animate) {
+    /** Updates the dot visibility if it's not suppressed based on whether it has unseen content. */
+    public void updateDotVisibility(boolean animate) {
+        if (mDotSuppressedForBubbleUpdate) {
+            // if the dot is suppressed for an update, there's nothing to do
+            return;
+        }
         final float targetScale = hasUnseenContent() ? 1f : 0f;
         if (animate) {
             animateDotScale(targetScale);
@@ -348,6 +319,16 @@ public class BubbleView extends ConstraintLayout {
         if (mAppIcon.getVisibility() == VISIBLE) {
             mAppIcon.setScaleX(fraction);
             mAppIcon.setScaleY(fraction);
+        }
+    }
+
+    /** Suppresses or un-suppresses drawing the dot due to an update for this bubble. */
+    public void suppressDotForBubbleUpdate(boolean suppress) {
+        mDotSuppressedForBubbleUpdate = suppress;
+        if (suppress) {
+            setDotScale(0);
+        } else {
+            showDotIfNeeded(/* animate= */ false);
         }
     }
 
@@ -387,8 +368,8 @@ public class BubbleView extends ConstraintLayout {
     }
 
     void showDotIfNeeded(boolean animate) {
-        // only show the dot if we have unseen content
-        if (!hasUnseenContent()) {
+        // only show the dot if we have unseen content and it's not suppressed
+        if (!hasUnseenContent() || mDotSuppressedForBubbleUpdate) {
             return;
         }
         if (animate) {
@@ -438,6 +419,23 @@ public class BubbleView extends ConstraintLayout {
                     setDotScale(showDot ? 1f : 0f);
                     mDotIsAnimating = false;
                 }).start();
+    }
+
+    /**
+     * Returns the distance from the top left corner of this bubble view to the center of its dot.
+     */
+    public PointF getDotCenter() {
+        float[] dotPosition =
+                mOnLeft ? mDotRenderer.getLeftDotPosition() : mDotRenderer.getRightDotPosition();
+        getDrawingRect(mTempBounds);
+        float dotCenterX = mTempBounds.width() * dotPosition[0];
+        float dotCenterY = mTempBounds.height() * dotPosition[1];
+        return new PointF(dotCenterX, dotCenterY);
+    }
+
+    /** Returns the dot color. */
+    public int getDotColor() {
+        return mDotColor;
     }
 
     @Override

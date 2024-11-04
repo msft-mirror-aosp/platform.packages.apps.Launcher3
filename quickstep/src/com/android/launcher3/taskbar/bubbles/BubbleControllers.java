@@ -21,7 +21,9 @@ import android.graphics.Rect;
 import android.view.View;
 
 import com.android.launcher3.taskbar.TaskbarControllers;
+import com.android.launcher3.taskbar.TaskbarSharedState;
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController.TaskbarViewPropertiesProvider;
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleBarLocationOnDemandListener;
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.RunnableList;
@@ -40,6 +42,7 @@ public class BubbleControllers {
     public final BubbleDismissController bubbleDismissController;
     public final BubbleBarPinController bubbleBarPinController;
     public final BubblePinController bubblePinController;
+    public final Optional<BubbleBarSwipeController> bubbleBarSwipeController;
     public final BubbleCreator bubbleCreator;
 
     private final RunnableList mPostInitRunnables = new RunnableList();
@@ -58,6 +61,7 @@ public class BubbleControllers {
             BubbleDismissController bubbleDismissController,
             BubbleBarPinController bubbleBarPinController,
             BubblePinController bubblePinController,
+            Optional<BubbleBarSwipeController> bubbleBarSwipeController,
             BubbleCreator bubbleCreator) {
         this.bubbleBarController = bubbleBarController;
         this.bubbleBarViewController = bubbleBarViewController;
@@ -67,6 +71,7 @@ public class BubbleControllers {
         this.bubbleDismissController = bubbleDismissController;
         this.bubbleBarPinController = bubbleBarPinController;
         this.bubblePinController = bubblePinController;
+        this.bubbleBarSwipeController = bubbleBarSwipeController;
         this.bubbleCreator = bubbleCreator;
     }
 
@@ -75,9 +80,17 @@ public class BubbleControllers {
      * BubbleControllers instance, but should be careful to only access things that were created
      * in constructors for now, as some controllers may still be waiting for init().
      */
-    public void init(TaskbarControllers taskbarControllers) {
+    public void init(TaskbarSharedState taskbarSharedState, TaskbarControllers taskbarControllers) {
+        BubbleBarLocationCompositeListener bubbleBarLocationListeners =
+                new BubbleBarLocationCompositeListener(
+                        taskbarControllers.navbarButtonsViewController,
+                        taskbarControllers.taskbarViewController,
+                        new BubbleBarLocationOnDemandListener(() -> taskbarControllers.uiController)
+                );
         bubbleBarController.init(this,
-                taskbarControllers.navbarButtonsViewController::isImeVisible);
+                bubbleBarLocationListeners,
+                taskbarControllers.navbarButtonsViewController::isImeVisible,
+                taskbarSharedState);
         bubbleStashedHandleViewController.ifPresent(
                 controller -> controller.init(/* bubbleControllers = */ this));
         bubbleStashController.init(
@@ -102,8 +115,9 @@ public class BubbleControllers {
                 });
         bubbleDragController.init(/* bubbleControllers = */ this);
         bubbleDismissController.init(/* bubbleControllers = */ this);
-        bubbleBarPinController.init(this);
+        bubbleBarPinController.init(this, bubbleBarLocationListeners);
         bubblePinController.init(this);
+        bubbleBarSwipeController.ifPresent(c -> c.init(this));
 
         mPostInitRunnables.executeAllAndDestroy();
     }
@@ -124,6 +138,7 @@ public class BubbleControllers {
     public void onDestroy() {
         bubbleStashedHandleViewController.ifPresent(BubbleStashedHandleViewController::onDestroy);
         bubbleBarController.onDestroy();
+        bubbleBarViewController.onDestroy();
     }
 
     /** Dumps bubble controllers state. */
