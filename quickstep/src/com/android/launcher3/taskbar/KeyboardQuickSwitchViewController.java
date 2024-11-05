@@ -47,7 +47,6 @@ import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
-import com.android.window.flags.Flags;
 
 import java.io.PrintWriter;
 import java.util.List;
@@ -247,8 +246,9 @@ public class KeyboardQuickSwitchViewController {
             return -1;
         }
         RemoteTransition remoteTransition = slideInTransition;
-        if (mOnDesktop && task.task1.isMinimized
-                && Flags.enableDesktopAppLaunchAlttabTransitions()) {
+        if (mOnDesktop
+                && mControllers.taskbarActivityContext.canUnminimizeDesktopTask(task.task1.key.id)
+        ) {
             // This app is being unminimized - use our own transition runner.
             remoteTransition = new RemoteTransition(
                     new DesktopAppLaunchTransition(context, MAIN_EXECUTOR));
