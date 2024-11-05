@@ -342,36 +342,36 @@ public class TouchInteractionService extends Service {
 
         @BinderThread
         @Override
-        public void checkNavBarModes() {
-            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
-                    executeForTaskbarManager(TaskbarManager::checkNavBarModes)
-            ));
-        }
-
-        @BinderThread
-        @Override
-        public void finishBarAnimations() {
-            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
-                    executeForTaskbarManager(TaskbarManager::finishBarAnimations)
-            ));
-        }
-
-        @BinderThread
-        @Override
-        public void touchAutoDim(boolean reset) {
-            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
-                    executeForTaskbarManager(taskbarManager -> taskbarManager.touchAutoDim(reset))
-            ));
-        }
-
-        @BinderThread
-        @Override
-        public void transitionTo(@BarTransitions.TransitionMode int barMode,
-                boolean animate) {
+        public void checkNavBarModes(int displayId) {
             MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
                     executeForTaskbarManager(
-                            taskbarManager -> taskbarManager.transitionTo(barMode, animate))
-            ));
+                            taskbarManager -> taskbarManager.checkNavBarModes(displayId))));
+        }
+
+        @BinderThread
+        @Override
+        public void finishBarAnimations(int displayId) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(
+                    tis -> executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.finishBarAnimations(displayId))));
+        }
+
+        @BinderThread
+        @Override
+        public void touchAutoDim(int displayId, boolean reset) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(
+                    tis -> executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.touchAutoDim(displayId, reset))));
+        }
+
+        @BinderThread
+        @Override
+        public void transitionTo(int displayId, @BarTransitions.TransitionMode int barMode,
+                boolean animate) {
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(
+                    tis -> executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.transitionTo(displayId, barMode,
+                                    animate))));
         }
 
         @BinderThread
