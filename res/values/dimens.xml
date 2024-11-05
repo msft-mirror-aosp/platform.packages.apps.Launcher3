@@ -230,6 +230,12 @@
 
     <dimen name="widget_list_top_bottom_corner_radius">28dp</dimen>
     <dimen name="widget_list_content_corner_radius">4dp</dimen>
+    <!-- Button that expands the widget apps list in the widget picker. -->
+    <dimen name="widgets_list_expand_button_drawable_padding">8dp</dimen>
+    <dimen name="widgets_list_expand_button_start_padding">16dp</dimen>
+    <dimen name="widgets_list_expand_button_end_padding">24dp</dimen>
+    <dimen name="widgets_list_expand_button_vertical_padding">16dp</dimen>
+    <dimen name="widgets_list_expand_button_top_margin">14dp</dimen>
 
     <dimen name="widget_list_header_view_vertical_padding">20dp</dimen>
     <dimen name="widget_list_entry_spacing">2dp</dimen>
