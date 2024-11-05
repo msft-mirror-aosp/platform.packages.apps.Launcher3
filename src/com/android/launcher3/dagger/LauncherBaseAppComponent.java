@@ -26,6 +26,7 @@ import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.SettingsCache;
+import com.android.launcher3.util.VibratorWrapper;
 import com.android.launcher3.util.window.RefreshRateTracker;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 
@@ -48,8 +49,9 @@ public interface LauncherBaseAppComponent {
     RefreshRateTracker getRefreshRateTracker();
     ScreenOnTracker getScreenOnTracker();
     SettingsCache getSettingsCache();
-    PluginManagerWrapper getPluginManagerWrapper();
     PackageManagerHelper getPackageManagerHelper();
+    PluginManagerWrapper getPluginManagerWrapper();
+    VibratorWrapper getVibratorWrapper();
 
     /** Builder for LauncherBaseAppComponent. */
     interface Builder {
