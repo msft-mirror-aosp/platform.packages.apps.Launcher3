@@ -20,6 +20,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -33,11 +34,13 @@ import android.view.inputmethod.Flags;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.AndroidJUnit4;
 
+import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.taskbar.TaskbarNavButtonController.TaskbarNavButtonCallbacks;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TouchInteractionService;
-import com.android.quickstep.util.AssistUtils;
+import com.android.quickstep.util.ContextualSearchInvoker;
+import com.android.systemui.contextualeducation.GestureType;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -52,12 +55,16 @@ public class TaskbarNavButtonControllerTest {
 
     @Mock
     SystemUiProxy mockSystemUiProxy;
+
+    @Mock
+    ContextualEduStatsManager mockContextualEduStatsManager;
+
     @Mock
     TouchInteractionService mockService;
     @Mock
     Handler mockHandler;
     @Mock
-    AssistUtils mockAssistUtils;
+    ContextualSearchInvoker mockContextualSearchInvoker;
     @Mock
     StatsLogManager mockStatsLogManager;
     @Mock
@@ -100,14 +107,22 @@ public class TaskbarNavButtonControllerTest {
                 mockService,
                 mCallbacks,
                 mockSystemUiProxy,
+                mockContextualEduStatsManager,
                 mockHandler,
-                mockAssistUtils);
+                mockContextualSearchInvoker);
     }
 
     @Test
     public void testPressBack() {
         mNavButtonController.onButtonClick(BUTTON_BACK, mockView);
         verify(mockSystemUiProxy, times(1)).onBackPressed();
+    }
+
+    @Test
+    public void testPressBack_updateContextualEduData() {
+        mNavButtonController.onButtonClick(BUTTON_BACK, mockView);
+        verify(mockContextualEduStatsManager, times(1))
+                .updateEduStats(/* isTrackpad= */ eq(false), eq(GestureType.BACK));
     }
 
     @Test
@@ -151,40 +166,40 @@ public class TaskbarNavButtonControllerTest {
     @Test
     public void testLongPressHome_enabled_withoutOverride() {
         mNavButtonController.setAssistantLongPressEnabled(true /*assistantLongPressEnabled*/);
-        when(mockAssistUtils.tryStartAssistOverride(anyInt())).thenReturn(false);
+        when(mockContextualSearchInvoker.tryStartAssistOverride(anyInt())).thenReturn(false);
 
         mNavButtonController.onButtonLongClick(BUTTON_HOME, mockView);
-        verify(mockAssistUtils, times(1)).tryStartAssistOverride(anyInt());
+        verify(mockContextualSearchInvoker, times(1)).tryStartAssistOverride(anyInt());
         verify(mockSystemUiProxy, times(1)).startAssistant(any());
     }
 
     @Test
     public void testLongPressHome_enabled_withOverride() {
         mNavButtonController.setAssistantLongPressEnabled(true /*assistantLongPressEnabled*/);
-        when(mockAssistUtils.tryStartAssistOverride(anyInt())).thenReturn(true);
+        when(mockContextualSearchInvoker.tryStartAssistOverride(anyInt())).thenReturn(true);
 
         mNavButtonController.onButtonLongClick(BUTTON_HOME, mockView);
-        verify(mockAssistUtils, times(1)).tryStartAssistOverride(anyInt());
+        verify(mockContextualSearchInvoker, times(1)).tryStartAssistOverride(anyInt());
         verify(mockSystemUiProxy, never()).startAssistant(any());
     }
 
     @Test
     public void testLongPressHome_disabled_withoutOverride() {
         mNavButtonController.setAssistantLongPressEnabled(false /*assistantLongPressEnabled*/);
-        when(mockAssistUtils.tryStartAssistOverride(anyInt())).thenReturn(false);
+        when(mockContextualSearchInvoker.tryStartAssistOverride(anyInt())).thenReturn(false);
 
         mNavButtonController.onButtonLongClick(BUTTON_HOME, mockView);
-        verify(mockAssistUtils, never()).tryStartAssistOverride(anyInt());
+        verify(mockContextualSearchInvoker, never()).tryStartAssistOverride(anyInt());
         verify(mockSystemUiProxy, never()).startAssistant(any());
     }
 
     @Test
     public void testLongPressHome_disabled_withOverride() {
         mNavButtonController.setAssistantLongPressEnabled(false /*assistantLongPressEnabled*/);
-        when(mockAssistUtils.tryStartAssistOverride(anyInt())).thenReturn(true);
+        when(mockContextualSearchInvoker.tryStartAssistOverride(anyInt())).thenReturn(true);
 
         mNavButtonController.onButtonLongClick(BUTTON_HOME, mockView);
-        verify(mockAssistUtils, never()).tryStartAssistOverride(anyInt());
+        verify(mockContextualSearchInvoker, never()).tryStartAssistOverride(anyInt());
         verify(mockSystemUiProxy, never()).startAssistant(any());
     }
 
@@ -195,9 +210,23 @@ public class TaskbarNavButtonControllerTest {
     }
 
     @Test
+    public void testPressHome_updateContextualEduData() {
+        mNavButtonController.onButtonClick(BUTTON_HOME, mockView);
+        verify(mockContextualEduStatsManager, times(1))
+                .updateEduStats(/* isTrackpad= */ eq(false), eq(GestureType.HOME));
+    }
+
+    @Test
     public void testPressRecents() {
         mNavButtonController.onButtonClick(BUTTON_RECENTS, mockView);
         assertThat(mOverviewToggleCount).isEqualTo(1);
+    }
+
+    @Test
+    public void testPressRecents_updateContextualEduData() {
+        mNavButtonController.onButtonClick(BUTTON_RECENTS, mockView);
+        verify(mockContextualEduStatsManager, times(1))
+                .updateEduStats(/* isTrackpad= */ eq(false), eq(GestureType.OVERVIEW));
     }
 
     @Test

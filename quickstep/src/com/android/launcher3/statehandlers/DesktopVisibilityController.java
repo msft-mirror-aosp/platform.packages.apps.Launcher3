@@ -16,9 +16,9 @@
 package com.android.launcher3.statehandlers;
 
 import static android.view.View.VISIBLE;
+import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY;
 
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.wm.shell.shared.desktopmode.DesktopModeFlags.WALLPAPER_ACTIVITY;
 
 import android.content.Context;
 import android.os.Debug;
@@ -167,7 +167,8 @@ public class DesktopVisibilityController {
                 notifyDesktopVisibilityListeners(areDesktopTasksVisibleNow);
             }
 
-            if (!WALLPAPER_ACTIVITY.isEnabled(mContext) && wasVisible != isVisible) {
+            if (!ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()
+                    && wasVisible != isVisible) {
                 // TODO: b/333533253 - Remove after flag rollout
                 if (mVisibleDesktopTasksCount > 0) {
                     setLauncherViewsVisibility(View.INVISIBLE);
@@ -225,7 +226,7 @@ public class DesktopVisibilityController {
                 notifyDesktopVisibilityListeners(areDesktopTasksVisibleNow);
             }
 
-            if (WALLPAPER_ACTIVITY.isEnabled(mContext)) {
+            if (ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()) {
                 return;
             }
             // TODO: b/333533253 - Clean up after flag rollout
@@ -252,7 +253,7 @@ public class DesktopVisibilityController {
         for (DesktopVisibilityListener listener : mDesktopVisibilityListeners) {
             listener.onDesktopVisibilityChanged(areDesktopTasksVisible);
         }
-        DisplayController.handleInfoChangeForDesktopMode(mContext);
+        DisplayController.INSTANCE.get(mContext).notifyConfigChange();
     }
 
     private void notifyTaskbarDesktopModeListeners(boolean doesAnyTaskRequireTaskbarRounding) {
@@ -341,7 +342,7 @@ public class DesktopVisibilityController {
         if (mContext == null) {
             return;
         }
-        if (WALLPAPER_ACTIVITY.isEnabled(mContext)) {
+        if (ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()) {
             return;
         }
         if (DEBUG) {
@@ -376,14 +377,14 @@ public class DesktopVisibilityController {
         if (mContext == null) {
             return;
         }
-        if (WALLPAPER_ACTIVITY.isEnabled(mContext)) {
+        if (ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()) {
             return;
         }
         if (DEBUG) {
             Log.d(TAG, "markLauncherPaused " + Debug.getCaller());
         }
         StatefulActivity<LauncherState> activity =
-                QuickstepLauncher.ACTIVITY_TRACKER.getCreatedActivity();
+                QuickstepLauncher.ACTIVITY_TRACKER.getCreatedContext();
         if (activity != null) {
             activity.setPaused();
         }
@@ -396,14 +397,14 @@ public class DesktopVisibilityController {
         if (mContext == null) {
             return;
         }
-        if (WALLPAPER_ACTIVITY.isEnabled(mContext)) {
+        if (ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()) {
             return;
         }
         if (DEBUG) {
             Log.d(TAG, "markLauncherResumed " + Debug.getCaller());
         }
         StatefulActivity<LauncherState> activity =
-                QuickstepLauncher.ACTIVITY_TRACKER.getCreatedActivity();
+                QuickstepLauncher.ACTIVITY_TRACKER.getCreatedContext();
         // Check activity state before calling setResumed(). Launcher may have been actually
         // paused (eg fullscreen task moved to front).
         // In this case we should not mark the activity as resumed.

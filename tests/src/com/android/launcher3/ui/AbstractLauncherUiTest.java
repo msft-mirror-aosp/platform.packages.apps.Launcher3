@@ -20,12 +20,12 @@ import static android.platform.test.flag.junit.SetFlagsRule.DefaultInitValueType
 import static androidx.test.InstrumentationRegistry.getInstrumentation;
 
 import static com.android.launcher3.testing.shared.TestProtocol.ICON_MISSING;
-import static com.android.launcher3.testing.shared.TestProtocol.WIDGET_CONFIG_NULL_EXTRA_INTENT;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -103,6 +103,8 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
     public static final long DEFAULT_UI_TIMEOUT = TestUtil.DEFAULT_UI_TIMEOUT;
     private static final String TAG = "AbstractLauncherUiTest";
 
+    private static final long BYTES_PER_MEGABYTE = 1 << 20;
+
     private static boolean sDumpWasGenerated = false;
     private static boolean sActivityLeakReported = false;
     private static boolean sSeenKeyguard = false;
@@ -123,6 +125,10 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
     protected Context mTargetContext;
     protected String mTargetPackage;
     private int mLauncherPid;
+
+    private final ActivityManager.MemoryInfo mMemoryInfo = new ActivityManager.MemoryInfo();
+    private final ActivityManager mActivityManager;
+    private long mMemoryBefore;
 
     /** Detects activity leaks and throws an exception if a leak is found. */
     public static void checkDetectedLeaks(LauncherInstrumentation launcher) {
@@ -192,6 +198,8 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
     }
 
     protected AbstractLauncherUiTest() {
+        mActivityManager = InstrumentationRegistry.getContext()
+                .getSystemService(ActivityManager.class);
         mLauncher.enableCheckEventsForSuccessfulGestures();
         mLauncher.setAnomalyChecker(AbstractLauncherUiTest::verifyKeyguardInvisible);
         try {
@@ -249,7 +257,7 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
 
     protected TestRule getRulesInsideActivityMonitor() {
         final ViewCaptureRule viewCaptureRule = new ViewCaptureRule(
-                Launcher.ACTIVITY_TRACKER::getCreatedActivity);
+                Launcher.ACTIVITY_TRACKER::getCreatedContext);
         final RuleChain inner = RuleChain
                 .outerRule(new PortraitLandscapeRunner<LAUNCHER_TYPE>(this))
                 .around(new FailureWatcher(mLauncher, viewCaptureRule::getViewCaptureData))
@@ -309,6 +317,26 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
         onTestStart();
 
         initialize(this);
+    }
+
+    private long getAvailableMemory() {
+        mActivityManager.getMemoryInfo(mMemoryInfo);
+
+        return Math.divideExact(mMemoryInfo.availMem,  BYTES_PER_MEGABYTE);
+    }
+
+    @Before
+    public void saveMemoryBefore() {
+        mMemoryBefore = getAvailableMemory();
+    }
+
+    @After
+    public void logMemoryAfter() {
+        long memoryAfter = getAvailableMemory();
+
+        Log.d(TAG, "Available memory: before=" + mMemoryBefore
+                + "MB, after=" + memoryAfter
+                + "MB, delta=" + (memoryAfter - mMemoryBefore) + "MB");
     }
 
     /** Method that should be called when a test starts. */
@@ -386,6 +414,7 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
     public void verifyLauncherState() {
         try {
             // Limits UI tests affecting tests running after them.
+            mDevice.pressHome();
             mLauncher.waitForLauncherInitialized();
             if (mLauncherPid != 0) {
                 assertEquals("Launcher crashed, pid mismatch:",
@@ -427,7 +456,7 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
 
     protected <T> T getFromLauncher(Function<LAUNCHER_TYPE, T> f) {
         if (!TestHelpers.isInLauncherProcess()) return null;
-        return getOnUiThread(() -> f.apply(Launcher.ACTIVITY_TRACKER.getCreatedActivity()));
+        return getOnUiThread(() -> f.apply(Launcher.ACTIVITY_TRACKER.getCreatedContext()));
     }
 
     protected void executeOnLauncher(Consumer<LAUNCHER_TYPE> f) {
@@ -534,23 +563,13 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
 
         @Override
         public void onReceive(Context context, Intent intent) {
-            Log.d(WIDGET_CONFIG_NULL_EXTRA_INTENT, intent == null
-                    ? "AbstractLauncherUiTest.onReceive(): inputted intent NULL"
-                    : "AbstractLauncherUiTest.onReceive(): inputted intent NOT NULL");
             mIntent = intent;
             latch.countDown();
-            Log.d(WIDGET_CONFIG_NULL_EXTRA_INTENT,
-                    "AbstractLauncherUiTest.onReceive() Countdown Latch started");
         }
 
         public Intent blockingGetIntent() throws InterruptedException {
-            Log.d(WIDGET_CONFIG_NULL_EXTRA_INTENT,
-                    "AbstractLauncherUiTest.blockingGetIntent()");
             assertTrue("Timed Out", latch.await(DEFAULT_BROADCAST_TIMEOUT_SECS, TimeUnit.SECONDS));
             mTargetContext.unregisterReceiver(this);
-            Log.d(WIDGET_CONFIG_NULL_EXTRA_INTENT, mIntent == null
-                    ? "AbstractLauncherUiTest.onReceive(): mIntent NULL"
-                    : "AbstractLauncherUiTest.onReceive(): mIntent NOT NULL");
             return mIntent;
         }
 

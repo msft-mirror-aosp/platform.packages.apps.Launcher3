@@ -32,10 +32,11 @@ import com.android.launcher3.R
 import com.android.launcher3.anim.AnimatedFloat
 import com.android.launcher3.anim.SpringAnimationBuilder
 import com.android.launcher3.taskbar.TaskbarInsetsController
-import com.android.launcher3.taskbar.TaskbarStashController.TASKBAR_STASH_ALPHA_DURATION
 import com.android.launcher3.taskbar.TaskbarStashController.TASKBAR_STASH_ALPHA_START_DELAY
+import com.android.launcher3.taskbar.TaskbarStashController.TRANSIENT_TASKBAR_STASH_ALPHA_DURATION
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController
 import com.android.launcher3.taskbar.bubbles.BubbleStashedHandleViewController
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.BubbleLauncherState
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Companion.BAR_STASH_DURATION
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.Companion.BAR_TRANSLATION_DURATION
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController.ControllersAfterInitAction
@@ -47,7 +48,7 @@ import kotlin.math.max
 
 class TransientBubbleStashController(
     private val taskbarHotseatDimensionsProvider: TaskbarHotseatDimensionsProvider,
-    private val context: Context
+    private val context: Context,
 ) : BubbleStashController {
 
     private lateinit var bubbleBarViewController: BubbleBarViewController
@@ -70,46 +71,38 @@ class TransientBubbleStashController(
     private lateinit var bubbleBarBubbleAlpha: AnimatedFloat
     private lateinit var bubbleBarBackgroundAlpha: AnimatedFloat
     private lateinit var bubbleBarTranslationYAnimator: AnimatedFloat
+    private lateinit var bubbleBarBubbleTranslationY: AnimatedFloat
     private lateinit var bubbleBarBackgroundScaleX: AnimatedFloat
     private lateinit var bubbleBarBackgroundScaleY: AnimatedFloat
     private val handleCenterFromScreenBottom =
         context.resources.getDimensionPixelSize(R.dimen.bubblebar_stashed_size) / 2f
 
     private var animator: AnimatorSet? = null
+    private var hotseatVerticalCenter: Int = 0
 
     override var isStashed: Boolean = false
         @VisibleForTesting set
 
-    override var isBubblesShowingOnHome: Boolean = false
-        set(onHome) {
-            if (field == onHome) return
-            field = onHome
+    override var launcherState: BubbleLauncherState = BubbleLauncherState.IN_APP
+        set(state) {
+            if (field == state) return
+            field = state
             if (!bubbleBarViewController.hasBubbles()) {
                 // if there are no bubbles, there's nothing to show, so just return.
                 return
             }
-            if (onHome) {
-                updateStashedAndExpandedState(stash = false, expand = false)
-                // When transitioning from app to home we need to animate the bubble bar
+            if (field == BubbleLauncherState.HOME) {
+                // When to home we need to animate the bubble bar
                 // here to align with hotseat center.
                 animateBubbleBarYToHotseat()
-            } else if (!bubbleBarViewController.isExpanded) {
-                updateStashedAndExpandedState(stash = true, expand = false)
-            }
-            bubbleBarViewController.onBubbleBarConfigurationChanged(/* animate= */ true)
-        }
-
-    override var isBubblesShowingOnOverview: Boolean = false
-        set(onOverview) {
-            if (field == onOverview) return
-            field = onOverview
-            if (onOverview) {
+            } else if (field == BubbleLauncherState.OVERVIEW) {
                 // When transitioning to overview we need to animate the bubble bar to align with
                 // the taskbar bottom.
                 animateBubbleBarYToTaskbar()
-            } else {
-                updateStashedAndExpandedState(stash = true, expand = false)
             }
+            // Only stash if we're in an app, otherwise we're in home or overview where we should
+            // be un-stashed
+            updateStashedAndExpandedState(field == BubbleLauncherState.IN_APP, expand = false)
             bubbleBarViewController.onBubbleBarConfigurationChanged(/* animate= */ true)
         }
 
@@ -126,10 +119,8 @@ class TransientBubbleStashController(
 
     override val bubbleBarTranslationYForHotseat: Float
         get() {
-            val hotseatBottomSpace = taskbarHotseatDimensionsProvider.getHotseatBottomSpace()
-            val hotseatCellHeight = taskbarHotseatDimensionsProvider.getHotseatHeight()
-            val bubbleBarHeight: Float = bubbleBarViewController.bubbleBarCollapsedHeight
-            return -hotseatBottomSpace - (hotseatCellHeight - bubbleBarHeight) / 2
+            val bubbleBarHeight = bubbleBarViewController.bubbleBarCollapsedHeight
+            return -hotseatVerticalCenter + bubbleBarHeight / 2
         }
 
     override val bubbleBarTranslationYForTaskbar: Float =
@@ -143,13 +134,14 @@ class TransientBubbleStashController(
         taskbarInsetsController: TaskbarInsetsController,
         bubbleBarViewController: BubbleBarViewController,
         bubbleStashedHandleViewController: BubbleStashedHandleViewController?,
-        controllersAfterInitAction: ControllersAfterInitAction
+        controllersAfterInitAction: ControllersAfterInitAction,
     ) {
         this.taskbarInsetsController = taskbarInsetsController
         this.bubbleBarViewController = bubbleBarViewController
         this.bubbleStashedHandleViewController = bubbleStashedHandleViewController
         this.controllersAfterInitAction = controllersAfterInitAction
         bubbleBarTranslationYAnimator = bubbleBarViewController.bubbleBarTranslationY
+        bubbleBarBubbleTranslationY = bubbleBarViewController.bubbleOffsetY
         // bubble bar has only alpha property, getting it at index 0
         bubbleBarAlpha = bubbleBarViewController.bubbleBarAlpha.get(/* index= */ 0)
         bubbleBarBubbleAlpha = bubbleBarViewController.bubbleBarBubbleAlpha
@@ -170,13 +162,21 @@ class TransientBubbleStashController(
                 bubbleBarTranslationYAnimator.animateToValue(bubbleBarTranslationY),
                 bubbleBarAlpha.animateToValue(1f),
                 bubbleBarBubbleAlpha.animateToValue(1f),
-                bubbleBarBackgroundAlpha.animateToValue(1f)
+                bubbleBarBackgroundAlpha.animateToValue(1f),
             )
         } else {
             isStashed = true
             stashHandleViewAlpha?.let { animatorSet.playTogether(it.animateToValue(1f)) }
         }
-        animatorSet.updateTouchRegionOnAnimationEnd().setDuration(BAR_STASH_DURATION).start()
+        animatorSet
+            .updateBarVisibility(isStashed)
+            .updateTouchRegionOnAnimationEnd()
+            .setDuration(BAR_STASH_DURATION)
+            .start()
+    }
+
+    override fun setHotseatVerticalCenter(hotseatVerticalCenter: Int) {
+        this.hotseatVerticalCenter = hotseatVerticalCenter
     }
 
     override fun showBubbleBarImmediate() {
@@ -193,6 +193,7 @@ class TransientBubbleStashController(
         bubbleBarBackgroundScaleX.updateValue(1f)
         bubbleBarBackgroundScaleY.updateValue(1f)
         isStashed = false
+        bubbleBarViewController.setHiddenForStashed(false)
         onIsStashedChanged()
     }
 
@@ -207,6 +208,7 @@ class TransientBubbleStashController(
         bubbleBarBackgroundScaleX.updateValue(getStashScaleX())
         bubbleBarBackgroundScaleY.updateValue(getStashScaleY())
         isStashed = true
+        bubbleBarViewController.setHiddenForStashed(true)
         onIsStashedChanged()
     }
 
@@ -301,23 +303,25 @@ class TransientBubbleStashController(
     private fun createStashAnimator(isStashed: Boolean, duration: Long): AnimatorSet {
         val animatorSet = AnimatorSet()
 
-        val alphaDuration = if (isStashed) duration else TASKBAR_STASH_ALPHA_DURATION
-        val alphaDelay = if (isStashed) TASKBAR_STASH_ALPHA_START_DELAY else 0L
         animatorSet.play(
             createBackgroundAlphaAnimator(isStashed).apply {
+                val alphaDuration =
+                    if (isStashed) duration else TRANSIENT_TASKBAR_STASH_ALPHA_DURATION
+                val alphaDelay = if (isStashed) TASKBAR_STASH_ALPHA_START_DELAY else 0L
                 this.duration = max(0L, alphaDuration - alphaDelay)
                 this.startDelay = alphaDelay
                 this.interpolator = LINEAR
             }
         )
 
-        val iconAlphaTarget = if (isStashed) 0f else 1f
         animatorSet.play(
-            bubbleBarBubbleAlpha.animateToValue(iconAlphaTarget).apply {
-                this.duration = TASKBAR_STASH_ALPHA_DURATION
-                this.startDelay = TASKBAR_STASH_ALPHA_START_DELAY
-                this.interpolator = LINEAR
-            }
+            bubbleBarBubbleAlpha
+                .animateToValue(getBarAlphaStart(isStashed), getBarAlphaEnd(isStashed))
+                .apply {
+                    this.duration = TRANSIENT_TASKBAR_STASH_ALPHA_DURATION
+                    this.startDelay = TASKBAR_STASH_ALPHA_START_DELAY
+                    this.interpolator = LINEAR
+                }
         )
 
         animatorSet.play(
@@ -329,6 +333,16 @@ class TransientBubbleStashController(
 
         animatorSet.play(
             bubbleBarViewController.createRevealAnimatorForStashChange(isStashed).apply {
+                this.duration = duration
+                this.interpolator = EMPHASIZED
+            }
+        )
+
+        // Animate bubble translation to keep reveal animation in the bounds of the bar
+        val bubbleTyStart = if (isStashed) 0f else -bubbleBarTranslationY
+        val bubbleTyEnd = if (isStashed) -bubbleBarTranslationY else 0f
+        animatorSet.play(
+            bubbleBarBubbleTranslationY.animateToValue(bubbleTyStart, bubbleTyEnd).apply {
                 this.duration = duration
                 this.interpolator = EMPHASIZED
             }
@@ -359,11 +373,15 @@ class TransientBubbleStashController(
         )
 
         animatorSet.doOnStart {
-            if (!isStashed) {
-                bubbleBarBackgroundAlpha.updateValue(0f)
-                bubbleBarBubbleAlpha.updateValue(0f)
-                bubbleBarAlpha.value = 1f
-            }
+            // Update the start value for bubble view and background alpha when the entire animation
+            // begins.
+            // Alpha animation has a delay, and if we set the initial values at the start of the
+            // alpha animation, it will cause flickers.
+            bubbleBarBubbleAlpha.updateValue(getBarAlphaStart(isStashed))
+            bubbleBarBackgroundAlpha.updateValue(getBarAlphaStart(isStashed))
+            // We animate alpha for background and bubble views separately. Make sure the container
+            // is always visible.
+            bubbleBarAlpha.value = 1f
         }
         animatorSet.doOnEnd {
             animator = null
@@ -373,6 +391,9 @@ class TransientBubbleStashController(
                     // reset bubble view alpha
                     bubbleBarBubbleAlpha.updateValue(1f)
                     bubbleBarBackgroundAlpha.updateValue(1f)
+                    // reset stash translation
+                    translationYDuringStash.updateValue(0f)
+                    bubbleBarBubbleTranslationY.updateValue(0f)
                     bubbleBarViewController.isExpanded = false
                 }
                 taskbarInsetsController.onTaskbarOrBubblebarWindowHeightOrInsetsChanged()
@@ -382,12 +403,27 @@ class TransientBubbleStashController(
     }
 
     private fun createBackgroundAlphaAnimator(isStashed: Boolean): AnimatorSet {
-        val stashHandleAlphaTarget = if (isStashed) 1f else 0f
-        val barAlphaTarget = if (isStashed) 0f else 1f
         return AnimatorSet().apply {
-            play(bubbleBarBackgroundAlpha.animateToValue(barAlphaTarget))
-            play(stashHandleViewAlpha?.animateToValue(stashHandleAlphaTarget))
+            play(
+                bubbleBarBackgroundAlpha.animateToValue(
+                    getBarAlphaStart(isStashed),
+                    getBarAlphaEnd(isStashed),
+                )
+            )
+            play(stashHandleViewAlpha?.animateToValue(getHandleAlphaEnd(isStashed)))
         }
+    }
+
+    private fun getBarAlphaStart(isStashed: Boolean): Float {
+        return if (isStashed) 1f else 0f
+    }
+
+    private fun getBarAlphaEnd(isStashed: Boolean): Float {
+        return if (isStashed) 0f else 1f
+    }
+
+    private fun getHandleAlphaEnd(isStashed: Boolean): Float {
+        return if (isStashed) 1f else 0f
     }
 
     private fun createSpringOnStashAnimator(isStashed: Boolean): Animator {
@@ -454,6 +490,7 @@ class TransientBubbleStashController(
             animator?.cancel()
             animator =
                 createStashAnimator(isStashed, BAR_STASH_DURATION).apply {
+                    updateBarVisibility(isStashed)
                     updateTouchRegionOnAnimationEnd()
                     start()
                 }
@@ -465,6 +502,15 @@ class TransientBubbleStashController(
 
     private fun Animator.updateTouchRegionOnAnimationEnd(): Animator {
         doOnEnd { onIsStashedChanged() }
+        return this
+    }
+
+    private fun <T : Animator> T.updateBarVisibility(stashed: Boolean): T {
+        if (stashed) {
+            doOnEnd { bubbleBarViewController.setHiddenForStashed(true) }
+        } else {
+            doOnStart { bubbleBarViewController.setHiddenForStashed(false) }
+        }
         return this
     }
 

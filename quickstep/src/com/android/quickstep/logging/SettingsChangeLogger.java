@@ -43,6 +43,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.R;
+import com.android.launcher3.dagger.ApplicationContext;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.logging.StatsLogManager.StatsLogger;
@@ -84,7 +85,7 @@ public class SettingsChangeLogger implements
     private StatsLogManager.LauncherEvent mNotificationDotsEvent;
     private StatsLogManager.LauncherEvent mHomeScreenSuggestionEvent;
 
-    private SettingsChangeLogger(Context context) {
+    SettingsChangeLogger(@ApplicationContext Context context) {
         this(context, StatsLogManager.newInstance(context));
     }
 
@@ -93,16 +94,17 @@ public class SettingsChangeLogger implements
         mContext = context;
         mStatsLogManager = statsLogManager;
         mLoggablePrefs = loadPrefKeys(context);
+
         DisplayController.INSTANCE.get(context).addChangeListener(this);
         mNavMode = DisplayController.getNavigationMode(context);
 
         getPrefs(context).registerOnSharedPreferenceChangeListener(this);
         getDevicePrefs(context).registerOnSharedPreferenceChangeListener(this);
 
-        SettingsCache mSettingsCache = SettingsCache.INSTANCE.get(context);
-        mSettingsCache.register(NOTIFICATION_BADGING_URI,
+        SettingsCache settingsCache = SettingsCache.INSTANCE.get(context);
+        settingsCache.register(NOTIFICATION_BADGING_URI,
                 this::onNotificationDotsChanged);
-        onNotificationDotsChanged(mSettingsCache.getValue(NOTIFICATION_BADGING_URI));
+        onNotificationDotsChanged(settingsCache.getValue(NOTIFICATION_BADGING_URI));
     }
 
     private static ArrayMap<String, LoggablePref> loadPrefKeys(Context context) {

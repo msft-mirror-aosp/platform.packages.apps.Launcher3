@@ -397,11 +397,20 @@ constructor(
         }
         get() = taskViewAlpha.get(ALPHA_INDEX_STABLE).value
 
-    protected var attachAlpha
+    var attachAlpha
         set(value) {
             taskViewAlpha.get(ALPHA_INDEX_ATTACH).value = value
         }
         get() = taskViewAlpha.get(ALPHA_INDEX_ATTACH).value
+
+    var splitAlpha
+        set(value) {
+            splitAlphaProperty.value = value
+        }
+        get() = splitAlphaProperty.value
+
+    val splitAlphaProperty: MultiPropertyFactory<View>.MultiProperty
+        get() = taskViewAlpha.get(ALPHA_INDEX_SPLIT)
 
     protected var shouldShowScreenshot = false
         get() = !isRunningTask || field
@@ -606,6 +615,8 @@ constructor(
 
     override fun onRecycle() {
         resetPersistentViewTransforms()
+        attachAlpha = 1f
+        splitAlpha = 1f
         // Clear any references to the thumbnail (it will be re-read either from the cache or the
         // system on next bind)
         if (!enableRefactorTaskThumbnail()) {
@@ -687,7 +698,6 @@ constructor(
         orientedState: RecentsOrientedState,
         taskOverlayFactory: TaskOverlayFactory,
     ) {
-
         cancelPendingLoadTasks()
         taskContainers =
             listOf(
@@ -714,19 +724,23 @@ constructor(
         @StagePosition stagePosition: Int,
         taskOverlayFactory: TaskOverlayFactory,
     ): TaskContainer {
-        val thumbnailViewDeprecated: TaskThumbnailViewDeprecated = findViewById(thumbnailViewId)!!
+        val existingThumbnailView: View = findViewById(thumbnailViewId)!!
         val snapshotView =
-            if (enableRefactorTaskThumbnail()) {
-                thumbnailViewDeprecated.visibility = GONE
-                val indexOfSnapshotView = indexOfChild(thumbnailViewDeprecated)
-                LayoutInflater.from(context).inflate(R.layout.task_thumbnail, this, false).also {
-                    addView(it, indexOfSnapshotView, thumbnailViewDeprecated.layoutParams)
+            when {
+                !enableRefactorTaskThumbnail() -> existingThumbnailView
+                existingThumbnailView is TaskThumbnailView -> existingThumbnailView
+                else -> {
+                    val indexOfSnapshotView = indexOfChild(existingThumbnailView)
+                    LayoutInflater.from(context)
+                        .inflate(R.layout.task_thumbnail, this, false)
+                        .also {
+                            it.id = thumbnailViewId
+                            addView(it, indexOfSnapshotView, existingThumbnailView.layoutParams)
+                            removeView(existingThumbnailView)
+                        }
                 }
-            } else {
-                thumbnailViewDeprecated
             }
         val iconView = getOrInflateIconView(iconViewId)
-        val digitalWellBeingToast = findViewById<DigitalWellBeingToast>(digitalWellbeingBannerId)!!
         return TaskContainer(
             this,
             task,
@@ -734,7 +748,7 @@ constructor(
             iconView,
             TransformingTouchDelegate(iconView.asView()),
             stagePosition,
-            digitalWellBeingToast,
+            findViewById(digitalWellbeingBannerId)!!,
             findViewById(showWindowViewId)!!,
             taskOverlayFactory,
         )
@@ -1587,10 +1601,7 @@ constructor(
         resetViewTransforms()
     }
 
-    fun getTaskContainerForTaskThumbnailView(taskThumbnailView: TaskThumbnailView): TaskContainer? =
-        taskContainers.firstOrNull { it.thumbnailView == taskThumbnailView }
-
-    open fun resetViewTransforms() {
+    fun resetViewTransforms() {
         // fullscreenTranslation and accumulatedTranslation should not be reset, as
         // resetViewTransforms is called during QuickSwitch scrolling.
         dismissTranslationX = 0f
@@ -1606,7 +1617,6 @@ constructor(
         }
         dismissScale = 1f
         translationZ = 0f
-        attachAlpha = 1f
         setIconScaleAndDim(1f)
         setColorTint(0f, 0)
     }
@@ -1691,8 +1701,9 @@ constructor(
 
         private const val ALPHA_INDEX_STABLE = 0
         private const val ALPHA_INDEX_ATTACH = 1
+        private const val ALPHA_INDEX_SPLIT = 2
 
-        private const val NUM_ALPHA_CHANNELS = 2
+        private const val NUM_ALPHA_CHANNELS = 3
 
         /** The maximum amount that a task view can be scrimmed, dimmed or tinted. */
         const val MAX_PAGE_SCRIM_ALPHA = 0.4f
