@@ -118,6 +118,8 @@ public class TaskbarUIController implements BubbleBarController.BubbleBarLocatio
      * Manually closes the overlay window.
      */
     public void hideOverlayWindow() {
+        mControllers.keyboardQuickSwitchController.closeQuickSwitchView();
+
         if (!DisplayController.isTransientTaskbar(mControllers.taskbarActivityContext)
                 || mControllers.taskbarAllAppsController.isOpen()) {
             mControllers.taskbarOverlayController.hideWindow();

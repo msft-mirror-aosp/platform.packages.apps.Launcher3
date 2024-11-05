@@ -20,6 +20,7 @@ import static com.android.launcher3.BuildConfig.WIDGET_ON_FIRST_SCREEN;
 import static com.android.launcher3.Flags.enableLauncherBrMetricsFixed;
 import static com.android.launcher3.Flags.enableSmartspaceAsAWidget;
 import static com.android.launcher3.Flags.enableSmartspaceRemovalToggle;
+import static com.android.launcher3.Flags.enableTieredWidgetsByDefaultInPicker;
 import static com.android.launcher3.LauncherPrefs.IS_FIRST_LOAD_AFTER_RESTORE;
 import static com.android.launcher3.LauncherPrefs.SHOULD_SHOW_SMARTSPACE;
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
@@ -72,8 +73,8 @@ import com.android.launcher3.folder.FolderNameInfos;
 import com.android.launcher3.folder.FolderNameProvider;
 import com.android.launcher3.icons.CacheableShortcutCachingLogic;
 import com.android.launcher3.icons.CacheableShortcutInfo;
-import com.android.launcher3.icons.ComponentWithLabelAndIcon;
 import com.android.launcher3.icons.IconCache;
+import com.android.launcher3.icons.cache.CachedObject;
 import com.android.launcher3.icons.cache.CachedObjectCachingLogic;
 import com.android.launcher3.icons.cache.IconCacheUpdateHandler;
 import com.android.launcher3.icons.cache.LauncherActivityCachingLogic;
@@ -142,6 +143,7 @@ public class LoaderTask implements Runnable {
     private final UserManager mUserManager;
     private final UserCache mUserCache;
     private final PackageManagerHelper mPmHelper;
+    private final WidgetsFilterDataProvider mWidgetsFilterDataProvider;
 
     private final InstallSessionHelper mSessionHelper;
     private final IconCache mIconCache;
@@ -158,13 +160,16 @@ public class LoaderTask implements Runnable {
     private String mDbName;
 
     public LoaderTask(@NonNull LauncherAppState app, AllAppsList bgAllAppsList, BgDataModel bgModel,
-            ModelDelegate modelDelegate, @NonNull BaseLauncherBinder launcherBinder) {
-        this(app, bgAllAppsList, bgModel, modelDelegate, launcherBinder, new UserManagerState());
+            ModelDelegate modelDelegate, @NonNull BaseLauncherBinder launcherBinder,
+            @NonNull WidgetsFilterDataProvider widgetsFilterDataProvider) {
+        this(app, bgAllAppsList, bgModel, modelDelegate, launcherBinder, widgetsFilterDataProvider,
+                new UserManagerState());
     }
 
     @VisibleForTesting
     LoaderTask(@NonNull LauncherAppState app, AllAppsList bgAllAppsList, BgDataModel bgModel,
             ModelDelegate modelDelegate, @NonNull BaseLauncherBinder launcherBinder,
+            WidgetsFilterDataProvider widgetsFilterDataProvider,
             UserManagerState userManagerState) {
         mApp = app;
         mBgAllAppsList = bgAllAppsList;
@@ -179,6 +184,7 @@ public class LoaderTask implements Runnable {
         mIconCache = mApp.getIconCache();
         mUserManagerState = userManagerState;
         mInstallingPkgsCached = null;
+        mWidgetsFilterDataProvider = widgetsFilterDataProvider;
     }
 
     protected synchronized void waitForIdle() {
@@ -287,11 +293,6 @@ public class LoaderTask implements Runnable {
             }
             logASplit("loadAllApps");
 
-            if (FeatureFlags.CHANGE_MODEL_DELEGATE_LOADING_ORDER.get()) {
-                mModelDelegate.loadAndBindAllAppsItems(mUserManagerState,
-                        mLauncherBinder.mCallbacksList, mShortcutKeyToPinnedShortcuts);
-                logASplit("allAppsDelegateItems");
-            }
             verifyNotStopped();
             mLauncherBinder.bindAllApps();
             logASplit("bindAllApps");
@@ -335,8 +336,15 @@ public class LoaderTask implements Runnable {
             verifyNotStopped();
 
             // fourth step
-            List<ComponentWithLabelAndIcon> allWidgetsList =
-                    mBgDataModel.widgetsModel.update(mApp, null);
+            WidgetsModel widgetsModel = mBgDataModel.widgetsModel;
+            if (enableTieredWidgetsByDefaultInPicker()) {
+                // Begin periodic refresh of filters
+                mWidgetsFilterDataProvider.initPeriodicDataRefresh(
+                        mApp.getModel()::onWidgetFiltersLoaded);
+                // And, update model with currently cached data.
+                widgetsModel.updateWidgetFilters(mWidgetsFilterDataProvider);
+            }
+            List<CachedObject> allWidgetsList = widgetsModel.update(mApp, /*packageUser=*/null);
             logASplit("load widgets");
 
             verifyNotStopped();
@@ -357,14 +365,8 @@ public class LoaderTask implements Runnable {
                 prefs.putSync(SHOULD_SHOW_SMARTSPACE.to(true));
             }
 
-            if (FeatureFlags.CHANGE_MODEL_DELEGATE_LOADING_ORDER.get()) {
-                mModelDelegate.loadAndBindOtherItems(mLauncherBinder.mCallbacksList);
-                logASplit("otherDelegateItems");
-                verifyNotStopped();
-            }
-
             updateHandler.updateIcons(allWidgetsList,
-                    new CachedObjectCachingLogic(mApp.getContext()),
+                    CachedObjectCachingLogic.INSTANCE,
                     mApp.getModel()::onWidgetLabelsUpdated);
             logASplit("save widgets in icon cache");
 
@@ -414,13 +416,6 @@ public class LoaderTask implements Runnable {
         }
         logASplit("loadWorkspace");
 
-        if (FeatureFlags.CHANGE_MODEL_DELEGATE_LOADING_ORDER.get()) {
-            verifyNotStopped();
-            mModelDelegate.loadAndBindWorkspaceItems(mUserManagerState,
-                    mLauncherBinder.mCallbacksList, mShortcutKeyToPinnedShortcuts);
-            mModelDelegate.markActive();
-            logASplit("workspaceDelegateItems");
-        }
         mBgDataModel.isFirstPagePinnedItemEnabled = FeatureFlags.QSB_ON_FIRST_SCREEN
                 && (!enableSmartspaceRemovalToggle() || LauncherPrefs.getPrefs(
                 mApp.getContext()).getBoolean(SMARTSPACE_ON_HOME_SCREEN, true));
@@ -436,7 +431,15 @@ public class LoaderTask implements Runnable {
         final WidgetInflater widgetInflater = new WidgetInflater(context);
 
         ModelDbController dbController = mApp.getModel().getModelDbController();
-        dbController.tryMigrateDB(restoreEventLogger);
+        if (Flags.gridMigrationRefactor()) {
+            try {
+                dbController.attemptMigrateDb(restoreEventLogger);
+            } catch (Exception e) {
+                FileLog.e(TAG, "Failed to migrate grid", e);
+            }
+        } else {
+            dbController.tryMigrateDB(restoreEventLogger);
+        }
         Log.d(TAG, "loadWorkspace: loading default favorites");
         dbController.loadDefaultFavoritesIfNecessary();
 
@@ -483,14 +486,12 @@ public class LoaderTask implements Runnable {
                 IOUtils.closeSilently(c);
             }
 
-            if (!FeatureFlags.CHANGE_MODEL_DELEGATE_LOADING_ORDER.get()) {
-                mModelDelegate.loadAndBindWorkspaceItems(mUserManagerState,
-                        mLauncherBinder.mCallbacksList, mShortcutKeyToPinnedShortcuts);
-                mModelDelegate.loadAndBindAllAppsItems(mUserManagerState,
-                        mLauncherBinder.mCallbacksList, mShortcutKeyToPinnedShortcuts);
-                mModelDelegate.loadAndBindOtherItems(mLauncherBinder.mCallbacksList);
-                mModelDelegate.markActive();
-            }
+            mModelDelegate.loadAndBindWorkspaceItems(mUserManagerState,
+                    mLauncherBinder.mCallbacksList, mShortcutKeyToPinnedShortcuts);
+            mModelDelegate.loadAndBindAllAppsItems(mUserManagerState,
+                    mLauncherBinder.mCallbacksList, mShortcutKeyToPinnedShortcuts);
+            mModelDelegate.loadAndBindOtherItems(mLauncherBinder.mCallbacksList);
+            mModelDelegate.markActive();
 
             // Break early if we've stopped loading
             if (mStopped) {

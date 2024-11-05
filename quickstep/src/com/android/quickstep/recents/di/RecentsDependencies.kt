@@ -34,6 +34,7 @@ import com.android.quickstep.task.thumbnail.TaskThumbnailViewData
 import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskOverlayViewModel
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
+import com.android.quickstep.task.viewmodel.TaskThumbnailViewModelImpl
 import com.android.quickstep.task.viewmodel.TaskViewData
 import com.android.quickstep.task.viewmodel.TaskViewModel
 import com.android.quickstep.views.TaskViewType
@@ -112,6 +113,10 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                 instance =
                     factory?.invoke(extras) as T ?: createDependency(modelClass, scopeId, extras)
                 scope[modelClass.simpleName] = instance!!
+                log(
+                    "instance of $modelClass" +
+                        " (${instance.hashCode()}) added to scope ${scope.scopeId}"
+                )
             }
         }
         return instance!!
@@ -147,6 +152,13 @@ class RecentsDependencies private constructor(private val appContext: Context) {
     fun getScope(scopeId: RecentsScopeId): RecentsDependenciesScope =
         scopes[scopeId] ?: createScope(scopeId)
 
+    fun removeScope(scope: Any) {
+        val scopeId: RecentsScopeId = scope as? RecentsScopeId ?: scope.hashCode().toString()
+        scopes[scopeId]?.close()
+        scopes.remove(scopeId)
+        log("Scope $scopeId removed")
+    }
+
     // TODO(b/353912757): Create a factory so we can prevent this method of growing indefinitely.
     //  Each class should be responsible for providing a factory function to create a new instance.
     @Suppress("UNCHECKED_CAST")
@@ -180,7 +192,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                 TaskContainerData::class.java -> TaskContainerData()
                 TaskThumbnailViewData::class.java -> TaskThumbnailViewData()
                 TaskThumbnailViewModel::class.java ->
-                    TaskThumbnailViewModel(
+                    TaskThumbnailViewModelImpl(
                         recentsViewData = inject(),
                         taskViewData = inject(scopeId, extras),
                         taskContainerData = inject(scopeId),

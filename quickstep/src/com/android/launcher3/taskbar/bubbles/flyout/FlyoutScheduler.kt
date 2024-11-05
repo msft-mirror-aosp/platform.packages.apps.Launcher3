@@ -14,24 +14,19 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.util;
+package com.android.launcher3.taskbar.bubbles.flyout
 
-import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import android.view.View
 
-import android.os.Looper;
+/** Interface for scheduling jobs by flyout. */
+fun interface FlyoutScheduler {
+    /** Runs the given [block] after layout. */
+    fun runAfterLayout(block: () -> Unit)
+}
 
-import java.util.concurrent.ExecutionException;
-
-public final class ExecutorUtil {
-
-    /**
-     * Executes runnable on {@link Looper#getMainLooper()}, otherwise fails with an exception.
-     */
-    public static void executeSyncOnMainOrFail(Runnable runnable) {
-        try {
-            MAIN_EXECUTOR.submit(runnable).get();
-        } catch (InterruptedException | ExecutionException e) {
-            throw new RuntimeException(e);
-        }
+/** A [FlyoutScheduler] that uses a Handler to schedule jobs. */
+class HandlerScheduler(val view: View) : FlyoutScheduler {
+    override fun runAfterLayout(block: () -> Unit) {
+        view.post(block)
     }
 }

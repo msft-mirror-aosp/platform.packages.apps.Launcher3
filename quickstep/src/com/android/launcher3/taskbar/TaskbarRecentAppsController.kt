@@ -16,7 +16,7 @@
 package com.android.launcher3.taskbar
 
 import android.content.Context
-import android.window.flags.DesktopModeFlags
+import android.window.DesktopModeFlags
 import androidx.annotation.VisibleForTesting
 import com.android.launcher3.Flags.enableRecentsInTaskbar
 import com.android.launcher3.model.data.ItemInfo
@@ -251,7 +251,7 @@ class TaskbarRecentAppsController(context: Context, private val recentsModel: Re
         // Remove any newly-missing Tasks, and actual group-tasks
         val newShownTasks =
             shownTasks
-                .filter { !it.hasMultipleTasks() }
+                .filter { !it.supportsMultipleTasks() }
                 .filter { it.task1.key.id in desktopTaskIds }
                 .toMutableList()
         // Add any new Tasks, maintaining the order from previous shownTasks.

@@ -24,6 +24,7 @@ import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.graphics.Rect
 import android.graphics.RectF
 import android.view.LayoutInflater
 import android.view.View
@@ -36,19 +37,23 @@ import com.android.launcher3.R
 import com.android.launcher3.popup.RoundedArrowDrawable
 
 /** The flyout view used to notify the user of a new bubble notification. */
-class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFlyoutPositioner) :
-    ConstraintLayout(context) {
+class BubbleBarFlyoutView(
+    context: Context,
+    private val positioner: BubbleBarFlyoutPositioner,
+    scheduler: FlyoutScheduler? = null,
+) : ConstraintLayout(context) {
 
     private companion object {
         // the minimum progress of the expansion animation before the content starts fading in.
         const val MIN_EXPANSION_PROGRESS_FOR_CONTENT_ALPHA = 0.75f
     }
 
-    private val sender: TextView by
-        lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.bubble_flyout_name) }
+    private val scheduler: FlyoutScheduler = scheduler ?: HandlerScheduler(this)
+    private val title: TextView by
+        lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.bubble_flyout_title) }
 
-    private val avatar: ImageView by
-        lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.bubble_flyout_avatar) }
+    private val icon: ImageView by
+        lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.bubble_flyout_icon) }
 
     private val message: TextView by
         lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.bubble_flyout_text) }
@@ -134,8 +139,12 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
      */
     private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
+    /** The bounds of the flyout relative to the parent view. */
+    val bounds = Rect()
+
     init {
         LayoutInflater.from(context).inflate(R.layout.bubblebar_flyout, this, true)
+        id = R.id.bubble_bar_flyout_view
 
         val ta = context.obtainStyledAttributes(intArrayOf(android.R.attr.dialogCornerRadius))
         cornerRadius = ta.getDimensionPixelSize(0, 0).toFloat()
@@ -169,12 +178,82 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
         applyConfigurationColors(resources.configuration)
     }
 
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        bounds.left = left
+        bounds.top = top
+        bounds.right = right
+        bounds.bottom = bottom
+    }
+
     /** Sets the data for the flyout and starts playing the expand animation. */
     fun showFromCollapsed(flyoutMessage: BubbleBarFlyoutMessage, expandAnimation: () -> Unit) {
-        avatar.alpha = 0f
-        sender.alpha = 0f
+        icon.alpha = 0f
+        title.alpha = 0f
         message.alpha = 0f
         setData(flyoutMessage)
+
+        updateTranslationToCollapsedPosition()
+        collapsedSize = positioner.collapsedSize
+        collapsedCornerRadius = collapsedSize / 2
+        collapsedColor = positioner.collapsedColor
+        collapsedElevation = positioner.collapsedElevation
+
+        // calculate the expansion progress required before we start showing the triangle as part of
+        // the expansion animation
+        minExpansionProgressForTriangle =
+            positioner.distanceToRevealTriangle / translationToCollapsedPosition.y
+
+        // post the request to start the expand animation to the looper so the view can measure
+        // itself
+        scheduler.runAfterLayout(expandAnimation)
+    }
+
+    /** Updates the content of the flyout and schedules [afterLayout] to run after a layout pass. */
+    fun updateData(flyoutMessage: BubbleBarFlyoutMessage, afterLayout: () -> Unit) {
+        setData(flyoutMessage)
+        scheduler.runAfterLayout(afterLayout)
+    }
+
+    private fun setData(flyoutMessage: BubbleBarFlyoutMessage) {
+        if (flyoutMessage.icon != null) {
+            icon.visibility = VISIBLE
+            icon.setImageDrawable(flyoutMessage.icon)
+        } else {
+            icon.visibility = GONE
+        }
+
+        val minTextViewWidth: Int
+        val maxTextViewWidth: Int
+        if (icon.visibility == VISIBLE) {
+            minTextViewWidth = minFlyoutWidth - icon.width - flyoutPadding * 2
+            maxTextViewWidth = maxFlyoutWidth - icon.width - flyoutPadding * 2
+        } else {
+            // when there's no avatar, the width of the text view is constant, so we're setting the
+            // min and max to the same value
+            minTextViewWidth = minFlyoutWidth - flyoutPadding * 2
+            maxTextViewWidth = minTextViewWidth
+        }
+
+        if (flyoutMessage.title.isEmpty()) {
+            title.visibility = GONE
+        } else {
+            title.minWidth = minTextViewWidth
+            title.maxWidth = maxTextViewWidth
+            title.text = flyoutMessage.title
+            title.visibility = VISIBLE
+        }
+
+        message.minWidth = minTextViewWidth
+        message.maxWidth = maxTextViewWidth
+        message.text = flyoutMessage.message
+    }
+
+    /**
+     * This should be called to update [translationToCollapsedPosition] before we start expanding or
+     * collapsing to make sure that we're animating the flyout to and from the correct position.
+     */
+    fun updateTranslationToCollapsedPosition() {
         val txToCollapsedPosition =
             if (positioner.isOnLeft) {
                 positioner.distanceToCollapsedPosition.x
@@ -184,55 +263,6 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
         val tyToCollapsedPosition =
             positioner.distanceToCollapsedPosition.y + triangleHeight - triangleOverlap
         translationToCollapsedPosition = PointF(txToCollapsedPosition, tyToCollapsedPosition)
-
-        collapsedSize = positioner.collapsedSize
-        collapsedCornerRadius = collapsedSize / 2
-        collapsedColor = positioner.collapsedColor
-        collapsedElevation = positioner.collapsedElevation
-
-        // calculate the expansion progress required before we start showing the triangle as part of
-        // the expansion animation
-        minExpansionProgressForTriangle =
-            positioner.distanceToRevealTriangle / tyToCollapsedPosition
-
-        // post the request to start the expand animation to the looper so the view can measure
-        // itself
-        post(expandAnimation)
-    }
-
-    private fun setData(flyoutMessage: BubbleBarFlyoutMessage) {
-        // the avatar is only displayed in group chat messages
-        if (flyoutMessage.senderAvatar != null && flyoutMessage.isGroupChat) {
-            avatar.visibility = VISIBLE
-            avatar.setImageDrawable(flyoutMessage.senderAvatar)
-        } else {
-            avatar.visibility = GONE
-        }
-
-        val minTextViewWidth: Int
-        val maxTextViewWidth: Int
-        if (avatar.visibility == VISIBLE) {
-            minTextViewWidth = minFlyoutWidth - avatar.width - flyoutPadding * 2
-            maxTextViewWidth = maxFlyoutWidth - avatar.width - flyoutPadding * 2
-        } else {
-            // when there's no avatar, the width of the text view is constant, so we're setting the
-            // min and max to the same value
-            minTextViewWidth = minFlyoutWidth - flyoutPadding * 2
-            maxTextViewWidth = minTextViewWidth
-        }
-
-        if (flyoutMessage.senderName.isEmpty()) {
-            sender.visibility = GONE
-        } else {
-            sender.minWidth = minTextViewWidth
-            sender.maxWidth = maxTextViewWidth
-            sender.text = flyoutMessage.senderName
-            sender.visibility = VISIBLE
-        }
-
-        message.minWidth = minTextViewWidth
-        message.maxWidth = maxTextViewWidth
-        message.text = flyoutMessage.message
     }
 
     /** Updates the flyout view with the progress of the animation. */
@@ -240,17 +270,17 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
         expansionProgress = fraction
 
         updateTranslationForAnimation(message)
-        updateTranslationForAnimation(sender)
-        updateTranslationForAnimation(avatar)
+        updateTranslationForAnimation(title)
+        updateTranslationForAnimation(icon)
 
         // start fading in the content only after we're past the threshold
         val alpha =
             ((expansionProgress - MIN_EXPANSION_PROGRESS_FOR_CONTENT_ALPHA) /
                     (1f - MIN_EXPANSION_PROGRESS_FOR_CONTENT_ALPHA))
                 .coerceIn(0f, 1f)
-        sender.alpha = alpha
+        title.alpha = alpha
         message.alpha = alpha
-        avatar.alpha = alpha
+        icon.alpha = alpha
 
         translationZ =
             collapsedElevation + (flyoutElevation - collapsedElevation) * expansionProgress
@@ -368,7 +398,7 @@ class BubbleBarFlyoutView(context: Context, private val positioner: BubbleBarFly
                 )
             )
         backgroundColor = ta.getColor(0, defaultBackgroundColor)
-        sender.setTextColor(ta.getColor(1, defaultTextColor))
+        title.setTextColor(ta.getColor(1, defaultTextColor))
         message.setTextColor(ta.getColor(2, defaultTextColor))
         ta.recycle()
         backgroundPaint.color = backgroundColor

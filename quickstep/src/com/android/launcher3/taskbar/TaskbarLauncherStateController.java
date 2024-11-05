@@ -16,6 +16,8 @@
 package com.android.launcher3.taskbar;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
+import static com.android.app.animation.Interpolators.FINAL_FRAME;
+import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.Hotseat.ALPHA_CHANNEL_TASKBAR_ALIGNMENT;
 import static com.android.launcher3.Hotseat.ALPHA_CHANNEL_TASKBAR_STASH;
 import static com.android.launcher3.LauncherState.HOTSEAT_ICONS;
@@ -30,11 +32,8 @@ import static com.android.launcher3.taskbar.bubbles.BubbleBarView.FADE_IN_ANIM_A
 import static com.android.launcher3.taskbar.bubbles.BubbleBarView.FADE_OUT_ANIM_POSITION_DURATION_MS;
 import static com.android.launcher3.util.FlagDebugUtils.appendFlag;
 import static com.android.launcher3.util.FlagDebugUtils.formatFlagChange;
+import static com.android.quickstep.util.SystemUiFlagUtils.isTaskbarHidden;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_AWAKE;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_COMMUNAL_HUB_SHOWING;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DEVICE_DREAMING;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_WAKEFULNESS_MASK;
-import static com.android.systemui.shared.system.QuickStepContract.WAKEFULNESS_AWAKE;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -42,6 +41,7 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.os.SystemClock;
 import android.util.Log;
+import android.view.animation.Interpolator;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -64,6 +64,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
 import com.android.quickstep.RecentsAnimationCallbacks;
 import com.android.quickstep.RecentsAnimationController;
+import com.android.quickstep.util.ScalingWorkspaceRevealAnim;
 import com.android.quickstep.util.SystemUiFlagUtils;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.animation.ViewRootSync;
@@ -375,16 +376,7 @@ public class TaskbarLauncherStateController {
 
         updateStateForFlag(FLAG_DEVICE_LOCKED, SystemUiFlagUtils.isLocked(systemUiStateFlags));
 
-        // Taskbar is hidden whenever the device is dreaming. The dreaming state includes the
-        // interactive dreams, AoD, screen off. Since the SYSUI_STATE_DEVICE_DREAMING only kicks in
-        // when the device is asleep, the second condition extends ensures that the transition from
-        // and to the WAKEFULNESS_ASLEEP state also hide the taskbar, and improves the taskbar
-        // hide/reveal animation timings. The Taskbar can show when dreaming if the glanceable hub
-        // is showing on top.
-        boolean isTaskbarHidden = (hasAnyFlag(systemUiStateFlags, SYSUI_STATE_DEVICE_DREAMING)
-                && !hasAnyFlag(systemUiStateFlags, SYSUI_STATE_COMMUNAL_HUB_SHOWING))
-                || (systemUiStateFlags & SYSUI_STATE_WAKEFULNESS_MASK) != WAKEFULNESS_AWAKE;
-        updateStateForFlag(FLAG_TASKBAR_HIDDEN, isTaskbarHidden);
+        updateStateForFlag(FLAG_TASKBAR_HIDDEN, isTaskbarHidden(systemUiStateFlags));
 
         if (applyState) {
             applyState();
@@ -679,10 +671,16 @@ public class TaskbarLauncherStateController {
                         + mIconAlignment.value
                         + " -> " + toAlignment + ": " + duration);
             }
-            animatorSet.play(iconAlignAnim);
+            if (hasAnyFlag(FLAG_TASKBAR_HIDDEN)) {
+                iconAlignAnim.setInterpolator(FINAL_FRAME);
+            } else {
+                animatorSet.play(iconAlignAnim);
+            }
         }
 
-        animatorSet.setInterpolator(EMPHASIZED);
+        Interpolator interpolator = enableScalingRevealHomeAnimation()
+                ? ScalingWorkspaceRevealAnim.SCALE_INTERPOLATOR : EMPHASIZED;
+        animatorSet.setInterpolator(interpolator);
 
         if (start) {
             animatorSet.start();
@@ -781,6 +779,9 @@ public class TaskbarLauncherStateController {
     }
 
     protected void stashHotseat(boolean stash) {
+        // align taskbar with the hotseat icons before performing any animation
+        mControllers.taskbarViewController.setLauncherIconAlignment(/* alignmentRatio = */ 1,
+                mLauncher.getDeviceProfile());
         TaskbarStashController stashController = mControllers.taskbarStashController;
         stashController.updateStateForFlag(FLAG_STASHED_FOR_BUBBLES, stash);
         Runnable swapHotseatWithTaskbar = new Runnable() {
@@ -870,18 +871,18 @@ public class TaskbarLauncherStateController {
         mBubbleBarLocation = location;
         if (location == null) {
             // bubble bar is not present, hence no location, resetting the hotseat
-            updateHotseatAndQsbTranslationX(0, animate);
+            updateHotseatAndQsbTranslationX(/* targetValue = */ 0, animate);
             mBubbleBarLocation = null;
             return;
         }
         DeviceProfile deviceProfile = mLauncher.getDeviceProfile();
-        if (!deviceProfile.shouldAdjustHotseatOnBubblesLocationUpdate(
+        if (!deviceProfile.shouldAdjustHotseatOnNavBarLocationUpdate(
                 mControllers.taskbarActivityContext)) {
             return;
         }
         boolean isBubblesOnLeft = location.isOnLeft(isRtl(mLauncher.getResources()));
         int targetX = deviceProfile
-                .getHotseatTranslationXForBubbleBar(/* isNavbarOnRight= */ isBubblesOnLeft);
+                .getHotseatTranslationXForNavBar(mLauncher, isBubblesOnLeft);
         updateHotseatAndQsbTranslationX(targetX, animate);
     }
 
@@ -892,19 +893,6 @@ public class TaskbarLauncherStateController {
             mHotseatTranslationXAnimation.cancel();
             mHotseatTranslationXAnimation = null;
         }
-        Runnable postAnimationAction = new Runnable() {
-            @Override
-            public void run() {
-                mHotseatTranslationXAnimation = null;
-                // We only need to align the task bar when on launcher home screen
-                if (mControllers.taskbarStashController.isOnHome()) {
-                    mControllers.taskbarViewController.setLauncherIconAlignment(
-                            /* alignmentRatio = */ 1,
-                            mLauncher.getDeviceProfile()
-                    );
-                }
-            }
-        };
         Hotseat hotseat = mLauncher.getHotseat();
         AnimatorSet translationXAnimation = new AnimatorSet();
         MultiProperty iconsTranslationX = mLauncher.getHotseat()
@@ -927,14 +915,12 @@ public class TaskbarLauncherStateController {
             }
         }
         if (!animate) {
-            postAnimationAction.run();
             return;
         }
         mHotseatTranslationXAnimation = translationXAnimation;
         translationXAnimation.setStartDelay(FADE_OUT_ANIM_POSITION_DURATION_MS);
         translationXAnimation.setDuration(FADE_IN_ANIM_ALPHA_DURATION_MS);
         translationXAnimation.setInterpolator(Interpolators.EMPHASIZED);
-        translationXAnimation.addListener(AnimatorListeners.forEndCallback(postAnimationAction));
         translationXAnimation.start();
     }
 

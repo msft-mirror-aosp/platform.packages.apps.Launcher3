@@ -78,6 +78,7 @@ class TransientBubbleStashController(
         context.resources.getDimensionPixelSize(R.dimen.bubblebar_stashed_size) / 2f
 
     private var animator: AnimatorSet? = null
+    private var hotseatVerticalCenter: Int = 0
 
     override var isStashed: Boolean = false
         @VisibleForTesting set
@@ -118,10 +119,8 @@ class TransientBubbleStashController(
 
     override val bubbleBarTranslationYForHotseat: Float
         get() {
-            val hotseatBottomSpace = taskbarHotseatDimensionsProvider.getHotseatBottomSpace()
-            val hotseatCellHeight = taskbarHotseatDimensionsProvider.getHotseatHeight()
-            val bubbleBarHeight: Float = bubbleBarViewController.bubbleBarCollapsedHeight
-            return -hotseatBottomSpace - (hotseatCellHeight - bubbleBarHeight) / 2
+            val bubbleBarHeight = bubbleBarViewController.bubbleBarCollapsedHeight
+            return -hotseatVerticalCenter + bubbleBarHeight / 2
         }
 
     override val bubbleBarTranslationYForTaskbar: Float =
@@ -169,7 +168,15 @@ class TransientBubbleStashController(
             isStashed = true
             stashHandleViewAlpha?.let { animatorSet.playTogether(it.animateToValue(1f)) }
         }
-        animatorSet.updateTouchRegionOnAnimationEnd().setDuration(BAR_STASH_DURATION).start()
+        animatorSet
+            .updateBarVisibility(isStashed)
+            .updateTouchRegionOnAnimationEnd()
+            .setDuration(BAR_STASH_DURATION)
+            .start()
+    }
+
+    override fun setHotseatVerticalCenter(hotseatVerticalCenter: Int) {
+        this.hotseatVerticalCenter = hotseatVerticalCenter
     }
 
     override fun showBubbleBarImmediate() {
@@ -186,6 +193,7 @@ class TransientBubbleStashController(
         bubbleBarBackgroundScaleX.updateValue(1f)
         bubbleBarBackgroundScaleY.updateValue(1f)
         isStashed = false
+        bubbleBarViewController.setHiddenForStashed(false)
         onIsStashedChanged()
     }
 
@@ -200,6 +208,7 @@ class TransientBubbleStashController(
         bubbleBarBackgroundScaleX.updateValue(getStashScaleX())
         bubbleBarBackgroundScaleY.updateValue(getStashScaleY())
         isStashed = true
+        bubbleBarViewController.setHiddenForStashed(true)
         onIsStashedChanged()
     }
 
@@ -481,6 +490,7 @@ class TransientBubbleStashController(
             animator?.cancel()
             animator =
                 createStashAnimator(isStashed, BAR_STASH_DURATION).apply {
+                    updateBarVisibility(isStashed)
                     updateTouchRegionOnAnimationEnd()
                     start()
                 }
@@ -492,6 +502,15 @@ class TransientBubbleStashController(
 
     private fun Animator.updateTouchRegionOnAnimationEnd(): Animator {
         doOnEnd { onIsStashedChanged() }
+        return this
+    }
+
+    private fun <T : Animator> T.updateBarVisibility(stashed: Boolean): T {
+        if (stashed) {
+            doOnEnd { bubbleBarViewController.setHiddenForStashed(true) }
+        } else {
+            doOnStart { bubbleBarViewController.setHiddenForStashed(false) }
+        }
         return this
     }
 

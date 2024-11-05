@@ -16,10 +16,13 @@
 
 package com.android.quickstep.util
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.AnimatorSet
 import android.graphics.Matrix
 import android.graphics.Path
 import android.graphics.RectF
+import android.util.Log
 import android.view.View
 import android.view.animation.PathInterpolator
 import androidx.core.graphics.transform
@@ -40,6 +43,8 @@ import com.android.launcher3.states.StateAnimationConfig.SKIP_OVERVIEW
 import com.android.launcher3.states.StateAnimationConfig.SKIP_SCRIM
 import com.android.launcher3.uioverrides.QuickstepLauncher
 import com.android.quickstep.views.RecentsView
+
+const val TAG = "ScalingWorkspaceRevealAnim"
 
 /**
  * Creates an animation where the workspace and hotseat fade in while revealing from the center of
@@ -62,7 +67,8 @@ class ScalingWorkspaceRevealAnim(
          * Custom interpolator for both the home and wallpaper scaling. Necessary because EMPHASIZED
          * is too aggressive, but EMPHASIZED_DECELERATE is too soft.
          */
-        private val SCALE_INTERPOLATOR =
+        @JvmField
+        val SCALE_INTERPOLATOR =
             PathInterpolator(
                 Path().apply {
                     moveTo(0f, 0f)
@@ -196,6 +202,19 @@ class ScalingWorkspaceRevealAnim(
         workspace.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         hotseat.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         animation.addListener(
+            object : AnimatorListenerAdapter() {
+                override fun onAnimationCancel(animation: Animator) {
+                    super.onAnimationCancel(animation)
+                    Log.d(TAG, "onAnimationCancel")
+                }
+
+                override fun onAnimationPause(animation: Animator) {
+                    super.onAnimationPause(animation)
+                    Log.d(TAG, "onAnimationPause")
+                }
+            }
+        )
+        animation.addListener(
             AnimatorListeners.forEndCallback(
                 Runnable {
                     workspace.setLayerType(View.LAYER_TYPE_NONE, null)
@@ -206,6 +225,8 @@ class ScalingWorkspaceRevealAnim(
                         Animations.setOngoingAnimation(workspace, animation = null)
                         Animations.setOngoingAnimation(hotseat, animation = null)
                     }
+
+                    Log.d(TAG, "alpha of workspace at the end of animation: ${workspace.alpha}")
                 }
             )
         )

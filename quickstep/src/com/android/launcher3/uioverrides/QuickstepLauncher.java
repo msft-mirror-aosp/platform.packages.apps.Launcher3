@@ -19,7 +19,7 @@ import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.os.Trace.TRACE_TAG_APP;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_OPTIMIZE_MEASURE;
 import static android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED;
-import static android.window.flags.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY;
+import static android.window.DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY;
 
 import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.internal.jank.Cuj.CUJ_LAUNCHER_LAUNCH_APP_PAIR_FROM_WORKSPACE;
@@ -139,6 +139,7 @@ import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.taskbar.LauncherTaskbarUIController;
 import com.android.launcher3.taskbar.TaskbarManager;
+import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.uioverrides.QuickstepWidgetHolder.QuickstepHolderFactory;
@@ -202,6 +203,8 @@ import com.android.systemui.unfold.updates.RotationChangeProvider;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
+import kotlin.Unit;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -213,8 +216,6 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-
-import kotlin.Unit;
 
 public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         SystemShortcut.BubbleActivityStarter {
@@ -1089,10 +1090,12 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         );
     }
 
-    public void setTaskbarUIController(LauncherTaskbarUIController taskbarUIController) {
-        mTaskbarUIController = taskbarUIController;
+    @Override
+    public void setTaskbarUIController(@Nullable TaskbarUIController taskbarUIController) {
+        mTaskbarUIController = (LauncherTaskbarUIController) taskbarUIController;
     }
 
+    @Override
     public @Nullable LauncherTaskbarUIController getTaskbarUIController() {
         return mTaskbarUIController;
     }
@@ -1105,17 +1108,12 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
                 && mBubbleBarLocation != null) {
             boolean isBubblesOnLeft = mBubbleBarLocation.isOnLeft(isRtl(getResources()));
             translationX += mDeviceProfile
-                    .getHotseatTranslationXForBubbleBar(/* isNavbarOnRight = */ isBubblesOnLeft);
+                    .getHotseatTranslationXForNavBar(this, isBubblesOnLeft);
         }
-        if (isBubbleBarEnabled() && hasBubbles()) {
-            // TODO(368379159) : create a class to reuse computation logic
-            float adjustedBorderSpace =
-                    mDeviceProfile.getHotseatAdjustedBorderSpaceForBubbleBar(this);
-            if (Float.compare(adjustedBorderSpace, 0f) != 0) {
-                float borderSpaceDelta = adjustedBorderSpace - mDeviceProfile.hotseatBorderSpace;
-                translationX +=
-                        (int) (mDeviceProfile.iconSizePx + itemInfo.cellX * borderSpaceDelta);
-            }
+        if (isBubbleBarEnabled()
+                && mDeviceProfile.shouldAdjustHotseatForBubbleBar(getContext(), hasBubbles())) {
+            translationX += (int) mDeviceProfile
+                    .getHotseatAdjustedTranslation(getContext(), itemInfo.cellX);
         }
         return translationX;
     }
@@ -1315,6 +1313,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         mTISBindHelper.setPredictiveBackToHomeInProgress(isInProgress);
     }
 
+    public boolean getPredictiveBackToHomeInProgress() {
+        return mIsPredictiveBackToHomeInProgress;
+    }
+
     @Override
     public boolean areDesktopTasksVisible() {
         DesktopVisibilityController desktopVisibilityController = getDesktopVisibilityController();
@@ -1400,6 +1402,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     }
 
     @NonNull
+    @Override
     public TISBindHelper getTISBindHelper() {
         return mTISBindHelper;
     }

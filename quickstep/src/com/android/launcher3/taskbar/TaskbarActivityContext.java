@@ -29,7 +29,6 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_ON_BOARD_POPUP;
 import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASKBAR_OVERLAY_PROXY;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
-import static com.android.launcher3.Flags.taskbarOverflow;
 import static com.android.launcher3.Utilities.calculateTextHeight;
 import static com.android.launcher3.Utilities.isRunningInTestHarness;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
@@ -71,6 +70,7 @@ import android.view.Surface;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 import android.window.RemoteTransition;
 
@@ -268,8 +268,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         NearestTouchFrame navButtonsView = mDragLayer.findViewById(R.id.navbuttons_view);
         StashedHandleView stashedHandleView = mDragLayer.findViewById(R.id.stashed_handle);
         BubbleBarView bubbleBarView = null;
+        FrameLayout bubbleBarContainer = null;
         if (isTransientTaskbar || Flags.enableBubbleBarInPersistentTaskBar()) {
             bubbleBarView = mDragLayer.findViewById(R.id.taskbar_bubbles);
+            bubbleBarContainer = mDragLayer.findViewById(R.id.taskbar_bubbles_container);
         }
         StashedHandleView bubbleHandleView = mDragLayer.findViewById(R.id.stashed_bubble_handle);
 
@@ -294,9 +296,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             BubbleStashController bubbleStashController = isTransientTaskbar
                     ? new TransientBubbleStashController(dimensionsProvider, this)
                     : new PersistentBubbleStashController(dimensionsProvider);
+            bubbleStashController.setHotseatVerticalCenter(launcherDp.getHotseatVerticalCenter());
             bubbleControllersOptional = Optional.of(new BubbleControllers(
                     new BubbleBarController(this, bubbleBarView),
-                    new BubbleBarViewController(this, bubbleBarView),
+                    new BubbleBarViewController(this, bubbleBarView, bubbleBarContainer),
                     bubbleStashController,
                     bubbleHandleController,
                     new BubbleDragController(this),
@@ -359,8 +362,11 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     /** Updates {@link DeviceProfile} instances for any Taskbar windows. */
     public void updateDeviceProfile(DeviceProfile launcherDp) {
         applyDeviceProfile(launcherDp);
-
         mControllers.taskbarOverlayController.updateLauncherDeviceProfile(launcherDp);
+        mControllers.bubbleControllers.ifPresent(bubbleControllers -> {
+            int hotseatVertCenter = launcherDp.getHotseatVerticalCenter();
+            bubbleControllers.bubbleStashController.setHotseatVerticalCenter(hotseatVertCenter);
+        });
         AbstractFloatingView.closeAllOpenViewsExcept(this, false, TYPE_REBIND_SAFE);
         // Reapply fullscreen to take potential new screen size into account.
         setTaskbarWindowFullscreen(mIsFullscreen);
@@ -946,15 +952,27 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     /**
-     * Hides the taskbar icons and background when the notication shade is expanded.
+     * Hides the taskbar icons and background when the notification shade is expanded.
      */
     private void onNotificationShadeExpandChanged(boolean isExpanded, boolean skipAnim) {
+        // Close all floating views within the Taskbar window to make sure nothing is shown over
+        // the notification shade.
+        if (isExpanded) {
+            AbstractFloatingView.closeAllOpenViewsExcept(this, TYPE_TASKBAR_OVERLAY_PROXY);
+        }
+
         float alpha = isExpanded ? 0 : 1;
         AnimatorSet anim = new AnimatorSet();
         anim.play(mControllers.taskbarViewController.getTaskbarIconAlpha().get(
                 TaskbarViewController.ALPHA_INDEX_NOTIFICATION_EXPANDED).animateToValue(alpha));
         anim.play(mControllers.taskbarDragLayerController.getNotificationShadeBgTaskbar()
                 .animateToValue(alpha));
+
+        mControllers.bubbleControllers.ifPresent(controllers -> {
+            BubbleBarViewController bubbleBarViewController = controllers.bubbleBarViewController;
+            anim.play(bubbleBarViewController.getBubbleBarAlpha().get(0).animateToValue(alpha));
+        });
+
         anim.start();
         if (skipAnim) {
             anim.end();
@@ -981,8 +999,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     public void onNavButtonsDarkIntensityChanged(float darkIntensity) {
-        mControllers.navbarButtonsViewController.getTaskbarNavButtonDarkIntensity()
-                .updateValue(darkIntensity);
+        mControllers.navbarButtonsViewController.getTaskbarNavButtonDarkIntensity().updateValue(
+                darkIntensity);
     }
 
     public void onNavigationBarLumaSamplingEnabled(int displayId, boolean enable) {
@@ -1198,9 +1216,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         boolean shouldCloseAllOpenViews = true;
         Object tag = view.getTag();
 
-        if (taskbarOverflow()) {
-            mControllers.keyboardQuickSwitchController.closeQuickSwitchView(false);
-        }
+        mControllers.keyboardQuickSwitchController.closeQuickSwitchView(false);
 
         if (tag instanceof GroupTask groupTask) {
             handleGroupTaskLaunch(
@@ -1225,7 +1241,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             }
         } else if (tag instanceof TaskItemInfo info) {
             UI_HELPER_EXECUTOR.execute(() ->
-                    SystemUiProxy.INSTANCE.get(this).showDesktopApp(info.getTaskId()));
+                    SystemUiProxy.INSTANCE.get(this).showDesktopApp(
+                            info.getTaskId(), /* remoteTransition= */ null));
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(
                     /* stash= */ true);
         } else if (tag instanceof WorkspaceItemInfo) {
@@ -1316,7 +1333,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             GroupTask task,
             @Nullable RemoteTransition remoteTransition,
             boolean onDesktop) {
-        handleGroupTaskLaunch(task, remoteTransition, onDesktop, null, null);
+        handleGroupTaskLaunch(task, remoteTransition, onDesktop,
+                /* onStartCallback= */ null, /* onFinishCallback= */ null);
     }
 
     /**
@@ -1340,17 +1358,24 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             UI_HELPER_EXECUTOR.execute(() ->
                     SystemUiProxy.INSTANCE.get(this).showDesktopApps(getDisplay().getDisplayId(),
                             remoteTransition));
-        } else if (onDesktop) {
+            return;
+        }
+        if (onDesktop) {
+            boolean useRemoteTransition = task.task1.isMinimized
+                    && com.android.window.flags.Flags.enableDesktopAppLaunchAlttabTransitions();
             UI_HELPER_EXECUTOR.execute(() -> {
                 if (onStartCallback != null) {
                     onStartCallback.run();
                 }
-                SystemUiProxy.INSTANCE.get(this).showDesktopApp(task.task1.key.id);
+                SystemUiProxy.INSTANCE.get(this).showDesktopApp(
+                        task.task1.key.id, useRemoteTransition ? remoteTransition : null);
                 if (onFinishCallback != null) {
                     onFinishCallback.run();
                 }
             });
-        } else if (task.task2 == null) {
+            return;
+        }
+        if (task.task2 == null) {
             UI_HELPER_EXECUTOR.execute(() -> {
                 ActivityOptions activityOptions =
                         makeDefaultActivityOptions(SPLASH_SCREEN_STYLE_UNDEFINED).options;
@@ -1359,9 +1384,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 ActivityManagerWrapper.getInstance().startActivityFromRecents(
                         task.task1.key, activityOptions);
             });
-        } else {
-            mControllers.uiController.launchSplitTasks(task, remoteTransition);
+            return;
         }
+        mControllers.uiController.launchSplitTasks(task, remoteTransition);
     }
 
     /**
@@ -1538,6 +1563,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     /**
      * Called when we want to unstash taskbar when user performs swipes up gesture.
+     *
      * @param delayTaskbarBackground whether we will delay the taskbar background animation
      */
     public void onSwipeToUnstashTaskbar(boolean delayTaskbarBackground) {
@@ -1679,7 +1705,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 duration);
 
         View allAppsButton = mControllers.taskbarViewController.getAllAppsButtonView();
-        if (allAppsButton != null && !FeatureFlags.enableAllAppsButtonInHotseat()) {
+        if (!FeatureFlags.enableAllAppsButtonInHotseat()) {
             ValueAnimator alphaOverride = ValueAnimator.ofFloat(0, 1);
             alphaOverride.setDuration(duration);
             alphaOverride.addUpdateListener(a -> {

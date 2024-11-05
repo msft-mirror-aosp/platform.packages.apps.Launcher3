@@ -14,14 +14,6 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.model
+package com.android.launcher3.shapes
 
-import com.android.launcher3.util.RoboApiWrapper
-import org.junit.rules.TestWatcher
-import org.junit.runner.Description
-
-class ModelTestRule : TestWatcher() {
-    override fun starting(description: Description?) {
-        RoboApiWrapper.initialize()
-    }
-}
+class AppShape(val key: String, val title: String, val path: String)

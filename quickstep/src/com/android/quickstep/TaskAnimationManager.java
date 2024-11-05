@@ -295,10 +295,11 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
 
         // TODO:(b/365777482) if flag is enabled, but on launcher it will crash.
         if(containerInterface.getCreatedContainer() instanceof RecentsWindowManager
-                && Flags.enableFallbackOverviewInWindow()){
-            mRecentsAnimationStartPending =
-                    getSystemUiProxy().startRecentsActivity(intent, options, mCallbacks);
-            mRecentsWindowsManager.startRecentsWindow();
+                && (Flags.enableFallbackOverviewInWindow()
+                        || Flags.enableLauncherOverviewInWindow())) {
+            mRecentsAnimationStartPending = getSystemUiProxy().startRecentsActivity(intent, options,
+                    mCallbacks, gestureState.useSyntheticRecentsTransition());
+            mRecentsWindowsManager.startRecentsWindow(mCallbacks);
         } else {
             options.setPendingIntentBackgroundActivityStartMode(
                     ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS);
@@ -326,9 +327,10 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                 });
             }
 
-            mRecentsAnimationStartPending = getSystemUiProxy()
-                    .startRecentsActivity(intent, options, mCallbacks);
+            mRecentsAnimationStartPending = getSystemUiProxy().startRecentsActivity(intent,
+                    options, mCallbacks, false /* useSyntheticRecentsTransition */);
         }
+
         if (enableHandleDelayedGestureCallbacks()) {
             ActiveGestureProtoLogProxy.logSettingRecentsAnimationStartPending(
                     mRecentsAnimationStartPending);
@@ -485,10 +487,6 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         mTargets = null;
         mLastGestureState = null;
         mLastAppearedTaskTargets = null;
-
-        if(Flags.enableFallbackOverviewInWindow()) {
-            mRecentsWindowsManager.cleanup();
-        }
     }
 
     @Nullable

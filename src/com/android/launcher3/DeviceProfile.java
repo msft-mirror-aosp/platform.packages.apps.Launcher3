@@ -24,6 +24,7 @@ import static com.android.launcher3.InvariantDeviceProfile.INDEX_LANDSCAPE;
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_LANDSCAPE;
 import static com.android.launcher3.InvariantDeviceProfile.INDEX_TWO_PANEL_PORTRAIT;
 import static com.android.launcher3.Utilities.dpiFromPx;
+import static com.android.launcher3.Utilities.isEnglishLanguage;
 import static com.android.launcher3.Utilities.pxFromSp;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.icons.GraphicsUtils.getShapePath;
@@ -69,7 +70,6 @@ import com.android.launcher3.util.CellContentDimensions;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.Info;
 import com.android.launcher3.util.IconSizeSteps;
-import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.ResourceHelper;
 import com.android.launcher3.util.WindowBounds;
 import com.android.launcher3.util.window.WindowManagerProxy;
@@ -1345,8 +1345,14 @@ public class DeviceProfile {
         }
         if ((Flags.enableTwolineToggle()
                 && LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE.get(context))) {
-            // Add extra textHeight to the existing allAppsCellHeight.
-            allAppsCellHeightPx += Utilities.calculateTextHeight(allAppsIconTextSizePx);
+            if (!isEnglishLanguage(context)) {
+                // Set toggle preference value to false if not english here as it's possible the
+                // preference is stale after language change.
+                LauncherPrefs.get(context).put(LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE, false);
+            } else {
+                // Add extra textHeight to the existing allAppsCellHeight.
+                allAppsCellHeightPx += Utilities.calculateTextHeight(allAppsIconTextSizePx);
+            }
         }
 
         updateHotseatSizes(iconSizePx);
@@ -1830,25 +1836,47 @@ public class DeviceProfile {
      * Returns the new border space that should be used between hotseat icons after adjusting it to
      * the bubble bar.
      *
+     * <p>Does not check for visible bubbles persistence, so caller should call
+     * {@link #shouldAdjustHotseatForBubbleBar} first.
+     *
      * <p>If there's no adjustment needed, this method returns {@code 0}.
+     * @see #shouldAdjustHotseatForBubbleBar(Context, boolean)
      */
     public float getHotseatAdjustedBorderSpaceForBubbleBar(Context context) {
-        // only need to adjust when QSB is on top of the hotseat.
-        if (isQsbInline) {
-            return 0;
-        }
-
-        // no need to adjust if there's enough space for the bubble bar to the right of the hotseat.
-        if (getHotseatLayoutPadding(context).right > mBubbleBarSpaceThresholdPx) {
-            return 0;
-        }
-
+        if (!shouldAdjustHotseatForBubbleBar(context)) return 0;
         // The adjustment is shrinking the hotseat's width by 1 icon on either side.
         int iconsWidth =
                 iconSizePx * numShownHotseatIcons + hotseatBorderSpace * (numShownHotseatIcons - 1);
         int newWidth = iconsWidth - 2 * iconSizePx;
         // Evenly space the icons within the boundaries of the new width.
         return (float) (newWidth - iconSizePx * numShownHotseatIcons) / (numShownHotseatIcons - 1);
+    }
+
+    /**
+     * Returns the hotseat icon translation X for the cellX index.
+     *
+     * <p>Does not check for visible bubbles persistence, so caller should call
+     * {@link #shouldAdjustHotseatForBubbleBar} first.
+     *
+     * <p>If there's no adjustment needed, this method returns {@code 0}.
+     * @see #shouldAdjustHotseatForBubbleBar(Context, boolean)
+     */
+    public float getHotseatAdjustedTranslation(Context context, int cellX) {
+        if (!shouldAdjustHotseatForBubbleBar(context)) return 0;
+        float borderSpace = getHotseatAdjustedBorderSpaceForBubbleBar(context);
+        float borderSpaceDelta = borderSpace - hotseatBorderSpace;
+        return iconSizePx + cellX * borderSpaceDelta;
+    }
+
+    /** Returns whether hotseat should be adjusted for the bubble bar. */
+    public boolean shouldAdjustHotseatForBubbleBar(Context context, boolean hasBubbles) {
+        return hasBubbles && shouldAdjustHotseatForBubbleBar(context);
+    }
+
+    private boolean shouldAdjustHotseatForBubbleBar(Context context) {
+        // only need to adjust if bubble bar is enabled, when QSB is on top of the hotseat and
+        // there's not enough space for the bubble bar to the right of the hotseat.
+        return !isQsbInline && getHotseatLayoutPadding(context).right <= mBubbleBarSpaceThresholdPx;
     }
 
     /**
@@ -1995,6 +2023,18 @@ public class DeviceProfile {
         } else {
             return hotseatBarSizePx - hotseatCellHeightPx;
         }
+    }
+
+    /**
+     * Returns the number of pixels the hotseat icons vertical center is translated from the bottom
+     * of the screen.
+     */
+    public int getHotseatVerticalCenter() {
+        return hotseatBarSizePx
+                - (isQsbInline ? 0 : hotseatQsbVisualHeight)
+                - hotseatQsbSpace
+                - (hotseatCellHeightPx / 2)
+                + ((hotseatCellHeightPx - iconSizePx) / 2);
     }
 
     /**
@@ -2334,19 +2374,23 @@ public class DeviceProfile {
     /**
      * Returns whether Taskbar and Hotseat should adjust horizontally on bubble bar location update.
      */
-    public boolean shouldAdjustHotseatOnBubblesLocationUpdate(Context context) {
+    public boolean shouldAdjustHotseatOnNavBarLocationUpdate(Context context) {
         return enableBubbleBar()
                 && enableBubbleBarInPersistentTaskBar()
-                && DisplayController.getNavigationMode(context)
-                == NavigationMode.THREE_BUTTONS;
+                && !DisplayController.getNavigationMode(context).hasGestures;
     }
 
     /** Returns hotseat translation X for the bubble bar position. */
-    public int getHotseatTranslationXForBubbleBar(boolean isNavbarOnRight) {
-        if (isNavbarOnRight) {
-            return 0;
+    public int getHotseatTranslationXForNavBar(Context context, boolean isBubblesOnLeft) {
+        if (shouldAdjustHotseatOnNavBarLocationUpdate(context)) {
+            boolean isRtl = Utilities.isRtl(context.getResources());
+            if (isBubblesOnLeft) {
+                return isRtl ? -navButtonsLayoutWidthPx : 0;
+            } else {
+                return isRtl ? 0 : navButtonsLayoutWidthPx;
+            }
         } else {
-            return navButtonsLayoutWidthPx;
+            return 0;
         }
     }
 

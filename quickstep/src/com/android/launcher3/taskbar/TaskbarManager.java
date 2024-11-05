@@ -16,7 +16,6 @@
 package com.android.launcher3.taskbar;
 
 import static android.content.Context.RECEIVER_NOT_EXPORTED;
-import static android.view.Display.DEFAULT_DISPLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR;
 import static android.view.WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL;
 
@@ -72,7 +71,9 @@ import com.android.launcher3.util.SimpleBroadcastReceiver;
 import com.android.quickstep.AllAppsActionManager;
 import com.android.quickstep.RecentsActivity;
 import com.android.quickstep.SystemUiProxy;
-import com.android.quickstep.util.AssistUtils;
+import com.android.quickstep.fallback.window.RecentsWindowManager;
+import com.android.quickstep.util.ContextualSearchInvoker;
+import com.android.quickstep.views.RecentsViewContainer;
 import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
@@ -116,7 +117,6 @@ public class TaskbarManager {
     private WindowManager mWindowManager;
     private FrameLayout mTaskbarRootLayout;
     private boolean mAddedWindow;
-    private boolean mIsSuspended;
     private final TaskbarNavButtonController mNavButtonController;
     private final ComponentCallbacks mComponentCallbacks;
 
@@ -132,6 +132,8 @@ public class TaskbarManager {
 
     private TaskbarActivityContext mTaskbarActivityContext;
     private StatefulActivity mActivity;
+    private RecentsViewContainer mRecentsViewContainer;
+
     /**
      * Cache a copy here so we can initialize state whenever taskbar is recreated, since
      * this class does not get re-initialized w/ new taskbars.
@@ -220,7 +222,7 @@ public class TaskbarManager {
             TaskbarNavButtonCallbacks navCallbacks,
             @NonNull DesktopVisibilityController desktopVisibilityController) {
         Display display =
-                context.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY);
+                context.getSystemService(DisplayManager.class).getDisplay(context.getDisplayId());
         mContext = context.createWindowContext(display,
                 ENABLE_TASKBAR_NAVBAR_UNIFICATION ? TYPE_NAVIGATION_BAR : TYPE_NAVIGATION_BAR_PANEL,
                 null);
@@ -250,7 +252,7 @@ public class TaskbarManager {
                 SystemUiProxy.INSTANCE.get(mContext),
                 ContextualEduStatsManager.INSTANCE.get(mContext),
                 new Handler(),
-                AssistUtils.newInstance(mContext));
+                ContextualSearchInvoker.newInstance(mContext));
         mComponentCallbacks = new ComponentCallbacks() {
             private Configuration mOldConfig = mContext.getResources().getConfiguration();
 
@@ -405,9 +407,28 @@ public class TaskbarManager {
         }
         mUnfoldProgressProvider.setSourceProvider(unfoldTransitionProgressProvider);
 
+        if (activity instanceof RecentsViewContainer recentsViewContainer) {
+            setRecentsViewContainer(recentsViewContainer);
+        }
+    }
+
+    /**
+     * Sets the current RecentsViewContainer, from which we create a TaskbarUIController.
+     */
+    public void setRecentsViewContainer(@NonNull RecentsViewContainer recentsViewContainer) {
+        if (mRecentsViewContainer == recentsViewContainer) {
+            return;
+        }
+        if (mRecentsViewContainer == mActivity) {
+            // When switching to RecentsWindowManager (not an Activity), the old mActivity is not
+            // destroyed, nor is there a new Activity to replace it. Thus if we don't clear it here,
+            // it will not get re-set properly if we return to the Activity (e.g. NexusLauncher).
+            mActivityOnDestroyCallback.run();
+        }
+        mRecentsViewContainer = recentsViewContainer;
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.setUIController(
-                    createTaskbarUIControllerForActivity(mActivity));
+                    createTaskbarUIControllerForRecentsViewContainer(mRecentsViewContainer));
         }
     }
 
@@ -430,12 +451,18 @@ public class TaskbarManager {
     /**
      * Creates a {@link TaskbarUIController} to use while the given StatefulActivity is active.
      */
-    private TaskbarUIController createTaskbarUIControllerForActivity(StatefulActivity activity) {
-        if (activity instanceof QuickstepLauncher) {
-            return new LauncherTaskbarUIController((QuickstepLauncher) activity);
+    private TaskbarUIController createTaskbarUIControllerForRecentsViewContainer(
+            RecentsViewContainer container) {
+        if (container instanceof QuickstepLauncher quickstepLauncher) {
+            return new LauncherTaskbarUIController(quickstepLauncher);
         }
-        if (activity instanceof RecentsActivity) {
-            return new FallbackTaskbarUIController((RecentsActivity) activity);
+        // If a 3P Launcher is default, always use FallbackTaskbarUIController regardless of
+        // whether the recents container is RecentsActivity or RecentsWindowManager.
+        if (container instanceof RecentsActivity recentsActivity) {
+            return new FallbackTaskbarUIController<>(recentsActivity);
+        }
+        if (container instanceof RecentsWindowManager recentsWindowManager) {
+            return new FallbackTaskbarUIController<>(recentsWindowManager);
         }
         return TaskbarUIController.DEFAULT;
     }
@@ -447,8 +474,6 @@ public class TaskbarManager {
      */
     @VisibleForTesting
     public synchronized void recreateTaskbar() {
-        if (mIsSuspended) return;
-
         Trace.beginSection("recreateTaskbar");
         try {
             DeviceProfile dp = mUserUnlocked ?
@@ -485,9 +510,9 @@ public class TaskbarManager {
             mSharedState.allAppsVisible = mSharedState.allAppsVisible && isLargeScreenTaskbar;
             mTaskbarActivityContext.init(mSharedState);
 
-            if (mActivity != null) {
+            if (mRecentsViewContainer != null) {
                 mTaskbarActivityContext.setUIController(
-                    createTaskbarUIControllerForActivity(mActivity));
+                        createTaskbarUIControllerForRecentsViewContainer(mRecentsViewContainer));
             }
 
             if (enableTaskbarNoRecreate()) {
@@ -661,21 +686,6 @@ public class TaskbarManager {
             pw.println(prefix + "\tTaskbarActivityContext: null");
         } else {
             mTaskbarActivityContext.dumpLogs(prefix + "\t", pw);
-        }
-    }
-
-    /**
-     * Removes Taskbar from the window manager and prevents recreation if {@code true}.
-     * <p>
-     * Suspending is for testing purposes only; avoid calling this method in production.
-     */
-    @VisibleForTesting
-    public void setSuspended(boolean isSuspended) {
-        mIsSuspended = isSuspended;
-        if (mIsSuspended) {
-            removeTaskbarRootViewFromWindow();
-        } else {
-            addTaskbarRootViewToWindow();
         }
     }
 

@@ -18,8 +18,17 @@ package com.android.launcher3.dagger;
 
 import android.content.Context;
 
+import com.android.launcher3.graphics.IconShape;
 import com.android.launcher3.pm.InstallSessionHelper;
+import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.DaggerSingletonTracker;
+import com.android.launcher3.util.PackageManagerHelper;
+import com.android.launcher3.util.PluginManagerWrapper;
+import com.android.launcher3.util.ScreenOnTracker;
+import com.android.launcher3.util.SettingsCache;
+import com.android.launcher3.util.VibratorWrapper;
+import com.android.launcher3.util.window.RefreshRateTracker;
+import com.android.launcher3.widget.custom.CustomWidgetManager;
 
 import dagger.BindsInstance;
 
@@ -33,7 +42,16 @@ import dagger.BindsInstance;
  */
 public interface LauncherBaseAppComponent {
     DaggerSingletonTracker getDaggerSingletonTracker();
+    ApiWrapper getApiWrapper();
+    CustomWidgetManager getCustomWidgetManager();
+    IconShape getIconShape();
     InstallSessionHelper getInstallSessionHelper();
+    RefreshRateTracker getRefreshRateTracker();
+    ScreenOnTracker getScreenOnTracker();
+    SettingsCache getSettingsCache();
+    PackageManagerHelper getPackageManagerHelper();
+    PluginManagerWrapper getPluginManagerWrapper();
+    VibratorWrapper getVibratorWrapper();
 
     /** Builder for LauncherBaseAppComponent. */
     interface Builder {
