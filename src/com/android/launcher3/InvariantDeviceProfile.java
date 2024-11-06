@@ -52,7 +52,6 @@ import androidx.core.content.res.ResourcesCompat;
 
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.DotRenderer;
-import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.DeviceGridState;
 import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.testing.shared.ResourceUtils;
@@ -301,35 +300,6 @@ public class InvariantDeviceProfile implements SafeCloseable {
     @Override
     public void close() {
         DisplayController.INSTANCE.executeIfCreated(dc -> dc.setPriorityListener(null));
-    }
-
-    /**
-     * Reinitialize the current grid after a restore, where some grids might now be disabled.
-     */
-    public void reinitializeAfterRestore(Context context) {
-        String currentGridName = getCurrentGridName(context);
-        String currentDbFile = dbFile;
-        String newGridName = initGrid(context, currentGridName);
-        String newDbFile = dbFile;
-        FileLog.d(TAG, "Reinitializing grid after restore."
-                + " currentGridName=" + currentGridName
-                + ", currentDbFile=" + currentDbFile
-                + ", newGridName=" + newGridName
-                + ", newDbFile=" + newDbFile);
-        if (!newDbFile.equals(currentDbFile)) {
-            FileLog.d(TAG, "Restored grid is disabled : " + currentGridName
-                    + ", migrating to: " + newGridName
-                    + ", removing all other grid db files");
-            for (String gridDbFile : LauncherFiles.GRID_DB_FILES) {
-                if (gridDbFile.equals(currentDbFile)) {
-                    continue;
-                }
-                if (context.getDatabasePath(gridDbFile).delete()) {
-                    FileLog.d(TAG, "Removed old grid db file: " + gridDbFile);
-                }
-            }
-            setCurrentGrid(context, newGridName);
-        }
     }
 
     public static String getCurrentGridName(Context context) {
