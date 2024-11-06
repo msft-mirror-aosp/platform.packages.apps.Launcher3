@@ -2629,8 +2629,9 @@ public class Launcher extends StatefulActivity<LauncherState>
      * See {@code LauncherBindingDelegate}
      */
     @Override
-    public void bindAllWidgets(final List<WidgetsListBaseEntry> allWidgets) {
-        mModelCallbacks.bindAllWidgets(allWidgets);
+    public void bindAllWidgets(@NonNull final List<WidgetsListBaseEntry> allWidgets,
+            @NonNull final List<WidgetsListBaseEntry> defaultWidgets) {
+        mModelCallbacks.bindAllWidgets(allWidgets, defaultWidgets);
     }
 
     @Override

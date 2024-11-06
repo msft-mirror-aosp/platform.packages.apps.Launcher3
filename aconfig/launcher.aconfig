@@ -506,3 +506,10 @@ flag {
     description: "Enable launcher app contrast tiles."
     bug: "341217082"
 }
+
+flag {
+  name: "msdl_feedback"
+  namespace: "launcher"
+  description: "Enable MSDL feedback for Launcher interactions"
+  bug: "377496684"
+}
