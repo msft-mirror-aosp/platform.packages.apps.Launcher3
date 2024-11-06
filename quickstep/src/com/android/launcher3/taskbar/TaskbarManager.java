@@ -175,6 +175,9 @@ public class TaskbarManager {
                                 + "onActivityDestroyed.");
                 mActivity.removeEventCallback(EVENT_DESTROYED, this);
             }
+            if (mActivity == mRecentsViewContainer) {
+                mRecentsViewContainer = null;
+            }
             mActivity = null;
             debugWhyTaskbarNotDestroyed("clearActivity");
             if (mTaskbarActivityContext != null) {
@@ -659,6 +662,7 @@ public class TaskbarManager {
      * Called when the manager is no longer needed
      */
     public void destroy() {
+        mRecentsViewContainer = null;
         debugWhyTaskbarNotDestroyed("TaskbarManager#destroy()");
         removeActivityCallbacksAndListeners();
         mTaskbarBroadcastReceiver.unregisterReceiverSafely(mContext);
