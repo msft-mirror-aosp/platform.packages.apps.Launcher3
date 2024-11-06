@@ -560,25 +560,25 @@ public class TaskbarManager {
         }
     }
 
-    public void checkNavBarModes() {
+    public void checkNavBarModes(int displayId) {
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.checkNavBarModes();
         }
     }
 
-    public void finishBarAnimations() {
+    public void finishBarAnimations(int displayId) {
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.finishBarAnimations();
         }
     }
 
-    public void touchAutoDim(boolean reset) {
+    public void touchAutoDim(int displayId, boolean reset) {
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.touchAutoDim(reset);
         }
     }
 
-    public void transitionTo(@BarTransitions.TransitionMode int barMode,
+    public void transitionTo(int displayId, @BarTransitions.TransitionMode int barMode,
             boolean animate) {
         if (mTaskbarActivityContext != null) {
             mTaskbarActivityContext.transitionTo(barMode, animate);
