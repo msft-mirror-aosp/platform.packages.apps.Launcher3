@@ -16,11 +16,13 @@
 package com.android.launcher3.graphics;
 
 import static com.android.launcher3.LauncherPrefs.THEMED_ICONS;
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.Themes.isThemedIconEnabled;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.MatrixCursor;
@@ -32,14 +34,22 @@ import android.os.IBinder;
 import android.os.IBinder.DeathRecipient;
 import android.os.Message;
 import android.os.Messenger;
+import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.util.Pair;
 
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile.GridOption;
+import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherPrefs;
+import com.android.launcher3.model.BgDataModel;
 import com.android.launcher3.util.Executors;
+import com.android.launcher3.util.Preconditions;
+import com.android.systemui.shared.Flags;
+
+import java.util.concurrent.ExecutionException;
 
 /**
  * Exposes various launcher grid options and allows the caller to change them.
@@ -80,8 +90,10 @@ public class GridCustomizationsProvider extends ContentProvider {
     private static final String KEY_SURFACE_PACKAGE = "surface_package";
     private static final String KEY_CALLBACK = "callback";
     public static final String KEY_HIDE_BOTTOM_ROW = "hide_bottom_row";
+    public static final String KEY_GRID_NAME = "grid_name";
 
     private static final int MESSAGE_ID_UPDATE_PREVIEW = 1337;
+    private static final int MESSAGE_ID_UPDATE_GRID = 7414;
 
     /**
      * Here we use the IBinder and the screen ID as the key of the active previews.
@@ -141,14 +153,20 @@ public class GridCustomizationsProvider extends ContentProvider {
 
     @Override
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-        switch (uri.getPath()) {
+        String path = uri.getPath();
+        Context context = getContext();
+        if (path == null || context == null) {
+            return 0;
+        }
+        switch (path) {
             case KEY_DEFAULT_GRID: {
                 String gridName = values.getAsString(KEY_NAME);
-                InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(getContext());
+                InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(context);
                 // Verify that this is a valid grid option
                 GridOption match = null;
-                for (GridOption option : idp.parseAllGridOptions(getContext())) {
-                    if (option.name.equals(gridName)) {
+                for (GridOption option : idp.parseAllGridOptions(context)) {
+                    String name = option.name;
+                    if (name != null && name.equals(gridName)) {
                         match = option;
                         break;
                     }
@@ -157,20 +175,45 @@ public class GridCustomizationsProvider extends ContentProvider {
                     return 0;
                 }
 
-                idp.setCurrentGrid(getContext(), gridName);
-                getContext().getContentResolver().notifyChange(uri, null);
+                idp.setCurrentGrid(context, gridName);
+                if (Flags.newCustomizationPickerUi()) {
+                    try {
+                        // Wait for device profile to be fully reloaded and applied to the launcher
+                        loadModelSync(context);
+                    } catch (ExecutionException | InterruptedException e) {
+                        Log.e(TAG, "Fail to load model", e);
+                    }
+                }
+                context.getContentResolver().notifyChange(uri, null);
                 return 1;
             }
             case ICON_THEMED:
             case SET_ICON_THEMED: {
-                LauncherPrefs.get(getContext())
+                LauncherPrefs.get(context)
                         .put(THEMED_ICONS, values.getAsBoolean(BOOLEAN_VALUE));
-                getContext().getContentResolver().notifyChange(uri, null);
+                context.getContentResolver().notifyChange(uri, null);
                 return 1;
             }
             default:
                 return 0;
         }
+    }
+
+    /**
+     * Loads the model in memory synchronously
+     */
+    private void loadModelSync(Context context) throws ExecutionException, InterruptedException {
+        Preconditions.assertNonUiThread();
+        BgDataModel.Callbacks emptyCallbacks = new BgDataModel.Callbacks() { };
+        LauncherModel launcherModel = LauncherAppState.getInstance(context).getModel();
+        MAIN_EXECUTOR.submit(
+                () -> launcherModel.addCallbacksAndLoad(emptyCallbacks)
+        ).get();
+
+        Executors.MODEL_EXECUTOR.submit(() -> { }).get();
+        MAIN_EXECUTOR.submit(
+                () -> launcherModel.removeCallbacks(emptyCallbacks)
+        ).get();
     }
 
     @Override
@@ -224,7 +267,7 @@ public class GridCustomizationsProvider extends ContentProvider {
         }
         observer.destroyed = true;
         observer.renderer.getHostToken().unlinkToDeath(observer, 0);
-        Executors.MAIN_EXECUTOR.execute(observer.renderer::destroy);
+        MAIN_EXECUTOR.execute(observer.renderer::destroy);
         PreviewLifecycleObserver cached = mActivePreviews.get(observer.getIdentifier());
         if (cached == observer) {
             mActivePreviews.remove(observer.getIdentifier());
@@ -245,11 +288,22 @@ public class GridCustomizationsProvider extends ContentProvider {
             if (destroyed) {
                 return true;
             }
-            if (message.what == MESSAGE_ID_UPDATE_PREVIEW) {
-                renderer.hideBottomRow(message.getData().getBoolean(KEY_HIDE_BOTTOM_ROW));
-            } else {
-                destroyObserver(this);
+
+            switch (message.what) {
+                case MESSAGE_ID_UPDATE_PREVIEW:
+                    renderer.hideBottomRow(message.getData().getBoolean(KEY_HIDE_BOTTOM_ROW));
+                    break;
+                case MESSAGE_ID_UPDATE_GRID:
+                    String gridName = message.getData().getString(KEY_GRID_NAME);
+                    if (!TextUtils.isEmpty(gridName)) {
+                        renderer.updateGrid(gridName);
+                    }
+                    break;
+                default:
+                    destroyObserver(this);
+                    break;
             }
+
             return true;
         }
 

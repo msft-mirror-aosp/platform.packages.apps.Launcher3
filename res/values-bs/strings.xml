@@ -38,6 +38,8 @@
     <string name="app_pair_not_available" msgid="3556767440808032031">"Par aplikacija nije dostupan"</string>
     <string name="long_press_widget_to_add" msgid="3587712543577675817">"Dodirnite i zadržite da pomjerite vidžet."</string>
     <string name="long_accessible_way_to_add" msgid="2733588281439571974">"Dvaput dodirnite i zadržite da pomjerite vidžet ili da koristite prilagođene radnje."</string>
+    <string name="widget_picker_widget_options_button_description" msgid="4770099264476852363">"Više opcija"</string>
+    <string name="widget_picker_show_all_widgets_menu_item_title" msgid="9023638224586908119">"Prikazuj sve vidžete"</string>
     <string name="widget_dims_format" msgid="2370757736025621599">"%1$d × %2$d"</string>
     <string name="widget_accessible_dims_format" msgid="3640149169885301790">"Širina %1$d, visina %2$d"</string>
     <string name="widget_preview_context_description" msgid="9045841361655787574">"Vidžet <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>
@@ -90,6 +92,7 @@
     <string name="install_drop_target_label" msgid="2539096853673231757">"Instaliraj"</string>
     <string name="dismiss_prediction_label" msgid="3357562989568808658">"Ne predlaži aplikaciju"</string>
     <string name="pin_prediction" msgid="4196423321649756498">"Zakači predviđanje"</string>
+    <string name="bubble" msgid="3072951361014076670">"Oblačić"</string>
     <string name="permlab_install_shortcut" msgid="5632423390354674437">"instaliraj prečice"</string>
     <string name="permdesc_install_shortcut" msgid="923466509822011139">"Dopušta aplikaciji dodavanje prečica bez posredovanja korisnika."</string>
     <string name="permlab_read_settings" msgid="5136500343007704955">"čita postavke na početnom ekranu i prečice"</string>
