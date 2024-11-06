@@ -217,8 +217,9 @@ public class BubbleBarViewController {
             }
 
             @Override
-            public void updateBubbleBarLocation(BubbleBarLocation location) {
-                mBubbleBarController.updateBubbleBarLocation(location);
+            public void updateBubbleBarLocation(BubbleBarLocation location,
+                    @BubbleBarLocation.UpdateSource int source) {
+                mBubbleBarController.updateBubbleBarLocation(location, source);
             }
         });
 
@@ -242,8 +243,9 @@ public class BubbleBarViewController {
             }
 
             @Override
-            public void updateBubbleBarLocation(BubbleBarLocation location) {
-                mBubbleBarController.updateBubbleBarLocation(location);
+            public void updateBubbleBarLocation(BubbleBarLocation location,
+                    @BubbleBarLocation.UpdateSource int source) {
+                mBubbleBarController.updateBubbleBarLocation(location, source);
             }
         };
     }
