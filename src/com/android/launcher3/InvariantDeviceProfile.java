@@ -540,7 +540,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         }
     }
 
-    private List<DisplayOption> getPredefinedDeviceProfiles(Context context,
+    private static List<DisplayOption> getPredefinedDeviceProfiles(Context context,
             String gridName, @DeviceType int deviceType, boolean allowDisabledGrid) {
         ArrayList<DisplayOption> profiles = new ArrayList<>();
 
@@ -554,7 +554,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
 
                     GridOption gridOption = new GridOption(context, Xml.asAttributeSet(parser));
                     if ((gridOption.isEnabled(deviceType) || allowDisabledGrid)
-                            && (Flags.oneGridSpecs() == gridOption.isNewGridOption())) {
+                            && gridOption.filterByFlag(deviceType)) {
                         final int displayDepth = parser.getDepth();
                         while (((type = parser.next()) != XmlPullParser.END_TAG
                                 || parser.getDepth() > displayDepth)
@@ -710,7 +710,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         return parseAllDefinedGridOptions(context)
                 .stream()
                 .filter(go -> go.isEnabled(deviceType))
-                .filter(go -> (Flags.oneGridSpecs() == go.isNewGridOption()))
+                .filter(go -> go.filterByFlag(deviceType))
                 .collect(Collectors.toList());
     }
 
@@ -967,6 +967,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         private final int demoModeLayoutId;
 
         private final boolean isScalable;
+        private final boolean mIsDualGrid;
         private final int devicePaddingId;
         private final int mWorkspaceSpecsId;
         private final int mWorkspaceSpecsTwoPanelId;
@@ -991,6 +992,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
                     DEVICE_CATEGORY_ALL);
             mRowCountSpecsId = a.getResourceId(
                     R.styleable.GridDisplayOption_rowCountSpecsId, INVALID_RESOURCE_HANDLE);
+            mIsDualGrid = a.getBoolean(R.styleable.GridDisplayOption_isDualGrid, false);
             if (mRowCountSpecsId != INVALID_RESOURCE_HANDLE) {
                 ResourceHelper resourceHelper = new ResourceHelper(context, mRowCountSpecsId);
                 NumRows numR = getRowCount(resourceHelper, context, deviceCategory);
@@ -1153,6 +1155,13 @@ public class InvariantDeviceProfile implements SafeCloseable {
 
         public boolean isNewGridOption() {
             return mRowCountSpecsId != INVALID_RESOURCE_HANDLE;
+        }
+
+        public boolean filterByFlag(int deviceType) {
+            if (deviceType == TYPE_TABLET) {
+                return Flags.oneGridRotationHandling() == mIsDualGrid;
+            }
+            return Flags.oneGridSpecs() == isNewGridOption();
         }
     }
 
