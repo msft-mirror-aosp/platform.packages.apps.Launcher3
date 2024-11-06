@@ -70,7 +70,7 @@
                 android:layout_height="match_parent"
                 android:clipChildren="false"
                 android:clipToPadding="false"
-                android:paddingBottom="24dp"
+                android:paddingBottom="8dp"
                 android:layout_gravity="start"
                 android:layout_weight="0.33">
                 <TextView
