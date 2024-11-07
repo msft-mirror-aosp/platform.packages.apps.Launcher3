@@ -420,8 +420,13 @@ public class BubbleBarController extends IBubblesListener.Stub {
             // Updates mean the dot state may have changed; any other changes were updated in
             // the populateBubble step.
             BubbleBarBubble bb = mBubbles.get(update.updatedBubble.getKey());
-            mBubbleBarViewController.animateBubbleNotification(
-                    bb, /* isExpanding= */ false, /* isUpdate= */ true);
+            if (suppressAnimation) {
+                // since we're not animating this update, we should update the dot visibility here.
+                bb.getView().updateDotVisibility(/* animate= */ false);
+            } else {
+                mBubbleBarViewController.animateBubbleNotification(
+                        bb, /* isExpanding= */ false, /* isUpdate= */ true);
+            }
         }
         if (update.bubbleKeysInOrder != null && !update.bubbleKeysInOrder.isEmpty()) {
             // Create the new list
