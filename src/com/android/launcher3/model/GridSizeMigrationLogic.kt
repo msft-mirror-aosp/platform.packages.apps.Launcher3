@@ -339,7 +339,7 @@ class GridSizeMigrationLogic {
         srcDeviceState: DeviceGridState,
         destDeviceState: DeviceGridState,
     ): Boolean {
-        return (isFirstLoad && Flags.enableGridMigrationFix()) &&
+        return isFirstLoad &&
             srcDeviceState.columns == destDeviceState.columns &&
             srcDeviceState.rows < destDeviceState.rows
     }

@@ -91,7 +91,7 @@ import com.android.wm.shell.recents.IRecentTasks;
 import com.android.wm.shell.recents.IRecentTasksListener;
 import com.android.wm.shell.recents.IRecentsAnimationController;
 import com.android.wm.shell.recents.IRecentsAnimationRunner;
-import com.android.wm.shell.shared.GroupedRecentTaskInfo;
+import com.android.wm.shell.shared.GroupedTaskInfo;
 import com.android.wm.shell.shared.IShellTransitions;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
@@ -1358,15 +1358,15 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle {
      * @throws GetRecentTasksException if IRecentTasks is not initialized, or when we get
      * RemoteException from server side
      */
-    public ArrayList<GroupedRecentTaskInfo> getRecentTasks(int numTasks, int userId)
-            throws GetRecentTasksException {
+    public ArrayList<GroupedTaskInfo> getRecentTasks(int numTasks,
+            int userId) throws GetRecentTasksException {
         if (mRecentTasks == null) {
             Log.e(TAG, "getRecentTasks() failed due to null mRecentTasks");
             throw new GetRecentTasksException("null mRecentTasks");
         }
         try {
-            final GroupedRecentTaskInfo[] rawTasks = mRecentTasks.getRecentTasks(numTasks,
-                    RECENT_IGNORE_UNAVAILABLE, userId);
+            final GroupedTaskInfo[] rawTasks =
+                    mRecentTasks.getRecentTasks(numTasks, RECENT_IGNORE_UNAVAILABLE, userId);
             if (rawTasks == null) {
                 return new ArrayList<>();
             }
