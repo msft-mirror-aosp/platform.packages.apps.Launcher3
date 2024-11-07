@@ -284,6 +284,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         BubbleBarController.onTaskbarRecreated();
         if (BubbleBarController.isBubbleBarEnabled()
                 && !mDeviceProfile.isPhone
+                && !mDeviceProfile.isVerticalBarLayout()
                 && bubbleBarView != null
         ) {
             Optional<BubbleStashedHandleViewController> bubbleHandleController = Optional.empty();
