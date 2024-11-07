@@ -827,7 +827,7 @@ public class DeviceProfile {
             hotseatBorderSpace = cellLayoutBorderSpacePx.y;
         }
 
-        if (isTablet) {
+        if (shouldShowAllAppsOnSheet()) {
             allAppsPadding.top = mInsets.top;
             allAppsShiftRange = heightPx;
         } else {
@@ -1514,6 +1514,11 @@ public class DeviceProfile {
                     Math.max(0, desiredWorkspaceHorizontalMarginPx + cellLayoutHorizontalPadding
                             - (allAppsBorderSpacePx.x / 2));
         }
+    }
+
+    /** Whether All Apps should be presented on a bottom sheet. */
+    public boolean shouldShowAllAppsOnSheet() {
+        return isTablet || Flags.allAppsSheetForHandheld();
     }
 
     private void setupAllAppsStyle(Context context) {

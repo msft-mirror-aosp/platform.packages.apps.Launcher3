@@ -38,7 +38,6 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.Flags;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings;
@@ -86,6 +85,9 @@ public class GridSizeMigrationDBController {
         if (needsToMigrate) {
             Log.i(TAG, "Migration is needed. destDeviceState: " + destDeviceState
                     + ", srcDeviceState: " + srcDeviceState);
+        } else {
+            Log.i(TAG, "Migration is not needed. destDeviceState: " + destDeviceState
+                    + ", srcDeviceState: " + srcDeviceState);
         }
         return needsToMigrate;
     }
@@ -118,21 +120,13 @@ public class GridSizeMigrationDBController {
             @NonNull DatabaseHelper target,
             @NonNull SQLiteDatabase source) {
 
-        Log.i("b/360462379", "Going from " + srcDeviceState.getColumns() + "x"
-                + srcDeviceState.getRows());
-        Log.i("b/360462379", "Going to " + destDeviceState.getColumns() + "x"
-                + destDeviceState.getRows());
-
         if (!needsToMigrate(srcDeviceState, destDeviceState)) {
-            Log.i("b/360462379", "Does not need to migrate.");
             return true;
         }
 
         if (LauncherPrefs.get(context).get(IS_FIRST_LOAD_AFTER_RESTORE)
-                && Flags.enableGridMigrationFix()
                 && srcDeviceState.getColumns().equals(destDeviceState.getColumns())
                 && srcDeviceState.getRows() < destDeviceState.getRows()) {
-            Log.i("b/360462379", "Grid migration fix entry point.");
             // Only use this strategy when comparing the previous grid to the new grid and the
             // columns are the same and the destination has more rows
             copyTable(source, TABLE_NAME, target.getWritableDatabase(), TABLE_NAME, context);
