@@ -38,7 +38,6 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.Flags;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings;
@@ -126,7 +125,6 @@ public class GridSizeMigrationDBController {
         }
 
         if (LauncherPrefs.get(context).get(IS_FIRST_LOAD_AFTER_RESTORE)
-                && Flags.enableGridMigrationFix()
                 && srcDeviceState.getColumns().equals(destDeviceState.getColumns())
                 && srcDeviceState.getRows() < destDeviceState.getRows()) {
             // Only use this strategy when comparing the previous grid to the new grid and the

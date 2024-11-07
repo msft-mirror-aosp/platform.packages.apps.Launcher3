@@ -311,6 +311,13 @@ flag {
 }
 
 flag {
+    name: "all_apps_sheet_for_handheld"
+    namespace: "launcher"
+    description: "All Apps will be presented on a bottom sheet in handheld mode"
+    bug: "374186088"
+}
+
+flag {
     name: "multiline_search_bar"
     namespace: "launcher"
     description: "Search bar can wrap to multi-line"
