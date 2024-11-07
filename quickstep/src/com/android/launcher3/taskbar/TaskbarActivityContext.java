@@ -72,6 +72,7 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.Toast;
+import android.window.DesktopModeFlags;
 import android.window.RemoteTransition;
 
 import androidx.annotation.NonNull;
@@ -89,6 +90,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.apppairs.AppPairIcon;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.desktop.DesktopAppLaunchTransition;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderIcon;
@@ -1219,10 +1221,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.keyboardQuickSwitchController.closeQuickSwitchView(false);
 
         if (tag instanceof GroupTask groupTask) {
-            handleGroupTaskLaunch(
-                    groupTask,
-                    /* remoteTransition= */ null,
-                    areDesktopTasksVisible());
+            RemoteTransition remoteTransition =
+                    (areDesktopTasksVisible() && canUnminimizeDesktopTask(groupTask.task1.key.id))
+                            ? createUnminimizeRemoteTransition() : null;
+            handleGroupTaskLaunch(groupTask, remoteTransition, areDesktopTasksVisible());
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
         } else if (tag instanceof FolderInfo) {
             // Tapping an expandable folder icon on Taskbar
@@ -1240,9 +1242,11 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
             }
         } else if (tag instanceof TaskItemInfo info) {
+            RemoteTransition remoteTransition = canUnminimizeDesktopTask(info.getTaskId())
+                    ? createUnminimizeRemoteTransition() : null;
             UI_HELPER_EXECUTOR.execute(() ->
                     SystemUiProxy.INSTANCE.get(this).showDesktopApp(
-                            info.getTaskId(), /* remoteTransition= */ null));
+                            info.getTaskId(), remoteTransition));
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(
                     /* stash= */ true);
         } else if (tag instanceof WorkspaceItemInfo) {
@@ -1361,8 +1365,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             return;
         }
         if (onDesktop) {
-            boolean useRemoteTransition = task.task1.isMinimized
-                    && com.android.window.flags.Flags.enableDesktopAppLaunchAlttabTransitions();
+            boolean useRemoteTransition = canUnminimizeDesktopTask(task.task1.key.id);
             UI_HELPER_EXECUTOR.execute(() -> {
                 if (onStartCallback != null) {
                     onStartCallback.run();
@@ -1387,6 +1390,18 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             return;
         }
         mControllers.uiController.launchSplitTasks(task, remoteTransition);
+    }
+
+    /** Returns whether the given task is minimized and can be unminimized. */
+    public boolean canUnminimizeDesktopTask(int taskId) {
+        BubbleTextView.RunningAppState runningAppState =
+                mControllers.taskbarRecentAppsController.getRunningAppState(taskId);
+        return runningAppState == BubbleTextView.RunningAppState.MINIMIZED
+                && DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_ALTTAB_TRANSITIONS.isTrue();
+    }
+
+    private RemoteTransition createUnminimizeRemoteTransition() {
+        return new RemoteTransition(new DesktopAppLaunchTransition(this, getMainExecutor()));
     }
 
     /**
