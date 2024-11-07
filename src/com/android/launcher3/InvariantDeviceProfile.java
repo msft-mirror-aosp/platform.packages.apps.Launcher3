@@ -52,7 +52,6 @@ import androidx.core.content.res.ResourcesCompat;
 
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.DotRenderer;
-import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.DeviceGridState;
 import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.testing.shared.ResourceUtils;
@@ -303,35 +302,6 @@ public class InvariantDeviceProfile implements SafeCloseable {
         DisplayController.INSTANCE.executeIfCreated(dc -> dc.setPriorityListener(null));
     }
 
-    /**
-     * Reinitialize the current grid after a restore, where some grids might now be disabled.
-     */
-    public void reinitializeAfterRestore(Context context) {
-        String currentGridName = getCurrentGridName(context);
-        String currentDbFile = dbFile;
-        String newGridName = initGrid(context, currentGridName);
-        String newDbFile = dbFile;
-        FileLog.d(TAG, "Reinitializing grid after restore."
-                + " currentGridName=" + currentGridName
-                + ", currentDbFile=" + currentDbFile
-                + ", newGridName=" + newGridName
-                + ", newDbFile=" + newDbFile);
-        if (!newDbFile.equals(currentDbFile)) {
-            FileLog.d(TAG, "Restored grid is disabled : " + currentGridName
-                    + ", migrating to: " + newGridName
-                    + ", removing all other grid db files");
-            for (String gridDbFile : LauncherFiles.GRID_DB_FILES) {
-                if (gridDbFile.equals(currentDbFile)) {
-                    continue;
-                }
-                if (context.getDatabasePath(gridDbFile).delete()) {
-                    FileLog.d(TAG, "Removed old grid db file: " + gridDbFile);
-                }
-            }
-            setCurrentGrid(context, newGridName);
-        }
-    }
-
     public static String getCurrentGridName(Context context) {
         return LauncherPrefs.get(context).get(GRID_NAME);
     }
@@ -540,7 +510,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         }
     }
 
-    private List<DisplayOption> getPredefinedDeviceProfiles(Context context,
+    private static List<DisplayOption> getPredefinedDeviceProfiles(Context context,
             String gridName, @DeviceType int deviceType, boolean allowDisabledGrid) {
         ArrayList<DisplayOption> profiles = new ArrayList<>();
 
@@ -554,7 +524,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
 
                     GridOption gridOption = new GridOption(context, Xml.asAttributeSet(parser));
                     if ((gridOption.isEnabled(deviceType) || allowDisabledGrid)
-                            && (Flags.oneGridSpecs() == gridOption.isNewGridOption())) {
+                            && gridOption.filterByFlag(deviceType)) {
                         final int displayDepth = parser.getDepth();
                         while (((type = parser.next()) != XmlPullParser.END_TAG
                                 || parser.getDepth() > displayDepth)
@@ -710,7 +680,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         return parseAllDefinedGridOptions(context)
                 .stream()
                 .filter(go -> go.isEnabled(deviceType))
-                .filter(go -> (Flags.oneGridSpecs() == go.isNewGridOption()))
+                .filter(go -> go.filterByFlag(deviceType))
                 .collect(Collectors.toList());
     }
 
@@ -967,6 +937,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         private final int demoModeLayoutId;
 
         private final boolean isScalable;
+        private final boolean mIsDualGrid;
         private final int devicePaddingId;
         private final int mWorkspaceSpecsId;
         private final int mWorkspaceSpecsTwoPanelId;
@@ -991,6 +962,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
                     DEVICE_CATEGORY_ALL);
             mRowCountSpecsId = a.getResourceId(
                     R.styleable.GridDisplayOption_rowCountSpecsId, INVALID_RESOURCE_HANDLE);
+            mIsDualGrid = a.getBoolean(R.styleable.GridDisplayOption_isDualGrid, false);
             if (mRowCountSpecsId != INVALID_RESOURCE_HANDLE) {
                 ResourceHelper resourceHelper = new ResourceHelper(context, mRowCountSpecsId);
                 NumRows numR = getRowCount(resourceHelper, context, deviceCategory);
@@ -1153,6 +1125,13 @@ public class InvariantDeviceProfile implements SafeCloseable {
 
         public boolean isNewGridOption() {
             return mRowCountSpecsId != INVALID_RESOURCE_HANDLE;
+        }
+
+        public boolean filterByFlag(int deviceType) {
+            if (deviceType == TYPE_TABLET) {
+                return Flags.oneGridRotationHandling() == mIsDualGrid;
+            }
+            return Flags.oneGridSpecs() == isNewGridOption();
         }
     }
 

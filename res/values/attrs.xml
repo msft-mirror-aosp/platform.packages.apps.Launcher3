@@ -268,6 +268,9 @@
              defaults to @dimen/taskbar_button_margin_default -->
         <attr name="inlineNavButtonsEndSpacing" format="reference" />
 
+        <!-- Grid flips row and column count when rotating the device -->
+        <attr name="isDualGrid" format="boolean" />
+
         <attr name="dbFile" format="string" />
         <attr name="defaultLayoutId" format="reference" />
         <attr name="demoModeLayoutId" format="reference" />
