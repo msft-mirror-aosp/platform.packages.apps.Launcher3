@@ -23,7 +23,7 @@ import android.content.Intent;
 import android.platform.test.annotations.LargeTest;
 import android.view.KeyEvent;
 
-import androidx.test.runner.AndroidJUnit4;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
 
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.allapps.SearchRecyclerView;
