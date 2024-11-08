@@ -893,9 +893,10 @@ public class BubbleBarViewController {
             mBubbleBarViewAnimator.animateToInitialState(bubble, isInApp, isExpanding);
             return;
         }
-        boolean persistentTaskbarOrOnHome = mBubbleStashController.isBubblesShowingOnHome()
+        // if we're not stashed or we're in persistent taskbar, animate for collapsed state.
+        boolean animateForCollapsed = !mBubbleStashController.isStashed()
                 || !mBubbleStashController.isTransientTaskBar();
-        if (persistentTaskbarOrOnHome) {
+        if (animateForCollapsed) {
             mBubbleBarViewAnimator.animateBubbleBarForCollapsed(bubble, isExpanding);
             return;
         }
