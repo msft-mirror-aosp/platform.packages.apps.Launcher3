@@ -18,6 +18,7 @@ package com.android.launcher3.states;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_NOSENSOR;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE;
 import static android.util.DisplayMetrics.DENSITY_DEVICE_STABLE;
 
 import static com.android.launcher3.LauncherPrefs.ALLOW_ROTATION;
@@ -62,6 +63,7 @@ public class RotationHelper implements LauncherPrefChangeListener,
     public static final int REQUEST_NONE = 0;
     public static final int REQUEST_ROTATE = 1;
     public static final int REQUEST_LOCK = 2;
+    public static final int REQUEST_FIXED_LANDSCAPE = 3;
 
     @NonNull
     private final BaseActivity mActivity;
@@ -195,7 +197,9 @@ public class RotationHelper implements LauncherPrefChangeListener,
         }
 
         final int activityFlags;
-        if (mStateHandlerRequest != REQUEST_NONE) {
+        if (mStateHandlerRequest == REQUEST_FIXED_LANDSCAPE) {
+            activityFlags = SCREEN_ORIENTATION_USER_LANDSCAPE;
+        } else if (mStateHandlerRequest != REQUEST_NONE) {
             activityFlags = mStateHandlerRequest == REQUEST_LOCK ?
                     SCREEN_ORIENTATION_LOCKED : SCREEN_ORIENTATION_UNSPECIFIED;
         } else if (mCurrentTransitionRequest != REQUEST_NONE) {
