@@ -21,6 +21,7 @@ import static androidx.test.InstrumentationRegistry.getInstrumentation;
 
 import static com.android.launcher3.testing.shared.TestProtocol.ICON_MISSING;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.TestUtil.resolveSystemAppInfo;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -31,7 +32,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Point;
@@ -625,13 +625,6 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
         Wait.atMost("Launcher activity didn't stop",
                 () -> !launcherInstrumentation.isLauncherActivityStarted(),
                 launcherInstrumentation);
-    }
-
-    public static ActivityInfo resolveSystemAppInfo(String category) {
-        return getInstrumentation().getContext().getPackageManager().resolveActivity(
-                new Intent(Intent.ACTION_MAIN).addCategory(category),
-                PackageManager.MATCH_SYSTEM_ONLY).
-                activityInfo;
     }
 
 
