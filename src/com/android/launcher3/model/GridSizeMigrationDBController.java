@@ -17,7 +17,6 @@
 package com.android.launcher3.model;
 
 import static com.android.launcher3.Flags.enableSmartspaceRemovalToggle;
-import static com.android.launcher3.LauncherPrefs.IS_FIRST_LOAD_AFTER_RESTORE;
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.LauncherSettings.Favorites.TMP_TABLE;
 import static com.android.launcher3.Utilities.SHOULD_SHOW_FIRST_PAGE_WIDGET;
@@ -118,13 +117,14 @@ public class GridSizeMigrationDBController {
             @NonNull DeviceGridState srcDeviceState,
             @NonNull DeviceGridState destDeviceState,
             @NonNull DatabaseHelper target,
-            @NonNull SQLiteDatabase source) {
+            @NonNull SQLiteDatabase source,
+            boolean isDestNewDb) {
 
         if (!needsToMigrate(srcDeviceState, destDeviceState)) {
             return true;
         }
 
-        if (LauncherPrefs.get(context).get(IS_FIRST_LOAD_AFTER_RESTORE)
+        if (isDestNewDb
                 && srcDeviceState.getColumns().equals(destDeviceState.getColumns())
                 && srcDeviceState.getRows() < destDeviceState.getRows()) {
             // Only use this strategy when comparing the previous grid to the new grid and the
