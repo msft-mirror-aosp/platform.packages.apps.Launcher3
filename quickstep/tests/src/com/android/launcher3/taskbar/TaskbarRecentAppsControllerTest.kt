@@ -26,6 +26,7 @@ import android.os.UserHandle
 import android.platform.test.rule.TestWatcher
 import android.testing.AndroidTestingRunner
 import com.android.internal.R
+import com.android.launcher3.BubbleTextView.RunningAppState
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION
 import com.android.launcher3.model.data.AppInfo
@@ -145,6 +146,37 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
         )
         // Verify that getTasks() was not called again after the init().
         verify(mockRecentsModel, times(1)).getTasks(any<Consumer<List<GroupTask>>>())
+    }
+
+    @Test
+    fun getRunningAppState_taskNotRunningOrMinimized_returnsNotRunning() {
+        setInDesktopMode(true)
+        updateRecentTasks(runningTasks = emptyList(), recentTaskPackages = emptyList())
+
+        assertThat(recentAppsController.getRunningAppState(taskId = 1))
+            .isEqualTo(RunningAppState.NOT_RUNNING)
+    }
+
+    @Test
+    fun getRunningAppState_taskNotVisible_returnsMinimized() {
+        setInDesktopMode(true)
+        val task1 = createTask(id = 1, packageName = RUNNING_APP_PACKAGE_1, isVisible = false)
+        val task2 = createTask(id = 2, packageName = RUNNING_APP_PACKAGE_1, isVisible = true)
+        updateRecentTasks(runningTasks = listOf(task1, task2), recentTaskPackages = emptyList())
+
+        assertThat(recentAppsController.getRunningAppState(taskId = 1))
+            .isEqualTo(RunningAppState.MINIMIZED)
+    }
+
+    @Test
+    fun getRunningAppState_taskVisible_returnsRunning() {
+        setInDesktopMode(true)
+        val task1 = createTask(id = 1, packageName = RUNNING_APP_PACKAGE_1, isVisible = false)
+        val task2 = createTask(id = 2, packageName = RUNNING_APP_PACKAGE_1, isVisible = true)
+        updateRecentTasks(runningTasks = listOf(task1, task2), recentTaskPackages = emptyList())
+
+        assertThat(recentAppsController.getRunningAppState(taskId = 2))
+            .isEqualTo(RunningAppState.RUNNING)
     }
 
     @Test

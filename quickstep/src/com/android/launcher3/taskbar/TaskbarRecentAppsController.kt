@@ -18,6 +18,7 @@ package com.android.launcher3.taskbar
 import android.content.Context
 import android.window.DesktopModeFlags
 import androidx.annotation.VisibleForTesting
+import com.android.launcher3.BubbleTextView.RunningAppState
 import com.android.launcher3.Flags.enableRecentsInTaskbar
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.TaskItemInfo
@@ -72,6 +73,16 @@ class TaskbarRecentAppsController(context: Context, private val recentsModel: Re
     var shownTasks: List<GroupTask> = emptyList()
         private set
 
+    /** Get the [RunningAppState] for the given task. */
+    fun getRunningAppState(taskId: Int): RunningAppState {
+        return when (taskId) {
+            in minimizedTaskIds -> RunningAppState.MINIMIZED
+            in runningTaskIds -> RunningAppState.RUNNING
+            else -> RunningAppState.NOT_RUNNING
+        }
+    }
+
+    @VisibleForTesting
     val runningTaskIds: Set<Int>
         /**
          * Returns the task IDs of apps that should be indicated as "running" to the user.
@@ -88,6 +99,7 @@ class TaskbarRecentAppsController(context: Context, private val recentsModel: Re
             return tasks.map { task -> task.key.id }.toSet()
         }
 
+    @VisibleForTesting
     val minimizedTaskIds: Set<Int>
         /**
          * Returns the task IDs for the tasks that should be indicated as "minimized" to the user.
