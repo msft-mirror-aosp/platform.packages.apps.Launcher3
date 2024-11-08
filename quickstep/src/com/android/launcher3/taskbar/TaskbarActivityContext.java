@@ -196,6 +196,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     private boolean mIsFullscreen;
     // The size we should return to when we call setTaskbarWindowFullscreen(false)
     private int mLastRequestedNonFullscreenSize;
+    /**
+     * When this is true, the taskbar window size is not updated. Requests to update the window
+     * size are stored in {@link #mLastRequestedNonFullscreenSize} and will take effect after
+     * bubbles no longer animate and {@link #setTaskbarWindowForAnimatingBubble()} is called.
+     */
+    private boolean mIsTaskbarSizeFrozenForAnimatingBubble;
 
     private NavigationMode mNavMode;
     private boolean mImeDrawsImeNavBar;
@@ -494,6 +500,13 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     @Override
     public boolean isBubbleBarEnabled() {
         return getBubbleControllers() != null && BubbleBarController.isBubbleBarEnabled();
+    }
+
+    private boolean isBubbleBarAnimating() {
+        return mControllers
+                .bubbleControllers
+                .map(controllers -> controllers.bubbleBarViewController.isAnimatingNewBubble())
+                .orElse(false);
     }
 
     /**
@@ -1062,6 +1075,25 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     /**
+     * Updates the taskbar window size according to whether bubbles are animating.
+     *
+     * <p>This method should be called when bubbles start animating and again after the animation is
+     * complete.
+     */
+    public void setTaskbarWindowForAnimatingBubble() {
+        if (isBubbleBarAnimating()) {
+            // the default window size accounts for the bubble flyout
+            setTaskbarWindowSize(getDefaultTaskbarWindowSize());
+            mIsTaskbarSizeFrozenForAnimatingBubble = true;
+        } else {
+            mIsTaskbarSizeFrozenForAnimatingBubble = false;
+            setTaskbarWindowSize(
+                    mLastRequestedNonFullscreenSize != 0
+                            ? mLastRequestedNonFullscreenSize : getDefaultTaskbarWindowSize());
+        }
+    }
+
+    /**
      * Called when drag ends or when a view is removed from the DragLayer.
      */
     void onDragEndOrViewRemoved() {
@@ -1097,11 +1129,13 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             size = mDeviceProfile.heightPx;
         } else {
             mLastRequestedNonFullscreenSize = size;
-            if (mIsFullscreen) {
-                // We still need to be fullscreen, so defer any change to our height until we call
-                // setTaskbarWindowFullscreen(false). For example, this could happen when dragging
-                // from the gesture region, as the drag will cancel the gesture and reset launcher's
-                // state, which in turn normally would reset the taskbar window height as well.
+            if (mIsFullscreen || mIsTaskbarSizeFrozenForAnimatingBubble) {
+                // We either still need to be fullscreen or a bubble is still animating, so defer
+                // any change to our height until setTaskbarWindowFullscreen(false) is called or
+                // setTaskbarWindowForAnimatingBubble() is called after the bubble animation
+                // completed. For example, this could happen when dragging from the gesture region,
+                // as the drag will cancel the gesture and reset launcher's state, which in turn
+                // normally would reset the taskbar window height as well.
                 return;
             }
         }
