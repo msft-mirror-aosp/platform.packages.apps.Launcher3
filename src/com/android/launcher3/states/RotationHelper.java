@@ -63,7 +63,8 @@ public class RotationHelper implements LauncherPrefChangeListener,
     public static final int REQUEST_NONE = 0;
     public static final int REQUEST_ROTATE = 1;
     public static final int REQUEST_LOCK = 2;
-    public static final int REQUEST_FIXED_LANDSCAPE = 3;
+
+    private boolean mIsFixedLandscape = false;
 
     @NonNull
     private final BaseActivity mActivity;
@@ -165,6 +166,18 @@ public class RotationHelper implements LauncherPrefChangeListener,
         notifyChange();
     }
 
+    public boolean isFixedLandscape() {
+        return mIsFixedLandscape;
+    }
+
+    /**
+     * If fixedLandscape is true then the Launcher become landscape until set false..
+     */
+    public void setFixedLandscape(boolean fixedLandscape) {
+        mIsFixedLandscape = fixedLandscape;
+        notifyChange();
+    }
+
     // Used by tests only.
     public void forceAllowRotationForTesting(boolean allowRotation) {
         if (mDestroyed) return;
@@ -197,9 +210,7 @@ public class RotationHelper implements LauncherPrefChangeListener,
         }
 
         final int activityFlags;
-        if (mStateHandlerRequest == REQUEST_FIXED_LANDSCAPE) {
-            activityFlags = SCREEN_ORIENTATION_USER_LANDSCAPE;
-        } else if (mStateHandlerRequest != REQUEST_NONE) {
+        if (mStateHandlerRequest != REQUEST_NONE) {
             activityFlags = mStateHandlerRequest == REQUEST_LOCK ?
                     SCREEN_ORIENTATION_LOCKED : SCREEN_ORIENTATION_UNSPECIFIED;
         } else if (mCurrentTransitionRequest != REQUEST_NONE) {
@@ -207,6 +218,8 @@ public class RotationHelper implements LauncherPrefChangeListener,
                     SCREEN_ORIENTATION_LOCKED : SCREEN_ORIENTATION_UNSPECIFIED;
         } else if (mCurrentStateRequest == REQUEST_LOCK) {
             activityFlags = SCREEN_ORIENTATION_LOCKED;
+        } else if (mIsFixedLandscape) {
+            activityFlags = SCREEN_ORIENTATION_USER_LANDSCAPE;
         } else if (mIgnoreAutoRotateSettings || mCurrentStateRequest == REQUEST_ROTATE
                 || mHomeRotationEnabled || mForceAllowRotationForTesting) {
             activityFlags = SCREEN_ORIENTATION_UNSPECIFIED;
