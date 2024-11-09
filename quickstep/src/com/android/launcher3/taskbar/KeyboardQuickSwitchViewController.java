@@ -36,6 +36,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.desktop.DesktopAppLaunchTransition;
+import com.android.launcher3.desktop.DesktopAppLaunchTransition.AppLaunchType;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayDragLayer;
 import com.android.launcher3.util.DisplayController;
@@ -251,7 +252,8 @@ public class KeyboardQuickSwitchViewController {
         ) {
             // This app is being unminimized - use our own transition runner.
             remoteTransition = new RemoteTransition(
-                    new DesktopAppLaunchTransition(context, MAIN_EXECUTOR));
+                    new DesktopAppLaunchTransition(
+                        context, MAIN_EXECUTOR, AppLaunchType.UNMINIMIZE));
         }
         mControllers.taskbarActivityContext.handleGroupTaskLaunch(
                 task,

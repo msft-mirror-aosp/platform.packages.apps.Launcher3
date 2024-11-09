@@ -617,7 +617,7 @@ public class DeviceProfile {
                 || inv.inlineQsb[INDEX_TWO_PANEL_LANDSCAPE]
                 : inv.inlineQsb[INDEX_DEFAULT] || inv.inlineQsb[INDEX_LANDSCAPE])
                 && hotseatQsbHeight > 0;
-        isQsbInline = mIsScalableGrid && inv.inlineQsb[mTypeIndex] && canQsbInline;
+        isQsbInline = isQsbInline(inv);
 
         areNavButtonsInline = isTaskbarPresent && !isGestureMode;
         numShownHotseatIcons =
@@ -848,6 +848,24 @@ public class DeviceProfile {
         // This is done last, after iconSizePx is calculated above.
         mDotRendererWorkSpace = createDotRenderer(context, iconSizePx, dotRendererCache);
         mDotRendererAllApps = createDotRenderer(context, allAppsIconSizePx, dotRendererCache);
+    }
+
+    /**
+     * Takes care of the logic that determines if we show a the QSB inline or not.
+     */
+    private boolean isQsbInline(InvariantDeviceProfile inv) {
+        // For foldable (two panel), we inline the qsb if we have the screen open and we are in
+        // either Landscape or Portrait. This cal also be disabled in the device_profile.xml
+        boolean twoPanelCanInline = inv.inlineQsb[INDEX_TWO_PANEL_PORTRAIT]
+                || inv.inlineQsb[INDEX_TWO_PANEL_LANDSCAPE];
+
+        // In tablets we inline in both orientations but only if we have enough space in the QSB
+        boolean tabletInlineQsb = inv.inlineQsb[INDEX_DEFAULT] || inv.inlineQsb[INDEX_LANDSCAPE];
+        boolean canQsbInline = isTwoPanels ? twoPanelCanInline : tabletInlineQsb;
+        canQsbInline = canQsbInline && hotseatQsbHeight > 0;
+
+        return (mIsScalableGrid && inv.inlineQsb[mTypeIndex] && canQsbInline)
+                || inv.isFixedLandscapeMode;
     }
 
     private static DotRenderer createDotRenderer(
@@ -1903,7 +1921,7 @@ public class DeviceProfile {
                 hotseatBarPadding.set(mHotseatBarWorkspaceSpacePx, paddingTop,
                         mInsets.right + mHotseatBarEdgePaddingPx, paddingBottom);
             }
-        } else if (isTaskbarPresent) {
+        } else if (isTaskbarPresent || inv.isFixedLandscapeMode) {
             // Center the QSB vertically with hotseat
             int hotseatBarBottomPadding = getHotseatBarBottomPadding();
             int hotseatBarTopPadding =
@@ -1921,6 +1939,13 @@ public class DeviceProfile {
                 endSpacing = startSpacing;
             }
             startSpacing += getAdditionalQsbSpace();
+
+            if (inv.isFixedLandscapeMode) {
+                endSpacing += workspacePadding.right + cellLayoutPaddingPx.right
+                        + mInsets.right;
+                startSpacing += workspacePadding.left + cellLayoutPaddingPx.left
+                        + mInsets.left;
+            }
 
             hotseatBarPadding.top = hotseatBarTopPadding;
             hotseatBarPadding.bottom = hotseatBarBottomPadding;
@@ -2517,7 +2542,8 @@ public class DeviceProfile {
                 throw new IllegalArgumentException("Window bounds not set");
             }
             if (mTransposeLayoutWithOrientation == null) {
-                mTransposeLayoutWithOrientation = !mInfo.isTablet(mWindowBounds);
+                mTransposeLayoutWithOrientation =
+                        !(mInfo.isTablet(mWindowBounds) || mInv.isFixedLandscapeMode);
             }
             if (mIsGestureMode == null) {
                 mIsGestureMode = mInfo.getNavigationMode().hasGestures;
