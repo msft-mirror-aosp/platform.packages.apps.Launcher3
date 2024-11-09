@@ -95,7 +95,7 @@ class TaskThumbnailView : ConstraintLayout, ViewPool.Reusable {
         viewModel = RecentsDependencies.get(this)
         viewModel.uiState
             .onEach { viewModelUiState ->
-                Log.d(TAG, "viewModelUiState changed from $uiState to: $viewModelUiState")
+                Log.d(TAG, "viewModelUiState changed from: $uiState to: $viewModelUiState")
                 uiState = viewModelUiState
                 resetViews()
                 when (viewModelUiState) {
