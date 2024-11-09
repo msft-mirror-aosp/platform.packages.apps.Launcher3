@@ -520,3 +520,10 @@ flag {
   description: "Enable MSDL feedback for Launcher interactions"
   bug: "377496684"
 }
+
+flag {
+    name: "taskbar_recents_layout_transition"
+    namespace: "launcher"
+    description: "Enable Taskbar LayoutTransition for Recent Apps"
+    bug: "343521765"
+}

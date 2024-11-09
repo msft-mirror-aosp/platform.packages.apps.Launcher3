@@ -59,6 +59,7 @@ import android.content.res.Resources;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
+import android.os.Bundle;
 import android.os.IRemoteCallback;
 import android.os.Process;
 import android.os.Trace;
@@ -91,6 +92,7 @@ import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.apppairs.AppPairIcon;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.desktop.DesktopAppLaunchTransition;
+import com.android.launcher3.desktop.DesktopAppLaunchTransition.AppLaunchType;
 import com.android.launcher3.dot.DotInfo;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderIcon;
@@ -862,6 +864,33 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         return makeDefaultActivityOptions(SPLASH_SCREEN_STYLE_UNDEFINED);
     }
 
+    private ActivityOptionsWrapper getActivityLaunchDesktopOptions(ItemInfo info) {
+        if (!DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS.isTrue()) {
+            return null;
+        }
+        if (!areDesktopTasksVisible()) {
+            return null;
+        }
+        BubbleTextView.RunningAppState appState =
+                mControllers.taskbarRecentAppsController.getDesktopItemState(info);
+        AppLaunchType launchType = null;
+        switch (appState) {
+            case RUNNING:
+                return null;
+            case MINIMIZED:
+                launchType = AppLaunchType.UNMINIMIZE;
+                break;
+            case NOT_RUNNING:
+                launchType = AppLaunchType.LAUNCH;
+                break;
+        }
+        ActivityOptions options = ActivityOptions.makeRemoteTransition(
+                new RemoteTransition(
+                        new DesktopAppLaunchTransition(
+                                /* context= */ this, getMainExecutor(), launchType)));
+        return new ActivityOptionsWrapper(options, new RunnableList());
+    }
+
     /**
      * Sets a new data-source for this taskbar instance
      */
@@ -1402,7 +1431,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     private RemoteTransition createUnminimizeRemoteTransition() {
-        return new RemoteTransition(new DesktopAppLaunchTransition(this, getMainExecutor()));
+        return new RemoteTransition(
+                new DesktopAppLaunchTransition(
+                        this, getMainExecutor(), AppLaunchType.UNMINIMIZE));
     }
 
     /**
@@ -1503,25 +1534,31 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             TestLogging.recordEvent(TestProtocol.SEQUENCE_MAIN, "start: taskbarAppIcon");
-            if (info.user.equals(Process.myUserHandle())) {
-                // TODO(b/216683257): Use startActivityForResult for search results that require it.
-                if (taskInRecents != null) {
-                    // Re launch instance from recents
-                    ActivityOptionsWrapper opts = getActivityLaunchOptions(null, info);
-                    opts.options.setLaunchDisplayId(
-                            getDisplay() == null ? DEFAULT_DISPLAY : getDisplay().getDisplayId());
-                    if (ActivityManagerWrapper.getInstance()
-                            .startActivityFromRecents(taskInRecents.key, opts.options)) {
-                        mControllers.uiController.getRecentsView()
-                                .addSideTaskLaunchCallback(opts.onEndCallback);
-                        return;
-                    }
-                }
-                startActivity(intent);
-            } else {
+            if (!info.user.equals(Process.myUserHandle())) {
+                // TODO b/376819104: support Desktop launch animations for apps in managed profiles
                 getSystemService(LauncherApps.class).startMainActivity(
                         intent.getComponent(), info.user, intent.getSourceBounds(), null);
+                return;
             }
+            // TODO(b/216683257): Use startActivityForResult for search results that require it.
+            if (taskInRecents != null) {
+                // Re launch instance from recents
+                ActivityOptionsWrapper opts = getActivityLaunchOptions(null, info);
+                opts.options.setLaunchDisplayId(
+                        getDisplay() == null ? DEFAULT_DISPLAY : getDisplay().getDisplayId());
+                if (ActivityManagerWrapper.getInstance()
+                        .startActivityFromRecents(taskInRecents.key, opts.options)) {
+                    mControllers.uiController.getRecentsView()
+                            .addSideTaskLaunchCallback(opts.onEndCallback);
+                    return;
+                }
+            }
+            ActivityOptionsWrapper opts = null;
+            if (areDesktopTasksVisible()) {
+                opts = getActivityLaunchDesktopOptions(info);
+            }
+            Bundle optionsBundle = opts == null ? null : opts.options.toBundle();
+            startActivity(intent, optionsBundle);
         } catch (NullPointerException | ActivityNotFoundException | SecurityException e) {
             Toast.makeText(this, R.string.activity_not_found, Toast.LENGTH_SHORT)
                     .show();

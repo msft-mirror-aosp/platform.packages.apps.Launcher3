@@ -26,6 +26,7 @@ import com.android.launcher3.tapl.OverviewTask
 import com.android.launcher3.ui.AbstractLauncherUiTest
 import com.android.launcher3.ui.PortraitLandscapeRunner.PortraitLandscape
 import com.android.launcher3.uioverrides.QuickstepLauncher
+import com.android.launcher3.util.TestUtil
 import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Before
 import org.junit.Test
@@ -172,7 +173,7 @@ class TaplTestsOverviewDesktop : AbstractLauncherUiTest<QuickstepLauncher?>() {
             .that(
                 mDevice.wait(
                     Until.hasObject(By.pkg(getAppPackageName()).text("TestActivity$index")),
-                    DEFAULT_UI_TIMEOUT,
+                    TestUtil.DEFAULT_UI_TIMEOUT,
                 )
             )
             .isTrue()
