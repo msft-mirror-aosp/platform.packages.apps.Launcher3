@@ -311,6 +311,9 @@
         <!-- defaults to allAppsCellSpecsId, if not specified -->
         <attr name="allAppsCellSpecsTwoPanelId" format="reference" />
 
+        <!-- defaults to false, if not specified -->
+        <attr name="isFixedLandscape" format="boolean" />
+
         <!-- By default all categories are enabled -->
         <attr name="deviceCategory" format="integer">
             <!-- Enable on phone only -->
