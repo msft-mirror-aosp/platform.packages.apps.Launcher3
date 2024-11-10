@@ -1216,8 +1216,6 @@ constructor(
                     if (isQuickSwitch) {
                         setFreezeRecentTasksReordering()
                     }
-                    // TODO(b/334826842) no work required - add splash functionality to new TTV -
-                    // cold start e.g. restart device. Small splash moving to bigger splash
                     disableStartingWindow = firstContainer.shouldShowSplashView
                 }
         Executors.UI_HELPER_EXECUTOR.execute {
