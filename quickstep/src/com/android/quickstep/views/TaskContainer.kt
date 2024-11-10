@@ -151,7 +151,7 @@ class TaskContainer(
         if (enableRefactorTaskThumbnail()) {
             bindThumbnailView()
         } else {
-            thumbnailViewDeprecated.bind(task, overlay)
+            thumbnailViewDeprecated.bind(task, overlay, taskView)
         }
         overlay.init()
     }
