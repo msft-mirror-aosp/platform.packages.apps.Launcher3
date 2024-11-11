@@ -471,6 +471,13 @@ public class BubbleBarViewController {
     }
 
     /**
+     * @return the max collapsed width for the bubble bar.
+     */
+    public float getCollapsedWidthWithMaxVisibleBubbles() {
+        return mBarView.getCollapsedWidthWithMaxVisibleBubbles();
+    }
+
+    /**
      * @return {@code true} if bubble bar is on the left edge of the screen, {@code false} if on
      * the right
      */

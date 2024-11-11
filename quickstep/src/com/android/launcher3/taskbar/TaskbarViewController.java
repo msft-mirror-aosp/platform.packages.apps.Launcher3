@@ -779,9 +779,16 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         }
     }
 
-    /** Resets the icon alignment controller so that it can be recreated again later. */
-    void resetIconAlignmentController() {
+    /**
+     * Resets the icon alignment controller so that it can be recreated again later, and updates
+     * the list of icons shown in the taskbar if the bubble bar visibility changes the taskbar
+     * overflow state.
+     */
+    void adjustTaskbarForBubbleBar() {
         mIconAlignControllerLazy = null;
+        if (mTaskbarView.updateMaxNumIcons()) {
+            commitRunningAppsToUI();
+        }
     }
 
     /**
