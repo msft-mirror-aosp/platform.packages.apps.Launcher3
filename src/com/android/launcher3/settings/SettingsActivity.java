@@ -294,6 +294,9 @@ public class SettingsActivity extends FragmentActivity
                 case NOTIFICATION_DOTS_PREFERENCE_KEY:
                     return BuildConfig.NOTIFICATION_DOTS_ENABLED;
                 case ALLOW_ROTATION_PREFERENCE_KEY:
+                    if (Flags.oneGridSpecs()) {
+                        return false;
+                    }
                     if (info.isTablet(info.realBounds)) {
                         // Launcher supports rotation by default. No need to show this setting.
                         return false;
