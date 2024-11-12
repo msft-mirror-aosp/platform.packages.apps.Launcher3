@@ -848,6 +848,13 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     }
 
     /**
+     * The max number of icon views the taskbar can have when taskbar overflow is enabled.
+     */
+    int getMaxNumIconViews() {
+        return mMaxNumIcons;
+    }
+
+    /**
      * Returns the all apps button in the taskbar.
      */
     public TaskbarAllAppsButtonContainer getAllAppsButtonContainer() {
