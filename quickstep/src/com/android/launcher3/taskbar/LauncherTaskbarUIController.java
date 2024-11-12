@@ -362,20 +362,21 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
             // This method can be called before init() is called.
             return;
         }
-        if (mControllers.uiController.isIconAlignedWithHotseat()
-                && !mTaskbarLauncherStateController.isAnimatingToLauncher()) {
-            // Only animate the nav buttons while home and not animating home, otherwise let
-            // the TaskbarViewController handle it.
-            mControllers.navbarButtonsViewController
-                    .getTaskbarNavButtonTranslationYForInAppDisplay()
-                    .updateValue(mLauncher.getDeviceProfile().getTaskbarOffsetY()
-                            * mTaskbarInAppDisplayProgress.value);
-            mControllers.navbarButtonsViewController
-                    .getOnTaskbarBackgroundNavButtonColorOverride().updateValue(progress);
-
+        if (mControllers.uiController.isIconAlignedWithHotseat()) {
+            if (!mTaskbarLauncherStateController.isAnimatingToLauncher()) {
+                // Only animate the nav buttons while home and not animating home, otherwise let
+                // the TaskbarViewController handle it.
+                mControllers.navbarButtonsViewController
+                        .getTaskbarNavButtonTranslationYForInAppDisplay()
+                        .updateValue(mLauncher.getDeviceProfile().getTaskbarOffsetY()
+                                * mTaskbarInAppDisplayProgress.value);
+                mControllers.navbarButtonsViewController
+                        .getOnTaskbarBackgroundNavButtonColorOverride().updateValue(progress);
+            }
             if (isBubbleBarEnabled()) {
                 mControllers.bubbleControllers.ifPresent(
-                        c -> c.bubbleStashController.setInAppDisplayOverrideProgress(progress));
+                        c -> c.bubbleStashController.setInAppDisplayOverrideProgress(
+                                mTaskbarInAppDisplayProgress.value));
             }
         }
     }
