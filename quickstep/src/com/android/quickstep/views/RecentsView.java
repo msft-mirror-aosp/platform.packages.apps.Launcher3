@@ -3694,30 +3694,42 @@ public abstract class RecentsView<
         int currentPageScroll = getScrollForPage(mCurrentPage);
         int lastGridTaskScroll = getScrollForPage(indexOfChild(lastGridTaskView));
         boolean currentPageSnapsToEndOfGrid = currentPageScroll == lastGridTaskScroll;
+
+        int topGridRowSize = mTopRowIdSet.size();
+        int numLargeTiles = mUtils.getLargeTileCount(getTaskViews());
+        int bottomGridRowSize = taskCount - mTopRowIdSet.size() - numLargeTiles;
+        boolean topRowLonger = topGridRowSize > bottomGridRowSize;
+        boolean bottomRowLonger = bottomGridRowSize > topGridRowSize;
+        boolean dismissedTaskFromTop = mTopRowIdSet.contains(dismissedTaskViewId);
+        boolean dismissedTaskFromBottom = !dismissedTaskFromTop && !isFocusedTaskDismissed;
+        if (dismissedTaskFromTop || (isFocusedTaskDismissed && nextFocusedTaskFromTop)) {
+            topGridRowSize--;
+        }
+        if (dismissedTaskFromBottom || (isFocusedTaskDismissed && !nextFocusedTaskFromTop)) {
+            bottomGridRowSize--;
+        }
+        int longRowWidth = Math.max(topGridRowSize, bottomGridRowSize)
+                * (mLastComputedGridTaskSize.width() + mPageSpacing);
+        if (!enableGridOnlyOverview() && !isStagingFocusedTask) {
+            longRowWidth += mLastComputedTaskSize.width() + mPageSpacing;
+        }
+        // Compensate the removed gap if we don't already have shortTotalCompensation,
+        // and adjust accordingly to the new shortTotalCompensation after dismiss.
+        int newClearAllShortTotalWidthTranslation = 0;
+        if (mClearAllShortTotalWidthTranslation == 0) {
+            // If first task is not in the expected position (mLastComputedTaskSize) and being too
+            // close  to ClearAllButton, then apply extra translation to ClearAllButton.
+            int firstTaskStart = mLastComputedGridSize.left + longRowWidth;
+            int expectedFirstTaskStart = mLastComputedTaskSize.right;
+            if (firstTaskStart < expectedFirstTaskStart) {
+                newClearAllShortTotalWidthTranslation = expectedFirstTaskStart - firstTaskStart;
+            }
+        }
         if (lastGridTaskView != null && lastGridTaskView.isVisibleToUser()) {
             // After dismissal, animate translation of the remaining tasks to fill any gap left
             // between the end of the grid and the clear all button. Only animate if the clear
             // all button is visible or would become visible after dismissal.
             float longGridRowWidthDiff = 0;
-
-            int topGridRowSize = mTopRowIdSet.size();
-            int numLargeTiles = mUtils.getLargeTileCount(getTaskViews());
-            int bottomGridRowSize = taskCount - mTopRowIdSet.size() - numLargeTiles;
-            boolean topRowLonger = topGridRowSize > bottomGridRowSize;
-            boolean bottomRowLonger = bottomGridRowSize > topGridRowSize;
-            boolean dismissedTaskFromTop = mTopRowIdSet.contains(dismissedTaskViewId);
-            boolean dismissedTaskFromBottom = !dismissedTaskFromTop && !isFocusedTaskDismissed;
-            if (dismissedTaskFromTop || (isFocusedTaskDismissed && nextFocusedTaskFromTop)) {
-                topGridRowSize--;
-            }
-            if (dismissedTaskFromBottom || (isFocusedTaskDismissed && !nextFocusedTaskFromTop)) {
-                bottomGridRowSize--;
-            }
-            int longRowWidth = Math.max(topGridRowSize, bottomGridRowSize)
-                    * (mLastComputedGridTaskSize.width() + mPageSpacing);
-            if (!enableGridOnlyOverview() && !isStagingFocusedTask) {
-                longRowWidth += mLastComputedTaskSize.width() + mPageSpacing;
-            }
 
             float gapWidth = 0;
             if ((topRowLonger && dismissedTaskFromTop)
@@ -3730,17 +3742,6 @@ public abstract class RecentsView<
             }
             if (gapWidth > 0) {
                 if (mClearAllShortTotalWidthTranslation == 0) {
-                    // Compensate the removed gap if we don't already have shortTotalCompensation,
-                    // and adjust accordingly to the new shortTotalCompensation after dismiss.
-                    int newClearAllShortTotalWidthTranslation = 0;
-                    if (longRowWidth < mLastComputedGridSize.width()) {
-                        DeviceProfile deviceProfile = mContainer.getDeviceProfile();
-                        newClearAllShortTotalWidthTranslation =
-                                (mIsRtl
-                                        ? mLastComputedTaskSize.right
-                                        : deviceProfile.widthPx - mLastComputedTaskSize.left)
-                                        - longRowWidth - deviceProfile.overviewGridSideMargin;
-                    }
                     float gapCompensation = gapWidth - newClearAllShortTotalWidthTranslation;
                     longGridRowWidthDiff += mIsRtl ? -gapCompensation : gapCompensation;
                 }
@@ -3830,6 +3831,8 @@ public abstract class RecentsView<
                     : mUtils.getDesktopTaskViewCount(getTaskViews());
             stagingTranslation = getPagedOrientationHandler().getPrimaryScroll(this)
                     - getScrollForPage(nextSnappedPage);
+            stagingTranslation += mIsRtl ? newClearAllShortTotalWidthTranslation
+                    : -newClearAllShortTotalWidthTranslation;
         }
         for (int i = 0; i < count; i++) {
             View child = getChildAt(i);
@@ -3888,7 +3891,7 @@ public abstract class RecentsView<
                     anim.setFloat(taskView, TaskView.DISMISS_SCALE, scale,
                             clampToProgress(LINEAR, animationStartProgress,
                                     dismissTranslationInterpolationEnd));
-                    primaryTranslation += mIsRtl ? dismissedTaskWidth : -dismissedTaskWidth;
+                    primaryTranslation += dismissedTaskWidth;
                     animationEndProgress = dismissTranslationInterpolationEnd;
                     float secondaryTranslation = -mTaskGridVerticalDiff;
                     if (!nextFocusedTaskFromTop) {
