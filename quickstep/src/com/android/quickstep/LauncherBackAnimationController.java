@@ -24,6 +24,7 @@ import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.BaseActivity.INVISIBLE_ALL;
 import static com.android.launcher3.BaseActivity.INVISIBLE_BY_PENDING_FLAGS;
 import static com.android.launcher3.BaseActivity.PENDING_INVISIBLE_BY_WALLPAPER_ANIMATION;
+import static com.android.window.flags.Flags.predictiveBackThreeButtonNav;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -60,6 +61,8 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.taskbar.LauncherTaskbarUIController;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
+import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.quickstep.util.BackAnimState;
 import com.android.systemui.shared.system.QuickStepContract;
@@ -295,8 +298,11 @@ public class LauncherBackAnimationController {
 
         mStartRect.set(appTarget.windowConfiguration.getMaxBounds());
 
-        // inset bottom in case of pinned taskbar being present
-        mStartRect.inset(0, 0, 0, appTarget.contentInsets.bottom);
+        // inset bottom in case of taskbar being present
+        if (!predictiveBackThreeButtonNav() || mLauncher.getDeviceProfile().isTaskbarPresent
+                || DisplayController.getNavigationMode(mLauncher) == NavigationMode.NO_BUTTON) {
+            mStartRect.inset(0, 0, 0, appTarget.contentInsets.bottom);
+        }
 
         mLauncherTargetView = mQuickstepTransitionManager.findLauncherView(
                 new RemoteAnimationTarget[]{ mBackTarget });
