@@ -69,6 +69,12 @@
     <string name="widget_category_note_taking" msgid="3469689394504266039">"การจดบันทึก"</string>
     <string name="widget_add_button_label" msgid="2761267068711937179">"เพิ่ม"</string>
     <string name="widget_add_button_content_description" msgid="1810530016360039643">"เพิ่มวิดเจ็ต <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>
+    <!-- no translation found for widgets_list_expand_button_label (7912016136574932622) -->
+    <skip />
+    <!-- no translation found for widgets_list_expand_button_content_description (4600513860973450888) -->
+    <skip />
+    <!-- no translation found for widgets_list_expanded (7374857868788557730) -->
+    <skip />
     <string name="reconfigurable_widget_education_tip" msgid="6336962690888067057">"แตะเพื่อเปลี่ยนการตั้งค่าวิดเจ็ต"</string>
     <string name="widget_reconfigure_button_content_description" msgid="8811472721881205250">"เปลี่ยนการตั้งค่าวิดเจ็ต"</string>
     <string name="all_apps_search_bar_hint" msgid="1390553134053255246">"ค้นหาแอป"</string>
@@ -124,6 +130,10 @@
     <string name="msg_disabled_by_admin" msgid="6898038085516271325">"ปิดใช้โดยผู้ดูแลระบบ"</string>
     <string name="allow_rotation_title" msgid="7222049633713050106">"อนุญาตให้หมุนหน้าจอหลัก"</string>
     <string name="allow_rotation_desc" msgid="8662546029078692509">"เมื่อหมุนโทรศัพท์"</string>
+    <!-- no translation found for landscape_mode_title (5138814555934843926) -->
+    <skip />
+    <!-- no translation found for landscape_mode_desc (7372569859592816793) -->
+    <skip />
     <string name="notification_dots_title" msgid="9062440428204120317">"เครื่องหมายจุดแสดงการแจ้งเตือน"</string>
     <string name="notification_dots_desc_on" msgid="1679848116452218908">"เปิด"</string>
     <string name="notification_dots_desc_off" msgid="1760796511504341095">"ปิด"</string>
@@ -142,7 +152,8 @@
     <string name="app_installing_title" msgid="5864044122733792085">"กำลังติดตั้ง <xliff:g id="NAME">%1$s</xliff:g> เสร็จแล้ว <xliff:g id="PROGRESS">%2$s</xliff:g>"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"กำลังดาวน์โหลด <xliff:g id="NAME">%1$s</xliff:g> เสร็จแล้ว <xliff:g id="PROGRESS">%2$s</xliff:g>"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g> กำลังรอติดตั้ง"</string>
-    <string name="app_archived_title" msgid="7717956158562544081">"เก็บถาวร <xliff:g id="NAME">%1$s</xliff:g> แล้ว แตะเพื่อดาวน์โหลดและกู้คืน"</string>
+    <string name="app_archived_title" msgid="4548283110222420708">"เก็บถาวร <xliff:g id="NAME">%1$s</xliff:g> แล้ว"</string>
+    <string name="app_unarchiving_action" msgid="5736107006413929484">"ดาวน์โหลดและกู้คืน"</string>
     <string name="dialog_update_title" msgid="114234265740994042">"ต้องอัปเดตแอป"</string>
     <string name="dialog_update_message" msgid="4176784553982226114">"แอปสำหรับไอคอนนี้ยังไม่ได้อัปเดต คุณอัปเดตด้วยตนเองได้โดยเปิดใช้ทางลัดนี้อีกครั้งหรือนำไอคอนออก"</string>
     <string name="dialog_update" msgid="2178028071796141234">"อัปเดต"</string>
@@ -187,6 +198,8 @@
     <string name="work_apps_paused_edu_accept" msgid="6377476824357318532">"รับทราบ"</string>
     <string name="work_apps_pause_btn_text" msgid="4669288269140620646">"หยุดแอปงานชั่วคราว"</string>
     <string name="work_apps_enable_btn_text" msgid="1736198302467317371">"ยกเลิกการหยุดชั่วคราว"</string>
+    <!-- no translation found for work_scheduler_button_content_description (917340740986764967) -->
+    <skip />
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"ตัวกรอง"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"ไม่สำเร็จ: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"พื้นที่ส่วนตัว"</string>

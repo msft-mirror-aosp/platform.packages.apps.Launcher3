@@ -407,11 +407,13 @@ public class BubbleBarView extends FrameLayout {
             return true;
         }
         if (action == R.id.action_move_left) {
-            mController.updateBubbleBarLocation(BubbleBarLocation.LEFT);
+            mController.updateBubbleBarLocation(BubbleBarLocation.LEFT,
+                    BubbleBarLocation.UpdateSource.A11Y_ACTION_BAR);
             return true;
         }
         if (action == R.id.action_move_right) {
-            mController.updateBubbleBarLocation(BubbleBarLocation.RIGHT);
+            mController.updateBubbleBarLocation(BubbleBarLocation.RIGHT,
+                    BubbleBarLocation.UpdateSource.A11Y_ACTION_BAR);
             return true;
         }
         return false;
@@ -791,6 +793,7 @@ public class BubbleBarView extends FrameLayout {
         updateLayoutParams();
         updateBubbleAccessibilityStates();
         updateContentDescription();
+        updateDotsAndBadgesIfCollapsed();
     }
 
     /** Removes the given bubble from the bubble bar. */
@@ -856,7 +859,7 @@ public class BubbleBarView extends FrameLayout {
         updateBubbleAccessibilityStates();
         updateContentDescription();
         mDismissedByDragBubbleView = null;
-        updateNotificationDotsIfCollapsed();
+        updateDotsAndBadgesIfCollapsed();
     }
 
     /**
@@ -886,17 +889,23 @@ public class BubbleBarView extends FrameLayout {
         return childViews;
     }
 
-    private void updateNotificationDotsIfCollapsed() {
+    private void updateDotsAndBadgesIfCollapsed() {
         if (isExpanded()) {
             return;
         }
         for (int i = 0; i < getChildCount(); i++) {
             BubbleView bubbleView = (BubbleView) getChildAt(i);
-            // when we're collapsed, the first bubble should show the dot if it has it. the rest of
-            // the bubbles should hide their dots.
-            if (i == 0 && bubbleView.hasUnseenContent()) {
-                bubbleView.showDotIfNeeded(/* animate= */ true);
+            // when we're collapsed, the first bubble should show the badge and the dot if it has
+            // it. the rest of the bubbles should hide their badges and dots.
+            if (i == 0) {
+                bubbleView.showBadge();
+                if (bubbleView.hasUnseenContent()) {
+                    bubbleView.showDotIfNeeded(/* animate= */ true);
+                } else {
+                    bubbleView.hideDot();
+                }
             } else {
+                bubbleView.hideBadge();
                 bubbleView.hideDot();
             }
         }
@@ -1100,7 +1109,7 @@ public class BubbleBarView extends FrameLayout {
             }
             updateBubblesLayoutProperties(mBubbleBarLocation);
             updateContentDescription();
-            updateNotificationDotsIfCollapsed();
+            updateDotsAndBadgesIfCollapsed();
         }
     }
 
@@ -1560,6 +1569,7 @@ public class BubbleBarView extends FrameLayout {
         void dismissBubbleBar();
 
         /** Requests the controller to update bubble bar location to the given value */
-        void updateBubbleBarLocation(BubbleBarLocation location);
+        void updateBubbleBarLocation(BubbleBarLocation location,
+                @BubbleBarLocation.UpdateSource int source);
     }
 }
