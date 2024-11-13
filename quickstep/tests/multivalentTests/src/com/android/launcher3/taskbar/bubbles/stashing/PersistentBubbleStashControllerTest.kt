@@ -284,6 +284,21 @@ class PersistentBubbleStashControllerTest {
     }
 
     @Test
+    fun inAppDisplayOverrideProgress_onHome_cancelExistingAnimation() {
+        whenever(bubbleBarViewController.hasBubbles()).thenReturn(false)
+        persistentTaskBarStashController.launcherState = BubbleLauncherState.HOME
+
+        bubbleBarViewController.bubbleBarTranslationY.animateToValue(100f)
+        advanceTimeBy(10)
+        assertThat(bubbleBarViewController.bubbleBarTranslationY.isAnimating).isTrue()
+
+        getInstrumentation().runOnMainSync {
+            persistentTaskBarStashController.inAppDisplayOverrideProgress = 0.5f
+        }
+        assertThat(bubbleBarViewController.bubbleBarTranslationY.isAnimating).isFalse()
+    }
+
+    @Test
     fun inAppDisplayProgressUpdate_inApp_noTranslationUpdate() {
         whenever(bubbleBarViewController.hasBubbles()).thenReturn(false)
         persistentTaskBarStashController.launcherState = BubbleLauncherState.IN_APP
