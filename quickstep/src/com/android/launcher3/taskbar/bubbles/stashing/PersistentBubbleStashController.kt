@@ -119,7 +119,10 @@ class PersistentBubbleStashController(
             if (field == value) return
             field = value
             if (launcherState == BubbleLauncherState.HOME) {
-                bubbleBarViewController.bubbleBarTranslationY.updateValue(bubbleBarTranslationY)
+                if (bubbleBarTranslationYAnimator.isAnimating) {
+                    bubbleBarTranslationYAnimator.cancelAnimation()
+                }
+                bubbleBarTranslationYAnimator.updateValue(bubbleBarTranslationY)
                 if (value == 0f || value == 1f) {
                     // Update insets only when we reach the end values
                     taskbarInsetsController.onTaskbarOrBubblebarWindowHeightOrInsetsChanged()

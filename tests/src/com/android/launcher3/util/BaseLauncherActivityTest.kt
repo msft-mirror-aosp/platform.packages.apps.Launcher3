@@ -69,8 +69,9 @@ open class BaseLauncherActivityTest<LAUNCHER_TYPE : Launcher> {
 
     protected fun targetContext(): Context = getInstrumentation().targetContext
 
-    protected fun goToState(state: LauncherState) = executeOnLauncher {
-        it.stateManager.goToState(state, 0)
+    protected fun goToState(state: LauncherState) {
+        executeOnLauncher { it.stateManager.goToState(state, 0) }
+        UiDevice.getInstance(getInstrumentation()).waitForIdle()
     }
 
     protected fun executeOnLauncher(f: ActivityAction<LAUNCHER_TYPE>) = scenario.onActivity(f)
@@ -91,6 +92,12 @@ open class BaseLauncherActivityTest<LAUNCHER_TYPE : Launcher> {
         message: String,
         condition: Function<LAUNCHER_TYPE, Boolean>,
     ) = atMost(message, { getFromLauncher(condition)!! })
+
+    protected fun waitForLauncherCondition(
+        message: String,
+        condition: Function<LAUNCHER_TYPE, Boolean>,
+        timeout: Long,
+    ) = atMost(message, { getFromLauncher(condition)!! }, null, timeout)
 
     protected fun <T> getOnceNotNull(message: String, f: Function<LAUNCHER_TYPE, T?>): T? {
         var output: T? = null
