@@ -85,6 +85,7 @@ import com.android.launcher3.EncryptionType;
 import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.anim.AnimatedFloat;
+import com.android.launcher3.desktop.DesktopAppLaunchTransitionManager;
 import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.statehandlers.DesktopVisibilityController;
 import com.android.launcher3.statemanager.StatefulActivity;
@@ -662,6 +663,7 @@ public class TouchInteractionService extends Service {
     private NavigationMode mGestureStartNavMode = null;
 
     private DesktopVisibilityController mDesktopVisibilityController;
+    private DesktopAppLaunchTransitionManager mDesktopAppLaunchTransitionManager;
 
     @Override
     public void onCreate() {
@@ -686,6 +688,9 @@ public class TouchInteractionService extends Service {
         mDesktopVisibilityController = new DesktopVisibilityController(this);
         mTaskbarManager = new TaskbarManager(
                 this, mAllAppsActionManager, mNavCallbacks, mDesktopVisibilityController);
+        mDesktopAppLaunchTransitionManager =
+                new DesktopAppLaunchTransitionManager(this, SystemUiProxy.INSTANCE.get(this));
+        mDesktopAppLaunchTransitionManager.registerTransitions();
         if (Flags.enableLauncherOverviewInWindow() || Flags.enableFallbackOverviewInWindow()) {
             mRecentsWindowManager = new RecentsWindowManager(this);
         }
@@ -851,6 +856,10 @@ public class TouchInteractionService extends Service {
         if (mRecentsWindowManager != null) {
             mRecentsWindowManager.destroy();
         }
+        if (mDesktopAppLaunchTransitionManager != null) {
+            mDesktopAppLaunchTransitionManager.unregisterTransitions();
+        }
+        mDesktopAppLaunchTransitionManager = null;
         mDesktopVisibilityController.onDestroy();
         sConnected = false;
 
