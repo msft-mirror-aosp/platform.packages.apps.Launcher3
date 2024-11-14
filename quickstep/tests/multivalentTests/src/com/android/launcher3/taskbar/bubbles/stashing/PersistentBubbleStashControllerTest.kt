@@ -86,6 +86,20 @@ class PersistentBubbleStashControllerTest {
     }
 
     @Test
+    fun updateLauncherState_noBubbles_controllerNotified() {
+        // Given bubble bar has  no bubbles
+        whenever(bubbleBarViewController.hasBubbles()).thenReturn(false)
+
+        // When switch to home screen
+        getInstrumentation().runOnMainSync {
+            persistentTaskBarStashController.launcherState = BubbleLauncherState.HOME
+        }
+
+        // Then bubble bar view controller is notified
+        verify(bubbleBarViewController).onBubbleBarConfigurationChanged(/* animate= */ false)
+    }
+
+    @Test
     fun setBubblesShowingOnHomeUpdatedToFalse_barPositionYUpdated_controllersNotified() {
         // Given bubble bar is on home and has bubbles
         whenever(bubbleBarViewController.hasBubbles()).thenReturn(false)
