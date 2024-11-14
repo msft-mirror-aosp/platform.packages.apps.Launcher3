@@ -27,6 +27,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherActivityInfo
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
+import android.multiuser.Flags.addLauncherUserConfig
 import android.os.Bundle
 import android.os.Flags.allowPrivateProfile
 import android.os.IBinder
@@ -74,16 +75,14 @@ open class SystemApiWrapper @Inject constructor(@ApplicationContext context: Con
         mContext.getSystemService(UserManager::class.java)!!.userProfiles?.forEach { user ->
             mContext.getSystemService(LauncherApps::class.java)!!.getLauncherUserInfo(user)?.apply {
                 users[user] =
-                    UserIconInfo(
-                        user,
-                        when (userType) {
-                            UserManager.USER_TYPE_PROFILE_MANAGED -> UserIconInfo.TYPE_WORK
-                            UserManager.USER_TYPE_PROFILE_CLONE -> UserIconInfo.TYPE_CLONED
-                            UserManager.USER_TYPE_PROFILE_PRIVATE -> UserIconInfo.TYPE_PRIVATE
-                            else -> UserIconInfo.TYPE_MAIN
-                        },
-                        userSerialNumber.toLong(),
-                    )
+                    if (addLauncherUserConfig())
+                        UserIconInfo(
+                            user,
+                            getUserIconType(userType),
+                            userSerialNumber.toLong(),
+                            userConfig,
+                        )
+                    else UserIconInfo(user, getUserIconType(userType), userSerialNumber.toLong())
             }
         }
         return users
@@ -192,4 +191,13 @@ open class SystemApiWrapper @Inject constructor(@ApplicationContext context: Con
 
     override fun getApplicationInfoHash(appInfo: ApplicationInfo): String =
         (appInfo.sourceDir?.hashCode() ?: 0).toString() + " " + appInfo.longVersionCode
+
+    fun getUserIconType(userType: String): Int {
+        return when (userType) {
+            UserManager.USER_TYPE_PROFILE_MANAGED -> UserIconInfo.TYPE_WORK
+            UserManager.USER_TYPE_PROFILE_CLONE -> UserIconInfo.TYPE_CLONED
+            UserManager.USER_TYPE_PROFILE_PRIVATE -> UserIconInfo.TYPE_PRIVATE
+            else -> UserIconInfo.TYPE_MAIN
+        }
+    }
 }

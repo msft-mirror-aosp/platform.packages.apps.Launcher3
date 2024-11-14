@@ -188,7 +188,9 @@ public class LauncherAppState implements SafeCloseable {
         mOnTerminateCallback.add(() ->
                 settingsCache.unregister(NOTIFICATION_BADGING_URI, notificationLister));
         // Register an observer to notify Launcher about Private Space settings toggle.
-        registerPrivateSpaceHideWhenLockListener(settingsCache);
+        if (!android.multiuser.Flags.addLauncherUserConfig()) {
+            registerPrivateSpaceHideWhenLockListener(settingsCache);
+        }
     }
 
     public LauncherAppState(Context context, @Nullable String iconCacheFileName) {
