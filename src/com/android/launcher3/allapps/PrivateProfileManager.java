@@ -45,6 +45,7 @@ import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Trace;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.Log;
@@ -220,6 +221,7 @@ public class PrivateProfileManager extends UserProfileManager {
      * when animation is not running.
      */
     public void reset() {
+        Trace.beginSection("PrivateProfileManager#reset");
         // Ensure the state of the header view is what it should be before animating.
         updateView();
         getMainRecyclerView().setChildAttachedConsumer(null);
@@ -239,6 +241,7 @@ public class PrivateProfileManager extends UserProfileManager {
             executeLock();
         }
         addPrivateSpaceDecorator(updatedState);
+        Trace.endSection();
     }
 
     /** Returns whether or not Private Space Settings Page is available. */
@@ -331,7 +334,9 @@ public class PrivateProfileManager extends UserProfileManager {
 
     /** Collapses the private space before the app list has been updated. */
     void executeLock() {
+        Trace.beginSection("PrivateProfileManager#executeLock");
         MAIN_EXECUTOR.execute(() -> updatePrivateStateAnimator(false));
+        Trace.endSection();
     }
 
     void setAnimationRunning(boolean isAnimationRunning) {
@@ -378,6 +383,7 @@ public class PrivateProfileManager extends UserProfileManager {
         if (mPSHeader == null) {
             return;
         }
+        Trace.beginSection("PrivateProfileManager#updateView");
         Log.d(TAG, "bindPrivateSpaceHeaderViewElements: " + "Updating view with state: "
                 + getCurrentState());
         mPSHeader.setAlpha(1);
@@ -436,6 +442,7 @@ public class PrivateProfileManager extends UserProfileManager {
             }
         }
         mPSHeader.invalidate();
+        Trace.endSection();
     }
 
     /** Sets the enablement of the profile when header or button is clicked. */
@@ -840,6 +847,7 @@ public class PrivateProfileManager extends UserProfileManager {
         ActivityAllAppsContainerView<?>.AdapterHolder mainAdapterHolder = mAllApps.mAH.get(MAIN);
         List<BaseAllAppsAdapter.AdapterItem> adapterItems =
                 mainAdapterHolder.mAppsList.getAdapterItems();
+        Trace.beginSection("PrivateProfileManager#expandPrivateSpace");
         if (Flags.enablePrivateSpace() && Flags.privateSpaceAnimation()
                 && mAllApps.isPersonalTab()) {
             // Animate the text and settings icon.
@@ -849,6 +857,7 @@ public class PrivateProfileManager extends UserProfileManager {
                     getPsHeaderHeight(), deviceProfile.allAppsCellHeightPx);
             updatePrivateStateAnimator(true);
         }
+        Trace.endSection();
     }
 
     private void exitSearchAndExpand() {
