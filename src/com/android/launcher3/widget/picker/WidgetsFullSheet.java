@@ -605,9 +605,12 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             mAdapters.get(AdapterHolder.SEARCH).mWidgetsRecyclerView.setVisibility(GONE);
             mAdapters.get(getCurrentAdapterHolderType()).mWidgetsRecyclerView.setVisibility(
                     VISIBLE);
-            // Visibility of recommended widgets, recycler views and headers are handled in methods
-            // below.
-            post(this::onRecommendedWidgetsBound);
+            if (mRecommendedWidgetsCount > 0) {
+                // Display recommendations immediately, if present, so that other parts of sticky
+                // header (e.g. personal / work tabs) don't flash in interim.
+                mWidgetRecommendationsContainer.setVisibility(VISIBLE);
+            }
+            // Visibility of recycler views and headers are handled in methods below.
             onWidgetsBound();
         }
     }

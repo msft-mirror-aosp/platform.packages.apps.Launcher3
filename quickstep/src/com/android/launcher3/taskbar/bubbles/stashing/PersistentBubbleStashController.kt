@@ -54,7 +54,9 @@ class PersistentBubbleStashController(
             if (field == state) return
             val transitionFromHome = field == BubbleLauncherState.HOME
             field = state
-            if (!bubbleBarViewController.hasBubbles()) {
+            val hasBubbles = bubbleBarViewController.hasBubbles()
+            bubbleBarViewController.onBubbleBarConfigurationChanged(hasBubbles)
+            if (!hasBubbles) {
                 // if there are no bubbles, there's nothing to show, so just return.
                 return
             }
@@ -65,7 +67,6 @@ class PersistentBubbleStashController(
                 // on home but in persistent taskbar elsewhere so the position is different.
                 animateBubbleBarY()
             }
-            bubbleBarViewController.onBubbleBarConfigurationChanged(/* animate= */ true)
         }
 
     override var isSysuiLocked: Boolean = false
