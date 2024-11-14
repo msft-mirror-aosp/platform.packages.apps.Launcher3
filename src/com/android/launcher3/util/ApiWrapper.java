@@ -16,11 +16,8 @@
 
 package com.android.launcher3.util;
 
-import static android.multiuser.Flags.addLauncherUserConfig;
-
 import static com.android.launcher3.LauncherConstants.ActivityCodes.REQUEST_HOME_ROLE;
 
-import android.annotation.SuppressLint;
 import android.app.ActivityOptions;
 import android.app.Person;
 import android.app.role.RoleManager;
@@ -28,12 +25,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherActivityInfo;
-import android.content.pm.LauncherApps;
-import android.content.pm.LauncherUserInfo;
 import android.content.pm.ShortcutInfo;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
-import android.os.Build;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.ArrayMap;
@@ -51,7 +45,6 @@ import com.android.launcher3.dagger.LauncherAppSingleton;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import javax.inject.Inject;
 
@@ -92,32 +85,22 @@ public class ApiWrapper {
     /**
      * Returns a map of all users on the device to their corresponding UI properties
      */
-    @SuppressLint("NewApi")
     public Map<UserHandle, UserIconInfo> queryAllUsers() {
         UserManager um = mContext.getSystemService(UserManager.class);
         Map<UserHandle, UserIconInfo> users = new ArrayMap<>();
         List<UserHandle> usersActual = um.getUserProfiles();
         if (usersActual != null) {
             for (UserHandle user : usersActual) {
+                long serial = um.getSerialNumberForUser(user);
+
+                // Simple check to check if the provided user is work profile
+                // TODO: Migrate to a better platform API
                 NoopDrawable d = new NoopDrawable();
                 boolean isWork = (d != mContext.getPackageManager().getUserBadgedIcon(d, user));
-                UserIconInfo info;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                    LauncherUserInfo userInfo = Objects.requireNonNull(
-                            mContext.getSystemService(LauncherApps.class)).getLauncherUserInfo(
-                            user);
-                    long serial = Objects.requireNonNull(userInfo).getUserSerialNumber();
-                    info = addLauncherUserConfig() ? new UserIconInfo(user,
-                            isWork ? UserIconInfo.TYPE_WORK : UserIconInfo.TYPE_MAIN, serial,
-                            userInfo.getUserConfig()) : new UserIconInfo(user,
-                            isWork ? UserIconInfo.TYPE_WORK : UserIconInfo.TYPE_MAIN, serial);
-                } else {
-                    long serial = um.getSerialNumberForUser(user);
-                    // Simple check to check if the provided user is work profile
-                    // TODO: Migrate to a better platform API
-                    info = new UserIconInfo(user,
-                            isWork ? UserIconInfo.TYPE_WORK : UserIconInfo.TYPE_MAIN, serial);
-                }
+                UserIconInfo info = new UserIconInfo(
+                        user,
+                        isWork ? UserIconInfo.TYPE_WORK : UserIconInfo.TYPE_MAIN,
+                        serial);
                 users.put(user, info);
             }
         }

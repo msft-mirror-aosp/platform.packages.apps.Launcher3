@@ -16,9 +16,7 @@
 
 package com.android.launcher3.model
 
-import android.annotation.SuppressLint
 import android.content.pm.LauncherApps
-import android.content.pm.LauncherUserInfo
 import android.content.pm.PackageInstaller.SessionInfo
 import android.content.pm.ShortcutInfo
 import android.os.UserHandle
@@ -34,7 +32,6 @@ import com.android.launcher3.model.PackageUpdatedTask.OP_UNSUSPEND
 import com.android.launcher3.model.PackageUpdatedTask.OP_UPDATE
 import com.android.launcher3.pm.InstallSessionTracker
 import com.android.launcher3.pm.PackageInstallInfo
-import com.android.launcher3.pm.UserCache
 import com.android.launcher3.util.PackageUserKey
 import java.util.function.Consumer
 
@@ -133,17 +130,6 @@ class ModelLauncherCallbacks(private var taskExecutor: Consumer<ModelUpdateTask>
             taskExecutor.accept { taskController, _, apps ->
                 apps.addPromiseApp(taskController.app.context, sessionInfo)
                 taskController.bindApplicationsIfNeeded()
-            }
-        }
-    }
-
-    @SuppressLint("NewApi")
-    override fun onUserConfigChanged(launcherUserInfo: LauncherUserInfo) {
-        FileLog.d(TAG, "onUserConfigChanged for user ${launcherUserInfo.userType}")
-        if (android.multiuser.Flags.addLauncherUserConfig()) {
-            taskExecutor.accept { taskController, _, _ ->
-                UserCache.INSTANCE.get(taskController.app.context).updateCache()
-                taskController.app.model.forceReload()
             }
         }
     }
