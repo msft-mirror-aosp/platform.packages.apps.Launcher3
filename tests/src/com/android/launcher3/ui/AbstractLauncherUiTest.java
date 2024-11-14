@@ -407,6 +407,15 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher> {
     }
 
     @After
+    public void resetFreezeRecentTaskList() {
+        try {
+            mDevice.executeShellCommand("wm reset-freeze-recent-tasks");
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to reset fozen recent tasks list", e);
+        }
+    }
+
+    @After
     public void verifyLauncherState() {
         try {
             // Limits UI tests affecting tests running after them.

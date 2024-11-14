@@ -1290,8 +1290,12 @@ public class BubbleBarView extends FrameLayout {
         // If there are more than 2 bubbles, the first 2 should be visible when collapsed,
         // excluding the overflow.
         return bubbleChildCount >= MAX_VISIBLE_BUBBLES_COLLAPSED
-                ? getScaledIconSize() + mIconOverlapAmount + horizontalPadding
+                ? getCollapsedWidthWithMaxVisibleBubbles()
                 : getScaledIconSize() + horizontalPadding;
+    }
+
+    float getCollapsedWidthWithMaxVisibleBubbles()  {
+        return getScaledIconSize() + mIconOverlapAmount + 2 * mBubbleBarPadding;
     }
 
     /** Returns the child count excluding the overflow if it's present. */
