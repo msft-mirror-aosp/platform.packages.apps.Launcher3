@@ -118,6 +118,7 @@
 
     <!-- Launcher app transition -->
     <dimen name="closing_window_trans_y">115dp</dimen>
+    <dimen name="closing_freeform_window_trans_y">36dp</dimen>
 
     <dimen name="quick_switch_scaling_scroll_threshold">100dp</dimen>
 
