@@ -1362,15 +1362,17 @@ public class TouchInteractionService extends Service {
                 && runningTask != null
                 && runningTask.isRootChooseActivity();
 
-        // In the case where we are in an excluded, translucent overlay, ignore it and treat the
-        // running activity as the task behind the overlay.
-        TopTaskTracker.CachedTaskInfo otherVisibleTask = runningTask == null
-                ? null
-                : runningTask.getVisibleNonExcludedTask();
-        if (otherVisibleTask != null) {
-            ActiveGestureProtoLogProxy.logUpdateGestureStateRunningTask(
-                    otherVisibleTask.getPackageName(), runningTask.getPackageName());
-            gestureState.updateRunningTask(otherVisibleTask);
+        if (!com.android.wm.shell.Flags.enableShellTopTaskTracking()) {
+            // In the case where we are in an excluded, translucent overlay, ignore it and treat the
+            // running activity as the task behind the overlay.
+            TopTaskTracker.CachedTaskInfo otherVisibleTask = runningTask == null
+                    ? null
+                    : runningTask.getVisibleNonExcludedTask();
+            if (otherVisibleTask != null) {
+                ActiveGestureProtoLogProxy.logUpdateGestureStateRunningTask(
+                        otherVisibleTask.getPackageName(), runningTask.getPackageName());
+                gestureState.updateRunningTask(otherVisibleTask);
+            }
         }
 
         boolean previousGestureAnimatedToLauncher =
@@ -1672,6 +1674,7 @@ public class TouchInteractionService extends Service {
         ContextualSearchStateManager.INSTANCE.get(this).dump("\t", pw);
         SystemUiProxy.INSTANCE.get(this).dump(pw);
         DeviceConfigWrapper.get().dump("   ", pw);
+        TopTaskTracker.INSTANCE.get(this).dump(pw);
     }
 
     private AbsSwipeUpHandler createLauncherSwipeHandler(

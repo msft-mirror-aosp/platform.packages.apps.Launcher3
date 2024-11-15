@@ -1031,6 +1031,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         private final int mAllAppsCellSpecsTwoPanelId;
         private final int mRowCountSpecsId;
         private final boolean mIsFixedLandscape;
+        private final boolean mIsOldGrid;
 
         public GridOption(Context context, AttributeSet attrs, Info displayInfo) {
             TypedArray a = context.obtainStyledAttributes(
@@ -1175,6 +1176,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
             }
 
             mIsFixedLandscape = a.getBoolean(R.styleable.GridDisplayOption_isFixedLandscape, false);
+            mIsOldGrid = a.getBoolean(R.styleable.GridDisplayOption_isOldGrid, false);
 
             int inlineForRotation = a.getInt(R.styleable.GridDisplayOption_inlineQsb,
                     DONT_INLINE_QSB);
@@ -1206,20 +1208,30 @@ public class InvariantDeviceProfile implements SafeCloseable {
             }
         }
 
-        public boolean isNewGridOption() {
-            return mRowCountSpecsId != INVALID_RESOURCE_HANDLE;
-        }
-
+        /**
+         * Returns true if the grid option should be used given the flags that are toggled on/off.
+         */
         public boolean filterByFlag(int deviceType, boolean isFixedLandscape) {
             if (deviceType == TYPE_TABLET) {
                 return Flags.oneGridRotationHandling() == mIsDualGrid;
             }
 
-            if (isFixedLandscape) {
-                return Flags.oneGridSpecs() && mIsFixedLandscape;
+            // Here we return true if fixed landscape mode should be on.
+            if (mIsFixedLandscape || isFixedLandscape) {
+                return mIsFixedLandscape && isFixedLandscape && Flags.oneGridSpecs();
             }
 
-            return ((Flags.oneGridSpecs() == isNewGridOption()) && !mIsFixedLandscape);
+            // Here we return true if we want to show the new grids.
+            if (mRowCountSpecsId != INVALID_RESOURCE_HANDLE) {
+                return Flags.oneGridSpecs();
+            }
+
+            // Here we return true if we want to show the old grids.
+            if (mIsOldGrid) {
+                return !Flags.oneGridSpecs();
+            }
+
+            return true;
         }
     }
 
