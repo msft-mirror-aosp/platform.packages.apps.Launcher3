@@ -100,6 +100,7 @@ import com.android.internal.jank.Cuj;
 import com.android.internal.util.LatencyTracker;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimationSuccessListener;
@@ -1373,8 +1374,9 @@ public abstract class AbsSwipeUpHandler<
             mInputConsumerProxy.enable();
         }
         if (endTarget == HOME) {
+            boolean isPinnedTaskbar = DisplayController.isPinnedTaskbar(mContext);
             duration = mContainer != null && mContainer.getDeviceProfile().isTaskbarPresent
-                    ? StaggeredWorkspaceAnim.DURATION_TASKBAR_MS
+                    ? QuickstepTransitionManager.getTaskbarToHomeDuration(isPinnedTaskbar)
                     : StaggeredWorkspaceAnim.DURATION_MS;
             ContextualEduStatsManager.INSTANCE.get(mContext).updateEduStats(
                     mGestureState.isTrackpadGesture(), GestureType.HOME);
