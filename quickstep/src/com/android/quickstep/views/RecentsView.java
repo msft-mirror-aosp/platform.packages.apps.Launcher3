@@ -847,6 +847,8 @@ public abstract class RecentsView<
     private final RecentsViewModelHelper mHelper;
     private final RecentsViewUtils mUtils = new RecentsViewUtils();
 
+    private final Matrix mTmpMatrix = new Matrix();
+
     public RecentsView(Context context, @Nullable AttributeSet attrs, int defStyleAttr,
             BaseContainerInterface sizeStrategy) {
         super(context, attrs, defStyleAttr);
@@ -1966,7 +1968,7 @@ public abstract class RecentsView<
                     // We try to avoid this because it can cause a scroll jump, but it is needed
                     // for cases where the running task isn't included in this load plan (e.g. if
                     // the current running task is excludedFromRecents.)
-                    showCurrentTask(mActiveGestureRunningTasks);
+                    showCurrentTask(mActiveGestureRunningTasks, "applyLoadPlan");
                 } else {
                     setRunningTaskViewId(INVALID_TASK_ID);
                 }
@@ -2749,7 +2751,7 @@ public abstract class RecentsView<
             updateSizeAndPadding();
         }
 
-        showCurrentTask(mActiveGestureRunningTasks);
+        showCurrentTask(mActiveGestureRunningTasks, "onGestureAnimationStart");
         setEnableFreeScroll(false);
         setEnableDrawingLiveTile(false);
         setRunningTaskHidden(true);
@@ -2930,8 +2932,9 @@ public abstract class RecentsView<
      * All subsequent calls to reload will keep the task as the first item until {@link #reset()}
      * is called.  Also scrolls the view to this task.
      */
-    private void showCurrentTask(Task[] runningTasks) {
-        Log.d(TAG, "showCurrentTask - runningTasks: " + Arrays.toString(runningTasks));
+    private void showCurrentTask(Task[] runningTasks, String caller) {
+        Log.d(TAG, "showCurrentTask(" + caller + ") - runningTasks: "
+                + Arrays.toString(runningTasks));
         if (runningTasks.length == 0) {
             return;
         }
@@ -5807,6 +5810,14 @@ public abstract class RecentsView<
         // mSyncTransactionApplier doesn't get transferred over
         runActionOnRemoteHandles(remoteTargetHandle -> {
             final TransformParams params = remoteTargetHandle.getTransformParams();
+            if (Flags.enableFallbackOverviewInWindow() || Flags.enableLauncherOverviewInWindow()) {
+                params.setHomeBuilderProxy((builder, app, transformParams) -> {
+                    mTmpMatrix.setScale(
+                            1f, 1f, app.localBounds.exactCenterX(), app.localBounds.exactCenterY());
+                    builder.setMatrix(mTmpMatrix).setAlpha(1f).setShow();
+                });
+            }
+
             if (mSyncTransactionApplier != null) {
                 params.setSyncTransactionApplier(mSyncTransactionApplier);
                 params.getTargetSet().addReleaseCheck(mSyncTransactionApplier);
