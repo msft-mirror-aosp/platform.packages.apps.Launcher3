@@ -217,6 +217,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
 
     public static final int CONTENT_ALPHA_DURATION = 217;
     public static final int TRANSIENT_TASKBAR_TRANSITION_DURATION = 417;
+    public static final int PINNED_TASKBAR_TRANSITION_DURATION = 600;
     public static final int TASKBAR_TO_APP_DURATION = 600;
     // TODO(b/236145847): Tune TASKBAR_TO_HOME_DURATION to 383 after conflict with unlock animation
     // is solved.
@@ -1745,8 +1746,21 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         return new AnimatorBackState(rectFSpringAnim, anim);
     }
 
-    public static int getTaskbarToHomeDuration() {
-        if (enableScalingRevealHomeAnimation()) {
+    /** Get animation duration for taskbar for going to home. */
+    public static int getTaskbarToHomeDuration(boolean isPinnedTaskbar) {
+        return getTaskbarToHomeDuration(false, isPinnedTaskbar);
+    }
+
+    /**
+     * Get animation duration for taskbar for going to home.
+     *
+     * @param shouldOverrideToFastAnimation should overwrite scaling reveal home animation duration
+     */
+    public static int getTaskbarToHomeDuration(boolean shouldOverrideToFastAnimation,
+            boolean isPinnedTaskbar) {
+        if (isPinnedTaskbar) {
+            return PINNED_TASKBAR_TRANSITION_DURATION;
+        } else if (enableScalingRevealHomeAnimation() && !shouldOverrideToFastAnimation) {
             return TASKBAR_TO_HOME_DURATION_SLOW;
         } else {
             return TASKBAR_TO_HOME_DURATION_FAST;
