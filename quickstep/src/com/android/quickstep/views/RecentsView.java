@@ -5854,15 +5854,22 @@ public abstract class RecentsView<
      * Finish recents animation.
      */
     public void finishRecentsAnimation(boolean toRecents, @Nullable Runnable onFinishComplete) {
-        finishRecentsAnimation(toRecents, true /* shouldPip */, onFinishComplete);
+        finishRecentsAnimation(toRecents, false, true /* shouldPip */, onFinishComplete);
     }
 
+    /**
+     * Finish recents animation.
+     */
+    public void finishRecentsAnimation(boolean toRecents, boolean shouldPip,
+            @Nullable Runnable onFinishComplete) {
+        finishRecentsAnimation(toRecents, shouldPip, false, onFinishComplete);
+    }
     /**
      * NOTE: Whatever value gets passed through to the toRecents param may need to also be set on
      * {@link #mRecentsAnimationController#setWillFinishToHome}.
      */
     public void finishRecentsAnimation(boolean toRecents, boolean shouldPip,
-            @Nullable Runnable onFinishComplete) {
+            boolean allAppTargetsAreTranslucent, @Nullable Runnable onFinishComplete) {
         Log.d(TAG, "finishRecentsAnimation - mRecentsAnimationController: "
                 + mRecentsAnimationController);
         // TODO(b/197232424#comment#10) Move this back into onRecentsAnimationComplete(). Maybe?
@@ -5894,7 +5901,7 @@ public abstract class RecentsView<
                         tx, null /* overlay */);
             }
         }
-        mRecentsAnimationController.finish(toRecents, () -> {
+        mRecentsAnimationController.finish(toRecents, allAppTargetsAreTranslucent, () -> {
             if (onFinishComplete != null) {
                 onFinishComplete.run();
             }
