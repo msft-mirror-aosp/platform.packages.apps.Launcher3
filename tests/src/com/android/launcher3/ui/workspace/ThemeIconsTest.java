@@ -15,8 +15,6 @@
  */
 package com.android.launcher3.ui.workspace;
 
-import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
-
 import static com.android.launcher3.AbstractFloatingView.TYPE_ACTION_POPUP;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.TestConstants.AppNames.TEST_APP_NAME;
@@ -29,11 +27,9 @@ import android.content.ContentProviderClient;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.net.Uri;
-import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.test.filters.LargeTest;
-import androidx.test.uiautomator.UiDevice;
 
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
@@ -48,9 +44,6 @@ import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.TestUtil;
 
 import org.junit.Test;
-
-import java.util.ArrayDeque;
-import java.util.Queue;
 
 /**
  * Tests for theme icon support in Launcher
@@ -137,27 +130,10 @@ public class ThemeIconsTest extends BaseLauncherActivityTest<Launcher> {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-
-        // Find the app icon
-        Queue<View> viewQueue = new ArrayDeque<>();
-        viewQueue.add(parent);
-        BubbleTextView icon = null;
-        while (!viewQueue.isEmpty()) {
-            View view = viewQueue.poll();
-            if (view instanceof ViewGroup) {
-                parent = (ViewGroup) view;
-                for (int i = parent.getChildCount() - 1; i >= 0; i--) {
-                    viewQueue.add(parent.getChildAt(i));
-                }
-            } else if (view instanceof BubbleTextView btv) {
-                if (btv.getContentDescription() != null
-                        && title.equals(btv.getContentDescription().toString())) {
-                    icon = btv;
-                    break;
-                }
-            }
-        }
-        return icon;
+        return (BubbleTextView) searchView(parent, v ->
+                v instanceof BubbleTextView btv
+                    && btv.getContentDescription() != null
+                        && title.equals(btv.getContentDescription().toString()));
     }
 
     private BubbleTextView verifyIconTheme(String title, ViewGroup parent, boolean isThemed) {
@@ -192,12 +168,5 @@ public class ThemeIconsTest extends BaseLauncherActivityTest<Launcher> {
                     .get());
             rv.getLayoutManager().scrollToPosition(pos);
         });
-    }
-
-    private void addToWorkspace(View btv) {
-        TestUtil.runOnExecutorSync(MAIN_EXECUTOR, () ->
-                btv.getAccessibilityDelegate().performAccessibilityAction(
-                        btv, com.android.launcher3.R.id.action_add_to_workspace, null));
-        UiDevice.getInstance(getInstrumentation()).waitForIdle();
     }
 }
