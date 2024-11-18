@@ -21,11 +21,8 @@ import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
 import static org.junit.Assert.assertTrue;
 
-import android.content.BroadcastReceiver;
 import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.os.Process;
 import android.system.OsConstants;
 import android.util.Log;
@@ -53,7 +50,6 @@ import org.junit.rules.TestRule;
 
 import java.util.Objects;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -214,38 +210,6 @@ public abstract class AbstractLauncherUiTest<LAUNCHER_TYPE extends Launcher>
             testThreadAction.run();
             return getFromLauncher(condition);
         }, mLauncher, timeout);
-    }
-
-    /**
-     * Broadcast receiver which blocks until the result is received.
-     */
-    public class BlockingBroadcastReceiver extends BroadcastReceiver {
-
-        private final CountDownLatch latch = new CountDownLatch(1);
-        private Intent mIntent;
-
-        public BlockingBroadcastReceiver(String action) {
-            mTargetContext.registerReceiver(this, new IntentFilter(action),
-                    Context.RECEIVER_EXPORTED/*UNAUDITED*/);
-        }
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            mIntent = intent;
-            latch.countDown();
-        }
-
-        public Intent blockingGetIntent() throws InterruptedException {
-            assertTrue("Timed Out", latch.await(DEFAULT_BROADCAST_TIMEOUT_SECS, TimeUnit.SECONDS));
-            mTargetContext.unregisterReceiver(this);
-            return mIntent;
-        }
-
-        public Intent blockingGetExtraIntent() throws InterruptedException {
-            Intent intent = blockingGetIntent();
-            return intent == null ? null : (Intent) intent.getParcelableExtra(
-                    Intent.EXTRA_INTENT);
-        }
     }
 
     public static void startAppFast(String packageName) {
