@@ -384,10 +384,11 @@ public class LauncherBackAnimationController {
         // Move the window along the Y axis.
         float top = (screenHeight - height) * 0.5f + deltaY;
         // Move the window along the X axis.
-        float left = event.getSwipeEdge() == BackEvent.EDGE_RIGHT
-                ? progress * mWindowScaleMarginX
-                : screenWidth - progress * mWindowScaleMarginX - width;
-
+        float left = switch (event.getSwipeEdge()) {
+            case BackEvent.EDGE_RIGHT -> progress * mWindowScaleMarginX;
+            case BackEvent.EDGE_LEFT -> screenWidth - progress * mWindowScaleMarginX - width;
+            default -> (screenWidth - width) / 2;
+        };
         mCurrentRect.set(left, top, left + width, top + height);
         float cornerRadius = Utilities.mapRange(
                 progress, mWindowScaleStartCornerRadius, mWindowScaleEndCornerRadius);
