@@ -25,6 +25,8 @@ import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER;
 import static com.android.launcher3.config.FeatureFlags.enableTaskbarPinning;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 
+import static java.util.function.Predicate.not;
+
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
@@ -70,7 +72,9 @@ import com.android.systemui.shared.recents.model.Task;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
@@ -362,10 +366,15 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         view.setTag(null);
     }
 
-    /**
-     * Inflates/binds the Hotseat views to show in the Taskbar given their ItemInfos.
-     */
-    protected void updateHotseatItems(ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks) {
+    /** Inflates/binds the hotseat items and recent tasks to the view. */
+    protected void updateItems(ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks) {
+        // Filter out unsupported items.
+        hotseatItemInfos = Arrays.stream(hotseatItemInfos)
+                .filter(Objects::nonNull)
+                .toArray(ItemInfo[]::new);
+        // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
+        recentTasks = recentTasks.stream().filter(not(GroupTask::supportsMultipleTasks)).toList();
+
         int nextViewIndex = 0;
         int numViewsAnimated = 0;
         mAddedDividerForRecents = false;
@@ -382,10 +391,6 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         // Add Hotseat icons.
         for (ItemInfo hotseatItemInfo : hotseatItemInfos) {
-            if (hotseatItemInfo == null) {
-                continue;
-            }
-
             // Replace any Hotseat views with the appropriate type if it's not already that type.
             final int expectedLayoutResId;
             boolean isCollection = false;
@@ -473,16 +478,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         boolean supportsOverflow = Flags.taskbarOverflow();
         int overflowSize = 0;
-        int numberOfSupportedRecents = 0;
         if (supportsOverflow) {
-            for (GroupTask task : recentTasks) {
-                // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
-                if (!task.supportsMultipleTasks()) {
-                    ++numberOfSupportedRecents;
-                }
-            }
-
-            mIdealNumIcons = nextViewIndex + numberOfSupportedRecents + nonTaskIconsToBeAdded;
+            mIdealNumIcons = nextViewIndex + recentTasks.size() + nonTaskIconsToBeAdded;
             overflowSize = mIdealNumIcons - mMaxNumIcons;
 
             if (overflowSize > 0 && mTaskbarOverflowView != null) {
@@ -496,7 +493,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // An extra item needs to be added to overflow button to account for the space taken up by
         // the overflow button.
         final int itemsToAddToOverflow =
-                (overflowSize > 0) ? Math.min(overflowSize + 1, numberOfSupportedRecents) : 0;
+                (overflowSize > 0) ? Math.min(overflowSize + 1, recentTasks.size()) : 0;
         if (overflowSize > 0) {
             overflownTasks = new ArrayList<Task>(itemsToAddToOverflow);
         }
@@ -506,10 +503,6 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             if (mTaskbarOverflowView != null && overflownTasks != null
                     && overflownTasks.size() < itemsToAddToOverflow) {
                 // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
-                if (task.supportsMultipleTasks()) {
-                    continue;
-                }
-
                 overflownTasks.add(task.task1);
                 if (overflownTasks.size() == itemsToAddToOverflow) {
                     mTaskbarOverflowView.setItems(overflownTasks);
@@ -549,11 +542,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
 
             if (recentIcon == null) {
-                if (isCollection) {
-                    // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
-                    continue;
-                }
-
+                // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
                 recentIcon = inflate(expectedLayoutResId);
                 LayoutParams lp = new LayoutParams(mIconTouchSize, mIconTouchSize);
                 recentIcon.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
