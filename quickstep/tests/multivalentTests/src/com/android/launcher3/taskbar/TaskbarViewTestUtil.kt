@@ -95,6 +95,16 @@ class TaskbarViewSubject(failureMetadata: FailureMetadata, private val view: Tas
             }
         assertThat(actualTypes).containsExactly(*expectedTypes).inOrder()
     }
+
+    /** Verifies that recents from [startIndex] have IDs that match [expectedIds] in order. */
+    fun hasRecentsOrder(startIndex: Int, expectedIds: List<Int>) {
+        val actualIds =
+            view.iconViews.slice(startIndex..<expectedIds.size).map {
+                assertThat(it.tag).isInstanceOf(GroupTask::class.java)
+                (it.tag as? GroupTask)?.task1?.key?.id
+            }
+        assertThat(actualIds).containsExactlyElementsIn(expectedIds).inOrder()
+    }
 }
 
 /** Types of icons in the [TaskbarView]. */

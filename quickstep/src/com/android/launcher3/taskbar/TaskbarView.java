@@ -20,6 +20,7 @@ import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_
 import static com.android.launcher3.BubbleTextView.DISPLAY_TASKBAR;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
 import static com.android.launcher3.Flags.enableRecentsInTaskbar;
+import static com.android.launcher3.Flags.taskbarRecentsLayoutTransition;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER;
 import static com.android.launcher3.config.FeatureFlags.enableTaskbarPinning;
@@ -131,6 +132,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
     private final int mAllAppsButtonTranslationOffset;
 
+    private final int mNumStaticViews;
+
     public TaskbarView(@NonNull Context context) {
         this(context, null);
     }
@@ -195,6 +198,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         // TODO: Disable touch events on QSB otherwise it can crash.
         mQsb = LayoutInflater.from(context).inflate(R.layout.search_container_hotseat, this, false);
+
+        mNumStaticViews = taskbarRecentsLayoutTransition() ? addStaticViews() : 0;
     }
 
     /**
@@ -253,6 +258,24 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         mMaxNumIcons = calculateMaxNumIcons();
         return oldMaxNumIcons != mMaxNumIcons
                 && (mIdealNumIcons > oldMaxNumIcons || mIdealNumIcons > mMaxNumIcons);
+    }
+
+    /**
+     * Pre-adds views that are always children of this view for LayoutTransition support.
+     * <p>
+     * Normally these views are removed and re-added when updating hotseat and recents. This
+     * approach does not behave well with LayoutTransition, so we instead need to add them
+     * initially and avoid removing them during updates.
+     */
+    private int addStaticViews() {
+        int numStaticViews = 1;
+        addView(mAllAppsButtonContainer);
+        if (mActivityContext.getDeviceProfile().isQsbInline) {
+            addView(mQsb, mIsRtl ? 1 : 0);
+            mQsb.setVisibility(View.INVISIBLE);
+            numStaticViews++;
+        }
+        return numStaticViews;
     }
 
     @Override
@@ -377,6 +400,16 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
         recentTasks = recentTasks.stream().filter(not(GroupTask::supportsMultipleTasks)).toList();
 
+        if (taskbarRecentsLayoutTransition()) {
+            updateItemsWithLayoutTransition(hotseatItemInfos, recentTasks);
+        } else {
+            updateItemsWithoutLayoutTransition(hotseatItemInfos, recentTasks);
+        }
+    }
+
+    private void updateItemsWithoutLayoutTransition(
+            ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks) {
+
         mNextViewIndex = 0;
         mAddedDividerForRecents = false;
 
@@ -399,11 +432,6 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         updateRecents(recentTasks);
 
-        // Remove remaining views
-        while (mNextViewIndex < getChildCount()) {
-            removeAndRecycle(getChildAt(mNextViewIndex));
-        }
-
         addView(mAllAppsButtonContainer, mIsRtl ? hotseatItemInfos.length : 0);
 
         // If there are no recent tasks, add divider after All Apps (unless it's the only view).
@@ -413,11 +441,76 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             addView(mTaskbarDividerContainer, mIsRtl ? (getChildCount() - 1) : 1);
         }
 
-
         if (mActivityContext.getDeviceProfile().isQsbInline) {
             addView(mQsb, mIsRtl ? getChildCount() : 0);
             // Always set QSB to invisible after re-adding.
             mQsb.setVisibility(View.INVISIBLE);
+        }
+    }
+
+    private void updateItemsWithLayoutTransition(
+            ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks) {
+
+        // Skip static views and potential All Apps divider, if they are on the left.
+        mNextViewIndex = mIsRtl ? 0 : mNumStaticViews;
+        if (getChildAt(mNextViewIndex) == mTaskbarDividerContainer) {
+            mNextViewIndex++;
+        }
+
+        // Update left section.
+        if (mIsRtl) {
+            updateRecents(recentTasks.reversed());
+        } else {
+            updateHotseatItems(hotseatItemInfos);
+        }
+
+        // Now at theoretical position for recent apps divider.
+        updateRecentsDivider(!recentTasks.isEmpty());
+        if (getChildAt(mNextViewIndex) == mTaskbarDividerContainer) {
+            mNextViewIndex++;
+        }
+
+        // Update right section.
+        if (mIsRtl) {
+            updateHotseatItems(hotseatItemInfos);
+        } else {
+            updateRecents(recentTasks);
+        }
+
+        // Recents divider takes priority.
+        if (!mAddedDividerForRecents) {
+            updateAllAppsDivider();
+        }
+    }
+
+    private void updateRecentsDivider(boolean hasRecents) {
+        if (hasRecents && !mAddedDividerForRecents) {
+            mAddedDividerForRecents = true;
+
+            // Remove possible All Apps divider.
+            if (getChildAt(mNumStaticViews) == mTaskbarDividerContainer) {
+                mNextViewIndex--; // All Apps divider on the left. Need to account for removing it.
+            }
+            removeView(mTaskbarDividerContainer);
+
+            addView(mTaskbarDividerContainer, mNextViewIndex);
+        } else if (!hasRecents && mAddedDividerForRecents) {
+            mAddedDividerForRecents = false;
+            removeViewAt(mNextViewIndex);
+        }
+    }
+
+    private void updateAllAppsDivider() {
+        final int allAppsDividerIndex =
+                mIsRtl ? getChildCount() - mNumStaticViews : mNumStaticViews;
+        if (getChildAt(allAppsDividerIndex) == mTaskbarDividerContainer
+                && getChildCount() == mNumStaticViews + 1) {
+            // Only static views with divider so remove divider.
+            removeView(mTaskbarDividerContainer);
+        } else if (getChildAt(allAppsDividerIndex) != mTaskbarDividerContainer
+                && getChildCount() >= mNumStaticViews + 1) {
+            // Static views with at least one app icon so add divider.
+            addView(mTaskbarDividerContainer, allAppsDividerIndex);
         }
     }
 
@@ -440,7 +533,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
 
             View hotseatView = null;
-            while (mNextViewIndex < getChildCount()) {
+            while (isNextViewInSection(ItemInfo.class)) {
                 hotseatView = getChildAt(mNextViewIndex);
 
                 // see if the view can be reused
@@ -500,6 +593,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
             mNextViewIndex++;
         }
+
+        while (isNextViewInSection(ItemInfo.class)) {
+            removeAndRecycle(getChildAt(mNextViewIndex));
+        }
     }
 
     private void updateRecents(List<GroupTask> recentTasks) {
@@ -558,7 +655,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
 
             View recentIcon = null;
-            while (mNextViewIndex < getChildCount()) {
+            while (isNextViewInSection(GroupTask.class)) {
                 recentIcon = getChildAt(mNextViewIndex);
 
                 // see if the view can be reused
@@ -589,6 +686,15 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
             mNextViewIndex++;
         }
+
+        while (isNextViewInSection(GroupTask.class)) {
+            removeAndRecycle(getChildAt(mNextViewIndex));
+        }
+    }
+
+    private boolean isNextViewInSection(Class<?> tagClass) {
+        return mNextViewIndex < getChildCount()
+                && tagClass.isInstance(getChildAt(mNextViewIndex).getTag());
     }
 
     /** Binds the GroupTask to the BubbleTextView to be ready to present to the user. */

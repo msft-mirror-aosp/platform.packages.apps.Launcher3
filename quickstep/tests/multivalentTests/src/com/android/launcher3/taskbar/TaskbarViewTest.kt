@@ -16,6 +16,10 @@
 
 package com.android.launcher3.taskbar
 
+import android.platform.test.flag.junit.FlagsParameterization
+import android.platform.test.flag.junit.FlagsParameterization.allCombinationsOf
+import android.platform.test.flag.junit.SetFlagsRule
+import com.android.launcher3.Flags.FLAG_TASKBAR_RECENTS_LAYOUT_TRANSITION
 import com.android.launcher3.R
 import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnMainSync
 import com.android.launcher3.taskbar.TaskbarIconType.ALL_APPS
@@ -25,22 +29,40 @@ import com.android.launcher3.taskbar.TaskbarIconType.RECENT
 import com.android.launcher3.taskbar.TaskbarViewTestUtil.assertThat
 import com.android.launcher3.taskbar.TaskbarViewTestUtil.createHotseatItems
 import com.android.launcher3.taskbar.TaskbarViewTestUtil.createRecents
+import com.android.launcher3.taskbar.rules.TaskbarDeviceEmulationRule
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule
 import com.android.launcher3.taskbar.rules.TaskbarUnitTestRule.ForceRtl
 import com.android.launcher3.taskbar.rules.TaskbarWindowSandboxContext
-import com.android.launcher3.util.LauncherMultivalentJUnit
-import com.android.launcher3.util.LauncherMultivalentJUnit.EmulatedDevices
+import com.android.launcher3.util.LauncherMultivalentJUnit.Companion.isRunningInRobolectric
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4
+import platform.test.runner.parameterized.Parameters
 
-@RunWith(LauncherMultivalentJUnit::class)
-@EmulatedDevices(["pixelFoldable2023", "pixelTablet2023"])
-class TaskbarViewTest {
+@RunWith(ParameterizedAndroidJunit4::class)
+class TaskbarViewTest(deviceName: String, flags: FlagsParameterization) {
 
-    @get:Rule(order = 0) val context = TaskbarWindowSandboxContext.create()
-    @get:Rule(order = 1) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
+    companion object {
+        @JvmStatic
+        @Parameters(name = "{0},{1}")
+        fun getParams(): List<Array<Any>> {
+            val devices =
+                if (isRunningInRobolectric) {
+                    listOf("pixelFoldable2023", "pixelTablet2023")
+                } else {
+                    listOf("onDevice") // Unused.
+                }
+            val flags = allCombinationsOf(FLAG_TASKBAR_RECENTS_LAYOUT_TRANSITION)
+            return devices.flatMap { d -> flags.map { f -> arrayOf(d, f) } } // Cartesian product.
+        }
+    }
+
+    @get:Rule(order = 0) val setFlagsRule = SetFlagsRule(flags)
+    @get:Rule(order = 1) val context = TaskbarWindowSandboxContext.create()
+    @get:Rule(order = 2) val deviceEmulationRule = TaskbarDeviceEmulationRule(context, deviceName)
+    @get:Rule(order = 3) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
 
     private lateinit var taskbarView: TaskbarView
 
