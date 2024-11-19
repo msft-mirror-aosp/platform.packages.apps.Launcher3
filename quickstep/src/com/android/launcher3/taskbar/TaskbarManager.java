@@ -749,4 +749,9 @@ public class TaskbarManager {
 
     private final DeviceProfile.OnDeviceProfileChangeListener mDebugActivityDeviceProfileChanged =
             dp -> debugWhyTaskbarNotDestroyed("mActivity onDeviceProfileChanged");
+
+    @VisibleForTesting
+    public Context getWindowContext() {
+        return mContext;
+    }
 }
