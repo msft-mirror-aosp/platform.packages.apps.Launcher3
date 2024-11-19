@@ -532,6 +532,21 @@ constructor(
         )
     }
 
+    /** Interrupts the animation due to the IME becoming visible. */
+    fun interruptForIme() {
+        cancelFlyout()
+        val hideAnimation = animatingBubble?.hideAnimation ?: return
+        scheduler.cancel(hideAnimation)
+        animatingBubble = null
+        bubbleStashController.getStashedHandlePhysicsAnimator().cancelIfRunning()
+        bubbleBarView.relativePivotY = 1f
+        // stash the bubble bar since the IME is now visible
+        bubbleStashController.onNewBubbleAnimationInterrupted(
+            /* isStashed= */ true,
+            bubbleBarView.translationY,
+        )
+    }
+
     fun expandedWhileAnimating() {
         val animatingBubble = animatingBubble ?: return
         this.animatingBubble = animatingBubble.copy(expand = true)
