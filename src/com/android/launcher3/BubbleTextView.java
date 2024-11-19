@@ -127,6 +127,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     private static final int[] STATE_PRESSED = new int[]{android.R.attr.state_pressed};
 
+    private static final int APP_PILL_TITLE_PADDING = 8;
+
     private float mScaleForReorderBounce = 1f;
 
     private IntArray mBreakPointsIntArray;
@@ -730,16 +732,21 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         Paint.FontMetrics fm = getPaint().getFontMetrics();
         Rect tmpRect = new Rect();
         getDrawingRect(tmpRect);
+        CharSequence text = getText();
 
-        if (mIcon == null) {
-            appTitleBounds = new RectF(0, 0, tmpRect.right,
-                    (int) Math.ceil(fm.bottom - fm.top));
-        } else {
+        float titleLength = (getPaint().measureText(text, 0, text.length())
+                + APP_PILL_TITLE_PADDING * 2);
+        titleLength = Math.min(titleLength, tmpRect.width());
+        appTitleBounds = new RectF((tmpRect.width() - titleLength) / 2.f - getCompoundPaddingLeft(),
+                0, (tmpRect.width() + titleLength) / 2.f + getCompoundPaddingRight(),
+                (int) Math.ceil(fm.bottom - fm.top));
+
+
+        if (mIcon != null) {
             Rect iconBounds = new Rect();
             getIconBounds(iconBounds);
             int textStart = iconBounds.bottom + getCompoundDrawablePadding();
-            appTitleBounds = new RectF(tmpRect.left, textStart, tmpRect.right,
-                    textStart + (int) Math.ceil(fm.bottom - fm.top));
+            appTitleBounds.offset(0, textStart);
         }
 
         canvas.drawRoundRect(appTitleBounds, appTitleBounds.height() / 2,
@@ -849,6 +856,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             int cellHeightPx = mIconSize + getCompoundDrawablePadding() +
                     (int) Math.ceil(fm.bottom - fm.top);
             setPadding(getPaddingLeft(), (height - cellHeightPx) / 2, getPaddingRight(),
+                    getPaddingBottom());
+        }
+        if (shouldDrawAppContrastTile()) {
+            setPadding(getPaddingLeft() + APP_PILL_TITLE_PADDING, getPaddingTop(),
+                    getPaddingRight() + APP_PILL_TITLE_PADDING,
                     getPaddingBottom());
         }
         // Only apply two line for all_apps and device search only if necessary.
