@@ -23,6 +23,8 @@ import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.view.Display.DEFAULT_DISPLAY;
 
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_TOP_OR_LEFT;
+import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_TYPE_A;
+import static com.android.wm.shell.Flags.enableFlexibleSplit;
 import static com.android.wm.shell.shared.GroupedTaskInfo.TYPE_SPLIT;
 
 import android.app.ActivityManager.RunningTaskInfo;
@@ -228,7 +230,8 @@ public class TopTaskTracker extends ISplitScreenListener.Stub
             return;
         }
 
-        if (stage == SplitConfigurationOptions.STAGE_TYPE_MAIN) {
+        if (stage == SplitConfigurationOptions.STAGE_TYPE_MAIN
+                || (enableFlexibleSplit() && stage == STAGE_TYPE_A)) {
             mMainStagePosition.taskId = taskId;
         } else {
             mSideStagePosition.taskId = taskId;
