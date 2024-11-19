@@ -486,7 +486,7 @@ constructor(
         if (flyout != null) {
             bubbleBarFlyoutController.setUpAndShowFlyout(
                 BubbleBarFlyoutMessage(flyout.icon, flyout.title, flyout.message),
-                onInit = { bubbleView.suppressDotForBubbleUpdate(true) },
+                onInit = { bubbleView.suppressDotForBubbleUpdate() },
                 onEnd = {
                     moveToState(AnimatingBubble.State.IN)
                     bubbleStashController.updateTaskbarTouchRegion()
@@ -498,11 +498,12 @@ constructor(
     }
 
     private fun cancelFlyout() {
-        bubbleBarFlyoutController.cancelFlyout { onFlyoutRemoved() }
+        animatingBubble?.bubbleView?.unsuppressDotForBubbleUpdate(/* animate= */ true)
+        bubbleBarFlyoutController.cancelFlyout { bubbleStashController.updateTaskbarTouchRegion() }
     }
 
     private fun onFlyoutRemoved() {
-        animatingBubble?.bubbleView?.suppressDotForBubbleUpdate(false)
+        animatingBubble?.bubbleView?.unsuppressDotForBubbleUpdate(/* animate= */ false)
         bubbleStashController.updateTaskbarTouchRegion()
     }
 
@@ -573,7 +574,7 @@ constructor(
         val flyout = bubble?.flyoutMessage
         if (flyout != null) {
             // the flyout is currently expanding and we need to update it with new data
-            bubbleView.suppressDotForBubbleUpdate(true)
+            bubbleView.suppressDotForBubbleUpdate()
             bubbleBarFlyoutController.updateFlyoutWhileExpanding(flyout)
         } else {
             // the flyout is expanding but we don't have new flyout data to update it with,
@@ -588,7 +589,7 @@ constructor(
         isExpanding: Boolean,
     ) {
         // unsuppress the current bubble because we are about to hide its flyout
-        animatingBubble.bubbleView.suppressDotForBubbleUpdate(false)
+        animatingBubble.bubbleView.unsuppressDotForBubbleUpdate(/* animate= */ false)
         this.animatingBubble = animatingBubble.copy(bubbleView = bubbleView, expand = isExpanding)
 
         // we're currently idle, waiting for the hide animation to start. update the flyout
@@ -601,7 +602,7 @@ constructor(
         val bubble = bubbleView.bubble as? BubbleBarBubble
         val flyout = bubble?.flyoutMessage
         if (flyout != null) {
-            bubbleView.suppressDotForBubbleUpdate(true)
+            bubbleView.suppressDotForBubbleUpdate()
             bubbleBarFlyoutController.updateFlyoutFullyExpanded(flyout) {
                 bubbleStashController.updateTaskbarTouchRegion()
             }
@@ -616,7 +617,7 @@ constructor(
         isExpanding: Boolean,
     ) {
         // unsuppress the current bubble because we are about to hide its flyout
-        animatingBubble.bubbleView.suppressDotForBubbleUpdate(false)
+        animatingBubble.bubbleView.unsuppressDotForBubbleUpdate(/* animate= */ false)
         this.animatingBubble = animatingBubble.copy(bubbleView = bubbleView, expand = isExpanding)
 
         // the hide animation already started so it can't be canceled, just post it again
@@ -629,7 +630,7 @@ constructor(
             // the flyout is collapsing. update it with the new flyout
             if (flyout != null) {
                 moveToState(AnimatingBubble.State.ANIMATING_IN)
-                bubbleView.suppressDotForBubbleUpdate(true)
+                bubbleView.suppressDotForBubbleUpdate()
                 bubbleBarFlyoutController.updateFlyoutWhileCollapsing(flyout) {
                     moveToState(AnimatingBubble.State.IN)
                     bubbleStashController.updateTaskbarTouchRegion()
