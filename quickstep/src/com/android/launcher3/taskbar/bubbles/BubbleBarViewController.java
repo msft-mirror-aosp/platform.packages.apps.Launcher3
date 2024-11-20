@@ -391,6 +391,13 @@ public class BubbleBarViewController {
         }
     }
 
+    /** Notifies that the IME became visible. */
+    public void onImeVisible() {
+        if (isAnimatingNewBubble()) {
+            mBubbleBarViewAnimator.interruptForIme();
+        }
+    }
+
     //
     // The below animators are exposed to BubbleStashController so it can manage the stashing
     // animation.
