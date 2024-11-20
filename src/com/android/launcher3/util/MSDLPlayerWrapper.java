@@ -28,6 +28,9 @@ import com.android.launcher3.dagger.LauncherBaseAppComponent;
 import com.google.android.msdl.data.model.MSDLToken;
 import com.google.android.msdl.domain.InteractionProperties;
 import com.google.android.msdl.domain.MSDLPlayer;
+import com.google.android.msdl.logging.MSDLEvent;
+
+import java.util.List;
 
 import javax.inject.Inject;
 
@@ -57,5 +60,9 @@ public class MSDLPlayerWrapper {
     /** Perform MSDL feedback for a token without properties */
     public void playToken(MSDLToken token) {
         mMSDLPlayer.playToken(token, null);
+    }
+
+    public List<MSDLEvent> getHistory() {
+        return mMSDLPlayer.getHistory();
     }
 }
