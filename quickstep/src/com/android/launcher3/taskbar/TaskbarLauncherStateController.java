@@ -475,7 +475,7 @@ public class TaskbarLauncherStateController {
         }
         mControllers.bubbleControllers.ifPresent(controllers -> {
             // Show the bubble bar when on launcher home (hotseat icons visible) or in overview
-            boolean onOverview = mLauncherState == LauncherState.OVERVIEW;
+            boolean onOverview = isInLauncher && mLauncherState == LauncherState.OVERVIEW;
             boolean hotseatIconsVisible = isInLauncher && mLauncherState.areElementsVisible(
                     mLauncher, HOTSEAT_ICONS);
             BubbleLauncherState state = onOverview
