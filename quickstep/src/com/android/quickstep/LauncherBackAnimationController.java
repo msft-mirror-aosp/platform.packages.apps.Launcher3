@@ -49,8 +49,8 @@ import android.view.animation.Interpolator;
 import android.window.BackEvent;
 import android.window.BackMotionEvent;
 import android.window.BackProgressAnimator;
+import android.window.IBackAnimationHandoffHandler;
 import android.window.IOnBackInvokedCallback;
-
 import com.android.app.animation.Interpolators;
 import com.android.internal.policy.SystemBarUtils;
 import com.android.internal.view.AppearanceRegion;
@@ -224,6 +224,12 @@ public class LauncherBackAnimationController {
         @Override
         public void setTriggerBack(boolean triggerBack) {
             // TODO(b/261654570): track touch from the Launcher process.
+        }
+
+        @Override
+        public void setHandoffHandler(IBackAnimationHandoffHandler unused) {
+            // For now, Launcher handles this internally so it doesn't need to hand off the
+            // animation.
         }
     }
 
