@@ -417,9 +417,6 @@ public abstract class RecentsView<
                 public void setValue(RecentsView view, float scale) {
                     view.setScaleX(scale);
                     view.setScaleY(scale);
-                    if (enableRefactorTaskThumbnail()) {
-                        view.mRecentsViewModel.updateScale(scale);
-                    }
                     view.mLastComputedTaskStartPushOutDistance = null;
                     view.mLastComputedTaskEndPushOutDistance = null;
                     view.runActionOnRemoteHandles(new Consumer<RemoteTargetHandle>() {
@@ -5034,7 +5031,7 @@ public abstract class RecentsView<
 
     private void updateTaskViewsSnapshotRadius() {
         for (TaskView taskView : getTaskViews()) {
-            taskView.updateSnapshotRadius();
+            taskView.updateFullscreenParams();
         }
     }
 
@@ -5167,7 +5164,7 @@ public abstract class RecentsView<
                 if (!enableRefactorTaskThumbnail()) {
                     taskContainer.getThumbnailViewDeprecated().refreshSplashView();
                 }
-                mSplitHiddenTaskView.updateSnapshotRadius();
+                mSplitHiddenTaskView.updateFullscreenParams();
             });
         } else if (isInitiatingSplitFromTaskView) {
             if (Flags.enableHoverOfChildElementsInTaskview()) {
