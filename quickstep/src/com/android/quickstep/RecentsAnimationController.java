@@ -21,9 +21,11 @@ import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.util.Log;
+import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.view.WindowManagerGlobal;
 import android.window.PictureInPictureSurfaceTransaction;
+import android.window.WindowAnimationState;
 
 import androidx.annotation.UiThread;
 
@@ -32,6 +34,7 @@ import com.android.internal.os.IResultReceiver;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.RunnableList;
 import com.android.quickstep.util.ActiveGestureProtoLogProxy;
+import com.android.systemui.animation.TransitionAnimator;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.RecentsAnimationControllerCompat;
@@ -86,6 +89,16 @@ public class RecentsAnimationController {
                     Log.e(TAG, "Unable to reach window manager", e);
                 }
             });
+        }
+    }
+
+    @UiThread
+    public void handOffAnimation(RemoteAnimationTarget[] targets, WindowAnimationState[] states) {
+        if (TransitionAnimator.Companion.longLivedReturnAnimationsEnabled()) {
+            UI_HELPER_EXECUTOR.execute(() -> mController.handOffAnimation(targets, states));
+        } else {
+            Log.e(TAG, "Tried to hand off the animation, but the feature is disabled",
+                    new Exception());
         }
     }
 

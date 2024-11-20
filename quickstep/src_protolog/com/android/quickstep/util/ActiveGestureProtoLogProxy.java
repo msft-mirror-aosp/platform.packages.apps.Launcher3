@@ -96,6 +96,12 @@ public class ActiveGestureProtoLogProxy {
                 + "force finish recents animation complete; clearing state callback.");
     }
 
+    public static void logHandOffAnimation() {
+        ActiveGestureLog.INSTANCE.addLog("AbsSwipeUpHandler.handOffAnimation");
+        if (!enableActiveGestureProtoLog()) return;
+        ProtoLog.d(ACTIVE_GESTURE_LOG, "AbsSwipeUpHandler.handOffAnimation");
+    }
+
     public static void logFinishRecentsAnimationOnTasksAppeared() {
         ActiveGestureLog.INSTANCE.addLog("finishRecentsAnimationOnTasksAppeared");
         if (!enableActiveGestureProtoLog()) return;
