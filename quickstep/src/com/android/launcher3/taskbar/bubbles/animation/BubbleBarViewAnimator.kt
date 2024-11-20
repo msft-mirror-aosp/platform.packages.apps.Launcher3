@@ -473,8 +473,8 @@ constructor(
         ObjectAnimator.ofFloat(bubbleBarView, View.TRANSLATION_Y, ty - bubbleBarBounceDistanceInPx)
             .withDuration(BUBBLE_BAR_BOUNCE_ANIMATION_DURATION_MS)
             .withEndAction {
-                if (animatingBubble?.expand == true) expandBubbleBar()
                 springBackAnimation.start()
+                if (animatingBubble?.expand == true) expandBubbleBar()
             }
             .start()
     }
