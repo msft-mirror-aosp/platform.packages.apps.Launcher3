@@ -30,6 +30,7 @@ import com.google.android.msdl.domain.InteractionProperties;
 import com.google.android.msdl.domain.MSDLPlayer;
 import com.google.android.msdl.logging.MSDLEvent;
 
+import java.io.PrintWriter;
 import java.util.List;
 
 import javax.inject.Inject;
@@ -64,5 +65,14 @@ public class MSDLPlayerWrapper {
 
     public List<MSDLEvent> getHistory() {
         return mMSDLPlayer.getHistory();
+    }
+
+    /** Print the latest history of MSDL tokens played */
+    public void dump(String prefix, PrintWriter writer) {
+        writer.println(prefix + "MSDLPlayerWrapper history of latest events:");
+        List<MSDLEvent> events = getHistory();
+        for (MSDLEvent event: events) {
+            writer.println(prefix + "\t" + event);
+        }
     }
 }
