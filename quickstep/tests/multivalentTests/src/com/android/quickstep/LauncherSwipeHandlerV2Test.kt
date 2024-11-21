@@ -23,6 +23,7 @@ import com.android.launcher3.R
 import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.util.LauncherModelHelper
+import com.android.launcher3.util.MSDLPlayerWrapper
 import com.android.quickstep.dagger.QuickStepModule
 import com.android.systemui.contextualeducation.GestureType
 import com.android.systemui.shared.system.InputConsumerController
@@ -50,6 +51,8 @@ class LauncherSwipeHandlerV2Test {
     @Mock private lateinit var inputConsumerController: InputConsumerController
 
     @Mock private lateinit var systemUiProxy: SystemUiProxy
+
+    @Mock private lateinit var msdlPlayerWrapper: MSDLPlayerWrapper
 
     private lateinit var underTest: LauncherSwipeHandlerV2
 
@@ -79,6 +82,7 @@ class LauncherSwipeHandlerV2Test {
                 0,
                 false,
                 inputConsumerController,
+                msdlPlayerWrapper,
             )
         underTest.onGestureStarted(/* isLikelyToStartNewTask= */ false)
     }

@@ -33,6 +33,7 @@ import static com.android.launcher3.BaseActivity.STATE_HANDLER_INVISIBILITY_FLAG
 import static com.android.launcher3.Flags.enableAdditionalHomeAnimations;
 import static com.android.launcher3.Flags.enableGridOnlyOverview;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
+import static com.android.launcher3.Flags.msdlFeedback;
 import static com.android.launcher3.PagedView.INVALID_PAGE;
 import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKGROUND;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.IGNORE;
@@ -121,6 +122,7 @@ import com.android.launcher3.taskbar.TaskbarThresholdUtils;
 import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.VibratorWrapper;
@@ -163,6 +165,8 @@ import com.android.wm.shell.Flags;
 import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.startingsurface.SplashScreenExitAnimationUtils;
+
+import com.google.android.msdl.data.model.MSDLToken;
 
 import kotlin.Unit;
 
@@ -362,10 +366,13 @@ public abstract class AbsSwipeUpHandler<
     @Nullable
     private RemoteAnimationTargets.ReleaseCheck mSwipePipToHomeReleaseCheck = null;
 
+    private final MSDLPlayerWrapper mMSDLPlayerWrapper;
+
     public AbsSwipeUpHandler(Context context, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState,
             long touchTimeMs, boolean continuingLastGesture,
-            InputConsumerController inputConsumer, RecentsWindowFactory recentsWindowFactory) {
+            InputConsumerController inputConsumer, RecentsWindowFactory recentsWindowFactory,
+            MSDLPlayerWrapper msdlPlayerWrapper) {
         super(context, deviceState, gestureState);
         mContainerInterface = gestureState.getContainerInterface();
         mContextInitListener =
@@ -391,6 +398,8 @@ public abstract class AbsSwipeUpHandler<
 
         mSplashMainWindowShiftLength = -res
                 .getDimensionPixelSize(R.dimen.starting_surface_exit_animation_window_shift_length);
+
+        mMSDLPlayerWrapper = msdlPlayerWrapper;
 
         initTransitionEndpoints(mRemoteTargetHandles[0].getTaskViewSimulator()
                 .getOrientationState().getLauncherDeviceProfile());
@@ -2272,7 +2281,11 @@ public abstract class AbsSwipeUpHandler<
     }
 
     protected void performHapticFeedback() {
-        VibratorWrapper.INSTANCE.get(mContext).vibrate(OVERVIEW_HAPTIC);
+        if (msdlFeedback()) {
+            mMSDLPlayerWrapper.playToken(MSDLToken.SWIPE_THRESHOLD_INDICATOR);
+        } else {
+            VibratorWrapper.INSTANCE.get(mContext).vibrate(OVERVIEW_HAPTIC);
+        }
     }
 
     public Consumer<MotionEvent> getRecentsViewDispatcher(float navbarRotation) {
