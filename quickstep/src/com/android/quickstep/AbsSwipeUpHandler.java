@@ -783,7 +783,7 @@ public abstract class AbsSwipeUpHandler<
                 && recentsAttachedToAppWindow) {
             // Only move running task if RecentsView has never been attached before, to avoid
             // TaskView jumping to new position as we move the tasks.
-            mRecentsView.moveRunningTaskToFront();
+            mRecentsView.moveRunningTaskToExpectedPosition();
         }
         mAnimationFactory.setRecentsAttachedToAppWindow(
                 recentsAttachedToAppWindow, animate, updateRunningTaskAlpha);
