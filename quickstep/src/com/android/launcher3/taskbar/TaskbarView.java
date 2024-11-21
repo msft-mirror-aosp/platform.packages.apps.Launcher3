@@ -199,7 +199,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // TODO: Disable touch events on QSB otherwise it can crash.
         mQsb = LayoutInflater.from(context).inflate(R.layout.search_container_hotseat, this, false);
 
-        mNumStaticViews = taskbarRecentsLayoutTransition() ? addStaticViews() : 0;
+        mNumStaticViews = taskbarRecentsLayoutTransition() && !mActivityContext.isPhoneMode()
+                ? addStaticViews() : 0;
     }
 
     /**
