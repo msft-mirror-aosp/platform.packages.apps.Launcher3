@@ -417,9 +417,6 @@ public abstract class RecentsView<
                 public void setValue(RecentsView view, float scale) {
                     view.setScaleX(scale);
                     view.setScaleY(scale);
-                    if (enableRefactorTaskThumbnail()) {
-                        view.mRecentsViewModel.updateScale(scale);
-                    }
                     view.mLastComputedTaskStartPushOutDistance = null;
                     view.mLastComputedTaskEndPushOutDistance = null;
                     view.runActionOnRemoteHandles(new Consumer<RemoteTargetHandle>() {
@@ -609,6 +606,8 @@ public abstract class RecentsView<
 
     private int mKeyboardTaskFocusSnapAnimationDuration;
     private int mKeyboardTaskFocusIndex = INVALID_PAGE;
+
+    private int[] mDismissPrimaryTranslations;
 
     /**
      * TODO: Call reloadIdNeeded in onTaskStackChanged.
@@ -846,6 +845,8 @@ public abstract class RecentsView<
     private final RecentsViewModel mRecentsViewModel;
     private final RecentsViewModelHelper mHelper;
     private final RecentsViewUtils mUtils = new RecentsViewUtils();
+
+    private final Matrix mTmpMatrix = new Matrix();
 
     public RecentsView(Context context, @Nullable AttributeSet attrs, int defStyleAttr,
             BaseContainerInterface sizeStrategy) {
@@ -1416,7 +1417,7 @@ public abstract class RecentsView<
         if (showAsGrid()) {
             int screenStart = getPagedOrientationHandler().getPrimaryScroll(this);
             int screenEnd = screenStart + getPagedOrientationHandler().getMeasuredSize(this);
-            return isTaskViewWithinBounds(tv, screenStart, screenEnd);
+            return isTaskViewWithinBounds(tv, screenStart, screenEnd, /*taskViewTranslation=*/ 0);
         } else {
             // For now, just check if it's the active task or an adjacent task
             return Math.abs(indexOfChild(tv) - getNextPage()) <= 1;
@@ -1463,14 +1464,28 @@ public abstract class RecentsView<
         return clearAllScroll + (mIsRtl ? distance : -distance);
     }
 
-    private boolean isTaskViewWithinBounds(TaskView tv, int start, int end) {
-        int taskStart = getPagedOrientationHandler().getChildStart(tv)
-                + (int) tv.getOffsetAdjustment(showAsGrid());
-        int taskSize = (int) (getPagedOrientationHandler().getMeasuredSize(tv)
-                * tv.getSizeAdjustment(showAsFullscreen()));
+    /*
+     * Returns if TaskView is within screen bounds defined in [screenStart, screenEnd].
+     *
+     * @param taskViewTranslation taskView is considered within bounds if either translated or
+     * original position of taskView is within screen bounds.
+     */
+    private boolean isTaskViewWithinBounds(TaskView taskView, int screenStart, int screenEnd,
+            int taskViewTranslation) {
+        int taskStart = getPagedOrientationHandler().getChildStart(taskView)
+                + (int) taskView.getOffsetAdjustment(showAsGrid());
+        int taskSize = (int) (getPagedOrientationHandler().getMeasuredSize(taskView)
+                * taskView.getSizeAdjustment(showAsFullscreen()));
         int taskEnd = taskStart + taskSize;
-        return (taskStart >= start && taskStart <= end) || (taskEnd >= start
-                && taskEnd <= end);
+
+        int translatedTaskStart = taskStart + taskViewTranslation;
+        int translatedTaskEnd = taskEnd + taskViewTranslation;
+
+        taskStart = Math.min(taskStart, translatedTaskStart);
+        taskEnd = Math.max(taskEnd, translatedTaskEnd);
+
+        return (taskStart >= screenStart && taskStart <= screenEnd) || (taskEnd >= screenStart
+                && taskEnd <= screenEnd);
     }
 
     private boolean isTaskViewFullyWithinBounds(TaskView tv, int start, int end) {
@@ -1966,7 +1981,7 @@ public abstract class RecentsView<
                     // We try to avoid this because it can cause a scroll jump, but it is needed
                     // for cases where the running task isn't included in this load plan (e.g. if
                     // the current running task is excludedFromRecents.)
-                    showCurrentTask(mActiveGestureRunningTasks);
+                    showCurrentTask(mActiveGestureRunningTasks, "applyLoadPlan");
                 } else {
                     setRunningTaskViewId(INVALID_TASK_ID);
                 }
@@ -2468,7 +2483,8 @@ public abstract class RecentsView<
             }
             boolean visible;
             if (showAsGrid()) {
-                visible = isTaskViewWithinBounds(taskView, visibleStart, visibleEnd);
+                visible = isTaskViewWithinBounds(taskView, visibleStart, visibleEnd,
+                        mDismissPrimaryTranslations != null ? mDismissPrimaryTranslations[i] : 0);
             } else {
                 visible = lower <= i && i <= upper;
             }
@@ -2749,7 +2765,7 @@ public abstract class RecentsView<
             updateSizeAndPadding();
         }
 
-        showCurrentTask(mActiveGestureRunningTasks);
+        showCurrentTask(mActiveGestureRunningTasks, "onGestureAnimationStart");
         setEnableFreeScroll(false);
         setEnableDrawingLiveTile(false);
         setRunningTaskHidden(true);
@@ -2930,8 +2946,9 @@ public abstract class RecentsView<
      * All subsequent calls to reload will keep the task as the first item until {@link #reset()}
      * is called.  Also scrolls the view to this task.
      */
-    private void showCurrentTask(Task[] runningTasks) {
-        Log.d(TAG, "showCurrentTask - runningTasks: " + Arrays.toString(runningTasks));
+    private void showCurrentTask(Task[] runningTasks, String caller) {
+        Log.d(TAG, "showCurrentTask(" + caller + ") - runningTasks: "
+                + Arrays.toString(runningTasks));
         if (runningTasks.length == 0) {
             return;
         }
@@ -3834,6 +3851,7 @@ public abstract class RecentsView<
             stagingTranslation += mIsRtl ? newClearAllShortTotalWidthTranslation
                     : -newClearAllShortTotalWidthTranslation;
         }
+        mDismissPrimaryTranslations = new int[taskCount];
         for (int i = 0; i < count; i++) {
             View child = getChildAt(i);
             if (child == dismissedTaskView) {
@@ -3851,7 +3869,7 @@ public abstract class RecentsView<
                             Math.abs(i - dismissedIndex),
                             scrollDiff,
                             anim,
-                            splitTimings);
+                            splitTimings, i);
                     needsCurveUpdates = true;
                 }
             } else if (child instanceof TaskView taskView) {
@@ -3912,10 +3930,12 @@ public abstract class RecentsView<
                 primaryTranslation += mIsRtl ? stagingTranslation : -stagingTranslation;
 
                 if (primaryTranslation != 0) {
+                    float finalTranslation = mIsRtl ? primaryTranslation : -primaryTranslation;
                     anim.setFloat(taskView, taskView.getPrimaryDismissTranslationProperty(),
-                            mIsRtl ? primaryTranslation : -primaryTranslation,
+                            finalTranslation,
                             clampToProgress(dismissInterpolator, animationStartProgress,
                                     animationEndProgress));
+                    mDismissPrimaryTranslations[i] = (int) finalTranslation;
                     distanceFromDismissedTask++;
                 }
             }
@@ -3934,7 +3954,7 @@ public abstract class RecentsView<
         if (animateTaskView && dismissedTaskView != null) {
             dismissedTaskView.setTranslationZ(0.1f);
         }
-
+        loadVisibleTaskData(TaskView.FLAG_UPDATE_ALL);
         mPendingAnimation = anim;
         final TaskView finalNextFocusedTaskView = nextFocusedTaskView;
         final boolean finalCloseGapBetweenClearAll = closeGapBetweenClearAll;
@@ -4152,6 +4172,7 @@ public abstract class RecentsView<
                 updateCurrentTaskActionsVisibility();
                 onDismissAnimationEnds();
                 mPendingAnimation = null;
+                mDismissPrimaryTranslations = null;
             }
         });
     }
@@ -4190,7 +4211,8 @@ public abstract class RecentsView<
             int indexDiff,
             int scrollDiffPerPage,
             PendingAnimation pendingAnimation,
-            SplitAnimationTimings splitTimings) {
+            SplitAnimationTimings splitTimings,
+            int index) {
         FloatProperty translationProperty = view instanceof TaskView
                 ? ((TaskView) view).getPrimaryDismissTranslationProperty()
                 : getPagedOrientationHandler().getPrimaryViewTranslate();
@@ -4224,6 +4246,9 @@ public abstract class RecentsView<
                 )
         );
 
+        if (view instanceof TaskView) {
+            mDismissPrimaryTranslations[index] = scrollDiffPerPage;
+        }
         if (mEnableDrawingLiveTile && view instanceof TaskView
                 && ((TaskView) view).isRunningTask()) {
             pendingAnimation.addOnFrameCallback(() -> {
@@ -5006,7 +5031,7 @@ public abstract class RecentsView<
 
     private void updateTaskViewsSnapshotRadius() {
         for (TaskView taskView : getTaskViews()) {
-            taskView.updateSnapshotRadius();
+            taskView.updateFullscreenParams();
         }
     }
 
@@ -5139,7 +5164,7 @@ public abstract class RecentsView<
                 if (!enableRefactorTaskThumbnail()) {
                     taskContainer.getThumbnailViewDeprecated().refreshSplashView();
                 }
-                mSplitHiddenTaskView.updateSnapshotRadius();
+                mSplitHiddenTaskView.updateFullscreenParams();
             });
         } else if (isInitiatingSplitFromTaskView) {
             if (Flags.enableHoverOfChildElementsInTaskview()) {
@@ -5807,6 +5832,14 @@ public abstract class RecentsView<
         // mSyncTransactionApplier doesn't get transferred over
         runActionOnRemoteHandles(remoteTargetHandle -> {
             final TransformParams params = remoteTargetHandle.getTransformParams();
+            if (Flags.enableFallbackOverviewInWindow() || Flags.enableLauncherOverviewInWindow()) {
+                params.setHomeBuilderProxy((builder, app, transformParams) -> {
+                    mTmpMatrix.setScale(
+                            1f, 1f, app.localBounds.exactCenterX(), app.localBounds.exactCenterY());
+                    builder.setMatrix(mTmpMatrix).setAlpha(1f).setShow();
+                });
+            }
+
             if (mSyncTransactionApplier != null) {
                 params.setSyncTransactionApplier(mSyncTransactionApplier);
                 params.getTargetSet().addReleaseCheck(mSyncTransactionApplier);

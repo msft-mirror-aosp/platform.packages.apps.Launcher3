@@ -120,7 +120,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     private final TaskbarView mTaskbarView;
     private final MultiValueAlpha mTaskbarIconAlpha;
     private final AnimatedFloat mTaskbarIconScaleForStash = new AnimatedFloat(this::updateScale);
-    private final AnimatedFloat mTaskbarIconTranslationYForHome = new AnimatedFloat(
+    public final AnimatedFloat mTaskbarIconTranslationYForHome = new AnimatedFloat(
             this::updateTranslationY);
     private final AnimatedFloat mTaskbarIconTranslationYForStash = new AnimatedFloat(
             this::updateTranslationY);
@@ -349,6 +349,11 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      */
     public void addOneTimePreDrawListener(@NonNull Runnable listener) {
         OneShotPreDrawListener.add(mTaskbarView, listener);
+    }
+
+    @VisibleForTesting
+    int getMaxNumIconViews() {
+        return mTaskbarView.getMaxNumIconViews();
     }
 
     public Rect getIconLayoutVisualBounds() {
@@ -796,6 +801,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      */
     private AnimatorPlaybackController createIconAlignmentController(DeviceProfile launcherDp) {
         PendingAnimation setter = new PendingAnimation(100);
+        // icon alignment not needed for pinned taskbar.
+        if (DisplayController.isPinnedTaskbar(mActivity)) return setter.createPlaybackController();
         mOnControllerPreCreateCallback.run();
         DeviceProfile taskbarDp = mActivity.getDeviceProfile();
         Rect hotseatPadding = launcherDp.getHotseatLayoutPadding(mActivity);
