@@ -34,7 +34,7 @@ import com.android.quickstep.RecentsModel
 import com.android.quickstep.SystemUiProxy
 import com.android.quickstep.util.GroupTask
 import com.android.systemui.shared.recents.model.ThumbnailData
-import com.android.wm.shell.shared.desktopmode.ManageWindowsViewContainer
+import com.android.wm.shell.shared.multiinstance.ManageWindowsViewContainer
 import java.util.Collections
 import java.util.function.Predicate
 
