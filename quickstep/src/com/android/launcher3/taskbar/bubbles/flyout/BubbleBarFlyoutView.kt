@@ -402,18 +402,13 @@ class BubbleBarFlyoutView(
         val isNightModeOn = nightModeFlags == Configuration.UI_MODE_NIGHT_YES
         val defaultBackgroundColor = if (isNightModeOn) Color.BLACK else Color.WHITE
         val defaultTextColor = if (isNightModeOn) Color.WHITE else Color.BLACK
-        val ta =
-            context.obtainStyledAttributes(
-                intArrayOf(
-                    com.android.internal.R.attr.materialColorSurfaceContainer,
-                    com.android.internal.R.attr.materialColorOnSurface,
-                    com.android.internal.R.attr.materialColorOnSurfaceVariant,
-                )
-            )
-        backgroundColor = ta.getColor(0, defaultBackgroundColor)
-        title.setTextColor(ta.getColor(1, defaultTextColor))
-        message.setTextColor(ta.getColor(2, defaultTextColor))
-        ta.recycle()
+
+        backgroundColor =
+            context.getColor(com.android.internal.R.color.materialColorSurfaceContainer)
+        title.setTextColor(context.getColor(com.android.internal.R.color.materialColorOnSurface))
+        message.setTextColor(
+            context.getColor(com.android.internal.R.color.materialColorOnSurfaceVariant)
+        )
         backgroundPaint.color = backgroundColor
     }
 }

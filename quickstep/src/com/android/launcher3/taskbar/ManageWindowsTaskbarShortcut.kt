@@ -148,7 +148,7 @@ class ManageWindowsTaskbarShortcut<T>(
     ) :
         ManageWindowsViewContainer(
             originalView.context,
-            Themes.getAttrColor(originalView.context, R.attr.materialColorSurfaceBright),
+            originalView.context.getColor(R.color.materialColorSurfaceBright),
         ),
         TouchController {
         private val taskbarActivityContext = controllers.taskbarActivityContext
