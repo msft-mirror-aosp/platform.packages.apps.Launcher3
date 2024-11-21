@@ -54,6 +54,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.atLeastOnce
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -1264,6 +1265,50 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.alpha).isEqualTo(0)
         assertThat(animator.isAnimating).isFalse()
         verify(bubbleStashController).stashBubbleBarImmediate()
+    }
+
+    @Test
+    fun interruptForIme() {
+        setUpBubbleBar()
+        setUpBubbleStashController()
+
+        val handle = View(context)
+        val handleAnimator = PhysicsAnimator.getInstance(handle)
+        whenever(bubbleStashController.getStashedHandlePhysicsAnimator()).thenReturn(handleAnimator)
+
+        val animator =
+            BubbleBarViewAnimator(
+                bubbleBarView,
+                bubbleStashController,
+                flyoutController,
+                onExpandedNoOp,
+                animatorScheduler,
+            )
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            animator.animateBubbleInForStashed(bubble, isExpanding = false)
+        }
+
+        // wait for the animation to start
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {}
+        PhysicsAnimatorTestUtils.blockUntilFirstAnimationFrameWhereTrue(handleAnimator) { true }
+
+        handleAnimator.assertIsRunning()
+        assertThat(animator.isAnimating).isTrue()
+        // verify the hide bubble animation is pending
+        assertThat(animatorScheduler.delayedBlock).isNotNull()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { animator.interruptForIme() }
+
+        // verify that the hide animation was canceled
+        assertThat(animatorScheduler.delayedBlock).isNull()
+        assertThat(animator.isAnimating).isFalse()
+        verify(bubbleStashController).onNewBubbleAnimationInterrupted(eq(true), any())
+
+        // PhysicsAnimatorTestUtils posts the cancellation to the main thread so we need to wait
+        // again
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        handleAnimator.assertIsNotRunning()
     }
 
     private fun setUpBubbleBar() {
