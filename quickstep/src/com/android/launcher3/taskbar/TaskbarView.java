@@ -473,8 +473,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         boolean supportsOverflow = Flags.taskbarOverflow();
         int overflowSize = 0;
+        int numberOfSupportedRecents = 0;
         if (supportsOverflow) {
-            int numberOfSupportedRecents = 0;
             for (GroupTask task : recentTasks) {
                 // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
                 if (!task.supportsMultipleTasks()) {
@@ -495,7 +495,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         List<Task> overflownTasks = null;
         // An extra item needs to be added to overflow button to account for the space taken up by
         // the overflow button.
-        final int itemsToAddToOverflow = overflowSize > 0 ? overflowSize + 1 : 0;
+        final int itemsToAddToOverflow =
+                (overflowSize > 0) ? Math.min(overflowSize + 1, numberOfSupportedRecents) : 0;
         if (overflowSize > 0) {
             overflownTasks = new ArrayList<Task>(itemsToAddToOverflow);
         }
