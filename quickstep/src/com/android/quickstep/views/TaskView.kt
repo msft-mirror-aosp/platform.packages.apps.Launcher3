@@ -147,11 +147,6 @@ constructor(
         get() = taskContainers[0].task
 
     @get:Deprecated("Use [taskContainers] instead.")
-    val firstSnapshotView: View
-        /** Returns the first snapshotView of the TaskView. */
-        get() = taskContainers[0].snapshotView
-
-    @get:Deprecated("Use [taskContainers] instead.")
     val firstItemInfo: ItemInfo
         get() = taskContainers[0].itemInfo
 

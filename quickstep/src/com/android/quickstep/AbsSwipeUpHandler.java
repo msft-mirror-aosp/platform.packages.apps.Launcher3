@@ -157,6 +157,7 @@ import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.SysUiStatsLog;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
+import com.android.wm.shell.Flags;
 import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.startingsurface.SplashScreenExitAnimationUtils;
@@ -2205,8 +2206,9 @@ public abstract class AbsSwipeUpHandler<
                     mSwipePipToHomeAnimator.getFinishTransaction(),
                     mSwipePipToHomeAnimator.getContentOverlay());
             mIsSwipingPipToHome = false;
-        } else if (mIsSwipeForSplit) {
+        } else if (mIsSwipeForSplit && !Flags.enablePip2()) {
             // Transaction to hide the task to avoid flicker for entering PiP from split-screen.
+            // Note: PiP2 handles entering differently, so skip if enable_pip2=true
             PictureInPictureSurfaceTransaction tx =
                     new PictureInPictureSurfaceTransaction.Builder()
                             .setAlpha(0f)

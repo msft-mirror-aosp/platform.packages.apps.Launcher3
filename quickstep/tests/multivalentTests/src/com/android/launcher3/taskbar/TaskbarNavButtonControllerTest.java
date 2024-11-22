@@ -353,7 +353,7 @@ public class TaskbarNavButtonControllerTest {
         mNavButtonController.sendBackKeyEvent(KeyEvent.ACTION_UP, false);
         verify(mockSystemUiProxy, times(2)).onBackEvent(keyEventCaptor.capture());
         verifyKeyEvent(keyEventCaptor.getAllValues().getFirst(), KeyEvent.ACTION_DOWN, false);
-        verifyKeyEvent(keyEventCaptor.getAllValues().getFirst(), KeyEvent.ACTION_UP, false);
+        verifyKeyEvent(keyEventCaptor.getAllValues().getLast(), KeyEvent.ACTION_UP, false);
     }
 
     @Test
@@ -364,7 +364,7 @@ public class TaskbarNavButtonControllerTest {
         mNavButtonController.sendBackKeyEvent(KeyEvent.ACTION_UP, true);
         verify(mockSystemUiProxy, times(2)).onBackEvent(keyEventCaptor.capture());
         verifyKeyEvent(keyEventCaptor.getAllValues().getFirst(), KeyEvent.ACTION_DOWN, false);
-        verifyKeyEvent(keyEventCaptor.getAllValues().getFirst(), KeyEvent.ACTION_UP, true);
+        verifyKeyEvent(keyEventCaptor.getAllValues().getLast(), KeyEvent.ACTION_UP, true);
     }
 
     @Test
