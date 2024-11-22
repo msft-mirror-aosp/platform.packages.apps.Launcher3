@@ -134,6 +134,22 @@ public class TopTaskTracker extends ISplitScreenListener.Stub
         mOrderedTaskList.removeIf(rto -> rto.taskId == taskInfo.taskId);
         mOrderedTaskList.addFirst(taskInfo);
 
+        // Workaround for b/372067617, if the home task is being brought to front, then it will
+        // occlude all other tasks, so mark them as not-visible
+        if (taskInfo.getActivityType() == ACTIVITY_TYPE_HOME) {
+            // We've moved the task to the front of the list above, so only iterate the tasks after
+            for (int i = 1; i < mOrderedTaskList.size(); i++) {
+                final TaskInfo info = mOrderedTaskList.get(i);
+                if (info.displayId != taskInfo.displayId) {
+                    // Only fall through to reset visibility for tasks on the same display as the
+                    // home task being brought forward
+                    continue;
+                }
+                info.isVisible = false;
+                info.isVisibleRequested = false;
+            }
+        }
+
         // Keep the home display's top running task in the first while adding a non-home
         // display's task to the list, to avoid showing non-home display's task upon going to
         // Recents animation.
