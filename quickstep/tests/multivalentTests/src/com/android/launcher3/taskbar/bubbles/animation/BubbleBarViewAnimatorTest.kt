@@ -48,6 +48,8 @@ import com.android.wm.shell.shared.animation.PhysicsAnimator
 import com.android.wm.shell.shared.animation.PhysicsAnimatorTestUtils
 import com.android.wm.shell.shared.bubbles.BubbleInfo
 import com.google.common.truth.Truth.assertThat
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -765,10 +767,12 @@ class BubbleBarViewAnimatorTest {
         whenever(bubbleStashController.bubbleBarTranslationY)
             .thenReturn(BAR_TRANSLATION_Y_FOR_HOTSEAT)
 
-        val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
-
+        val semaphore = Semaphore(0)
         var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
+        val onExpanded = Runnable {
+            notifiedExpanded = true
+            semaphore.release()
+        }
         val animator =
             BubbleBarViewAnimator(
                 bubbleBarView,
@@ -793,7 +797,12 @@ class BubbleBarViewAnimatorTest {
 
         // the lift animation is complete; the spring back animation should start now
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
-        barAnimator.assertIsRunning()
+
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        assertThat(semaphore.tryAcquire(5, TimeUnit.SECONDS)).isTrue()
+        // we should be expanded now
+        assertThat(bubbleBarView.isExpanded).isTrue()
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
         // verify there is no hide animation
@@ -801,7 +810,6 @@ class BubbleBarViewAnimatorTest {
 
         assertThat(animator.isAnimating).isFalse()
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_HOTSEAT)
-        assertThat(bubbleBarView.isExpanded).isTrue()
         verify(bubbleStashController).showBubbleBarImmediate()
         assertThat(notifiedExpanded).isTrue()
     }
