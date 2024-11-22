@@ -20,10 +20,13 @@ import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_
 import static com.android.launcher3.BubbleTextView.DISPLAY_TASKBAR;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
 import static com.android.launcher3.Flags.enableRecentsInTaskbar;
+import static com.android.launcher3.Flags.taskbarRecentsLayoutTransition;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER;
 import static com.android.launcher3.config.FeatureFlags.enableTaskbarPinning;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
+
+import static java.util.function.Predicate.not;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -70,7 +73,9 @@ import com.android.systemui.shared.recents.model.Task;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
@@ -108,6 +113,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     // Only non-null when device supports having a Taskbar Overflow button.
     @Nullable private TaskbarOverflowView mTaskbarOverflowView;
 
+    private int mNextViewIndex;
+
     /**
      * Whether the divider is between Hotseat icons and Recents,
      * instead of between All Apps button and Hotseat.
@@ -124,6 +131,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     private int mIdealNumIcons = 0;
 
     private final int mAllAppsButtonTranslationOffset;
+
+    private final int mNumStaticViews;
 
     public TaskbarView(@NonNull Context context) {
         this(context, null);
@@ -189,6 +198,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         // TODO: Disable touch events on QSB otherwise it can crash.
         mQsb = LayoutInflater.from(context).inflate(R.layout.search_container_hotseat, this, false);
+
+        mNumStaticViews = taskbarRecentsLayoutTransition() ? addStaticViews() : 0;
     }
 
     /**
@@ -247,6 +258,24 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         mMaxNumIcons = calculateMaxNumIcons();
         return oldMaxNumIcons != mMaxNumIcons
                 && (mIdealNumIcons > oldMaxNumIcons || mIdealNumIcons > mMaxNumIcons);
+    }
+
+    /**
+     * Pre-adds views that are always children of this view for LayoutTransition support.
+     * <p>
+     * Normally these views are removed and re-added when updating hotseat and recents. This
+     * approach does not behave well with LayoutTransition, so we instead need to add them
+     * initially and avoid removing them during updates.
+     */
+    private int addStaticViews() {
+        int numStaticViews = 1;
+        addView(mAllAppsButtonContainer);
+        if (mActivityContext.getDeviceProfile().isQsbInline) {
+            addView(mQsb, mIsRtl ? 1 : 0);
+            mQsb.setVisibility(View.INVISIBLE);
+            numStaticViews++;
+        }
+        return numStaticViews;
     }
 
     @Override
@@ -362,12 +391,26 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         view.setTag(null);
     }
 
-    /**
-     * Inflates/binds the Hotseat views to show in the Taskbar given their ItemInfos.
-     */
-    protected void updateHotseatItems(ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks) {
-        int nextViewIndex = 0;
-        int numViewsAnimated = 0;
+    /** Inflates/binds the hotseat items and recent tasks to the view. */
+    protected void updateItems(ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks) {
+        // Filter out unsupported items.
+        hotseatItemInfos = Arrays.stream(hotseatItemInfos)
+                .filter(Objects::nonNull)
+                .toArray(ItemInfo[]::new);
+        // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
+        recentTasks = recentTasks.stream().filter(not(GroupTask::supportsMultipleTasks)).toList();
+
+        if (taskbarRecentsLayoutTransition()) {
+            updateItemsWithLayoutTransition(hotseatItemInfos, recentTasks);
+        } else {
+            updateItemsWithoutLayoutTransition(hotseatItemInfos, recentTasks);
+        }
+    }
+
+    private void updateItemsWithoutLayoutTransition(
+            ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks) {
+
+        mNextViewIndex = 0;
         mAddedDividerForRecents = false;
 
         removeView(mAllAppsButtonContainer);
@@ -380,12 +423,101 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         }
         removeView(mQsb);
 
-        // Add Hotseat icons.
-        for (ItemInfo hotseatItemInfo : hotseatItemInfos) {
-            if (hotseatItemInfo == null) {
-                continue;
-            }
+        updateHotseatItems(hotseatItemInfos);
 
+        if (mTaskbarDividerContainer != null && !recentTasks.isEmpty()) {
+            addView(mTaskbarDividerContainer, mNextViewIndex++);
+            mAddedDividerForRecents = true;
+        }
+
+        updateRecents(recentTasks);
+
+        addView(mAllAppsButtonContainer, mIsRtl ? hotseatItemInfos.length : 0);
+
+        // If there are no recent tasks, add divider after All Apps (unless it's the only view).
+        if (!mAddedDividerForRecents
+                && mTaskbarDividerContainer != null
+                && getChildCount() > 1) {
+            addView(mTaskbarDividerContainer, mIsRtl ? (getChildCount() - 1) : 1);
+        }
+
+        if (mActivityContext.getDeviceProfile().isQsbInline) {
+            addView(mQsb, mIsRtl ? getChildCount() : 0);
+            // Always set QSB to invisible after re-adding.
+            mQsb.setVisibility(View.INVISIBLE);
+        }
+    }
+
+    private void updateItemsWithLayoutTransition(
+            ItemInfo[] hotseatItemInfos, List<GroupTask> recentTasks) {
+
+        // Skip static views and potential All Apps divider, if they are on the left.
+        mNextViewIndex = mIsRtl ? 0 : mNumStaticViews;
+        if (getChildAt(mNextViewIndex) == mTaskbarDividerContainer) {
+            mNextViewIndex++;
+        }
+
+        // Update left section.
+        if (mIsRtl) {
+            updateRecents(recentTasks.reversed());
+        } else {
+            updateHotseatItems(hotseatItemInfos);
+        }
+
+        // Now at theoretical position for recent apps divider.
+        updateRecentsDivider(!recentTasks.isEmpty());
+        if (getChildAt(mNextViewIndex) == mTaskbarDividerContainer) {
+            mNextViewIndex++;
+        }
+
+        // Update right section.
+        if (mIsRtl) {
+            updateHotseatItems(hotseatItemInfos);
+        } else {
+            updateRecents(recentTasks);
+        }
+
+        // Recents divider takes priority.
+        if (!mAddedDividerForRecents) {
+            updateAllAppsDivider();
+        }
+    }
+
+    private void updateRecentsDivider(boolean hasRecents) {
+        if (hasRecents && !mAddedDividerForRecents) {
+            mAddedDividerForRecents = true;
+
+            // Remove possible All Apps divider.
+            if (getChildAt(mNumStaticViews) == mTaskbarDividerContainer) {
+                mNextViewIndex--; // All Apps divider on the left. Need to account for removing it.
+            }
+            removeView(mTaskbarDividerContainer);
+
+            addView(mTaskbarDividerContainer, mNextViewIndex);
+        } else if (!hasRecents && mAddedDividerForRecents) {
+            mAddedDividerForRecents = false;
+            removeViewAt(mNextViewIndex);
+        }
+    }
+
+    private void updateAllAppsDivider() {
+        final int allAppsDividerIndex =
+                mIsRtl ? getChildCount() - mNumStaticViews : mNumStaticViews;
+        if (getChildAt(allAppsDividerIndex) == mTaskbarDividerContainer
+                && getChildCount() == mNumStaticViews + 1) {
+            // Only static views with divider so remove divider.
+            removeView(mTaskbarDividerContainer);
+        } else if (getChildAt(allAppsDividerIndex) != mTaskbarDividerContainer
+                && getChildCount() >= mNumStaticViews + 1) {
+            // Static views with at least one app icon so add divider.
+            addView(mTaskbarDividerContainer, allAppsDividerIndex);
+        }
+    }
+
+    private void updateHotseatItems(ItemInfo[] hotseatItemInfos) {
+        int numViewsAnimated = 0;
+
+        for (ItemInfo hotseatItemInfo : hotseatItemInfos) {
             // Replace any Hotseat views with the appropriate type if it's not already that type.
             final int expectedLayoutResId;
             boolean isCollection = false;
@@ -401,8 +533,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
 
             View hotseatView = null;
-            while (nextViewIndex < getChildCount()) {
-                hotseatView = getChildAt(nextViewIndex);
+            while (isNextViewInSection(ItemInfo.class)) {
+                hotseatView = getChildAt(mNextViewIndex);
 
                 // see if the view can be reused
                 if ((hotseatView.getSourceLayoutResId() != expectedLayoutResId)
@@ -443,7 +575,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 }
                 LayoutParams lp = new LayoutParams(mIconTouchSize, mIconTouchSize);
                 hotseatView.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
-                addView(hotseatView, nextViewIndex, lp);
+                addView(hotseatView, mNextViewIndex, lp);
             }
 
             // Apply the Hotseat ItemInfos, or hide the view if there is none for a given index.
@@ -459,34 +591,27 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             if (enableCursorHoverStates()) {
                 setHoverListenerForIcon(hotseatView);
             }
-            nextViewIndex++;
+            mNextViewIndex++;
         }
 
-        if (mTaskbarDividerContainer != null && !recentTasks.isEmpty()) {
-            addView(mTaskbarDividerContainer, nextViewIndex++);
-            mAddedDividerForRecents = true;
+        while (isNextViewInSection(ItemInfo.class)) {
+            removeAndRecycle(getChildAt(mNextViewIndex));
         }
+    }
 
+    private void updateRecents(List<GroupTask> recentTasks) {
         // At this point, the all apps button has not been added as a child view, but needs to be
         // accounted for when comparing current icon count to max number of icons.
         int nonTaskIconsToBeAdded = 1;
 
         boolean supportsOverflow = Flags.taskbarOverflow();
         int overflowSize = 0;
-        int numberOfSupportedRecents = 0;
         if (supportsOverflow) {
-            for (GroupTask task : recentTasks) {
-                // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
-                if (!task.supportsMultipleTasks()) {
-                    ++numberOfSupportedRecents;
-                }
-            }
-
-            mIdealNumIcons = nextViewIndex + numberOfSupportedRecents + nonTaskIconsToBeAdded;
+            mIdealNumIcons = mNextViewIndex + recentTasks.size() + nonTaskIconsToBeAdded;
             overflowSize = mIdealNumIcons - mMaxNumIcons;
 
             if (overflowSize > 0 && mTaskbarOverflowView != null) {
-                addView(mTaskbarOverflowView, nextViewIndex++);
+                addView(mTaskbarOverflowView, mNextViewIndex++);
             } else if (mTaskbarOverflowView != null) {
                 mTaskbarOverflowView.clearItems();
             }
@@ -496,9 +621,9 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // An extra item needs to be added to overflow button to account for the space taken up by
         // the overflow button.
         final int itemsToAddToOverflow =
-                (overflowSize > 0) ? Math.min(overflowSize + 1, numberOfSupportedRecents) : 0;
+                (overflowSize > 0) ? Math.min(overflowSize + 1, recentTasks.size()) : 0;
         if (overflowSize > 0) {
-            overflownTasks = new ArrayList<Task>(itemsToAddToOverflow);
+            overflownTasks = new ArrayList<>(itemsToAddToOverflow);
         }
 
         // Add Recent/Running icons.
@@ -506,10 +631,6 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             if (mTaskbarOverflowView != null && overflownTasks != null
                     && overflownTasks.size() < itemsToAddToOverflow) {
                 // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
-                if (task.supportsMultipleTasks()) {
-                    continue;
-                }
-
                 overflownTasks.add(task.task1);
                 if (overflownTasks.size() == itemsToAddToOverflow) {
                     mTaskbarOverflowView.setItems(overflownTasks);
@@ -534,8 +655,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
 
             View recentIcon = null;
-            while (nextViewIndex < getChildCount()) {
-                recentIcon = getChildAt(nextViewIndex);
+            while (isNextViewInSection(GroupTask.class)) {
+                recentIcon = getChildAt(mNextViewIndex);
 
                 // see if the view can be reused
                 if ((recentIcon.getSourceLayoutResId() != expectedLayoutResId)
@@ -549,15 +670,11 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
 
             if (recentIcon == null) {
-                if (isCollection) {
-                    // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
-                    continue;
-                }
-
+                // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
                 recentIcon = inflate(expectedLayoutResId);
                 LayoutParams lp = new LayoutParams(mIconTouchSize, mIconTouchSize);
                 recentIcon.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
-                addView(recentIcon, nextViewIndex, lp);
+                addView(recentIcon, mNextViewIndex, lp);
             }
 
             if (recentIcon instanceof BubbleTextView btv) {
@@ -567,29 +684,17 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             if (enableCursorHoverStates()) {
                 setHoverListenerForIcon(recentIcon);
             }
-            nextViewIndex++;
+            mNextViewIndex++;
         }
 
-        // Remove remaining views
-        while (nextViewIndex < getChildCount()) {
-            removeAndRecycle(getChildAt(nextViewIndex));
+        while (isNextViewInSection(GroupTask.class)) {
+            removeAndRecycle(getChildAt(mNextViewIndex));
         }
+    }
 
-        addView(mAllAppsButtonContainer, mIsRtl ? hotseatItemInfos.length : 0);
-
-        // If there are no recent tasks, add divider after All Apps (unless it's the only view).
-        if (!mAddedDividerForRecents
-                && mTaskbarDividerContainer != null
-                && getChildCount() > 1) {
-            addView(mTaskbarDividerContainer, mIsRtl ? (getChildCount() - 1) : 1);
-        }
-
-
-        if (mActivityContext.getDeviceProfile().isQsbInline) {
-            addView(mQsb, mIsRtl ? getChildCount() : 0);
-            // Always set QSB to invisible after re-adding.
-            mQsb.setVisibility(View.INVISIBLE);
-        }
+    private boolean isNextViewInSection(Class<?> tagClass) {
+        return mNextViewIndex < getChildCount()
+                && tagClass.isInstance(getChildAt(mNextViewIndex).getTag());
     }
 
     /** Binds the GroupTask to the BubbleTextView to be ready to present to the user. */
