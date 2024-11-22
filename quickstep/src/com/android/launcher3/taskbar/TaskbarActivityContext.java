@@ -1634,15 +1634,6 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mControllers.taskbarEduTooltipController.hide();
     }
 
-    /**
-     * Called when we want to open bubblebar when user performs swipes up gesture.
-     */
-    public void onSwipeToOpenBubblebar() {
-        mControllers.bubbleControllers.ifPresent(controllers -> {
-            controllers.bubbleStashController.showBubbleBar(/* expandBubbles= */ true);
-        });
-    }
-
     /** Returns {@code true} if Taskbar All Apps is open. */
     public boolean isTaskbarAllAppsOpen() {
         return mControllers.taskbarAllAppsController.isOpen();

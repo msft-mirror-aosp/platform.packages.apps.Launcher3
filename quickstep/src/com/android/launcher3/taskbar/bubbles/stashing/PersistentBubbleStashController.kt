@@ -180,8 +180,8 @@ class PersistentBubbleStashController(
         updateExpandedState(expand = false)
     }
 
-    override fun showBubbleBar(expandBubbles: Boolean) {
-        updateExpandedState(expandBubbles)
+    override fun showBubbleBar(expandBubbles: Boolean, bubbleBarGesture: Boolean) {
+        updateExpandedState(expand = expandBubbles, bubbleBarGesture = bubbleBarGesture)
     }
 
     override fun stashBubbleBarImmediate() {
@@ -235,13 +235,14 @@ class PersistentBubbleStashController(
         // no op since does not have a handle view
     }
 
-    private fun updateExpandedState(expand: Boolean) {
+    private fun updateExpandedState(expand: Boolean, bubbleBarGesture: Boolean = false) {
         if (bubbleBarViewController.isHiddenForNoBubbles) {
             // If there are no bubbles the bar is invisible, nothing to do here.
             return
         }
         if (bubbleBarViewController.isExpanded != expand) {
-            bubbleBarViewController.isExpanded = expand
+            val maybeShowEdu = expand && bubbleBarGesture
+            bubbleBarViewController.setExpanded(expand, maybeShowEdu)
         }
     }
 

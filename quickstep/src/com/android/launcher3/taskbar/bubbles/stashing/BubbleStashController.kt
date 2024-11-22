@@ -131,7 +131,17 @@ interface BubbleStashController {
     fun stashBubbleBar()
 
     /** Shows the bubble bar, and expands bubbles depending on [expandBubbles]. */
-    fun showBubbleBar(expandBubbles: Boolean)
+    fun showBubbleBar(expandBubbles: Boolean) {
+        showBubbleBar(expandBubbles = expandBubbles, bubbleBarGesture = false)
+    }
+
+    /**
+     * Shows the bubble bar, and expands bubbles depending on [expandBubbles].
+     *
+     * Set [bubbleBarGesture] to true if this request originates from a touch gesture on the bubble
+     * bar.
+     */
+    fun showBubbleBar(expandBubbles: Boolean, bubbleBarGesture: Boolean)
 
     // TODO(b/354218264): Move to BubbleBarViewAnimator
     /**
