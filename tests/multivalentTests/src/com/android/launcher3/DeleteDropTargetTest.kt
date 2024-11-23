@@ -16,13 +16,20 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.Mock
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.times
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoMoreInteractions
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
 class DeleteDropTargetTest {
 
     @get:Rule val mSetFlagsRule = SetFlagsRule()
+
+    @Mock private val msdlPlayerWrapper = mock<MSDLPlayerWrapper>()
 
     private var mContext: Context = ActivityContextWrapper(getApplicationContext())
 
@@ -50,13 +57,12 @@ class DeleteDropTargetTest {
     @Test
     @EnableFlags(Flags.FLAG_MSDL_FEEDBACK)
     fun onDragEnter_performsMSDLSwipeThresholdFeedback() {
+        buttonDropTarget.setMSDLPlayerWrapper(msdlPlayerWrapper)
         val target = DropTarget.DragObject(mContext)
         target.dragView = mock<DragView<*>>()
         buttonDropTarget.onDragEnter(target)
-        val wrapper = MSDLPlayerWrapper.INSTANCE.get(mContext)
 
-        val history = wrapper.history
-        assertThat(history.size).isEqualTo(1)
-        assertThat(history[0].tokenName).isEqualTo(MSDLToken.SWIPE_THRESHOLD_INDICATOR.name)
+        verify(msdlPlayerWrapper, times(1)).playToken(eq(MSDLToken.SWIPE_THRESHOLD_INDICATOR))
+        verifyNoMoreInteractions(msdlPlayerWrapper)
     }
 }
