@@ -69,6 +69,7 @@ public class MSDLPlayerWrapper {
 
     /** Print the latest history of MSDL tokens played */
     public void dump(String prefix, PrintWriter writer) {
+        writer.println(prefix + mMSDLPlayer.toString());
         writer.println(prefix + "MSDLPlayerWrapper history of latest events:");
         List<MSDLEvent> events = getHistory();
         for (MSDLEvent event: events) {

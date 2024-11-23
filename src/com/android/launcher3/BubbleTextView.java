@@ -127,8 +127,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     private static final int[] STATE_PRESSED = new int[]{android.R.attr.state_pressed};
 
-    private static final int APP_PILL_TITLE_PADDING = 8;
-
     private float mScaleForReorderBounce = 1f;
 
     private IntArray mBreakPointsIntArray;
@@ -734,12 +732,18 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         getDrawingRect(tmpRect);
         CharSequence text = getText();
 
+        int mAppTitleHorizontalPadding = getResources().getDimensionPixelSize(
+                R.dimen.app_title_pill_horizontal_padding);
+        int mRoundRectPadding = getResources().getDimensionPixelSize(
+                R.dimen.app_title_pill_round_rect_padding);
+
         float titleLength = (getPaint().measureText(text, 0, text.length())
-                + APP_PILL_TITLE_PADDING * 2);
+                + (mAppTitleHorizontalPadding + mRoundRectPadding) * 2);
         titleLength = Math.min(titleLength, tmpRect.width());
         appTitleBounds = new RectF((tmpRect.width() - titleLength) / 2.f - getCompoundPaddingLeft(),
                 0, (tmpRect.width() + titleLength) / 2.f + getCompoundPaddingRight(),
                 (int) Math.ceil(fm.bottom - fm.top));
+        appTitleBounds.inset(mRoundRectPadding * 2, 0);
 
 
         if (mIcon != null) {
@@ -859,8 +863,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     getPaddingBottom());
         }
         if (shouldDrawAppContrastTile()) {
-            setPadding(getPaddingLeft() + APP_PILL_TITLE_PADDING, getPaddingTop(),
-                    getPaddingRight() + APP_PILL_TITLE_PADDING,
+            int mAppTitleHorizontalPadding = getResources().getDimensionPixelSize(
+                    R.dimen.app_title_pill_horizontal_padding);
+            int mRoundRectPadding = getResources().getDimensionPixelSize(
+                    R.dimen.app_title_pill_round_rect_padding);
+
+            setPadding(mAppTitleHorizontalPadding + mRoundRectPadding, getPaddingTop(),
+                    mAppTitleHorizontalPadding + mRoundRectPadding,
                     getPaddingBottom());
         }
         // Only apply two line for all_apps and device search only if necessary.
