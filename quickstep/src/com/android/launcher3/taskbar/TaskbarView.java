@@ -199,7 +199,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // TODO: Disable touch events on QSB otherwise it can crash.
         mQsb = LayoutInflater.from(context).inflate(R.layout.search_container_hotseat, this, false);
 
-        mNumStaticViews = taskbarRecentsLayoutTransition() ? addStaticViews() : 0;
+        mNumStaticViews = taskbarRecentsLayoutTransition() && !mActivityContext.isPhoneMode()
+                ? addStaticViews() : 0;
     }
 
     /**
@@ -501,16 +502,20 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     }
 
     private void updateAllAppsDivider() {
-        final int allAppsDividerIndex =
-                mIsRtl ? getChildCount() - mNumStaticViews : mNumStaticViews;
-        if (getChildAt(allAppsDividerIndex) == mTaskbarDividerContainer
+        // Index where All Apps divider would be if it is already in Taskbar.
+        final int expectedAllAppsDividerIndex =
+                mIsRtl ? getChildCount() - mNumStaticViews - 1 : mNumStaticViews;
+        if (getChildAt(expectedAllAppsDividerIndex) == mTaskbarDividerContainer
                 && getChildCount() == mNumStaticViews + 1) {
             // Only static views with divider so remove divider.
             removeView(mTaskbarDividerContainer);
-        } else if (getChildAt(allAppsDividerIndex) != mTaskbarDividerContainer
+        } else if (getChildAt(expectedAllAppsDividerIndex) != mTaskbarDividerContainer
                 && getChildCount() >= mNumStaticViews + 1) {
-            // Static views with at least one app icon so add divider.
-            addView(mTaskbarDividerContainer, allAppsDividerIndex);
+            // Static views with at least one app icon so add divider. For RTL, add it after the
+            // icon that is at the expected index.
+            addView(
+                    mTaskbarDividerContainer,
+                    mIsRtl ? expectedAllAppsDividerIndex + 1 : expectedAllAppsDividerIndex);
         }
     }
 

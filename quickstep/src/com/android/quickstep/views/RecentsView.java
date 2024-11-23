@@ -1768,26 +1768,17 @@ public abstract class RecentsView<
     }
 
     /**
-     * Moves the running task to the front of the carousel in tablets, to minimize animation
-     * required to move the running task in grid.
+     * Moves the running task to the expected position in the carousel. In tablets, this minimize
+     * animation required to move the running task into focused task position.
      */
-    public void moveRunningTaskToFront() {
-        if (!mContainer.getDeviceProfile().isTablet) {
-            return;
-        }
-
+    public void moveRunningTaskToExpectedPosition() {
         TaskView runningTaskView = getRunningTaskView();
-        if (runningTaskView == null) {
+        if (runningTaskView == null || mCurrentPage != indexOfChild(runningTaskView)) {
             return;
         }
 
-        if (indexOfChild(runningTaskView) != mCurrentPage) {
-            return;
-        }
-
-        int frontIndex = enableLargeDesktopWindowingTile() ? getDesktopTaskViewCount() : 0;
-
-        if (mCurrentPage <= frontIndex) {
+        int runningTaskExpectedIndex = getRunningTaskExpectedIndex(runningTaskView);
+        if (mCurrentPage == runningTaskExpectedIndex) {
             return;
         }
 
@@ -1800,10 +1791,29 @@ public abstract class RecentsView<
         mMovingTaskView = null;
         runningTaskView.resetPersistentViewTransforms();
 
-        addView(runningTaskView, frontIndex);
-        setCurrentPage(frontIndex);
+        addView(runningTaskView, runningTaskExpectedIndex);
+        setCurrentPage(runningTaskExpectedIndex);
 
         updateTaskSize();
+    }
+
+    private int getRunningTaskExpectedIndex(TaskView runningTaskView) {
+        if (mContainer.getDeviceProfile().isTablet) {
+            if (runningTaskView instanceof DesktopTaskView) {
+                return 0; // Desktop running task is always in front.
+            } else if (enableLargeDesktopWindowingTile()) {
+                return getDesktopTaskViewCount(); // Other running task is behind desktop tasks.
+            } else {
+                return 0;
+            }
+        } else {
+            int currentIndex = indexOfChild(runningTaskView);
+            if (currentIndex != -1) {
+                return currentIndex; // Keep the position if running task already in layout.
+            } else {
+                return 0; // New running task are added to the front to begin with.
+            }
+        }
     }
 
     @Override
@@ -2971,7 +2981,7 @@ public abstract class RecentsView<
                 taskView = getTaskViewFromPool(TaskViewType.SINGLE);
                 taskView.bind(runningTasks[0], mOrientationState, mTaskOverlayFactory);
             }
-            addView(taskView, 0);
+            addView(taskView, getRunningTaskExpectedIndex(taskView));
             runningTaskViewId = taskView.getTaskViewId();
             if (wasEmpty) {
                 addView(mClearAllButton);
@@ -5689,43 +5699,6 @@ public abstract class RecentsView<
         updateCurrentTaskActionsVisibility();
         loadVisibleTaskData(TaskView.FLAG_UPDATE_ALL);
         updateEnabledOverlays();
-
-        if (enableRefactorTaskThumbnail()) {
-            int screenStart = 0;
-            int screenEnd = 0;
-            int centerPageIndex = 0;
-            if (showAsGrid()) {
-                screenStart = getPagedOrientationHandler().getPrimaryScroll(this);
-                int pageOrientedSize = getPagedOrientationHandler().getMeasuredSize(this);
-                screenEnd = screenStart + pageOrientedSize;
-            } else {
-                centerPageIndex = getPageNearestToCenterOfScreen();
-            }
-
-            Set<Integer> fullyVisibleTaskIds = new HashSet<>();
-
-            // Update the task data for the in/visible children
-            for (int i = 0; i < getTaskViewCount(); i++) {
-                TaskView taskView = requireTaskViewAt(i);
-                List<TaskContainer> containers = taskView.getTaskContainers();
-                if (containers.isEmpty()) {
-                    continue;
-                }
-                boolean isFullyVisible;
-                if (showAsGrid()) {
-                    isFullyVisible = isTaskViewFullyWithinBounds(taskView, screenStart,
-                            screenEnd);
-                } else {
-                    isFullyVisible = i == centerPageIndex;
-                }
-                if (isFullyVisible) {
-                    List<Integer> taskIds = containers.stream().map(
-                            taskContainer -> taskContainer.getTask().key.id).toList();
-                    fullyVisibleTaskIds.addAll(taskIds);
-                }
-            }
-            mRecentsViewModel.updateTasksFullyVisible(fullyVisibleTaskIds);
-        }
     }
 
     @Override
@@ -6284,17 +6257,27 @@ public abstract class RecentsView<
     }
 
     private void updateEnabledOverlays() {
-        TaskView focusedTaskView = getFocusedTaskView();
-        for (TaskView taskView : getTaskViews()) {
-            if (taskView == focusedTaskView) {
-                continue;
+        if (enableRefactorTaskThumbnail()) {
+            Set<Integer> fullyVisibleTaskIds = new HashSet<>();
+            for (TaskView taskView : getTaskViews()) {
+                if (isTaskViewFullyVisible(taskView)) {
+                    fullyVisibleTaskIds.addAll(taskView.getTaskIdSet());
+                }
             }
-            taskView.setOverlayEnabled(mOverlayEnabled && isTaskViewFullyVisible(taskView));
-        }
-        // Focus task overlay should be enabled and refreshed at last
-        if (focusedTaskView != null) {
-            focusedTaskView.setOverlayEnabled(
-                    mOverlayEnabled && isTaskViewFullyVisible(focusedTaskView));
+            mRecentsViewModel.updateTasksFullyVisible(fullyVisibleTaskIds);
+        } else {
+            TaskView focusedTaskView = getFocusedTaskView();
+            for (TaskView taskView : getTaskViews()) {
+                if (taskView == focusedTaskView) {
+                    continue;
+                }
+                taskView.setOverlayEnabled(mOverlayEnabled && isTaskViewFullyVisible(taskView));
+            }
+            // Focus task overlay should be enabled and refreshed at last
+            if (focusedTaskView != null) {
+                focusedTaskView.setOverlayEnabled(
+                        mOverlayEnabled && isTaskViewFullyVisible(focusedTaskView));
+            }
         }
     }
 
