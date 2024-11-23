@@ -84,7 +84,17 @@ class TaskbarViewWithLayoutTransitionTest {
 
     @Test
     @ForceRtl
-    fun testUpdateItems_rtl_addHotseatItem_updatesHotseat() {
+    fun testUpdateItems_rtl_addHotseatItemWithoutRecents_updatesHotseat() {
+        runOnMainSync {
+            taskbarView.updateItems(createHotseatItems(1), emptyList())
+            taskbarView.updateItems(createHotseatItems(2), emptyList())
+        }
+        assertThat(taskbarView).hasIconTypes(*HOTSEAT * 2, DIVIDER, ALL_APPS)
+    }
+
+    @Test
+    @ForceRtl
+    fun testUpdateItems_rtl_addHotseatItemWithRecents_updatesHotseat() {
         runOnMainSync {
             taskbarView.updateItems(createHotseatItems(1), createRecents(1))
             taskbarView.updateItems(createHotseatItems(2), createRecents(1))
