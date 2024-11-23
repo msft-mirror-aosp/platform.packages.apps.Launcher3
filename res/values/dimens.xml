@@ -568,4 +568,8 @@
 
     <!-- WindowManagerProxy -->
     <dimen name="max_width_and_height_of_small_display_cutout">136px</dimen>
+
+    <!-- App Title Pill -->
+    <dimen name="app_title_pill_horizontal_padding">4dp</dimen>
+    <dimen name="app_title_pill_round_rect_padding">2dp</dimen>
 </resources>

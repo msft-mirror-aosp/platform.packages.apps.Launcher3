@@ -65,7 +65,7 @@ public abstract class ButtonDropTarget extends TextView
     protected final ActivityContext mActivityContext;
     protected final DropTargetHandler mDropTargetHandler;
     protected DropTargetBar mDropTargetBar;
-    private final MSDLPlayerWrapper mMSDLPlayerWrapper;
+    private MSDLPlayerWrapper mMSDLPlayerWrapper;
 
     /** Whether this drop target is active for the current drag */
     protected boolean mActive;
@@ -436,6 +436,11 @@ public abstract class ButtonDropTarget extends TextView
         int textHeight = lineCount * (fontMetricsInt.bottom - fontMetricsInt.top);
 
         return textHeight + getPaddingTop() + getPaddingBottom() >= availableHeight;
+    }
+
+    @VisibleForTesting
+    public void setMSDLPlayerWrapper(MSDLPlayerWrapper wrapper) {
+        mMSDLPlayerWrapper = wrapper;
     }
 
     /**
