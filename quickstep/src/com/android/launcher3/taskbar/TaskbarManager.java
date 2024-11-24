@@ -116,7 +116,6 @@ public class TaskbarManager {
     private final Context mContext;
     private final @Nullable Context mNavigationBarPanelContext;
     private WindowManager mWindowManager;
-    private FrameLayout mDefaultRootLayout;
     private boolean mAddedWindow;
     private final TaskbarNavButtonController mDefaultNavButtonController;
     private final ComponentCallbacks mDefaultComponentCallbacks;
@@ -132,6 +131,8 @@ public class TaskbarManager {
             new NonDestroyableScopedUnfoldTransitionProgressProvider();
     /** DisplayId - {@link TaskbarActivityContext} map for Connected Display. */
     private final SparseArray<TaskbarActivityContext> mTaskbars = new SparseArray<>();
+    /** DisplayId - {@link FrameLayout} map for Connected Display. */
+    private final SparseArray<FrameLayout> mRootLayouts = new SparseArray<>();
     private StatefulActivity mActivity;
     private RecentsViewContainer mRecentsViewContainer;
 
@@ -240,7 +241,7 @@ public class TaskbarManager {
         mDesktopVisibilityController = desktopVisibilityController;
         if (enableTaskbarNoRecreate()) {
             mWindowManager = mContext.getSystemService(WindowManager.class);
-            mDefaultRootLayout = new FrameLayout(mContext) {
+            FrameLayout taskbarRootLayout = new FrameLayout(mContext) {
                 @Override
                 public boolean dispatchTouchEvent(MotionEvent ev) {
                     // The motion events can be outside the view bounds of task bar, and hence
@@ -252,6 +253,7 @@ public class TaskbarManager {
                     return super.dispatchTouchEvent(ev);
                 }
             };
+            addTaskbarRootLayoutToMap(getDefaultDisplayId(), taskbarRootLayout);
         }
         mDefaultNavButtonController = new TaskbarNavButtonController(
                 context,
@@ -340,6 +342,7 @@ public class TaskbarManager {
         for (int i = 0; i < mTaskbars.size(); i++) {
             int displayId = mTaskbars.keyAt(i);
             destroyTaskbarForDisplay(displayId);
+            removeTaskbarRootViewFromWindow(displayId);
         }
     }
 
@@ -359,7 +362,7 @@ public class TaskbarManager {
         DeviceProfile dp = mUserUnlocked ?
                 LauncherAppState.getIDP(mContext).getDeviceProfile(mContext) : null;
         if (dp == null || !isTaskbarEnabled(dp)) {
-            removeTaskbarRootViewFromWindow();
+            removeTaskbarRootViewFromWindow(displayId);
         }
     }
 
@@ -552,8 +555,9 @@ public class TaskbarManager {
 
             if (enableTaskbarNoRecreate()) {
                 addTaskbarRootViewToWindow(displayId);
-                mDefaultRootLayout.removeAllViews();
-                mDefaultRootLayout.addView(taskbar.getDragLayer());
+                FrameLayout taskbarRootLayout = getTaskbarRootLayoutForDisplay(displayId);
+                taskbarRootLayout.removeAllViews();
+                taskbarRootLayout.addView(taskbar.getDragLayer());
                 taskbar.notifyUpdateLayoutParams();
             }
             addTaskbarToMap(displayId, taskbar);
@@ -714,7 +718,6 @@ public class TaskbarManager {
         removeActivityCallbacksAndListeners();
         mTaskbarBroadcastReceiver.unregisterReceiverSafely(mContext);
         destroyAllTaskbars();
-        removeTaskbarRootViewFromWindow();
         if (mUserUnlocked) {
             DisplayController.INSTANCE.get(mContext).removeChangeListener(mRecreationListener);
         }
@@ -744,15 +747,18 @@ public class TaskbarManager {
     private void addTaskbarRootViewToWindow(int displayId) {
         TaskbarActivityContext taskbar = getTaskbarForDisplay(displayId);
         if (enableTaskbarNoRecreate() && !mAddedWindow && taskbar != null) {
-            mWindowManager.addView(mDefaultRootLayout, taskbar.getWindowLayoutParams());
+            mWindowManager.addView(getTaskbarRootLayoutForDisplay(displayId),
+                    taskbar.getWindowLayoutParams());
             mAddedWindow = true;
         }
     }
 
-    private void removeTaskbarRootViewFromWindow() {
-        if (enableTaskbarNoRecreate() && mAddedWindow) {
-            mWindowManager.removeViewImmediate(mDefaultRootLayout);
+    private void removeTaskbarRootViewFromWindow(int displayId) {
+        FrameLayout rootLayout = getTaskbarRootLayoutForDisplay(displayId);
+        if (enableTaskbarNoRecreate() && mAddedWindow && rootLayout != null) {
+            mWindowManager.removeViewImmediate(rootLayout);
             mAddedWindow = false;
+            removeTaskbarRootLayoutFromMap(displayId);
         }
     }
 
@@ -767,14 +773,59 @@ public class TaskbarManager {
         return mTaskbars.get(displayId);
     }
 
+    /**
+     * Adds the {@link TaskbarActivityContext} associated with the given display ID to taskbar
+     * map if there is not already a taskbar mapped to that displayId.
+     *
+     * @param displayId The ID of the display to retrieve the taskbar for.
+     * @param newTaskbar The new {@link TaskbarActivityContext} to add to the map.
+     */
     private void addTaskbarToMap(int displayId, TaskbarActivityContext newTaskbar) {
         if (!mTaskbars.contains(displayId)) {
             mTaskbars.put(displayId, newTaskbar);
         }
     }
 
+    /**
+     * Removes the taskbar associated with the given display ID from the taskbar map.
+     *
+     * @param displayId The ID of the display for which to remove the taskbar.
+     */
     private void removeTaskbarFromMap(int displayId) {
         mTaskbars.delete(displayId);
+    }
+
+    /**
+     * Retrieves the root layout of the taskbar for the specified display.
+     *
+     * @param displayId The ID of the display for which to retrieve the taskbar root layout.
+     * @return The taskbar root layout {@link FrameLayout} for a given display or {@code null}.
+     */
+    private FrameLayout getTaskbarRootLayoutForDisplay(int displayId) {
+        return mRootLayouts.get(displayId);
+    }
+
+    /**
+     * Adds the taskbar root layout {@link FrameLayout} to taskbar map, mapped to display ID.
+     *
+     * @param displayId The ID of the display to associate with the taskbar root layout.
+     * @param rootLayout The taskbar root layout {@link FrameLayout} to add to the map.
+     */
+    private void addTaskbarRootLayoutToMap(int displayId, FrameLayout rootLayout) {
+        if (!mRootLayouts.contains(displayId)) {
+            mRootLayouts.put(displayId, rootLayout);
+        }
+    }
+
+    /**
+     * Removes taskbar root layout {@link FrameLayout} for given display ID from the taskbar map.
+     *
+     * @param displayId The ID of the display for which to remove the taskbar root layout.
+     */
+    private void removeTaskbarRootLayoutFromMap(int displayId) {
+        if (mRootLayouts.contains(displayId)) {
+            mRootLayouts.delete(displayId);
+        }
     }
 
     private int getDefaultDisplayId() {
