@@ -47,7 +47,7 @@ class PersistentBubbleStashController(
     private lateinit var bubbleBarAlphaAnimator: MultiPropertyFactory<View>.MultiProperty
     private lateinit var bubbleBarScaleAnimator: AnimatedFloat
     private lateinit var controllersAfterInitAction: ControllersAfterInitAction
-    private var hotseatVerticalCenter: Int = 0
+    private var verticalCenterForHome: Int = 0
 
     override var launcherState: BubbleLauncherState = BubbleLauncherState.IN_APP
         set(state) {
@@ -97,7 +97,7 @@ class PersistentBubbleStashController(
     override val bubbleBarTranslationYForHotseat: Float
         get() {
             val bubbleBarHeight = bubbleBarViewController.bubbleBarCollapsedHeight
-            return -hotseatVerticalCenter + bubbleBarHeight / 2
+            return -verticalCenterForHome + bubbleBarHeight / 2
         }
 
     override val bubbleBarTranslationY: Float
@@ -159,8 +159,8 @@ class PersistentBubbleStashController(
         animatorSet.setDuration(BAR_STASH_DURATION).start()
     }
 
-    override fun setHotseatVerticalCenter(hotseatVerticalCenter: Int) {
-        this.hotseatVerticalCenter = hotseatVerticalCenter
+    override fun setBubbleBarVerticalCenterForHome(verticalCenter: Int) {
+        verticalCenterForHome = verticalCenter
     }
 
     override fun showBubbleBarImmediate() = showBubbleBarImmediate(bubbleBarTranslationY)

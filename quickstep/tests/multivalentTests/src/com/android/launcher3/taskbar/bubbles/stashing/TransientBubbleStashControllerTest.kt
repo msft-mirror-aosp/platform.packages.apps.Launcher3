@@ -109,7 +109,7 @@ class TransientBubbleStashControllerTest {
         setUpStashedHandleView()
         setUpBubbleStashedHandleViewController()
         PhysicsAnimatorTestUtils.prepareForTest()
-        mTransientBubbleStashController.setHotseatVerticalCenter(HOTSEAT_VERTICAL_CENTER)
+        mTransientBubbleStashController.setBubbleBarVerticalCenterForHome(HOTSEAT_VERTICAL_CENTER)
         mTransientBubbleStashController.init(
             taskbarInsetsController,
             bubbleBarViewController,

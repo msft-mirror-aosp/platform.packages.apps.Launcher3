@@ -121,8 +121,8 @@ interface BubbleStashController {
     /** Set a bubble bar location */
     fun setBubbleBarLocation(bubbleBarLocation: BubbleBarLocation)
 
-    /** Set the hotseat vertical center that bubble bar will align with. */
-    fun setHotseatVerticalCenter(hotseatVerticalCenter: Int)
+    /** Set the bubble bar vertical center for launcher home. */
+    fun setBubbleBarVerticalCenterForHome(verticalCenter: Int)
 
     /**
      * Stashes the bubble bar (transform to the handle view), or just shrink width of the expanded

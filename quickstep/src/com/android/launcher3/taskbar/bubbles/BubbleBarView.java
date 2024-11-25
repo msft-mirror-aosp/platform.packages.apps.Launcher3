@@ -1307,6 +1307,10 @@ public class BubbleBarView extends FrameLayout {
         return getBubbleBarCollapsedHeight() + mPointerSize;
     }
 
+    float getArrowHeight() {
+        return mPointerSize;
+    }
+
     float getBubbleBarCollapsedHeight() {
         // the pointer is invisible when collapsed
         return getScaledIconSize() + mBubbleBarPadding * 2;

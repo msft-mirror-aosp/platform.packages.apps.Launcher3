@@ -447,6 +447,11 @@ public class BubbleBarViewController {
         return mBarView.getBubbleBarCollapsedHeight();
     }
 
+    /** Returns the bubble bar arrow height.*/
+    public float getBubbleBarArrowHeight() {
+        return mBarView.getArrowHeight();
+    }
+
     /**
      * @see BubbleBarView#getRelativePivotX()
      */
