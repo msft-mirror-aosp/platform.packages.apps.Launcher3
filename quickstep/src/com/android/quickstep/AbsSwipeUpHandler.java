@@ -38,6 +38,8 @@ import static com.android.launcher3.logging.StatsLogManager.LAUNCHER_STATE_BACKG
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.IGNORE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_HOME_GESTURE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_OVERVIEW_GESTURE;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_QUICKSWITCH_ENTER_DESKTOP_MODE;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_QUICKSWITCH_EXIT_DESKTOP_MODE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_QUICKSWITCH_LEFT;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_QUICKSWITCH_RIGHT;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
@@ -147,6 +149,7 @@ import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
+import com.android.quickstep.views.TaskViewType;
 import com.android.systemui.animation.TransitionAnimator;
 import com.android.systemui.contextualeducation.GestureType;
 import com.android.systemui.shared.recents.model.Task;
@@ -204,6 +207,8 @@ public abstract class AbsSwipeUpHandler<
     protected MultiStateCallback mStateCallback;
     protected boolean mCanceled;
     private boolean mRecentsViewScrollLinked = false;
+    // The previous task view type before the user quick switches between tasks
+    private TaskViewType mPreviousTaskViewType;
 
     private final Runnable mLauncherOnDestroyCallback = () -> {
         ActiveGestureProtoLogProxy.logLauncherDestroyed();
@@ -693,6 +698,10 @@ public abstract class AbsSwipeUpHandler<
             return;
         }
         mRecentsView.onGestureAnimationStart(runningTasks, mDeviceState.getRotationTouchHelper());
+        TaskView currentPageTaskView = mRecentsView.getCurrentPageTaskView();
+        if (currentPageTaskView != null) {
+            mPreviousTaskViewType = currentPageTaskView.getType();
+        }
     }
 
     private void launcherFrameDrawn() {
@@ -1463,21 +1472,29 @@ public abstract class AbsSwipeUpHandler<
             return;
         }
 
-        StatsLogManager.EventEnum event;
+        ArrayList<StatsLogManager.EventEnum> events = new ArrayList<>();
         switch (endTarget) {
             case HOME:
-                event = LAUNCHER_HOME_GESTURE;
+                events.add(LAUNCHER_HOME_GESTURE);
                 break;
             case RECENTS:
-                event = LAUNCHER_OVERVIEW_GESTURE;
+                events.add(LAUNCHER_OVERVIEW_GESTURE);
                 break;
             case LAST_TASK:
             case NEW_TASK:
-                event = mLogDirectionUpOrLeft ? LAUNCHER_QUICKSWITCH_LEFT
-                        : LAUNCHER_QUICKSWITCH_RIGHT;
+                events.add(mLogDirectionUpOrLeft ? LAUNCHER_QUICKSWITCH_LEFT
+                        : LAUNCHER_QUICKSWITCH_RIGHT);
+                if (targetTask != null && DesktopModeStatus.canEnterDesktopMode(mContext)
+                        && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_QUICK_SWITCH.isTrue()) {
+                    if (targetTask.getType() == TaskViewType.DESKTOP) {
+                        events.add(LAUNCHER_QUICKSWITCH_ENTER_DESKTOP_MODE);
+                    } else if (mPreviousTaskViewType == TaskViewType.DESKTOP) {
+                        events.add(LAUNCHER_QUICKSWITCH_EXIT_DESKTOP_MODE);
+                    }
+                }
                 break;
             default:
-                event = IGNORE;
+                events.add(IGNORE);
         }
         StatsLogger logger = StatsLogManager.newInstance(
                         mContainer != null ? mContainer.asContext() : mContext).logger()
@@ -1494,7 +1511,7 @@ public abstract class AbsSwipeUpHandler<
                 ? LOG_NO_OP_PAGE_INDEX
                 : mRecentsView.getNextPage();
         logger.withRank(pageIndex);
-        logger.log(event);
+        events.forEach(logger::log);
     }
 
     /** Animates to the given progress, where 0 is the current app and 1 is overview. */
@@ -1971,6 +1988,7 @@ public abstract class AbsSwipeUpHandler<
     @UiThread
     private void startNewTask() {
         TaskView taskToLaunch = mRecentsView == null ? null : mRecentsView.getNextPageTaskView();
+        doLogGesture(NEW_TASK, taskToLaunch);
         startNewTask(success -> {
             if (!success) {
                 reset();
@@ -1979,7 +1997,6 @@ public abstract class AbsSwipeUpHandler<
                 endLauncherTransitionController();
                 updateSysUiFlags(1 /* windowProgress == overview */);
             }
-            doLogGesture(NEW_TASK, taskToLaunch);
         });
     }
 
