@@ -163,9 +163,19 @@ class RecentsWindowManager(context: Context) :
     }
 
     override fun startHome() {
+        startHome(/* finishRecentsAnimation= */ true)
+    }
+
+    fun startHome(finishRecentsAnimation: Boolean) {
         val recentsView: RecentsView<*, *> = getOverviewPanel()
+
+        if (!finishRecentsAnimation) {
+            recentsView.switchToScreenshot(/* onFinishRunnable= */ null)
+            startHomeInternal()
+            return
+        }
         recentsView.switchToScreenshot {
-            recentsView.finishRecentsAnimation(true) { startHomeInternal() }
+            recentsView.finishRecentsAnimation(/* toRecents= */ true) { startHomeInternal() }
         }
     }
 
@@ -218,6 +228,11 @@ class RecentsWindowManager(context: Context) :
             )
         }
 
+    private val onBackInvokedCallback: () -> Unit = {
+        // If we are in live tile mode, launch the live task, otherwise return home
+        recentsView?.runningTaskView?.launchWithAnimation() ?: startHome()
+    }
+
     private fun cleanupRecentsWindow() {
         RecentsWindowProtoLogProxy.logCleanup(isShowing())
         if (isShowing()) {
@@ -240,6 +255,10 @@ class RecentsWindowManager(context: Context) :
             windowView = layoutInflater.inflate(R.layout.fallback_recents_activity, null)
         }
         windowManager.addView(windowView, windowLayoutParams)
+
+        windowView
+            ?.findOnBackInvokedDispatcher()
+            ?.registerSystemOnBackInvokedCallback(onBackInvokedCallback)
 
         windowView?.systemUiVisibility =
             (View.SYSTEM_UI_FLAG_LAYOUT_STABLE or

@@ -137,6 +137,17 @@ public class TaskbarViewCallbacks {
         return null;
     }
 
+    /**
+     * Get the max bubble bar collapsed width for the current bubble bar visibility state. Used to
+     * reserve space for the bubble bar when transitioning taskbar view into overflow.
+     */
+    public float getBubbleBarMaxCollapsedWidthIfVisible() {
+        return mControllers.bubbleControllers
+                .filter(c -> !c.bubbleBarViewController.isHiddenForNoBubbles())
+                .map(c -> c.bubbleBarViewController.getCollapsedWidthWithMaxVisibleBubbles())
+                .orElse(0f);
+    }
+
     /** Returns true if bubble bar controllers present and enabled in persistent taskbar. */
     public boolean isBubbleBarEnabledInPersistentTaskbar() {
         return Flags.enableBubbleBarInPersistentTaskBar()
@@ -148,8 +159,7 @@ public class TaskbarViewCallbacks {
         return new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mControllers.keyboardQuickSwitchController.toggleQuickSwitchViewForTaskbar(
-                        mControllers.taskbarViewController.getTaskIdsForPinnedApps());
+                toggleKeyboardQuickSwitchView();
             }
         };
     }
@@ -159,11 +169,26 @@ public class TaskbarViewCallbacks {
         return new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View v) {
-                mControllers.keyboardQuickSwitchController.toggleQuickSwitchViewForTaskbar(
-                        mControllers.taskbarViewController.getTaskIdsForPinnedApps());
+                toggleKeyboardQuickSwitchView();
                 return true;
             }
         };
+    }
+
+    private void toggleKeyboardQuickSwitchView() {
+        if (mTaskbarView.getTaskbarOverflowView() != null) {
+            mTaskbarView.getTaskbarOverflowView().setIsActive(
+                    !mTaskbarView.getTaskbarOverflowView().getIsActive());
+        }
+        mControllers.keyboardQuickSwitchController.toggleQuickSwitchViewForTaskbar(
+                mControllers.taskbarViewController.getTaskIdsForPinnedApps(),
+                this::onKeyboardQuickSwitchViewClosed);
+    }
+
+    private void onKeyboardQuickSwitchViewClosed() {
+        if (mTaskbarView.getTaskbarOverflowView() != null) {
+            mTaskbarView.getTaskbarOverflowView().setIsActive(false);
+        }
     }
 
     private float getDividerCenterX() {

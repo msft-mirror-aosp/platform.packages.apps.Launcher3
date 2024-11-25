@@ -33,6 +33,7 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
+import com.android.launcher3.Hotseat;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
@@ -83,6 +84,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     private final DeviceProfile.OnDeviceProfileChangeListener mOnDeviceProfileChangeListener =
             dp -> {
                 onStashedInAppChanged(dp);
+                adjustHotseatForBubbleBar();
                 if (mControllers != null && mControllers.taskbarViewController != null) {
                     mControllers.taskbarViewController.onRotationChanged(dp);
                 }
@@ -152,8 +154,9 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     @Override
     protected boolean isTaskbarTouchable() {
-        return !(mTaskbarLauncherStateController.isAnimatingToLauncher()
-                && mTaskbarLauncherStateController.isTaskbarAlignedWithHotseat());
+        // Touching down during animation to Hotseat will end the transition and allow the touch to
+        // go through to the Hotseat directly.
+        return !isAnimatingToHotseat();
     }
 
     public void setShouldDelayLauncherStateAnim(boolean shouldDelayLauncherStateAnim) {
@@ -210,8 +213,12 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     private int getTaskbarAnimationDuration(boolean isVisible) {
-        if (isVisible && !mLauncher.getPredictiveBackToHomeInProgress()) {
-            return getTaskbarToHomeDuration();
+        // fast animation duration since we will not be playing workspace reveal animation.
+        boolean shouldOverrideToFastAnimation =
+                !isHotseatIconOnTopWhenAligned() || mLauncher.getPredictiveBackToHomeInProgress();
+        boolean isPinnedTaskbar = DisplayController.isPinnedTaskbar(mLauncher);
+        if (isVisible || isPinnedTaskbar) {
+            return getTaskbarToHomeDuration(shouldOverrideToFastAnimation, isPinnedTaskbar);
         } else {
             return DisplayController.isTransientTaskbar(mLauncher)
                     ? TRANSIENT_TASKBAR_TRANSITION_DURATION
@@ -261,6 +268,14 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         if (mLauncher.getHotseat() != null) {
             mLauncher.getHotseat().adjustForBubbleBar(isBubbleBarVisible);
         }
+    }
+
+    private void adjustHotseatForBubbleBar() {
+        Hotseat hotseat = mLauncher.getHotseat();
+        if (mControllers.bubbleControllers.isEmpty() || hotseat == null) return;
+        boolean hiddenForBubbles =
+                mControllers.bubbleControllers.get().bubbleBarViewController.isHiddenForNoBubbles();
+        hotseat.post(() -> adjustHotseatForBubbleBar(!hiddenForBubbles));
     }
 
     /**
@@ -362,16 +377,22 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
             // This method can be called before init() is called.
             return;
         }
-        if (mControllers.uiController.isIconAlignedWithHotseat()
-                && !mTaskbarLauncherStateController.isAnimatingToLauncher()) {
-            // Only animate the nav buttons while home and not animating home, otherwise let
-            // the TaskbarViewController handle it.
-            mControllers.navbarButtonsViewController
-                    .getTaskbarNavButtonTranslationYForInAppDisplay()
-                    .updateValue(mLauncher.getDeviceProfile().getTaskbarOffsetY()
-                            * mTaskbarInAppDisplayProgress.value);
-            mControllers.navbarButtonsViewController
-                    .getOnTaskbarBackgroundNavButtonColorOverride().updateValue(progress);
+        if (mControllers.uiController.isIconAlignedWithHotseat()) {
+            if (!mTaskbarLauncherStateController.isAnimatingToLauncher()) {
+                // Only animate the nav buttons while home and not animating home, otherwise let
+                // the TaskbarViewController handle it.
+                mControllers.navbarButtonsViewController
+                        .getTaskbarNavButtonTranslationYForInAppDisplay()
+                        .updateValue(mLauncher.getDeviceProfile().getTaskbarOffsetY()
+                                * mTaskbarInAppDisplayProgress.value);
+                mControllers.navbarButtonsViewController
+                        .getOnTaskbarBackgroundNavButtonColorOverride().updateValue(progress);
+            }
+            if (isBubbleBarEnabled()) {
+                mControllers.bubbleControllers.ifPresent(
+                        c -> c.bubbleStashController.setInAppDisplayOverrideProgress(
+                                mTaskbarInAppDisplayProgress.value));
+            }
         }
     }
 
@@ -417,6 +438,17 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         return mTaskbarLauncherStateController.isInHotseatOnTopStates()
                 && mTaskbarInAppDisplayProgressMultiProp.get(MINUS_ONE_PAGE_PROGRESS_INDEX)
                     .getValue() == 0;
+    }
+
+    @Override
+    public boolean isAnimatingToHotseat() {
+        return mTaskbarLauncherStateController.isAnimatingToLauncher()
+                && isIconAlignedWithHotseat();
+    }
+
+    @Override
+    public void endAnimationToHotseat() {
+        mTaskbarLauncherStateController.resetIconAlignment();
     }
 
     @Override

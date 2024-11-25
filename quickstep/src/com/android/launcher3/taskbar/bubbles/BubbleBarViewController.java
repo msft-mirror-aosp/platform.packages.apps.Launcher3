@@ -85,6 +85,7 @@ public class BubbleBarViewController {
     private final BubbleBarView mBarView;
     private int mIconSize;
     private int mBubbleBarPadding;
+    private final int mDragElevation;
 
     // Initialized in init.
     private BubbleStashController mBubbleStashController;
@@ -152,6 +153,8 @@ public class BubbleBarViewController {
         mBubbleBarAlpha = new MultiValueAlpha(mBarView, 1 /* num alpha channels */);
         mIconSize = activity.getResources().getDimensionPixelSize(
                 R.dimen.bubblebar_icon_size);
+        mDragElevation = activity.getResources().getDimensionPixelSize(
+                R.dimen.bubblebar_drag_elevation);
         mTaskbarTranslationDelta = getBubbleBarTranslationDeltaForTaskbar(activity);
     }
 
@@ -217,8 +220,14 @@ public class BubbleBarViewController {
             }
 
             @Override
-            public void updateBubbleBarLocation(BubbleBarLocation location) {
-                mBubbleBarController.updateBubbleBarLocation(location);
+            public void updateBubbleBarLocation(BubbleBarLocation location,
+                    @BubbleBarLocation.UpdateSource int source) {
+                mBubbleBarController.updateBubbleBarLocation(location, source);
+            }
+
+            @Override
+            public void setIsDragging(boolean dragging) {
+                mBubbleBarContainer.setElevation(dragging ? mDragElevation : 0);
             }
         });
 
@@ -242,8 +251,9 @@ public class BubbleBarViewController {
             }
 
             @Override
-            public void updateBubbleBarLocation(BubbleBarLocation location) {
-                mBubbleBarController.updateBubbleBarLocation(location);
+            public void updateBubbleBarLocation(BubbleBarLocation location,
+                    @BubbleBarLocation.UpdateSource int source) {
+                mBubbleBarController.updateBubbleBarLocation(location, source);
             }
         };
     }
@@ -381,6 +391,13 @@ public class BubbleBarViewController {
         }
     }
 
+    /** Notifies that the IME became visible. */
+    public void onImeVisible() {
+        if (isAnimatingNewBubble()) {
+            mBubbleBarViewAnimator.interruptForIme();
+        }
+    }
+
     //
     // The below animators are exposed to BubbleStashController so it can manage the stashing
     // animation.
@@ -468,6 +485,13 @@ public class BubbleBarViewController {
      */
     public BubbleBarLocation getBubbleBarLocation() {
         return mBarView.getBubbleBarLocation();
+    }
+
+    /**
+     * @return the max collapsed width for the bubble bar.
+     */
+    public float getCollapsedWidthWithMaxVisibleBubbles() {
+        return mBarView.getCollapsedWidthWithMaxVisibleBubbles();
     }
 
     /**
@@ -893,9 +917,10 @@ public class BubbleBarViewController {
             mBubbleBarViewAnimator.animateToInitialState(bubble, isInApp, isExpanding);
             return;
         }
-        boolean persistentTaskbarOrOnHome = mBubbleStashController.isBubblesShowingOnHome()
+        // if we're not stashed or we're in persistent taskbar, animate for collapsed state.
+        boolean animateForCollapsed = !mBubbleStashController.isStashed()
                 || !mBubbleStashController.isTransientTaskBar();
-        if (persistentTaskbarOrOnHome) {
+        if (animateForCollapsed) {
             mBubbleBarViewAnimator.animateBubbleBarForCollapsed(bubble, isExpanding);
             return;
         }
@@ -987,10 +1012,9 @@ public class BubbleBarViewController {
         }
     }
 
-    /** Marks as should show education and shows the bubble bar in a collapsed state */
+    /** Marks as should show education. */
     public void prepareToShowEducation() {
         mShouldShowEducation = true;
-        mBubbleStashController.showBubbleBar(false /* expand the bubbles */);
     }
 
     /**
