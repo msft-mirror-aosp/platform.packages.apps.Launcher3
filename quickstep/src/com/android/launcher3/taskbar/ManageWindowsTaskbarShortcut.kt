@@ -113,13 +113,13 @@ class ManageWindowsTaskbarShortcut<T>(
     private fun createAndPositionTaskbarShortcut(taskList: ArrayList<Pair<Int, Bitmap?>>) {
         val onIconClickListener =
             ({ taskId: Int? ->
-                taskbarShortcutAllWindowsView.removeFromContainer()
+                taskbarShortcutAllWindowsView.animateClose()
                 if (taskId != null) {
                     SystemUiProxy.INSTANCE.get(target).showDesktopApp(taskId, null)
                 }
             })
 
-        val onOutsideClickListener = { taskbarShortcutAllWindowsView.removeFromContainer() }
+        val onOutsideClickListener = { taskbarShortcutAllWindowsView.animateClose() }
 
         taskbarShortcutAllWindowsView =
             TaskbarShortcutManageWindowsView(
@@ -156,6 +156,7 @@ class ManageWindowsTaskbarShortcut<T>(
         init {
             createAndShowMenuView(snapshotList, onIconClickListener, onOutsideClickListener)
             taskbarOverlayContext.dragLayer.addTouchController(this)
+            animateOpen()
         }
 
         /** Adds the carousel menu to the taskbar overlay drag layer */
@@ -230,7 +231,7 @@ class ManageWindowsTaskbarShortcut<T>(
                     ev.action == MotionEvent.ACTION_DOWN &&
                         !taskbarOverlayContext.dragLayer.isEventOverView(menuView.rootView, ev)
                 ) {
-                    removeFromContainer()
+                    animateClose()
                 }
             }
             return false
