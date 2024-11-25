@@ -359,6 +359,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (!(view.getTag() instanceof CollectionInfo)) {
             mActivityContext.getViewCache().recycleView(view.getSourceLayoutResId(), view);
         }
+        if (view instanceof FolderIcon fi) {
+            // We should clear FolderInfo's Folder and FolderIcon to avoid memory leak.
+            fi.removeListeners();
+        }
         view.setTag(null);
     }
 
