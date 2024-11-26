@@ -80,6 +80,8 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.Pair;
+import android.util.TimeUtils;
+import android.view.Choreographer;
 import android.view.MotionEvent;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
@@ -1453,8 +1455,21 @@ public abstract class AbsSwipeUpHandler<
                 onPageTransitionEnd.run();
             }
         }
+        long finalDuration = duration;
+        runOnRecentsAnimationAndLauncherBound(() -> animateGestureEnd(
+                startShift, endShift, finalDuration, interpolator, endTarget, velocityPxPerMs));
+    }
 
-        animateToProgress(startShift, endShift, duration, interpolator, endTarget, velocityPxPerMs);
+    @UiThread
+    protected void animateGestureEnd(
+            float startShift,
+            float endShift,
+            long duration,
+            @NonNull Interpolator interpolator,
+            @NonNull GestureEndTarget endTarget,
+            @NonNull PointF velocityPxPerMs) {
+        animateToProgressInternal(
+                startShift, endShift, duration, interpolator, endTarget, velocityPxPerMs);
     }
 
     private void doLogGesture(GestureEndTarget endTarget, @Nullable TaskView targetTask) {
@@ -1495,14 +1510,6 @@ public abstract class AbsSwipeUpHandler<
                 : mRecentsView.getNextPage();
         logger.withRank(pageIndex);
         logger.log(event);
-    }
-
-    /** Animates to the given progress, where 0 is the current app and 1 is overview. */
-    @UiThread
-    private void animateToProgress(float start, float end, long duration, Interpolator interpolator,
-            GestureEndTarget target, PointF velocityPxPerMs) {
-        runOnRecentsAnimationAndLauncherBound(() -> animateToProgressInternal(start, end, duration,
-                interpolator, target, velocityPxPerMs));
     }
 
     protected abstract HomeAnimationFactory createHomeAnimationFactory(
@@ -1729,13 +1736,30 @@ public abstract class AbsSwipeUpHandler<
     }
 
     private void handOffAnimation(PointF velocityPxPerMs) {
-        if (!TransitionAnimator.Companion.longLivedReturnAnimationsEnabled()
-                || mRecentsAnimationController == null) {
+        if (!TransitionAnimator.Companion.longLivedReturnAnimationsEnabled()) {
+            return;
+        }
+
+        // This function is not guaranteed to be called inside a frame. We try to access the frame
+        // time immediately, but if we're not inside a frame we must post a callback to be run at
+        // the beginning of the next frame.
+        try  {
+            handOffAnimationInternal(Choreographer.getInstance().getFrameTime(), velocityPxPerMs);
+        } catch (IllegalStateException e) {
+            Choreographer.getInstance().postFrameCallback(
+                    frameTimeNanos -> handOffAnimationInternal(
+                            frameTimeNanos / TimeUtils.NANOS_PER_MS, velocityPxPerMs));
+        }
+    }
+
+    private void handOffAnimationInternal(long timestamp, PointF velocityPxPerMs) {
+        if (mRecentsAnimationController == null) {
             return;
         }
 
         Pair<RemoteAnimationTarget[], WindowAnimationState[]> targetsAndStates =
-                extractTargetsAndStates(mRemoteTargetHandles, velocityPxPerMs);
+                extractTargetsAndStates(
+                        mRemoteTargetHandles, timestamp, velocityPxPerMs);
         mRecentsAnimationController.handOffAnimation(
                 targetsAndStates.first, targetsAndStates.second);
         ActiveGestureProtoLogProxy.logHandOffAnimation();

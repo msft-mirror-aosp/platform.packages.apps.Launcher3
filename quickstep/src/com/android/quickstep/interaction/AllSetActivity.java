@@ -121,6 +121,8 @@ public class AllSetActivity extends Activity {
 
     private TextView mHintView;
 
+    private final Runnable mOverviewTargetChangeRunnable = this::onOverviewTargetChanged;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -285,11 +287,19 @@ public class AllSetActivity extends Activity {
     private void onTISConnected(TISBinder binder) {
         setSetupUIVisible(isResumed());
         binder.setSwipeUpProxy(isResumed() ? this::createSwipeUpProxy : null);
-        binder.setOverviewTargetChangeListener(binder::preloadOverviewForSUWAllSet);
+        binder.registerOverviewTargetChangeListener(mOverviewTargetChangeRunnable);
         binder.preloadOverviewForSUWAllSet();
         TaskbarManager taskbarManager = binder.getTaskbarManager();
         if (taskbarManager != null) {
             mLauncherStartAnim = taskbarManager.createLauncherStartFromSuwAnim(MAX_SWIPE_DURATION);
+        }
+    }
+
+    private void onOverviewTargetChanged() {
+        TISBinder binder = mTISBindHelper.getBinder();
+        if (binder != null) {
+            binder.preloadOverviewForSUWAllSet();
+            binder.unregisterOverviewTargetChangeListener(mOverviewTargetChangeRunnable);
         }
     }
 
@@ -309,7 +319,7 @@ public class AllSetActivity extends Activity {
         if (binder != null) {
             setSetupUIVisible(false);
             binder.setSwipeUpProxy(null);
-            binder.setOverviewTargetChangeListener(null);
+            binder.unregisterOverviewTargetChangeListener(mOverviewTargetChangeRunnable);
         }
     }
 
