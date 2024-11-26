@@ -120,7 +120,7 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
     private final TaskbarView mTaskbarView;
     private final MultiValueAlpha mTaskbarIconAlpha;
     private final AnimatedFloat mTaskbarIconScaleForStash = new AnimatedFloat(this::updateScale);
-    private final AnimatedFloat mTaskbarIconTranslationYForHome = new AnimatedFloat(
+    public final AnimatedFloat mTaskbarIconTranslationYForHome = new AnimatedFloat(
             this::updateTranslationY);
     private final AnimatedFloat mTaskbarIconTranslationYForStash = new AnimatedFloat(
             this::updateTranslationY);
@@ -349,6 +349,11 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      */
     public void addOneTimePreDrawListener(@NonNull Runnable listener) {
         OneShotPreDrawListener.add(mTaskbarView, listener);
+    }
+
+    @VisibleForTesting
+    int getMaxNumIconViews() {
+        return mTaskbarView.getMaxNumIconViews();
     }
 
     public Rect getIconLayoutVisualBounds() {
@@ -623,12 +628,10 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      * Updates which icons are marked as running or minimized given the Sets of currently running
      * and minimized tasks.
      */
-    public void updateIconViewsRunningStates(Set<Integer> runningTaskIds,
-            Set<Integer> minimizedTaskIds) {
+    public void updateIconViewsRunningStates() {
         for (View iconView : getIconViews()) {
             if (iconView instanceof BubbleTextView btv) {
-                btv.updateRunningState(
-                        getRunningAppState(btv, runningTaskIds, minimizedTaskIds));
+                btv.updateRunningState(getRunningAppState(btv));
             }
         }
     }
@@ -651,26 +654,15 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         return pinnedAppsWithTasks;
     }
 
-    private BubbleTextView.RunningAppState getRunningAppState(
-            BubbleTextView btv,
-            Set<Integer> runningTaskIds,
-            Set<Integer> minimizedTaskIds) {
+    private BubbleTextView.RunningAppState getRunningAppState(BubbleTextView btv) {
         Object tag = btv.getTag();
         if (tag instanceof TaskItemInfo itemInfo) {
-            if (minimizedTaskIds.contains(itemInfo.getTaskId())) {
-                return BubbleTextView.RunningAppState.MINIMIZED;
-            }
-            if (runningTaskIds.contains(itemInfo.getTaskId())) {
-                return BubbleTextView.RunningAppState.RUNNING;
-            }
+            return mControllers.taskbarRecentAppsController.getRunningAppState(
+                    itemInfo.getTaskId());
         }
         if (tag instanceof GroupTask groupTask && !groupTask.hasMultipleTasks()) {
-            if (minimizedTaskIds.contains(groupTask.task1.key.id)) {
-                return BubbleTextView.RunningAppState.MINIMIZED;
-            }
-            if (runningTaskIds.contains(groupTask.task1.key.id)) {
-                return BubbleTextView.RunningAppState.RUNNING;
-            }
+            return mControllers.taskbarRecentAppsController.getRunningAppState(
+                    groupTask.task1.key.id);
         }
         return BubbleTextView.RunningAppState.NOT_RUNNING;
     }
@@ -792,9 +784,16 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
         }
     }
 
-    /** Resets the icon alignment controller so that it can be recreated again later. */
-    void resetIconAlignmentController() {
+    /**
+     * Resets the icon alignment controller so that it can be recreated again later, and updates
+     * the list of icons shown in the taskbar if the bubble bar visibility changes the taskbar
+     * overflow state.
+     */
+    void adjustTaskbarForBubbleBar() {
         mIconAlignControllerLazy = null;
+        if (mTaskbarView.updateMaxNumIcons()) {
+            commitRunningAppsToUI();
+        }
     }
 
     /**
@@ -802,6 +801,8 @@ public class TaskbarViewController implements TaskbarControllers.LoggableTaskbar
      */
     private AnimatorPlaybackController createIconAlignmentController(DeviceProfile launcherDp) {
         PendingAnimation setter = new PendingAnimation(100);
+        // icon alignment not needed for pinned taskbar.
+        if (DisplayController.isPinnedTaskbar(mActivity)) return setter.createPlaybackController();
         mOnControllerPreCreateCallback.run();
         DeviceProfile taskbarDp = mActivity.getDeviceProfile();
         Rect hotseatPadding = launcherDp.getHotseatLayoutPadding(mActivity);

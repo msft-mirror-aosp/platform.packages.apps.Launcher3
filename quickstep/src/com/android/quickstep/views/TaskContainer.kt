@@ -110,7 +110,6 @@ class TaskContainer(
             return snapshotView as TaskThumbnailViewDeprecated
         }
 
-    // TODO(b/334826842): Support shouldShowSplashView for new TTV.
     val shouldShowSplashView: Boolean
         get() =
             if (enableRefactorTaskThumbnail())
@@ -182,5 +181,6 @@ class TaskContainer(
         addAccessibleChildToList(snapshotView, outChildren)
         showWindowsView?.let { addAccessibleChildToList(it, outChildren) }
         digitalWellBeingToast?.let { addAccessibleChildToList(it, outChildren) }
+        overlay.addChildForAccessibility(outChildren)
     }
 }
