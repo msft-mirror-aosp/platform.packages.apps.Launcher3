@@ -195,7 +195,7 @@ public class AllSetActivity extends Activity {
                         LOTTIE_TERTIARY_COLOR_TOKEN, R.color.all_set_bg_tertiary),
                 getTheme());
 
-        startBackgroundAnimation(getDP().isTablet);
+        setUpBackgroundAnimation(getDP().isTablet);
         getIDP().addOnChangeListener(mOnIDPChangeListener);
     }
 
@@ -220,7 +220,7 @@ public class AllSetActivity extends Activity {
         Executors.UI_HELPER_EXECUTOR.execute(runnable);
     }
 
-    private void startBackgroundAnimation(boolean forTablet) {
+    private void setUpBackgroundAnimation(boolean forTablet) {
         if (mVibrator == null) {
             return;
         }
@@ -264,7 +264,6 @@ public class AllSetActivity extends Activity {
                     };
         }
         mAnimatedBackground.addAnimatorListener(mBackgroundAnimatorListener);
-        mAnimatedBackground.playAnimation();
     }
 
     private void setSetupUIVisible(boolean visible) {
