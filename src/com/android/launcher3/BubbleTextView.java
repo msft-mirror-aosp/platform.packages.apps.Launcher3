@@ -980,7 +980,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     public boolean shouldDrawAppContrastTile() {
         return mDisplay == DISPLAY_WORKSPACE && shouldTextBeVisible()
                 && PillColorProvider.getInstance(getContext()).isMatchaEnabled()
-                && enableContrastTiles() && TextUtils.isEmpty(getText());
+                && enableContrastTiles() && !TextUtils.isEmpty(getText());
     }
 
     public void setTextVisibility(boolean visible) {
