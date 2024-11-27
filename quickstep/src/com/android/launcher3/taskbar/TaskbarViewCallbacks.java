@@ -91,6 +91,7 @@ public class TaskbarViewCallbacks {
     public View.OnTouchListener getTaskbarDividerRightClickListener() {
         return (v, event) -> {
             if (event.isFromSource(InputDevice.SOURCE_MOUSE)
+                    && event.getAction() == MotionEvent.ACTION_DOWN
                     && event.getButtonState() == MotionEvent.BUTTON_SECONDARY) {
                 mControllers.taskbarPinningController.showPinningView(v, getDividerCenterX());
                 return true;
