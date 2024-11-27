@@ -821,10 +821,12 @@ class BubbleBarViewAnimatorTest {
         whenever(bubbleStashController.bubbleBarTranslationY)
             .thenReturn(BAR_TRANSLATION_Y_FOR_HOTSEAT)
 
-        val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
-
+        val semaphore = Semaphore(0)
         var notifiedExpanded = false
-        val onExpanded = Runnable { notifiedExpanded = true }
+        val onExpanded = Runnable {
+            notifiedExpanded = true
+            semaphore.release()
+        }
         val animator =
             BubbleBarViewAnimator(
                 bubbleBarView,
@@ -847,6 +849,10 @@ class BubbleBarViewAnimatorTest {
             animatorTestRule.advanceTimeBy(100)
         }
 
+        // verify there is a pending hide animation
+        assertThat(animatorScheduler.delayedBlock).isNotNull()
+        assertThat(animator.isAnimating).isTrue()
+
         // send the expand signal in the middle of the lift animation
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             animator.expandedWhileAnimating()
@@ -857,14 +863,11 @@ class BubbleBarViewAnimatorTest {
             animatorTestRule.advanceTimeBy(150)
         }
 
-        // verify there is a pending hide animation
-        assertThat(animatorScheduler.delayedBlock).isNotNull()
-        assertThat(animator.isAnimating).isTrue()
-
         // the lift animation is complete; the spring back animation should start now. wait for it
         // to complete
         InstrumentationRegistry.getInstrumentation().runOnMainSync {}
-        barAnimator.assertIsRunning()
+
+        assertThat(semaphore.tryAcquire(5, TimeUnit.SECONDS)).isTrue()
         PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(DynamicAnimation.TRANSLATION_Y)
 
         // verify that the hide animation was canceled
