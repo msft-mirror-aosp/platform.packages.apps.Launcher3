@@ -4698,6 +4698,7 @@ public abstract class RecentsView<
             return;
         }
         setContentDescription(isEmpty ? mEmptyMessage : "");
+        setFocusable(isEmpty);
         mShowEmptyMessage = isEmpty;
         updateEmptyStateUi(hasSizeChanged);
         invalidate();
