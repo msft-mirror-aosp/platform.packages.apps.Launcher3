@@ -250,8 +250,12 @@ class TransientBubbleStashController(
         updateStashedAndExpandedState(stash = true, expand = false)
     }
 
-    override fun showBubbleBar(expandBubbles: Boolean) {
-        updateStashedAndExpandedState(stash = false, expandBubbles)
+    override fun showBubbleBar(expandBubbles: Boolean, bubbleBarGesture: Boolean) {
+        updateStashedAndExpandedState(
+            stash = false,
+            expand = expandBubbles,
+            bubbleBarGesture = bubbleBarGesture,
+        )
     }
 
     override fun getDiffBetweenHandleAndBarCenters(): Float {
@@ -481,7 +485,11 @@ class TransientBubbleStashController(
     }
 
     @VisibleForTesting
-    fun updateStashedAndExpandedState(stash: Boolean, expand: Boolean) {
+    fun updateStashedAndExpandedState(
+        stash: Boolean,
+        expand: Boolean,
+        bubbleBarGesture: Boolean = false,
+    ) {
         if (bubbleBarViewController.isHiddenForNoBubbles) {
             // If there are no bubbles the bar and handle are invisible, nothing to do here.
             return
@@ -502,7 +510,8 @@ class TransientBubbleStashController(
                 }
         }
         if (bubbleBarViewController.isExpanded != expand) {
-            bubbleBarViewController.isExpanded = expand
+            val maybeShowEdu = expand && bubbleBarGesture
+            bubbleBarViewController.setExpanded(expand, maybeShowEdu)
         }
     }
 
