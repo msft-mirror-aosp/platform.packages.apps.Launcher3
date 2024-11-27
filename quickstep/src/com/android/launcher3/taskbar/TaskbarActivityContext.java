@@ -1138,6 +1138,10 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             return getSetupWindowSize();
         }
 
+        int bubbleBarTop = mControllers.bubbleControllers.map(bubbleControllers ->
+                bubbleControllers.bubbleBarViewController.getBubbleBarWithFlyoutMaximumHeight()
+        ).orElse(0);
+        int taskbarWindowSize;
         boolean shouldTreatAsTransient = DisplayController.isTransientTaskbar(this)
                 || (enableTaskbarPinning() && !isThreeButtonNav());
 
@@ -1154,16 +1158,18 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             DeviceProfile transientTaskbarDp = mDeviceProfile.toBuilder(this)
                     .setIsTransientTaskbar(true).build();
 
-            return transientTaskbarDp.taskbarHeight
+            taskbarWindowSize = transientTaskbarDp.taskbarHeight
                     + (2 * transientTaskbarDp.taskbarBottomMargin)
                     + Math.max(extraHeightForTaskbarTooltips, resources.getDimensionPixelSize(
                     R.dimen.transient_taskbar_shadow_blur));
+            return Math.max(taskbarWindowSize, bubbleBarTop);
         }
 
 
-        return mDeviceProfile.taskbarHeight
+        taskbarWindowSize =  mDeviceProfile.taskbarHeight
                 + getCornerRadius()
                 + extraHeightForTaskbarTooltips;
+        return Math.max(taskbarWindowSize, bubbleBarTop);
     }
 
     public int getSetupWindowSize() {

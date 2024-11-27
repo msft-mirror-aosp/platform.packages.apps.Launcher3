@@ -74,6 +74,9 @@ interface BubbleStashController {
     val isBubblesShowingOnOverview: Boolean
         get() = launcherState == BubbleLauncherState.OVERVIEW
 
+    /** Bubble bar vertical center for launcher home. */
+    var bubbleBarVerticalCenterForHome: Int
+
     /** Updated when sysui locked state changes, when locked, bubble bar is not shown. */
     var isSysuiLocked: Boolean
 
@@ -120,9 +123,6 @@ interface BubbleStashController {
 
     /** Set a bubble bar location */
     fun setBubbleBarLocation(bubbleBarLocation: BubbleBarLocation)
-
-    /** Set the bubble bar vertical center for launcher home. */
-    fun setBubbleBarVerticalCenterForHome(verticalCenter: Int)
 
     /**
      * Stashes the bubble bar (transform to the handle view), or just shrink width of the expanded
