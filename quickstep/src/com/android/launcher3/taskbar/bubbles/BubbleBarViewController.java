@@ -170,7 +170,7 @@ public class BubbleBarViewController {
                 mBubbleBarContainer, createFlyoutPositioner(), createFlyoutCallbacks());
         mBubbleBarViewAnimator = new BubbleBarViewAnimator(
                 mBarView, mBubbleStashController, mBubbleBarFlyoutController,
-                mBubbleBarController::showExpandedView);
+                createBubbleBarParentViewController(), mBubbleBarController::showExpandedView);
         mTaskbarViewPropertiesProvider = taskbarViewPropertiesProvider;
         onBubbleBarConfigurationChanged(/* animate= */ false);
         mActivity.addOnDeviceProfileChangeListener(
@@ -317,20 +317,18 @@ public class BubbleBarViewController {
     private FlyoutCallbacks createFlyoutCallbacks() {
         return new FlyoutCallbacks() {
             @Override
-            public void extendTopBoundary(int space) {
-                int defaultSize = mActivity.getDefaultTaskbarWindowSize();
-                mActivity.setTaskbarWindowSize(defaultSize + space);
-            }
-
-            @Override
-            public void resetTopBoundary() {
-                mActivity.setTaskbarWindowSize(mActivity.getDefaultTaskbarWindowSize());
-            }
-
-            @Override
             public void flyoutClicked() {
                 interruptAnimationForTouch();
                 setExpanded(/* isExpanded= */ true, /* maybeShowEdu*/ true);
+            }
+        };
+    }
+
+    private BubbleBarParentViewHeightUpdateNotifier createBubbleBarParentViewController() {
+        return new BubbleBarParentViewHeightUpdateNotifier() {
+            @Override
+            public void updateTopBoundary() {
+                mActivity.setTaskbarWindowSize(mActivity.getDefaultTaskbarWindowSize());
             }
         };
     }
@@ -440,6 +438,11 @@ public class BubbleBarViewController {
 
     public float getBubbleBarCollapsedHeight() {
         return mBarView.getBubbleBarCollapsedHeight();
+    }
+
+    /** Returns the bubble bar arrow height.*/
+    public float getBubbleBarArrowHeight() {
+        return mBarView.getArrowHeight();
     }
 
     /**
@@ -573,6 +576,19 @@ public class BubbleBarViewController {
      */
     public boolean isHiddenForNoBubbles() {
         return mHiddenForNoBubbles;
+    }
+
+    /** Returns maximum height of the bubble bar with the flyout view. */
+    public int getBubbleBarWithFlyoutMaximumHeight() {
+        if (!isBubbleBarVisible()) return 0;
+        int bubbleBarTopOnHome = (int) (mBubbleStashController.getBubbleBarVerticalCenterForHome()
+                + mBarView.getBubbleBarCollapsedHeight() / 2);
+        int result = (int) (bubbleBarTopOnHome + mBarView.getArrowHeight());
+        if (isAnimatingNewBubble()) {
+            // when animating new bubble add the maximum height of the flyout view
+            result += mBubbleBarFlyoutController.getMaximumFlyoutHeight();
+        }
+        return result;
     }
 
     /**

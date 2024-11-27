@@ -77,7 +77,7 @@ class PersistentBubbleStashControllerTest {
             PersistentBubbleStashController(DefaultDimensionsProvider())
         setUpBubbleBarView()
         setUpBubbleBarController()
-        persistentTaskBarStashController.setHotseatVerticalCenter(HOTSEAT_VERTICAL_CENTER)
+        persistentTaskBarStashController.bubbleBarVerticalCenterForHome = HOTSEAT_VERTICAL_CENTER
         persistentTaskBarStashController.init(
             taskbarInsetsController,
             bubbleBarViewController,
