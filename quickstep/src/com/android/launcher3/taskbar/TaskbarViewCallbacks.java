@@ -203,6 +203,10 @@ public class TaskbarViewCallbacks {
     private class TaskbarViewGestureListener extends GestureDetector.SimpleOnGestureListener {
         @Override
         public boolean onDown(@NonNull MotionEvent event) {
+            if (event.isFromSource(InputDevice.SOURCE_MOUSE)
+                    && event.getButtonState() == MotionEvent.BUTTON_SECONDARY) {
+                maybeShowPinningView(event);
+            }
             return true;
         }
 
@@ -212,11 +216,16 @@ public class TaskbarViewCallbacks {
         }
 
         @Override
-        public void onLongPress(MotionEvent event) {
-            if (DisplayController.isPinnedTaskbar(mActivity)) {
-                mControllers.taskbarPinningController.showPinningView(mTaskbarView,
-                        event.getRawX());
+        public void onLongPress(@NonNull MotionEvent event) {
+            maybeShowPinningView(event);
+        }
+
+        private void maybeShowPinningView(@NonNull MotionEvent event) {
+            if (!DisplayController.isPinnedTaskbar(mActivity) || mTaskbarView.isEventOverAnyItem(
+                    event)) {
+                return;
             }
+            mControllers.taskbarPinningController.showPinningView(mTaskbarView, event.getRawX());
         }
     }
 }
