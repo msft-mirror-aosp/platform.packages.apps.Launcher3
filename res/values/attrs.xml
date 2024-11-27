@@ -163,8 +163,8 @@
     </declare-styleable>
 
     <declare-styleable name="GridDimension">
-        <attr name="minDeviceWidthPx" format="float"/>
-        <attr name="minDeviceHeightPx" format="float"/>
+        <attr name="minDeviceWidthDp" format="integer"/>
+        <attr name="minDeviceHeightDp" format="integer"/>
         <attr name="numGridDimension" format="integer"/>
         <attr name="dbFile" />
         <attr name="defaultLayoutId"/>
