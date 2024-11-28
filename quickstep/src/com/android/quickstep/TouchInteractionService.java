@@ -524,7 +524,8 @@ public class TouchInteractionService extends Service {
         }
 
         protected void onOverviewTargetChange() {
-            for (Runnable listener : mOnOverviewTargetChangeListeners) {
+            Set<Runnable> listeners = new HashSet<>(mOnOverviewTargetChangeListeners);
+            for (Runnable listener : listeners) {
                 listener.run();
             }
         }
