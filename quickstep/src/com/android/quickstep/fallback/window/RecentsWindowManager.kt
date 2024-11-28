@@ -163,9 +163,19 @@ class RecentsWindowManager(context: Context) :
     }
 
     override fun startHome() {
+        startHome(/* finishRecentsAnimation= */ true)
+    }
+
+    fun startHome(finishRecentsAnimation: Boolean) {
         val recentsView: RecentsView<*, *> = getOverviewPanel()
+
+        if (!finishRecentsAnimation) {
+            recentsView.switchToScreenshot(/* onFinishRunnable= */ null)
+            startHomeInternal()
+            return
+        }
         recentsView.switchToScreenshot {
-            recentsView.finishRecentsAnimation(true) { startHomeInternal() }
+            recentsView.finishRecentsAnimation(/* toRecents= */ true) { startHomeInternal() }
         }
     }
 

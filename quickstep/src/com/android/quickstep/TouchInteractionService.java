@@ -137,6 +137,7 @@ import com.android.wm.shell.startingsurface.IStartingWindow;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.lang.ref.WeakReference;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -163,7 +164,7 @@ public class TouchInteractionService extends Service {
 
         private final WeakReference<TouchInteractionService> mTis;
 
-        @Nullable private Runnable mOnOverviewTargetChangeListener = null;
+        private final Set<Runnable> mOnOverviewTargetChangeListeners = new HashSet<>();
 
         private TISBinder(TouchInteractionService tis) {
             mTis = new WeakReference<>(tis);
@@ -512,15 +513,19 @@ public class TouchInteractionService extends Service {
                     tis -> tis.mDeviceState.setGestureBlockingTaskId(taskId));
         }
 
-        /** Sets a listener to be run on Overview Target updates. */
-        public void setOverviewTargetChangeListener(@Nullable Runnable listener) {
-            mOnOverviewTargetChangeListener = listener;
+        /** Registers a listener to be run on Overview Target updates. */
+        public void registerOverviewTargetChangeListener(@NonNull Runnable listener) {
+            mOnOverviewTargetChangeListeners.add(listener);
+        }
+
+        /** Unregisters an OverviewTargetChange listener. */
+        public void unregisterOverviewTargetChangeListener(@NonNull Runnable listener) {
+            mOnOverviewTargetChangeListeners.remove(listener);
         }
 
         protected void onOverviewTargetChange() {
-            if (mOnOverviewTargetChangeListener != null) {
-                mOnOverviewTargetChangeListener.run();
-                mOnOverviewTargetChangeListener = null;
+            for (Runnable listener : mOnOverviewTargetChangeListeners) {
+                listener.run();
             }
         }
 

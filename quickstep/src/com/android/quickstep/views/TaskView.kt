@@ -101,7 +101,7 @@ constructor(
     defStyleRes: Int = 0,
     focusBorderAnimator: BorderAnimator? = null,
     hoverBorderAnimator: BorderAnimator? = null,
-    private val type: TaskViewType = TaskViewType.SINGLE,
+    val type: TaskViewType = TaskViewType.SINGLE,
     protected val thumbnailFullscreenParams: FullscreenDrawParams = FullscreenDrawParams(context),
 ) : FrameLayout(context, attrs), ViewPool.Reusable {
     /**
