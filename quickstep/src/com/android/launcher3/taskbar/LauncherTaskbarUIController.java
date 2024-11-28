@@ -33,10 +33,10 @@ import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Flags;
+import com.android.launcher3.Hotseat;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatedFloat;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.InstanceIdSequence;
 import com.android.launcher3.model.data.ItemInfo;
@@ -69,17 +69,14 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     public static final int ALL_APPS_PAGE_PROGRESS_INDEX = 1;
     public static final int WIDGETS_PAGE_PROGRESS_INDEX = 2;
     public static final int SYSUI_SURFACE_PROGRESS_INDEX = 3;
-    public static final int LAUNCHER_PAUSE_PROGRESS_INDEX = 4;
 
-    public static final int DISPLAY_PROGRESS_COUNT = 5;
+    public static final int DISPLAY_PROGRESS_COUNT = 4;
 
     private final AnimatedFloat mTaskbarInAppDisplayProgress = new AnimatedFloat(
             this::onInAppDisplayProgressChanged);
     private final MultiPropertyFactory<AnimatedFloat> mTaskbarInAppDisplayProgressMultiProp =
             new MultiPropertyFactory<>(mTaskbarInAppDisplayProgress,
                     AnimatedFloat.VALUE, DISPLAY_PROGRESS_COUNT, Float::max);
-    private final AnimatedFloat mLauncherPauseProgress = new AnimatedFloat(
-            this::launcherPauseProgressUpdate);
 
     private final QuickstepLauncher mLauncher;
     private final HomeVisibilityState mHomeState;
@@ -87,6 +84,7 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     private final DeviceProfile.OnDeviceProfileChangeListener mOnDeviceProfileChangeListener =
             dp -> {
                 onStashedInAppChanged(dp);
+                adjustHotseatForBubbleBar();
                 if (mControllers != null && mControllers.taskbarViewController != null) {
                     mControllers.taskbarViewController.onRotationChanged(dp);
                 }
@@ -156,8 +154,9 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     @Override
     protected boolean isTaskbarTouchable() {
-        return !(mTaskbarLauncherStateController.isAnimatingToLauncher()
-                && mTaskbarLauncherStateController.isTaskbarAlignedWithHotseat());
+        // Touching down during animation to Hotseat will end the transition and allow the touch to
+        // go through to the Hotseat directly.
+        return !isAnimatingToHotseat();
     }
 
     public void setShouldDelayLauncherStateAnim(boolean shouldDelayLauncherStateAnim) {
@@ -195,33 +194,6 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     /**
-     * Called when Launcher Activity is paused/resumed.
-     * <p>
-     * To avoid UI clash between taskbar & bottom sheet, shift nav buttons down on launcher
-     * pause/resume at home.
-     * @param paused if launcher is currently paused.
-     */
-    public void onLauncherPausedOrResumed(boolean paused) {
-        if (!FeatureFlags.enableHomeTransitionListener()) {
-            onLauncherVisibilityChanged(mLauncher.hasBeenResumed());
-            return;
-        }
-
-        // Animate navbar iff pause/resume from home, NOT to/from app (avoid overriding existing
-        // animations).
-        boolean launcherPauseOrResumeFromHome = mHomeState.isHomeVisible() && mControllers
-                .taskbarAutohideSuspendController.isSuspendedForTransientTaskbarInLauncher();
-        if (launcherPauseOrResumeFromHome) {
-            mLauncherPauseProgress.animateToValue(paused ? 1.0f : 0.0f).start();
-        }
-    }
-
-    private void launcherPauseProgressUpdate() {
-        onTaskbarInAppDisplayProgressUpdate(
-                mLauncherPauseProgress.value, LAUNCHER_PAUSE_PROGRESS_INDEX);
-    }
-
-    /**
      * Should be called from onResume() and onPause(), and animates the Taskbar accordingly.
      */
     @Override
@@ -241,8 +213,12 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
     }
 
     private int getTaskbarAnimationDuration(boolean isVisible) {
-        if (isVisible && !mLauncher.getPredictiveBackToHomeInProgress()) {
-            return getTaskbarToHomeDuration();
+        // fast animation duration since we will not be playing workspace reveal animation.
+        boolean shouldOverrideToFastAnimation =
+                !isHotseatIconOnTopWhenAligned() || mLauncher.getPredictiveBackToHomeInProgress();
+        boolean isPinnedTaskbar = DisplayController.isPinnedTaskbar(mLauncher);
+        if (isVisible || isPinnedTaskbar) {
+            return getTaskbarToHomeDuration(shouldOverrideToFastAnimation, isPinnedTaskbar);
         } else {
             return DisplayController.isTransientTaskbar(mLauncher)
                     ? TRANSIENT_TASKBAR_TRANSITION_DURATION
@@ -292,6 +268,14 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         if (mLauncher.getHotseat() != null) {
             mLauncher.getHotseat().adjustForBubbleBar(isBubbleBarVisible);
         }
+    }
+
+    private void adjustHotseatForBubbleBar() {
+        Hotseat hotseat = mLauncher.getHotseat();
+        if (mControllers.bubbleControllers.isEmpty() || hotseat == null) return;
+        boolean hiddenForBubbles =
+                mControllers.bubbleControllers.get().bubbleBarViewController.isHiddenForNoBubbles();
+        hotseat.post(() -> adjustHotseatForBubbleBar(!hiddenForBubbles));
     }
 
     /**
@@ -393,22 +377,26 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
             // This method can be called before init() is called.
             return;
         }
-        if (mControllers.uiController.isIconAlignedWithHotseat()
-                && !mTaskbarLauncherStateController.isAnimatingToLauncher()) {
-            // Only animate nav button position while home and not animating home, otherwise let
-            // the TaskbarViewController handle it.
-            mControllers.navbarButtonsViewController
-                    .getNavButtonTranslationYForInAppDisplay()
-                    .updateValue(mLauncher.getDeviceProfile().getTaskbarOffsetY()
-                            * mTaskbarInAppDisplayProgress.value);
-            if (!mLauncher.isPaused()) {
+        if (mControllers.uiController.isIconAlignedWithHotseat()) {
+            if (!mTaskbarLauncherStateController.isAnimatingToLauncher()) {
+                // Only animate the nav buttons while home and not animating home, otherwise let
+                // the TaskbarViewController handle it.
+                mControllers.navbarButtonsViewController
+                        .getTaskbarNavButtonTranslationYForInAppDisplay()
+                        .updateValue(mLauncher.getDeviceProfile().getTaskbarOffsetY()
+                                * mTaskbarInAppDisplayProgress.value);
                 mControllers.navbarButtonsViewController
                         .getOnTaskbarBackgroundNavButtonColorOverride().updateValue(progress);
+            }
+            if (isBubbleBarEnabled()) {
+                mControllers.bubbleControllers.ifPresent(
+                        c -> c.bubbleStashController.setInAppDisplayOverrideProgress(
+                                mTaskbarInAppDisplayProgress.value));
             }
         }
     }
 
-    @Override
+    /** Returns true iff any in-app display progress > 0. */
     public boolean shouldUseInAppLayout() {
         return mTaskbarInAppDisplayProgress.value > 0;
     }
@@ -450,6 +438,17 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
         return mTaskbarLauncherStateController.isInHotseatOnTopStates()
                 && mTaskbarInAppDisplayProgressMultiProp.get(MINUS_ONE_PAGE_PROGRESS_INDEX)
                     .getValue() == 0;
+    }
+
+    @Override
+    public boolean isAnimatingToHotseat() {
+        return mTaskbarLauncherStateController.isAnimatingToLauncher()
+                && isIconAlignedWithHotseat();
+    }
+
+    @Override
+    public void endAnimationToHotseat() {
+        mTaskbarLauncherStateController.resetIconAlignment();
     }
 
     @Override

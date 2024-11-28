@@ -91,6 +91,7 @@ public class TaskbarViewCallbacks {
     public View.OnTouchListener getTaskbarDividerRightClickListener() {
         return (v, event) -> {
             if (event.isFromSource(InputDevice.SOURCE_MOUSE)
+                    && event.getAction() == MotionEvent.ACTION_DOWN
                     && event.getButtonState() == MotionEvent.BUTTON_SECONDARY) {
                 mControllers.taskbarPinningController.showPinningView(v, getDividerCenterX());
                 return true;
@@ -137,6 +138,17 @@ public class TaskbarViewCallbacks {
         return null;
     }
 
+    /**
+     * Get the max bubble bar collapsed width for the current bubble bar visibility state. Used to
+     * reserve space for the bubble bar when transitioning taskbar view into overflow.
+     */
+    public float getBubbleBarMaxCollapsedWidthIfVisible() {
+        return mControllers.bubbleControllers
+                .filter(c -> !c.bubbleBarViewController.isHiddenForNoBubbles())
+                .map(c -> c.bubbleBarViewController.getCollapsedWidthWithMaxVisibleBubbles())
+                .orElse(0f);
+    }
+
     /** Returns true if bubble bar controllers present and enabled in persistent taskbar. */
     public boolean isBubbleBarEnabledInPersistentTaskbar() {
         return Flags.enableBubbleBarInPersistentTaskBar()
@@ -148,8 +160,7 @@ public class TaskbarViewCallbacks {
         return new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mControllers.keyboardQuickSwitchController.openQuickSwitchView(
-                        mControllers.taskbarViewController.getTaskIdsForPinnedApps());
+                toggleKeyboardQuickSwitchView();
             }
         };
     }
@@ -159,11 +170,26 @@ public class TaskbarViewCallbacks {
         return new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View v) {
-                mControllers.keyboardQuickSwitchController.openQuickSwitchView(
-                        mControllers.taskbarViewController.getTaskIdsForPinnedApps());
+                toggleKeyboardQuickSwitchView();
                 return true;
             }
         };
+    }
+
+    private void toggleKeyboardQuickSwitchView() {
+        if (mTaskbarView.getTaskbarOverflowView() != null) {
+            mTaskbarView.getTaskbarOverflowView().setIsActive(
+                    !mTaskbarView.getTaskbarOverflowView().getIsActive());
+        }
+        mControllers.keyboardQuickSwitchController.toggleQuickSwitchViewForTaskbar(
+                mControllers.taskbarViewController.getTaskIdsForPinnedApps(),
+                this::onKeyboardQuickSwitchViewClosed);
+    }
+
+    private void onKeyboardQuickSwitchViewClosed() {
+        if (mTaskbarView.getTaskbarOverflowView() != null) {
+            mTaskbarView.getTaskbarOverflowView().setIsActive(false);
+        }
     }
 
     private float getDividerCenterX() {
@@ -177,6 +203,10 @@ public class TaskbarViewCallbacks {
     private class TaskbarViewGestureListener extends GestureDetector.SimpleOnGestureListener {
         @Override
         public boolean onDown(@NonNull MotionEvent event) {
+            if (event.isFromSource(InputDevice.SOURCE_MOUSE)
+                    && event.getButtonState() == MotionEvent.BUTTON_SECONDARY) {
+                maybeShowPinningView(event);
+            }
             return true;
         }
 
@@ -186,11 +216,16 @@ public class TaskbarViewCallbacks {
         }
 
         @Override
-        public void onLongPress(MotionEvent event) {
-            if (DisplayController.isPinnedTaskbar(mActivity)) {
-                mControllers.taskbarPinningController.showPinningView(mTaskbarView,
-                        event.getRawX());
+        public void onLongPress(@NonNull MotionEvent event) {
+            maybeShowPinningView(event);
+        }
+
+        private void maybeShowPinningView(@NonNull MotionEvent event) {
+            if (!DisplayController.isPinnedTaskbar(mActivity) || mTaskbarView.isEventOverAnyItem(
+                    event)) {
+                return;
             }
+            mControllers.taskbarPinningController.showPinningView(mTaskbarView, event.getRawX());
         }
     }
 }

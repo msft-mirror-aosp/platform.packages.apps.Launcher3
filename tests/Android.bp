@@ -63,7 +63,6 @@ filegroup {
         "src/com/android/launcher3/dragging/TaplDragTest.java",
         "src/com/android/launcher3/dragging/TaplUninstallRemoveTest.java",
         "src/com/android/launcher3/ui/TaplTestsLauncher3Test.java",
-        "src/com/android/launcher3/ui/widget/TaplWidgetPickerTest.java",
         "src/com/android/launcher3/ui/workspace/TaplWorkspaceTest.java",
     ],
 }
@@ -148,6 +147,7 @@ android_test {
     platform_apis: true,
     test_config: "Launcher3Tests.xml",
     data: [":Launcher3"],
+    plugins: ["dagger2-compiler"],
     test_suites: ["general-tests"],
 }
 
@@ -172,6 +172,7 @@ filegroup {
         "multivalentTests/src/**/*.java",
         "multivalentTests/src/**/*.kt",
         "src/com/android/launcher3/ui/AbstractLauncherUiTest.java",
+        "src/com/android/launcher3/ui/BaseLauncherTaplTest.java",
         "tapl/com/android/launcher3/tapl/*.java",
         "tapl/com/android/launcher3/tapl/*.kt",
     ],
@@ -237,6 +238,7 @@ android_robolectric_test {
         "truth",
     ],
     instrumentation_for: "Launcher3",
+    plugins: ["dagger2-compiler"],
     upstream: true,
     strict_mode: false,
 }

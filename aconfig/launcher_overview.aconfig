@@ -48,3 +48,17 @@ flag {
       purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "enable_desktop_windowing_carousel_detach"
+    namespace: "launcher_overview"
+    description: "Makes the desktop windowing task carousel detaches from fullscreen task carousel during quickswitch."
+    bug: "353947917"
+}
+
+flag {
+    name: "enable_desktop_exploded_view"
+    namespace: "launcher_overview"
+    description: "Enables the non-overlapping layout for desktop windows in Overview mode."
+    bug: "378011776"
+}

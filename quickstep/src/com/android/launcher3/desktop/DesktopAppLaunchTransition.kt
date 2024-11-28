@@ -20,6 +20,7 @@ import android.animation.Animator
 import android.animation.AnimatorSet
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Rect
 import android.os.IBinder
 import android.view.SurfaceControl.Transaction
 import android.view.WindowManager.TRANSIT_OPEN
@@ -31,7 +32,10 @@ import android.window.TransitionInfo
 import android.window.TransitionInfo.Change
 import androidx.core.animation.addListener
 import com.android.app.animation.Interpolators
+import com.android.internal.policy.ScreenDecorationsUtils
 import com.android.quickstep.RemoteRunnable
+import com.android.wm.shell.shared.animation.MinimizeAnimator
+import com.android.wm.shell.shared.animation.WindowAnimator
 import java.util.concurrent.Executor
 
 /**
@@ -41,8 +45,19 @@ import java.util.concurrent.Executor
  * ([android.view.WindowManager.TRANSIT_TO_BACK]) this transition will apply a minimize animation to
  * that window.
  */
-class DesktopAppLaunchTransition(private val context: Context, private val mainExecutor: Executor) :
-    RemoteTransitionStub() {
+class DesktopAppLaunchTransition(
+    private val context: Context,
+    private val mainExecutor: Executor,
+    private val launchType: AppLaunchType,
+) : RemoteTransitionStub() {
+
+    enum class AppLaunchType(
+        val boundsAnimationParams: WindowAnimator.BoundsAnimationParams,
+        val alphaDurationMs: Long,
+    ) {
+        LAUNCH(launchBoundsAnimationDef, /* alphaDurationMs= */ 200L),
+        UNMINIMIZE(unminimizeBoundsAnimationDef, /* alphaDurationMs= */ 100L),
+    }
 
     override fun startAnimation(
         token: IBinder,
@@ -77,7 +92,13 @@ class DesktopAppLaunchTransition(private val context: Context, private val mainE
         val launchAnimator =
             createLaunchAnimator(getLaunchChange(info), transaction, finishCallback)
         val minimizeChange = getMinimizeChange(info) ?: return listOf(launchAnimator)
-        val minimizeAnimator = createMinimizeAnimator(minimizeChange, transaction, finishCallback)
+        val minimizeAnimator =
+            MinimizeAnimator.create(
+                context.resources.displayMetrics,
+                minimizeChange,
+                transaction,
+                finishCallback,
+            )
         return listOf(launchAnimator, minimizeAnimator)
     }
 
@@ -96,45 +117,25 @@ class DesktopAppLaunchTransition(private val context: Context, private val mainE
     ): Animator {
         val boundsAnimator =
             WindowAnimator.createBoundsAnimator(
-                context,
-                launchBoundsAnimationDef,
+                context.resources.displayMetrics,
+                launchType.boundsAnimationParams,
                 change,
                 transaction,
             )
         val alphaAnimator =
             ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = LAUNCH_ANIM_ALPHA_DURATION_MS
+                duration = launchType.alphaDurationMs
                 interpolator = Interpolators.LINEAR
                 addUpdateListener { animation ->
                     transaction.setAlpha(change.leash, animation.animatedValue as Float).apply()
                 }
             }
-        return AnimatorSet().apply {
-            playTogether(boundsAnimator, alphaAnimator)
-            addListener(onEnd = { animation -> onAnimFinish(animation) })
-        }
-    }
-
-    private fun createMinimizeAnimator(
-        change: Change,
-        transaction: Transaction,
-        onAnimFinish: (Animator) -> Unit,
-    ): Animator {
-        val boundsAnimator =
-            WindowAnimator.createBoundsAnimator(
-                context,
-                minimizeBoundsAnimationDef,
-                change,
-                transaction,
-            )
-        val alphaAnimator =
-            ValueAnimator.ofFloat(1f, 0f).apply {
-                duration = MINIMIZE_ANIM_ALPHA_DURATION_MS
-                interpolator = Interpolators.LINEAR
-                addUpdateListener { animation ->
-                    transaction.setAlpha(change.leash, animation.animatedValue as Float).apply()
-                }
-            }
+        val clipRect = Rect(change.endAbsBounds).apply { offsetTo(0, 0) }
+        transaction.setCrop(change.leash, clipRect)
+        transaction.setCornerRadius(
+            change.leash,
+            ScreenDecorationsUtils.getWindowCornerRadius(context),
+        )
         return AnimatorSet().apply {
             playTogether(boundsAnimator, alphaAnimator)
             addListener(onEnd = { animation -> onAnimFinish(animation) })
@@ -142,25 +143,23 @@ class DesktopAppLaunchTransition(private val context: Context, private val mainE
     }
 
     companion object {
-        private val LAUNCH_CHANGE_MODES = intArrayOf(TRANSIT_OPEN, TRANSIT_TO_FRONT)
-
-        private const val LAUNCH_ANIM_ALPHA_DURATION_MS = 100L
-        private const val MINIMIZE_ANIM_ALPHA_DURATION_MS = 100L
+        /** Change modes that represent a task becoming visible / launching in Desktop mode. */
+        val LAUNCH_CHANGE_MODES = intArrayOf(TRANSIT_OPEN, TRANSIT_TO_FRONT)
 
         private val launchBoundsAnimationDef =
+            WindowAnimator.BoundsAnimationParams(
+                durationMs = 600,
+                startOffsetYDp = 36f,
+                startScale = 0.95f,
+                interpolator = Interpolators.STANDARD_DECELERATE,
+            )
+
+        private val unminimizeBoundsAnimationDef =
             WindowAnimator.BoundsAnimationParams(
                 durationMs = 300,
                 startOffsetYDp = 12f,
                 startScale = 0.97f,
                 interpolator = Interpolators.STANDARD_DECELERATE,
-            )
-
-        private val minimizeBoundsAnimationDef =
-            WindowAnimator.BoundsAnimationParams(
-                durationMs = 200,
-                endOffsetYDp = 12f,
-                endScale = 0.97f,
-                interpolator = Interpolators.STANDARD_ACCELERATE,
             )
     }
 }

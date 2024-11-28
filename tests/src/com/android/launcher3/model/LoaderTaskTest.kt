@@ -3,6 +3,8 @@ package com.android.launcher3.model
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.UserHandle
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.SetFlagsRule
 import android.provider.Settings
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -26,6 +28,7 @@ import com.android.launcher3.util.TestUtil
 import com.android.launcher3.util.UserIconInfo
 import com.google.common.truth.Truth
 import java.util.concurrent.CountDownLatch
+import java.util.function.Predicate
 import junit.framework.Assert.assertEquals
 import org.junit.After
 import org.junit.Before
@@ -74,6 +77,7 @@ class LoaderTaskTest {
     @Mock private lateinit var modelDelegate: ModelDelegate
     @Mock private lateinit var launcherBinder: BaseLauncherBinder
     private lateinit var launcherModel: LauncherModel
+    @Mock private lateinit var widgetsFilterDataProvider: WidgetsFilterDataProvider
     @Mock private lateinit var transaction: LoaderTransaction
     @Mock private lateinit var iconCache: IconCache
     @Mock private lateinit var idleLock: LooperIdleLock
@@ -87,6 +91,7 @@ class LoaderTaskTest {
     @Before
     fun setup() {
         MockitoAnnotations.initMocks(this)
+        setFlagsRule.enableFlags(Flags.FLAG_ENABLE_TIERED_WIDGETS_BY_DEFAULT_IN_PICKER)
         launcherModel = mock(LauncherModel::class.java)
         mockitoSession =
             ExtendedMockito.mockitoSession()
@@ -116,6 +121,7 @@ class LoaderTaskTest {
         `when`(launcherBinder.newIdleLock(any())).thenReturn(idleLock)
         `when`(idleLock.awaitLocked(1000)).thenReturn(false)
         `when`(iconCache.updateHandler).thenReturn(iconCacheUpdateHandler)
+        `when`(widgetsFilterDataProvider.getDefaultWidgetsFilter()).thenReturn(Predicate { true })
         context.putObject(UserCache.INSTANCE, userCache)
 
         TestUtil.grantWriteSecurePermission()
@@ -134,17 +140,32 @@ class LoaderTaskTest {
             val mockUserHandles = arrayListOf<UserHandle>(MAIN_HANDLE)
             `when`(userCache.userProfiles).thenReturn(mockUserHandles)
             `when`(userCache.getUserInfo(MAIN_HANDLE)).thenReturn(UserIconInfo(MAIN_HANDLE, 1))
-            LoaderTask(app, bgAllAppsList, this, modelDelegate, launcherBinder)
+            LoaderTask(
+                    app,
+                    bgAllAppsList,
+                    this,
+                    modelDelegate,
+                    launcherBinder,
+                    widgetsFilterDataProvider,
+                )
                 .runSyncOnBackgroundThread()
             Truth.assertThat(workspaceItems.size).isAtLeast(25)
             Truth.assertThat(appWidgets.size).isAtLeast(7)
             Truth.assertThat(collections.size()).isAtLeast(8)
             Truth.assertThat(itemsIdMap.size()).isAtLeast(40)
+            Truth.assertThat(widgetsModel.defaultWidgetsFilter).isNotNull()
         }
 
     @Test
     fun bindsLoadedDataCorrectly() {
-        LoaderTask(app, bgAllAppsList, BgDataModel(), modelDelegate, launcherBinder)
+        LoaderTask(
+                app,
+                bgAllAppsList,
+                BgDataModel(),
+                modelDelegate,
+                launcherBinder,
+                widgetsFilterDataProvider,
+            )
             .runSyncOnBackgroundThread()
 
         verify(launcherBinder).bindWorkspace(true, false)
@@ -153,6 +174,7 @@ class LoaderTaskTest {
         verify(launcherBinder).bindAllApps()
         verify(iconCacheUpdateHandler, times(4)).updateIcons(any(), any<CachingLogic<Any>>(), any())
         verify(launcherBinder).bindDeepShortcuts()
+        verify(widgetsFilterDataProvider).initPeriodicDataRefresh(any())
         verify(launcherBinder).bindWidgets()
         verify(modelDelegate).loadAndBindOtherItems(anyOrNull())
         verify(iconCacheUpdateHandler).finish()
@@ -170,7 +192,15 @@ class LoaderTaskTest {
             `when`(userManagerState?.isUserQuiet(MAIN_HANDLE)).thenReturn(true)
             `when`(userCache.getUserInfo(MAIN_HANDLE)).thenReturn(UserIconInfo(MAIN_HANDLE, 1))
 
-            LoaderTask(app, bgAllAppsList, this, modelDelegate, launcherBinder, userManagerState)
+            LoaderTask(
+                    app,
+                    bgAllAppsList,
+                    this,
+                    modelDelegate,
+                    launcherBinder,
+                    widgetsFilterDataProvider,
+                    userManagerState,
+                )
                 .runSyncOnBackgroundThread()
 
             verify(bgAllAppsList)
@@ -191,7 +221,15 @@ class LoaderTaskTest {
             `when`(userManagerState?.isUserQuiet(MAIN_HANDLE)).thenReturn(true)
             `when`(userCache.getUserInfo(MAIN_HANDLE)).thenReturn(UserIconInfo(MAIN_HANDLE, 3))
 
-            LoaderTask(app, bgAllAppsList, this, modelDelegate, launcherBinder, userManagerState)
+            LoaderTask(
+                    app,
+                    bgAllAppsList,
+                    this,
+                    modelDelegate,
+                    launcherBinder,
+                    widgetsFilterDataProvider,
+                    userManagerState,
+                )
                 .runSyncOnBackgroundThread()
 
             verify(bgAllAppsList)
@@ -203,7 +241,8 @@ class LoaderTaskTest {
         }
 
     @Test
-    fun `When launcher_broadcast_installed_apps and is restore then send installed item broadcast`() {
+    @DisableFlags(Flags.FLAG_ENABLE_FIRST_SCREEN_BROADCAST_ARCHIVING_EXTRAS)
+    fun `When secure setting true and is restore then send installed item broadcast`() {
         // Given
         val spyContext = spy(context)
         `when`(app.context).thenReturn(spyContext)
@@ -229,7 +268,14 @@ class LoaderTaskTest {
         RestoreDbTask.setPending(spyContext)
 
         // When
-        LoaderTask(app, bgAllAppsList, BgDataModel(), modelDelegate, launcherBinder)
+        LoaderTask(
+                app,
+                bgAllAppsList,
+                BgDataModel(),
+                modelDelegate,
+                launcherBinder,
+                widgetsFilterDataProvider,
+            )
             .runSyncOnBackgroundThread()
 
         // Then
@@ -271,40 +317,8 @@ class LoaderTaskTest {
     }
 
     @Test
-    fun `When not a restore then installed item broadcast not sent`() {
-        // Given
-        val spyContext = spy(context)
-        `when`(app.context).thenReturn(spyContext)
-        whenever(
-                FirstScreenBroadcastHelper.createModelsForFirstScreenBroadcast(
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                )
-            )
-            .thenReturn(listOf(expectedBroadcastModel))
-
-        whenever(
-                FirstScreenBroadcastHelper.sendBroadcastsForModels(
-                    spyContext,
-                    listOf(expectedBroadcastModel),
-                )
-            )
-            .thenCallRealMethod()
-
-        Settings.Secure.putInt(spyContext.contentResolver, "launcher_broadcast_installed_apps", 1)
-
-        // When
-        LoaderTask(app, bgAllAppsList, BgDataModel(), modelDelegate, launcherBinder)
-            .runSyncOnBackgroundThread()
-
-        // Then
-        verify(spyContext, times(0)).sendBroadcast(any())
-    }
-
-    @Test
-    fun `When launcher_broadcast_installed_apps false then installed item broadcast not sent`() {
+    @EnableFlags(Flags.FLAG_ENABLE_FIRST_SCREEN_BROADCAST_ARCHIVING_EXTRAS)
+    fun `When broadcast flag true and is restore then send installed item broadcast`() {
         // Given
         val spyContext = spy(context)
         `when`(app.context).thenReturn(spyContext)
@@ -330,7 +344,131 @@ class LoaderTaskTest {
         RestoreDbTask.setPending(spyContext)
 
         // When
-        LoaderTask(app, bgAllAppsList, BgDataModel(), modelDelegate, launcherBinder)
+        LoaderTask(
+                app,
+                bgAllAppsList,
+                BgDataModel(),
+                modelDelegate,
+                launcherBinder,
+                widgetsFilterDataProvider,
+            )
+            .runSyncOnBackgroundThread()
+
+        // Then
+        val argumentCaptor = ArgumentCaptor.forClass(Intent::class.java)
+        verify(spyContext).sendBroadcast(argumentCaptor.capture())
+        val actualBroadcastIntent = argumentCaptor.value
+        assertEquals(expectedBroadcastModel.installerPackage, actualBroadcastIntent.`package`)
+        assertEquals(
+            ArrayList(expectedBroadcastModel.installedWorkspaceItems),
+            actualBroadcastIntent.getStringArrayListExtra("workspaceInstalledItems"),
+        )
+        assertEquals(
+            ArrayList(expectedBroadcastModel.installedHotseatItems),
+            actualBroadcastIntent.getStringArrayListExtra("hotseatInstalledItems"),
+        )
+        assertEquals(
+            ArrayList(
+                expectedBroadcastModel.firstScreenInstalledWidgets +
+                    expectedBroadcastModel.secondaryScreenInstalledWidgets
+            ),
+            actualBroadcastIntent.getStringArrayListExtra("widgetInstalledItems"),
+        )
+        assertEquals(
+            ArrayList(expectedBroadcastModel.pendingCollectionItems),
+            actualBroadcastIntent.getStringArrayListExtra("folderItem"),
+        )
+        assertEquals(
+            ArrayList(expectedBroadcastModel.pendingWorkspaceItems),
+            actualBroadcastIntent.getStringArrayListExtra("workspaceItem"),
+        )
+        assertEquals(
+            ArrayList(expectedBroadcastModel.pendingHotseatItems),
+            actualBroadcastIntent.getStringArrayListExtra("hotseatItem"),
+        )
+        assertEquals(
+            ArrayList(expectedBroadcastModel.pendingWidgetItems),
+            actualBroadcastIntent.getStringArrayListExtra("widgetItem"),
+        )
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_FIRST_SCREEN_BROADCAST_ARCHIVING_EXTRAS)
+    fun `When not a restore then installed item broadcast not sent`() {
+        // Given
+        val spyContext = spy(context)
+        `when`(app.context).thenReturn(spyContext)
+        whenever(
+                FirstScreenBroadcastHelper.createModelsForFirstScreenBroadcast(
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .thenReturn(listOf(expectedBroadcastModel))
+
+        whenever(
+                FirstScreenBroadcastHelper.sendBroadcastsForModels(
+                    spyContext,
+                    listOf(expectedBroadcastModel),
+                )
+            )
+            .thenCallRealMethod()
+
+        Settings.Secure.putInt(spyContext.contentResolver, "launcher_broadcast_installed_apps", 1)
+
+        // When
+        LoaderTask(
+                app,
+                bgAllAppsList,
+                BgDataModel(),
+                modelDelegate,
+                launcherBinder,
+                widgetsFilterDataProvider,
+            )
+            .runSyncOnBackgroundThread()
+
+        // Then
+        verify(spyContext, times(0)).sendBroadcast(any())
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_ENABLE_FIRST_SCREEN_BROADCAST_ARCHIVING_EXTRAS)
+    fun `When broadcast flag and secure setting false then installed item broadcast not sent`() {
+        // Given
+        val spyContext = spy(context)
+        `when`(app.context).thenReturn(spyContext)
+        whenever(
+                FirstScreenBroadcastHelper.createModelsForFirstScreenBroadcast(
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                )
+            )
+            .thenReturn(listOf(expectedBroadcastModel))
+
+        whenever(
+                FirstScreenBroadcastHelper.sendBroadcastsForModels(
+                    spyContext,
+                    listOf(expectedBroadcastModel),
+                )
+            )
+            .thenCallRealMethod()
+
+        Settings.Secure.putInt(spyContext.contentResolver, "launcher_broadcast_installed_apps", 0)
+        RestoreDbTask.setPending(spyContext)
+
+        // When
+        LoaderTask(
+                app,
+                bgAllAppsList,
+                BgDataModel(),
+                modelDelegate,
+                launcherBinder,
+                widgetsFilterDataProvider,
+            )
             .runSyncOnBackgroundThread()
 
         // Then

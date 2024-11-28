@@ -131,6 +131,15 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
     }
 
     @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+
+        if (mViewCallbacks != null) {
+            mViewCallbacks.onViewDetchedFromWindow();
+        }
+    }
+
+    @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
         mNoRecentItemsPane = findViewById(R.id.no_recent_items_pane);
@@ -192,6 +201,8 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
             int currentFocusIndexOverride,
             @NonNull KeyboardQuickSwitchViewController.ViewCallbacks viewCallbacks,
             boolean useDesktopTaskView) {
+        mContent.removeAllViews();
+
         mViewCallbacks = viewCallbacks;
         Resources resources = context.getResources();
         Resources.Theme theme = context.getTheme();
@@ -281,6 +292,10 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
         return mDesktopTaskIndex;
     }
 
+    void resetViewCallbacks() {
+        mViewCallbacks = null;
+    }
+
     protected Animator getCloseAnimation() {
         AnimatorSet closeAnimation = new AnimatorSet();
 
@@ -320,11 +335,17 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
         return closeAnimation;
     }
 
-    private void animateOpen(int currentFocusIndexOverride) {
+    protected void animateOpen(int currentFocusIndexOverride) {
         if (mOpenAnimation != null) {
             // Restart animation since currentFocusIndexOverride can change the initial scroll.
             mOpenAnimation.cancel();
         }
+
+        // Reset the alpha for the case where the KQS view is opened before.
+        setAlpha(0);
+        mScrollView.setAlpha(0);
+        mNoRecentItemsPane.setAlpha(0);
+
         mOpenAnimation = new AnimatorSet();
 
         Animator outlineAnimation = mOutlineAnimationProgress.animateToValue(1f);

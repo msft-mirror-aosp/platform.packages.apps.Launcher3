@@ -201,8 +201,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                         // Only finish if the end target is RECENTS. Otherwise, if the target is
                         // NEW_TASK, startActivityFromRecents will be skipped.
                         if (mLastGestureState.getEndTarget() == RECENTS) {
-                            finishRunningRecentsAnimation(false /* toHome */,
-                                    true /* forceFinish */, null /* forceFinishCb */);
+                            finishRunningRecentsAnimation(false /* toHome */);
                         }
                     });
                 }
@@ -295,7 +294,8 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
 
         // TODO:(b/365777482) if flag is enabled, but on launcher it will crash.
         if(containerInterface.getCreatedContainer() instanceof RecentsWindowManager
-                && Flags.enableFallbackOverviewInWindow()){
+                && (Flags.enableFallbackOverviewInWindow()
+                        || Flags.enableLauncherOverviewInWindow())) {
             mRecentsAnimationStartPending = getSystemUiProxy().startRecentsActivity(intent, options,
                     mCallbacks, gestureState.useSyntheticRecentsTransition());
             mRecentsWindowsManager.startRecentsWindow(mCallbacks);

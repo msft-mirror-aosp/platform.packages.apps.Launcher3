@@ -74,6 +74,9 @@ interface BubbleStashController {
     val isBubblesShowingOnOverview: Boolean
         get() = launcherState == BubbleLauncherState.OVERVIEW
 
+    /** Bubble bar vertical center for launcher home. */
+    var bubbleBarVerticalCenterForHome: Int
+
     /** Updated when sysui locked state changes, when locked, bubble bar is not shown. */
     var isSysuiLocked: Boolean
 
@@ -121,9 +124,6 @@ interface BubbleStashController {
     /** Set a bubble bar location */
     fun setBubbleBarLocation(bubbleBarLocation: BubbleBarLocation)
 
-    /** Set the hotseat vertical center that bubble bar will align with. */
-    fun setHotseatVerticalCenter(hotseatVerticalCenter: Int)
-
     /**
      * Stashes the bubble bar (transform to the handle view), or just shrink width of the expanded
      * bubble bar based on the controller implementation.
@@ -131,7 +131,17 @@ interface BubbleStashController {
     fun stashBubbleBar()
 
     /** Shows the bubble bar, and expands bubbles depending on [expandBubbles]. */
-    fun showBubbleBar(expandBubbles: Boolean)
+    fun showBubbleBar(expandBubbles: Boolean) {
+        showBubbleBar(expandBubbles = expandBubbles, bubbleBarGesture = false)
+    }
+
+    /**
+     * Shows the bubble bar, and expands bubbles depending on [expandBubbles].
+     *
+     * Set [bubbleBarGesture] to true if this request originates from a touch gesture on the bubble
+     * bar.
+     */
+    fun showBubbleBar(expandBubbles: Boolean, bubbleBarGesture: Boolean)
 
     // TODO(b/354218264): Move to BubbleBarViewAnimator
     /**
@@ -176,11 +186,17 @@ interface BubbleStashController {
                 bubbleBarTranslationYForTaskbar
             }
 
-    /** Translation Y to align the bubble bar with the hotseat. */
+    /** Translation Y to align the bubble bar with the taskbar. */
     val bubbleBarTranslationYForTaskbar: Float
 
-    /** Return translation Y to align the bubble bar with the taskbar. */
+    /** Return translation Y to align the bubble bar with the hotseat. */
     val bubbleBarTranslationYForHotseat: Float
+
+    /**
+     * Show bubble bar is if it were in-app while launcher state is still on home. Set as a progress
+     * value between 0 and 1: 0 - use home layout, 1 - use in-app layout.
+     */
+    var inAppDisplayOverrideProgress: Float
 
     /** Dumps the state of BubbleStashController. */
     fun dump(pw: PrintWriter) {

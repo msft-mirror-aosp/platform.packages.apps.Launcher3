@@ -91,14 +91,6 @@ public class TaskbarUIController implements BubbleBarController.BubbleBarLocatio
     protected void onStashedInAppChanged() { }
 
     /**
-     * Whether the Taskbar should use in-app layout.
-     * @return {@code true} iff in-app display progress > 0 or Launcher Activity paused.
-     */
-    public boolean shouldUseInAppLayout() {
-        return false;
-    }
-
-    /**
      * Called when taskbar icon layout bounds change.
      */
     protected void onIconLayoutBoundsChanged() { }
@@ -126,6 +118,8 @@ public class TaskbarUIController implements BubbleBarController.BubbleBarLocatio
      * Manually closes the overlay window.
      */
     public void hideOverlayWindow() {
+        mControllers.keyboardQuickSwitchController.closeQuickSwitchView();
+
         if (!DisplayController.isTransientTaskbar(mControllers.taskbarActivityContext)
                 || mControllers.taskbarAllAppsController.isOpen()) {
             mControllers.taskbarOverlayController.hideWindow();
@@ -200,6 +194,16 @@ public class TaskbarUIController implements BubbleBarController.BubbleBarLocatio
     public boolean isHotseatIconOnTopWhenAligned() {
         return true;
     }
+
+    public boolean isAnimatingToHotseat() {
+        return false;
+    }
+
+    /**
+     * Skips to the end of the animation to Hotseat - should only be used if
+     * {@link #isAnimatingToHotseat()} returns true.
+     */
+    public void endAnimationToHotseat() {}
 
     /** Returns {@code true} if Taskbar is currently within overview. */
     protected boolean isInOverviewUi() {

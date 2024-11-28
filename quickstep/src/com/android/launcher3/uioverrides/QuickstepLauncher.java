@@ -139,6 +139,7 @@ import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
 import com.android.launcher3.taskbar.LauncherTaskbarUIController;
 import com.android.launcher3.taskbar.TaskbarManager;
+import com.android.launcher3.taskbar.TaskbarUIController;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.uioverrides.QuickstepWidgetHolder.QuickstepHolderFactory;
@@ -189,6 +190,7 @@ import com.android.quickstep.views.OverviewActionsView;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.RecentsViewContainer;
 import com.android.quickstep.views.TaskView;
+import com.android.systemui.animation.back.FlingOnBackAnimationCallback;
 import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.unfold.RemoteUnfoldSharedComponent;
@@ -262,6 +264,8 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
 
     private boolean mIsOverlayVisible;
 
+    private final Runnable mOverviewTargetChangeRunnable = this::onOverviewTargetChanged;
+
     public static QuickstepLauncher getLauncher(Context context) {
         return fromContext(context);
     }
@@ -302,7 +306,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
 
         mTISBindHelper = new TISBindHelper(this, this::onTISConnected);
         mDepthController = new DepthController(this);
-        if (DesktopModeStatus.canEnterDesktopMode(this)) {
+        if (DesktopModeStatus.canEnterDesktopModeOrShowAppHandle(this)) {
             mSplitSelectStateController.initSplitFromDesktopController(this,
                     overviewComponentObserver);
         }
@@ -419,8 +423,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
             mDepthController.setActivityStarted(isStarted());
         }
 
-        if ((changeBits & ACTIVITY_STATE_RESUMED) != 0 && mTaskbarUIController != null) {
-            mTaskbarUIController.onLauncherPausedOrResumed(isPaused());
+        if ((changeBits & ACTIVITY_STATE_RESUMED) != 0) {
+            if (!FeatureFlags.enableHomeTransitionListener() && mTaskbarUIController != null) {
+                mTaskbarUIController.onLauncherVisibilityChanged(hasBeenResumed());
+            }
         }
 
         super.onActivityFlagsChanged(changeBits);
@@ -546,6 +552,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
             mUnfoldTransitionProgressProvider.destroy();
         }
 
+        TISBinder binder = mTISBindHelper.getBinder();
+        if (binder != null) {
+            binder.unregisterOverviewTargetChangeListener(mOverviewTargetChangeRunnable);
+        }
         mTISBindHelper.onDestroy();
 
         if (mLauncherUnfoldAnimationController != null) {
@@ -897,12 +907,12 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     protected void registerBackDispatcher() {
         getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                 OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-                new OnBackAnimationCallback() {
+                new FlingOnBackAnimationCallback() {
 
                     @Nullable OnBackAnimationCallback mActiveOnBackAnimationCallback;
 
                     @Override
-                    public void onBackStarted(@NonNull BackEvent backEvent) {
+                    public void onBackStartedCompat(@NonNull BackEvent backEvent) {
                         if (mActiveOnBackAnimationCallback != null) {
                             mActiveOnBackAnimationCallback.onBackCancelled();
                         }
@@ -912,7 +922,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
 
                     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
                     @Override
-                    public void onBackInvoked() {
+                    public void onBackInvokedCompat() {
                         // Recreate mActiveOnBackAnimationCallback if necessary to avoid NPE
                         // because:
                         // 1. b/260636433: In 3-button-navigation mode, onBackStarted() is not
@@ -928,7 +938,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
                     }
 
                     @Override
-                    public void onBackProgressed(@NonNull BackEvent backEvent) {
+                    public void onBackProgressedCompat(@NonNull BackEvent backEvent) {
                         if (!FeatureFlags.IS_STUDIO_BUILD
                                 && mActiveOnBackAnimationCallback == null) {
                             return;
@@ -937,7 +947,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
                     }
 
                     @Override
-                    public void onBackCancelled() {
+                    public void onBackCancelledCompat() {
                         if (!FeatureFlags.IS_STUDIO_BUILD
                                 && mActiveOnBackAnimationCallback == null) {
                             return;
@@ -1021,12 +1031,20 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         }
     }
 
+    private void onOverviewTargetChanged() {
+        QuickstepTransitionManager transitionManager = getAppTransitionManager();
+        if (transitionManager != null) {
+            transitionManager.onOverviewTargetChange();
+        }
+    }
+
     private void onTISConnected(TISBinder binder) {
         TaskbarManager taskbarManager = mTISBindHelper.getTaskbarManager();
         if (taskbarManager != null) {
             taskbarManager.setActivity(this);
         }
         mTISBindHelper.setPredictiveBackToHomeInProgress(mIsPredictiveBackToHomeInProgress);
+        binder.registerOverviewTargetChangeListener(mOverviewTargetChangeRunnable);
     }
 
     @Override
@@ -1087,10 +1105,12 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         );
     }
 
-    public void setTaskbarUIController(LauncherTaskbarUIController taskbarUIController) {
-        mTaskbarUIController = taskbarUIController;
+    @Override
+    public void setTaskbarUIController(@Nullable TaskbarUIController taskbarUIController) {
+        mTaskbarUIController = (LauncherTaskbarUIController) taskbarUIController;
     }
 
+    @Override
     public @Nullable LauncherTaskbarUIController getTaskbarUIController() {
         return mTaskbarUIController;
     }
@@ -1397,6 +1417,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     }
 
     @NonNull
+    @Override
     public TISBindHelper getTISBindHelper() {
         return mTISBindHelper;
     }

@@ -17,9 +17,14 @@
 package com.android.launcher3.taskbar
 
 import android.animation.AnimatorTestRule
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
+import android.platform.test.flag.junit.SetFlagsRule
+import android.view.KeyEvent
 import android.view.View.GONE
 import android.view.View.VISIBLE
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
+import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController
 import com.android.launcher3.taskbar.rules.TaskbarModeRule
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.PINNED
 import com.android.launcher3.taskbar.rules.TaskbarModeRule.Mode.TRANSIENT
@@ -33,6 +38,7 @@ import com.android.quickstep.SystemUiProxy
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_MANAGE_MENU_EXPANDED
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE
+import com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_BAR
 import com.android.wm.shell.shared.bubbles.BubbleConstants.BUBBLE_EXPANDED_SCRIM_ALPHA
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -42,16 +48,30 @@ import org.junit.runner.RunWith
 @RunWith(LauncherMultivalentJUnit::class)
 @EmulatedDevices(["pixelTablet2023"])
 class TaskbarScrimViewControllerTest {
-    @get:Rule(order = 0) val context = TaskbarWindowSandboxContext.create()
-    @get:Rule(order = 1) val taskbarModeRule = TaskbarModeRule(context)
-    @get:Rule(order = 2) val animatorTestRule = AnimatorTestRule(this)
-    @get:Rule(order = 3) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
+    @get:Rule(order = 0) val setFlagsRule = SetFlagsRule()
+    @get:Rule(order = 1)
+    val context =
+        TaskbarWindowSandboxContext.create { builder ->
+            builder.bindSystemUiProxy(
+                object : SystemUiProxy(this) {
+                    override fun onBackEvent(backEvent: KeyEvent?) {
+                        super.onBackEvent(backEvent)
+                        backPressed = true
+                    }
+                }
+            )
+        }
+    @get:Rule(order = 2) val taskbarModeRule = TaskbarModeRule(context)
+    @get:Rule(order = 3) val animatorTestRule = AnimatorTestRule(this)
+    @get:Rule(order = 4) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
 
     @InjectController lateinit var scrimViewController: TaskbarScrimViewController
 
     // Default animation duration.
     private val animationDuration =
         context.resources.getInteger(android.R.integer.config_mediumAnimTime).toLong()
+
+    private var backPressed = false
 
     @Test
     @TaskbarMode(PINNED)
@@ -76,10 +96,31 @@ class TaskbarScrimViewControllerTest {
     }
 
     @Test
+    @DisableFlags(FLAG_ENABLE_BUBBLE_BAR)
     @TaskbarMode(PINNED)
     fun testOnTaskbarVisibilityChanged_pinnedTaskbarHiddenDuringScrim_hidesScrim() {
         getInstrumentation().runOnMainSync {
             scrimViewController.onTaskbarVisibilityChanged(VISIBLE)
+            scrimViewController.updateStateForSysuiFlags(SYSUI_STATE_BUBBLES_EXPANDED, true)
+        }
+        assertThat(scrimViewController.scrimAlpha).isEqualTo(BUBBLE_EXPANDED_SCRIM_ALPHA)
+
+        getInstrumentation().runOnMainSync {
+            scrimViewController.onTaskbarVisibilityChanged(GONE)
+            animatorTestRule.advanceTimeBy(animationDuration)
+        }
+        assertThat(scrimViewController.scrimAlpha).isEqualTo(0)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_BUBBLE_BAR)
+    @TaskbarMode(PINNED)
+    fun testOnTaskbarVisibilityChanged_pinnedTaskbarOnHomeHiddenDuringScrim_hidesScrim() {
+        getInstrumentation().runOnMainSync {
+            scrimViewController.onTaskbarVisibilityChanged(VISIBLE)
+            taskbarUnitTestRule.activityContext.bubbleControllers!!
+                .bubbleStashController
+                .launcherState = BubbleStashController.BubbleLauncherState.HOME
             scrimViewController.updateStateForSysuiFlags(SYSUI_STATE_BUBBLES_EXPANDED, true)
         }
         assertThat(scrimViewController.scrimAlpha).isEqualTo(BUBBLE_EXPANDED_SCRIM_ALPHA)
@@ -130,16 +171,6 @@ class TaskbarScrimViewControllerTest {
     @Test
     @TaskbarMode(PINNED)
     fun testOnClick_scrimShown_performsSystemBack() {
-        var backPressed = false
-        context.putObject(
-            SystemUiProxy.INSTANCE,
-            object : SystemUiProxy(context) {
-                override fun onBackPressed() {
-                    backPressed = true
-                }
-            },
-        )
-
         getInstrumentation().runOnMainSync {
             scrimViewController.updateStateForSysuiFlags(SYSUI_STATE_BUBBLES_EXPANDED, true)
             scrimViewController.onTaskbarVisibilityChanged(VISIBLE)

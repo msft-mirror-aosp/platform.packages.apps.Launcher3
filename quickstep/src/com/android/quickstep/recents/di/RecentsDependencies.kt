@@ -19,6 +19,7 @@ package com.android.quickstep.recents.di
 import android.content.Context
 import android.util.Log
 import android.view.View
+import com.android.launcher3.util.coroutines.DispatcherProvider
 import com.android.launcher3.util.coroutines.ProductionDispatchers
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.recents.data.RecentTasksRepository
@@ -35,9 +36,6 @@ import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskOverlayViewModel
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModelImpl
-import com.android.quickstep.task.viewmodel.TaskViewData
-import com.android.quickstep.task.viewmodel.TaskViewModel
-import com.android.quickstep.views.TaskViewType
 import com.android.systemui.shared.recents.model.Task
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -63,6 +61,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
             val recentsCoroutineScope =
                 CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("RecentsView"))
             set(CoroutineScope::class.java.simpleName, recentsCoroutineScope)
+            set(DispatcherProvider::class.java.simpleName, ProductionDispatchers)
             val recentsModel = RecentsModel.INSTANCE.get(appContext)
             val taskVisualsChangedDelegate =
                 TaskVisualsChangedDelegateImpl(
@@ -113,6 +112,10 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                 instance =
                     factory?.invoke(extras) as T ?: createDependency(modelClass, scopeId, extras)
                 scope[modelClass.simpleName] = instance!!
+                log(
+                    "instance of $modelClass" +
+                        " (${instance.hashCode()}) added to scope ${scope.scopeId}"
+                )
             }
         }
         return instance!!
@@ -148,6 +151,13 @@ class RecentsDependencies private constructor(private val appContext: Context) {
     fun getScope(scopeId: RecentsScopeId): RecentsDependenciesScope =
         scopes[scopeId] ?: createScope(scopeId)
 
+    fun removeScope(scope: Any) {
+        val scopeId: RecentsScopeId = scope as? RecentsScopeId ?: scope.hashCode().toString()
+        scopes[scopeId]?.close()
+        scopes.remove(scopeId)
+        log("Scope $scopeId removed")
+    }
+
     // TODO(b/353912757): Create a factory so we can prevent this method of growing indefinitely.
     //  Each class should be responsible for providing a factory function to create a new instance.
     @Suppress("UNCHECKED_CAST")
@@ -173,18 +183,13 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                     }
                 }
                 RecentsViewData::class.java -> RecentsViewData()
-                TaskViewModel::class.java -> TaskViewModel(taskViewData = inject(scopeId, extras))
-                TaskViewData::class.java -> {
-                    val taskViewType = extras["TaskViewType"] as TaskViewType
-                    TaskViewData(taskViewType)
-                }
                 TaskContainerData::class.java -> TaskContainerData()
                 TaskThumbnailViewData::class.java -> TaskThumbnailViewData()
                 TaskThumbnailViewModel::class.java ->
                     TaskThumbnailViewModelImpl(
                         recentsViewData = inject(),
-                        taskViewData = inject(scopeId, extras),
                         taskContainerData = inject(scopeId),
+                        dispatcherProvider = inject(),
                         getThumbnailPositionUseCase = inject(),
                         tasksRepository = inject(),
                         splashAlphaUseCase = inject(scopeId),

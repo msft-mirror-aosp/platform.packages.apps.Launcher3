@@ -23,6 +23,7 @@ import static com.android.app.animation.Interpolators.INSTANT;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.internal.jank.InteractionJankMonitor.Configuration;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
+import static com.android.launcher3.QuickstepTransitionManager.PINNED_TASKBAR_TRANSITION_DURATION;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TRANSIENT_TASKBAR_HIDE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TRANSIENT_TASKBAR_SHOW;
@@ -398,6 +399,9 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      * Returns how long the stash/unstash animation should play.
      */
     public long getStashDuration() {
+        if (DisplayController.isPinnedTaskbar(mActivity)) {
+            return PINNED_TASKBAR_TRANSITION_DURATION;
+        }
         return DisplayController.isTransientTaskbar(mActivity)
                 ? TRANSIENT_TASKBAR_STASH_DURATION
                 : TASKBAR_STASH_DURATION;
@@ -410,12 +414,20 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         return mIsStashed;
     }
 
-    /** Sets the hotseat stashed. */
+    /**
+     * Sets the hotseat stashed.
+     * b/373429249 - we might change this behavior if we remove the scrim, that's why we're keeping
+     * this method
+     */
     public void stashHotseat(boolean stash) {
         mControllers.uiController.stashHotseat(stash);
     }
 
-    /** Instantly un-stashes the hotseat. */
+    /**
+     * Instantly un-stashes the hotseat.
+     * * b/373429249 - we might change this behavior if we remove the scrim, that's why we're
+     * keeping this method
+     */
     public void unStashHotseatInstantly() {
         mControllers.uiController.unStashHotseatInstantly();
     }
