@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.taskbar.bubbles.flyout
+package com.android.launcher3.taskbar.bubbles
 
-/** Callbacks that the flyout uses to notify of events. */
-interface FlyoutCallbacks {
+/** Controls the parent view height. */
+interface BubbleBarParentViewHeightUpdateNotifier {
 
-    /** The flyout was clicked. */
-    fun flyoutClicked()
+    /** Notify parent that top boundary should be updated. */
+    fun updateTopBoundary()
 }
