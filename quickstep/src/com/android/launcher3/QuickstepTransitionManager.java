@@ -1567,7 +1567,8 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
 
     private boolean isFreeformAnimation(RemoteAnimationTarget[] appTargets) {
         return DesktopModeStatus.canEnterDesktopMode(mLauncher.getApplicationContext())
-                && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_EXIT_TRANSITIONS.isTrue()
+                && (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_EXIT_TRANSITIONS.isTrue()
+                    || DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_EXIT_TRANSITIONS_BUGFIX.isTrue())
                 && Arrays.stream(appTargets)
                         .anyMatch(app -> app.taskInfo != null && app.taskInfo.isFreeform());
     }
