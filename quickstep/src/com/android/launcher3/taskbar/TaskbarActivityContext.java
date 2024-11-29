@@ -869,7 +869,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     }
 
     private ActivityOptionsWrapper getActivityLaunchDesktopOptions(ItemInfo info) {
-        if (!DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS.isTrue()) {
+        if (!DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS.isTrue()
+                && !DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS_BUGFIX.isTrue()) {
             return null;
         }
         if (!areDesktopTasksVisible()) {
@@ -1437,7 +1438,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         BubbleTextView.RunningAppState runningAppState =
                 mControllers.taskbarRecentAppsController.getRunningAppState(taskId);
         return runningAppState == BubbleTextView.RunningAppState.MINIMIZED
-                && DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_ALTTAB_TRANSITIONS.isTrue();
+                && (DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_ALTTAB_TRANSITIONS.isTrue()
+                    || DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_ALTTAB_TRANSITIONS_BUGFIX.isTrue()
+                    );
     }
 
     private RemoteTransition createUnminimizeRemoteTransition() {
