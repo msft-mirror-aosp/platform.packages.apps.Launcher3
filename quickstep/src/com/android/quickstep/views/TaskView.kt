@@ -1566,6 +1566,7 @@ constructor(
     }
 
     private fun onModalnessUpdated(modalness: Float) {
+        isClickable = modalness == 0f
         taskContainers.forEach {
             it.iconView.setModalAlpha(1 - modalness)
             it.digitalWellBeingToast?.bannerOffsetPercentage = modalness
