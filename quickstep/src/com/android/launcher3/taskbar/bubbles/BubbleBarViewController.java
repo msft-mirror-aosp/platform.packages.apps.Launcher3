@@ -597,13 +597,17 @@ public class BubbleBarViewController {
     public void setHiddenForBubbles(boolean hidden) {
         if (mHiddenForNoBubbles != hidden) {
             mHiddenForNoBubbles = hidden;
-            updateVisibilityForStateChange();
             if (hidden) {
-                mBarView.setAlpha(0);
-                mBarView.setExpanded(false);
-                adjustTaskbarAndHotseatToBubbleBarState(/* isBubbleBarExpanded = */ false);
+                mBarView.dismiss(() -> {
+                    updateVisibilityForStateChange();
+                    mBarView.setExpanded(false);
+                    adjustTaskbarAndHotseatToBubbleBarState(/* isBubbleBarExpanded= */ false);
+                    mActivity.bubbleBarVisibilityChanged(/* isVisible= */ false);
+                });
+            } else {
+                updateVisibilityForStateChange();
+                mActivity.bubbleBarVisibilityChanged(/* isVisible= */ true);
             }
-            mActivity.bubbleBarVisibilityChanged(!hidden);
         }
     }
 
@@ -636,7 +640,6 @@ public class BubbleBarViewController {
         }
     }
 
-    // TODO: (b/273592694) animate it
     private void updateVisibilityForStateChange() {
         if (!mHiddenForSysui && !mHiddenForNoBubbles && !mHiddenForStashed) {
             mBarView.setVisibility(VISIBLE);
