@@ -286,8 +286,7 @@ public class TouchInteractionService extends Service {
         @Override
         public void onAssistantOverrideInvoked(int invocationType) {
             executeForTouchInteractionService(tis -> {
-                if (!ContextualSearchInvoker.newInstance(tis)
-                        .tryStartAssistOverride(invocationType)) {
+                if (!new ContextualSearchInvoker(tis).tryStartAssistOverride(invocationType)) {
                     Log.w(TAG, "Failed to invoke Assist override");
                 }
             });
@@ -524,7 +523,8 @@ public class TouchInteractionService extends Service {
         }
 
         protected void onOverviewTargetChange() {
-            for (Runnable listener : mOnOverviewTargetChangeListeners) {
+            Set<Runnable> listeners = new HashSet<>(mOnOverviewTargetChangeListeners);
+            for (Runnable listener : listeners) {
                 listener.run();
             }
         }
