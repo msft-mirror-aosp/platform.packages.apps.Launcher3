@@ -98,6 +98,9 @@ class RecentsViewUtils {
     /** Returns the first TaskView if it exists, or null otherwise. */
     fun getFirstTaskView(taskViews: Iterable<TaskView>): TaskView? = taskViews.firstOrNull()
 
+    /** Returns the last TaskView if it exists, or null otherwise. */
+    fun getLastTaskView(taskViews: Iterable<TaskView>): TaskView? = taskViews.lastOrNull()
+
     /**
      * Returns the first TaskView that is not large
      *
