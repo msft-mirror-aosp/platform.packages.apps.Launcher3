@@ -63,6 +63,7 @@ import com.android.launcher3.util.Partner;
 import com.android.launcher3.util.ResourceHelper;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.WindowBounds;
+import com.android.launcher3.util.window.CachedDisplayInfo;
 import com.android.launcher3.util.window.WindowManagerProxy;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -679,28 +680,15 @@ public class InvariantDeviceProfile implements SafeCloseable {
     }
 
     private static int[] findMinWidthAndHeightDpForDevice(Info displayInfo) {
-        int minWidthPx = Integer.MAX_VALUE;
-        int minHeightPx = Integer.MAX_VALUE;
-        for (WindowBounds bounds : displayInfo.supportedBounds) {
-            boolean isTablet = displayInfo.isTablet(bounds);
-            if (isTablet && displayInfo.getDeviceType() == TYPE_MULTI_DISPLAY) {
-                // For split displays, take half width per page.
-                minWidthPx = Math.min(minWidthPx, bounds.availableSize.x / 2);
-                minHeightPx = Math.min(minHeightPx, bounds.availableSize.y);
-            } else if (!isTablet && bounds.isLandscape()) {
-                // We will use transposed layout in this case.
-                minWidthPx = Math.min(minWidthPx, bounds.availableSize.y);
-                minHeightPx = Math.min(minHeightPx, bounds.availableSize.x);
-            } else {
-                minWidthPx = Math.min(minWidthPx, bounds.availableSize.x);
-                minHeightPx = Math.min(minHeightPx, bounds.availableSize.y);
-            }
+        int minDisplayWidthDp = Integer.MAX_VALUE;
+        int minDisplayHeightDp = Integer.MAX_VALUE;
+        for (CachedDisplayInfo display: displayInfo.getAllDisplays()) {
+            minDisplayWidthDp = Math.min(minDisplayWidthDp,
+                    (int) dpiFromPx(display.size.x, DisplayMetrics.DENSITY_DEVICE_STABLE));
+            minDisplayHeightDp = Math.min(minDisplayHeightDp,
+                    (int) dpiFromPx(display.size.y, DisplayMetrics.DENSITY_DEVICE_STABLE));
         }
-
-        int minWidthDp = (int) dpiFromPx(minWidthPx, DisplayMetrics.DENSITY_DEVICE_STABLE);
-        int minHeightDp = (int) dpiFromPx(minHeightPx, DisplayMetrics.DENSITY_DEVICE_STABLE);
-
-        return new int[]{minWidthDp, minHeightDp};
+        return new int[]{minDisplayWidthDp, minDisplayHeightDp};
     }
 
     /**
