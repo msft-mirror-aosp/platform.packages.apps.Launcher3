@@ -415,7 +415,6 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
                         screenId, coordinates[0], coordinates[1]);
 
                 bindItem(info, accessibility, finishCallback);
-                announceConfirmation(R.string.item_added_to_workspace);
             } else if (item instanceof PendingAddItemInfo) {
                 PendingAddItemInfo info = (PendingAddItemInfo) item;
                 if (info instanceof PendingAddWidgetInfo widgetInfo
