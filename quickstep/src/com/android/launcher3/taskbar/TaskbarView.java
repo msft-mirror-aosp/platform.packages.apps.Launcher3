@@ -463,7 +463,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         // Skip static views and potential All Apps divider, if they are on the left.
         mNextViewIndex = mIsRtl ? 0 : mNumStaticViews;
-        if (getChildAt(mNextViewIndex) == mTaskbarDividerContainer) {
+        if (getChildAt(mNextViewIndex) == mTaskbarDividerContainer && !mAddedDividerForRecents) {
             mNextViewIndex++;
         }
 
