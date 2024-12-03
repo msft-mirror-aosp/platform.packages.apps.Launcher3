@@ -197,6 +197,8 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarParentViewController.timesInvoked).isEqualTo(2)
         assertThat(animatorScheduler.delayedBlock).isNull()
         assertThat(bubbleBarView.alpha).isEqualTo(1)
+        assertThat(bubbleBarView.scaleX).isEqualTo(1)
+        assertThat(bubbleBarView.scaleY).isEqualTo(1)
         assertThat(bubbleBarView.visibility).isEqualTo(VISIBLE)
         assertThat(bubbleBarView.translationY).isEqualTo(BAR_TRANSLATION_Y_FOR_TASKBAR)
         assertThat(animator.isAnimating).isFalse()
@@ -241,6 +243,8 @@ class BubbleBarViewAnimatorTest {
         // verify that the hide animation was canceled
         assertThat(animatorScheduler.delayedBlock).isNull()
         assertThat(animator.isAnimating).isFalse()
+        assertThat(bubbleBarView.scaleX).isEqualTo(1)
+        assertThat(bubbleBarView.scaleY).isEqualTo(1)
         verify(bubbleStashController).onNewBubbleAnimationInterrupted(any(), any())
 
         // PhysicsAnimatorTestUtils posts the cancellation to the main thread so we need to wait
