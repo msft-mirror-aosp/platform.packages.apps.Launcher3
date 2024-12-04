@@ -210,7 +210,9 @@ public class RotationHelper implements LauncherPrefChangeListener,
         }
 
         final int activityFlags;
-        if (mStateHandlerRequest != REQUEST_NONE) {
+        if (mIsFixedLandscape) {
+            activityFlags = SCREEN_ORIENTATION_USER_LANDSCAPE;
+        } else if (mStateHandlerRequest != REQUEST_NONE) {
             activityFlags = mStateHandlerRequest == REQUEST_LOCK ?
                     SCREEN_ORIENTATION_LOCKED : SCREEN_ORIENTATION_UNSPECIFIED;
         } else if (mCurrentTransitionRequest != REQUEST_NONE) {
@@ -218,8 +220,6 @@ public class RotationHelper implements LauncherPrefChangeListener,
                     SCREEN_ORIENTATION_LOCKED : SCREEN_ORIENTATION_UNSPECIFIED;
         } else if (mCurrentStateRequest == REQUEST_LOCK) {
             activityFlags = SCREEN_ORIENTATION_LOCKED;
-        } else if (mIsFixedLandscape) {
-            activityFlags = SCREEN_ORIENTATION_USER_LANDSCAPE;
         } else if (mIgnoreAutoRotateSettings || mCurrentStateRequest == REQUEST_ROTATE
                 || mHomeRotationEnabled || mForceAllowRotationForTesting) {
             activityFlags = SCREEN_ORIENTATION_UNSPECIFIED;
