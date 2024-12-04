@@ -25,6 +25,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.animation.AnimationUtils;
+import android.window.OnBackInvokedCallback;
 import android.window.RemoteTransition;
 
 import androidx.annotation.NonNull;
@@ -331,6 +332,7 @@ public class KeyboardQuickSwitchViewController {
     }
 
     class ViewCallbacks {
+        public final OnBackInvokedCallback onBackInvokedCallback = () -> closeQuickSwitchView(true);
 
         boolean onKeyUp(int keyCode, KeyEvent event, boolean isRTL, boolean allowTraversal) {
             if (keyCode != KeyEvent.KEYCODE_TAB
