@@ -789,7 +789,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             LauncherPrefs.get(this).put(LauncherPrefs.ALLOW_ROTATION, false);
         }
         getRotationHelper().setFixedLandscape(
-                Objects.requireNonNull(mDeviceProfile.inv).isFixedLandscapeMode
+                Objects.requireNonNull(mDeviceProfile.inv).isFixedLandscape
         );
     }
 

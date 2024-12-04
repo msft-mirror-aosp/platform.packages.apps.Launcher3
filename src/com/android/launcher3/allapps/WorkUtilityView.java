@@ -33,6 +33,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.graphics.Insets;
 import androidx.core.view.WindowInsetsCompat;
 
@@ -126,6 +127,7 @@ public class WorkUtilityView extends LinearLayout implements Insettable,
         setInsets(mActivityContext.getDeviceProfile().getInsets());
         updateStringFromCache();
         mSchedulerButton.setVisibility(GONE);
+        mSchedulerButton.setOnClickListener(null);
         if (shouldUseScheduler()) {
             mSchedulerButton.setVisibility(VISIBLE);
             mSchedulerButton.setOnClickListener(view ->
@@ -393,7 +395,13 @@ public class WorkUtilityView extends LinearLayout implements Insettable,
         }
     }
 
-    private boolean shouldUseScheduler() {
+    @VisibleForTesting
+    boolean shouldUseScheduler() {
         return Flags.workSchedulerInWorkProfile() && !mWorkSchedulerIntentAction.isEmpty();
+    }
+
+    @VisibleForTesting
+    ImageButton getSchedulerButton() {
+        return mSchedulerButton;
     }
 }
