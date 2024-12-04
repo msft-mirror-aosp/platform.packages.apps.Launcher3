@@ -173,13 +173,16 @@
     <dimen name="work_edu_card_margin">16dp</dimen>
     <dimen name="work_edu_card_radius">16dp</dimen>
     <dimen name="work_edu_card_bottom_margin">26dp</dimen>
-    <dimen name="work_edu_card_text_end_margin">32dp</dimen>
+    <dimen name="work_edu_card_text_end_margin">12dp</dimen>
     <dimen name="work_apps_paused_button_stroke">1dp</dimen>
+    <dimen name="work_edu_card_button_margin_top">12dp</dimen>
 
     <dimen name="work_card_margin">24dp</dimen>
+    <dimen name="work_card_margin_end">12dp</dimen>
     <!-- (x) icon button inside work edu card -->
-    <dimen name="rounded_button_width">24dp</dimen>
+    <dimen name="rounded_button_width">48dp</dimen>
     <dimen name="x_icon_size">16dp</dimen>
+    <dimen name="inset_rounded_action_button">12dp</dimen>
 
     <!-- rounded button shown inside card views, and snack bars  -->
     <dimen name="padded_rounded_button_height">48dp</dimen>

@@ -511,23 +511,21 @@ constructor(
 
     /** Interrupts the animation due to touching the bubble bar or flyout. */
     fun interruptForTouch() {
+        animatingBubble?.hideAnimation?.let { scheduler.cancel(it) }
         PhysicsAnimator.getInstance(bubbleBarView).cancelIfRunning()
         bubbleStashController.getStashedHandlePhysicsAnimator().cancelIfRunning()
         cancelFlyout()
-        val hideAnimation = animatingBubble?.hideAnimation ?: return
-        scheduler.cancel(hideAnimation)
-        bubbleBarView.relativePivotY = 1f
+        resetBubbleBarPropertiesOnInterrupt()
         clearAnimatingBubble()
     }
 
     /** Notifies the animator that the taskbar area was touched during an animation. */
     fun onStashStateChangingWhileAnimating() {
+        animatingBubble?.hideAnimation?.let { scheduler.cancel(it) }
         cancelFlyout()
-        val hideAnimation = animatingBubble?.hideAnimation ?: return
-        scheduler.cancel(hideAnimation)
         clearAnimatingBubble()
         bubbleStashController.getStashedHandlePhysicsAnimator().cancelIfRunning()
-        bubbleBarView.relativePivotY = 1f
+        resetBubbleBarPropertiesOnInterrupt()
         bubbleStashController.onNewBubbleAnimationInterrupted(
             /* isStashed= */ bubbleBarView.alpha == 0f,
             bubbleBarView.translationY,
@@ -541,7 +539,7 @@ constructor(
         scheduler.cancel(hideAnimation)
         animatingBubble = null
         bubbleStashController.getStashedHandlePhysicsAnimator().cancelIfRunning()
-        bubbleBarView.relativePivotY = 1f
+        resetBubbleBarPropertiesOnInterrupt()
         // stash the bubble bar since the IME is now visible
         bubbleStashController.onNewBubbleAnimationInterrupted(
             /* isStashed= */ true,
@@ -677,6 +675,12 @@ constructor(
         clearAnimatingBubble()
         bubbleBarView.relativePivotY = 1f
         bubbleStashController.showBubbleBarImmediate()
+    }
+
+    private fun resetBubbleBarPropertiesOnInterrupt() {
+        bubbleBarView.relativePivotY = 1f
+        bubbleBarView.scaleX = 1f
+        bubbleBarView.scaleY = 1f
     }
 
     private fun <T> PhysicsAnimator<T>?.cancelIfRunning() {
