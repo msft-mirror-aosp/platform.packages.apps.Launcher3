@@ -50,6 +50,9 @@ class BubbleBarFlyoutControllerTest {
     private var onLeft = true
     private var flyoutTy = 50f
 
+    private val showAnimationDuration = 400L
+    private val hideAnimationDuration = 350L
+
     @Before
     fun setUp() {
         flyoutContainer = FrameLayout(context)
@@ -76,7 +79,7 @@ class BubbleBarFlyoutControllerTest {
     @Test
     fun flyoutPosition_left() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
+            setupAndShowFlyout()
             assertThat(flyoutContainer.childCount).isEqualTo(1)
             val flyout = flyoutContainer.getChildAt(0)
             val lp = flyout.layoutParams as FrameLayout.LayoutParams
@@ -89,7 +92,7 @@ class BubbleBarFlyoutControllerTest {
     fun flyoutPosition_right() {
         onLeft = false
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
+            setupAndShowFlyout()
             assertThat(flyoutContainer.childCount).isEqualTo(1)
             val flyout = flyoutContainer.getChildAt(0)
             val lp = flyout.layoutParams as FrameLayout.LayoutParams
@@ -101,7 +104,7 @@ class BubbleBarFlyoutControllerTest {
     @Test
     fun flyoutMessage() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
+            setupAndShowFlyout()
             assertThat(flyoutContainer.childCount).isEqualTo(1)
             val flyout = flyoutContainer.getChildAt(0)
             val sender = flyout.findViewById<TextView>(R.id.bubble_flyout_title)
@@ -114,78 +117,37 @@ class BubbleBarFlyoutControllerTest {
     @Test
     fun hideFlyout_removedFromContainer() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
+            setupAndShowFlyout()
             assertThat(flyoutController.hasFlyout()).isTrue()
             assertThat(flyoutContainer.childCount).isEqualTo(1)
             flyoutController.collapseFlyout {}
-            animatorTestRule.advanceTimeBy(300)
+            animatorTestRule.advanceTimeBy(hideAnimationDuration)
         }
         assertThat(flyoutContainer.childCount).isEqualTo(0)
         assertThat(flyoutController.hasFlyout()).isFalse()
     }
 
     @Test
-    fun showFlyout_extendsTopBoundary() {
-        // set negative translation for the flyout so that it will request to extend the top
-        // boundary
-        flyoutTy = -50f
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
-            assertThat(flyoutContainer.childCount).isEqualTo(1)
-        }
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            animatorTestRule.advanceTimeBy(300)
-        }
-        assertThat(flyoutCallbacks.topBoundaryExtendedSpace).isEqualTo(50)
-    }
-
-    @Test
-    fun showFlyout_withinBoundary() {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
-            assertThat(flyoutContainer.childCount).isEqualTo(1)
-        }
-        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            animatorTestRule.advanceTimeBy(300)
-        }
-        assertThat(flyoutCallbacks.topBoundaryExtendedSpace).isEqualTo(0)
-    }
-
-    @Test
-    fun collapseFlyout_resetsTopBoundary() {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
-            assertThat(flyoutContainer.childCount).isEqualTo(1)
-            flyoutController.collapseFlyout {}
-            animatorTestRule.advanceTimeBy(300)
-        }
-        assertThat(flyoutCallbacks.topBoundaryReset).isTrue()
-    }
-
-    @Test
     fun cancelFlyout_fadesOutFlyout() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
+            setupAndShowFlyout()
             assertThat(flyoutContainer.childCount).isEqualTo(1)
             val flyoutView = flyoutContainer.findViewById<View>(R.id.bubble_bar_flyout_view)
             assertThat(flyoutView.alpha).isEqualTo(1f)
             flyoutController.cancelFlyout {}
-            animatorTestRule.advanceTimeBy(300)
+            animatorTestRule.advanceTimeBy(hideAnimationDuration)
             assertThat(flyoutView.alpha).isEqualTo(0f)
         }
-        assertThat(flyoutCallbacks.topBoundaryReset).isTrue()
     }
 
     @Test
     fun clickFlyout_notifiesCallback() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
+            setupAndShowFlyout()
             assertThat(flyoutContainer.childCount).isEqualTo(1)
             val flyoutView = flyoutContainer.findViewById<View>(R.id.bubble_bar_flyout_view)
             assertThat(flyoutView.alpha).isEqualTo(1f)
-            animatorTestRule.advanceTimeBy(300)
+            animatorTestRule.advanceTimeBy(showAnimationDuration)
             flyoutView.performClick()
         }
         assertThat(flyoutCallbacks.flyoutClicked).isTrue()
@@ -194,7 +156,7 @@ class BubbleBarFlyoutControllerTest {
     @Test
     fun updateFlyoutWhileExpanding() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
+            setupAndShowFlyout()
             assertThat(flyoutController.hasFlyout()).isTrue()
             val flyout = flyoutContainer.findViewById<View>(R.id.bubble_bar_flyout_view)
             assertThat(flyout.findViewById<TextView>(R.id.bubble_flyout_text).text)
@@ -214,14 +176,13 @@ class BubbleBarFlyoutControllerTest {
             assertThat(flyout.findViewById<TextView>(R.id.bubble_flyout_text).text)
                 .isEqualTo("new message")
         }
-        assertThat(flyoutCallbacks.topBoundaryExtendedSpace).isEqualTo(50)
     }
 
     @Test
     fun updateFlyoutFullyExpanded() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            flyoutController.setUpAndShowFlyout(flyoutMessage) {}
-            animatorTestRule.advanceTimeBy(300)
+            setupAndShowFlyout()
+            animatorTestRule.advanceTimeBy(showAnimationDuration)
         }
         assertThat(flyoutController.hasFlyout()).isTrue()
 
@@ -234,31 +195,59 @@ class BubbleBarFlyoutControllerTest {
             flyoutController.updateFlyoutFullyExpanded(newFlyoutMessage) {}
 
             // advance the timer so that the fade out animation plays
-            animatorTestRule.advanceTimeBy(250)
+            animatorTestRule.advanceTimeBy(hideAnimationDuration)
             assertThat(flyout.alpha).isEqualTo(0)
             assertThat(flyout.findViewById<TextView>(R.id.bubble_flyout_text).text)
                 .isEqualTo("new message")
 
             // advance the timer so that the fade in animation plays
-            animatorTestRule.advanceTimeBy(250)
+            animatorTestRule.advanceTimeBy(showAnimationDuration)
             assertThat(flyout.alpha).isEqualTo(1)
         }
-        assertThat(flyoutCallbacks.topBoundaryExtendedSpace).isEqualTo(50)
+    }
+
+    @Test
+    fun updateFlyoutWhileCollapsing() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            setupAndShowFlyout()
+            animatorTestRule.advanceTimeBy(showAnimationDuration)
+        }
+        assertThat(flyoutController.hasFlyout()).isTrue()
+
+        val newFlyoutMessage = flyoutMessage.copy(message = "new message")
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            var flyoutCollapsed = false
+            flyoutController.collapseFlyout { flyoutCollapsed = true }
+            // advance the fake timer so that the collapse animation runs for 125ms
+            animatorTestRule.advanceTimeBy(125)
+
+            // update the flyout in the middle of collapsing, which should start expanding it.
+            var flyoutReversed = false
+            flyoutController.updateFlyoutWhileCollapsing(newFlyoutMessage) { flyoutReversed = true }
+
+            // the collapse and expand animations use an emphasized interpolator, so the reverse
+            // path does not take the same time. advance the timer the by full duration of the show
+            // animation to ensure it completes
+            animatorTestRule.advanceTimeBy(showAnimationDuration)
+            val flyout = flyoutContainer.findViewById<View>(R.id.bubble_bar_flyout_view)
+            assertThat(flyout.alpha).isEqualTo(1)
+            assertThat(flyout.findViewById<TextView>(R.id.bubble_flyout_text).text)
+                .isEqualTo("new message")
+            // verify that we never called the end action on the collapse animation
+            assertThat(flyoutCollapsed).isFalse()
+            // verify that we called the end action on the reverse animation
+            assertThat(flyoutReversed).isTrue()
+        }
+        assertThat(flyoutController.hasFlyout()).isTrue()
+    }
+
+    private fun setupAndShowFlyout() {
+        flyoutController.setUpAndShowFlyout(flyoutMessage, {}, {})
     }
 
     class FakeFlyoutCallbacks : FlyoutCallbacks {
 
-        var topBoundaryExtendedSpace = 0
-        var topBoundaryReset = false
         var flyoutClicked = false
-
-        override fun extendTopBoundary(space: Int) {
-            topBoundaryExtendedSpace = space
-        }
-
-        override fun resetTopBoundary() {
-            topBoundaryReset = true
-        }
 
         override fun flyoutClicked() {
             flyoutClicked = true

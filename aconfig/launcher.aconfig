@@ -311,6 +311,13 @@ flag {
 }
 
 flag {
+    name: "all_apps_sheet_for_handheld"
+    namespace: "launcher"
+    description: "All Apps will be presented on a bottom sheet in handheld mode"
+    bug: "374186088"
+}
+
+flag {
     name: "multiline_search_bar"
     namespace: "launcher"
     description: "Search bar can wrap to multi-line"
@@ -494,10 +501,13 @@ flag {
 }
 
 flag {
-   name: "enforce_system_radius_for_app_widgets"
+   name: "use_system_radius_for_app_widgets"
    namespace: "launcher"
-   description: "Enforce system radius for widget corners instead of a separate 16.dp value"
-   bug: "370950552"
+   description: "Use system radius for enforced widget corners instead of a separate 16.dp value"
+   bug: "373351337"
+   metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -505,4 +515,32 @@ flag {
     namespace: "launcher"
     description: "Enable launcher app contrast tiles."
     bug: "341217082"
+}
+
+flag {
+  name: "msdl_feedback"
+  namespace: "launcher"
+  description: "Enable MSDL feedback for Launcher interactions"
+  bug: "377496684"
+}
+
+flag {
+    name: "taskbar_recents_layout_transition"
+    namespace: "launcher"
+    description: "Enable Taskbar LayoutTransition for Recent Apps"
+    bug: "343521765"
+}
+
+flag {
+    name: "enable_pinning_app_with_context_menu"
+    namespace: "launcher"
+    description: "Add options to pin/unpin to taskbar to app context menus."
+    bug: "375648361"
+}
+
+flag {
+  name: "enable_launcher_icon_shapes"
+  namespace: "launcher"
+  description: "Enable launcher icon shape customizations"
+  bug: "348708061"
 }
