@@ -1957,18 +1957,20 @@ public abstract class RecentsView<
         }
 
         // Keep same previous focused task
-        TaskView newFocusedTaskView = getTaskViewByTaskIds(focusedTaskIds);
-        if (enableLargeDesktopWindowingTile() && newFocusedTaskView instanceof DesktopTaskView) {
-            newFocusedTaskView = null;
+        TaskView newFocusedTaskView = null;
+        if (!enableGridOnlyOverview()) {
+            newFocusedTaskView = getTaskViewByTaskIds(focusedTaskIds);
+            if (enableLargeDesktopWindowingTile()
+                    && newFocusedTaskView instanceof DesktopTaskView) {
+                newFocusedTaskView = null;
+            }
+            // If the list changed, maybe the focused task doesn't exist anymore.
+            if (newFocusedTaskView == null) {
+                newFocusedTaskView = mUtils.getExpectedFocusedTask(getTaskViews());
+            }
         }
-        // If the list changed, maybe the focused task doesn't exist anymore
-        int newFocusedTaskViewIndex = mUtils.getFocusedTaskIndex(taskGroups);
-        if (newFocusedTaskView == null && getTaskViewCount() > newFocusedTaskViewIndex) {
-            newFocusedTaskView = getTaskViewAt(newFocusedTaskViewIndex);
-        }
-
-        setFocusedTaskViewId(newFocusedTaskView != null && !enableGridOnlyOverview()
-                ? newFocusedTaskView.getTaskViewId() : INVALID_TASK_ID);
+        setFocusedTaskViewId(
+                newFocusedTaskView != null ? newFocusedTaskView.getTaskViewId() : INVALID_TASK_ID);
 
         updateTaskSize();
         updateChildTaskOrientations();
@@ -1987,6 +1989,7 @@ public abstract class RecentsView<
                     // for cases where the running task isn't included in this load plan (e.g. if
                     // the current running task is excludedFromRecents.)
                     showCurrentTask(mActiveGestureRunningTasks, "applyLoadPlan");
+                    newRunningTaskView = getRunningTaskView();
                 } else {
                     setRunningTaskViewId(INVALID_TASK_ID);
                 }
@@ -2006,12 +2009,9 @@ public abstract class RecentsView<
         } else if (previousFocusedPage != INVALID_PAGE) {
             targetPage = previousFocusedPage;
         } else {
-            // Set the current page to the running task, but not if settling on new task.
-            if (hasAllValidTaskIds(runningTaskIds)) {
-                targetPage = indexOfChild(newRunningTaskView);
-            } else if (getTaskViewCount() > newFocusedTaskViewIndex) {
-                targetPage = indexOfChild(requireTaskViewAt(newFocusedTaskViewIndex));
-            }
+            targetPage = indexOfChild(
+                    mUtils.getExpectedCurrentTask(newRunningTaskView, newFocusedTaskView,
+                            getTaskViews()));
         }
         if (targetPage != -1 && mCurrentPage != targetPage) {
             int finalTargetPage = targetPage;
