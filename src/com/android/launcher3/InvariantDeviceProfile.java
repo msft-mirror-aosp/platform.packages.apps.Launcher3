@@ -240,10 +240,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
     @TargetApi(23)
     private InvariantDeviceProfile(Context context) {
         String gridName = getCurrentGridName(context);
-        String newGridName = initGrid(context, gridName);
-        if (!newGridName.equals(gridName)) {
-            LauncherPrefs.get(context).put(GRID_NAME, newGridName);
-        }
+        initGrid(context, gridName);
 
         DisplayController.INSTANCE.get(context).setPriorityListener(
                 (displayContext, info, flags) -> {
@@ -367,6 +364,11 @@ public class InvariantDeviceProfile implements SafeCloseable {
                                 ? new ArrayList<>(allOptions)
                                 : new ArrayList<>(allOptionsFilteredByColCount),
                         displayInfo.getDeviceType());
+
+        if (!displayOption.grid.name.equals(gridName)) {
+            LauncherPrefs.get(context).put(GRID_NAME, displayOption.grid.name);
+        }
+
         initGrid(context, displayInfo, displayOption);
         return displayOption.grid.name;
     }
