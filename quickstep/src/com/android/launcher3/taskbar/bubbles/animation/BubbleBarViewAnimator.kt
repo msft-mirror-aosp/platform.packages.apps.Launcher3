@@ -42,6 +42,7 @@ constructor(
     private val bubbleBarFlyoutController: BubbleBarFlyoutController,
     private val bubbleBarParentViewHeightUpdateNotifier: BubbleBarParentViewHeightUpdateNotifier,
     private val onExpanded: Runnable,
+    private val onBubbleBarVisible: Runnable,
     private val scheduler: Scheduler = HandlerScheduler(bubbleBarView),
 ) {
 
@@ -397,6 +398,7 @@ constructor(
         // prepare the bubble bar for the animation
         bubbleBarView.translationY = bubbleBarView.height.toFloat()
         bubbleBarView.visibility = VISIBLE
+        onBubbleBarVisible.run()
         bubbleBarView.alpha = 1f
         bubbleBarView.scaleX = 1f
         bubbleBarView.scaleY = 1f

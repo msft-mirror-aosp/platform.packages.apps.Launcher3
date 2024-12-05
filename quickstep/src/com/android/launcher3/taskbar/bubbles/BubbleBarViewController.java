@@ -170,7 +170,8 @@ public class BubbleBarViewController {
                 mBubbleBarContainer, createFlyoutPositioner(), createFlyoutCallbacks());
         mBubbleBarViewAnimator = new BubbleBarViewAnimator(
                 mBarView, mBubbleStashController, mBubbleBarFlyoutController,
-                createBubbleBarParentViewController(), mBubbleBarController::showExpandedView);
+                createBubbleBarParentViewController(), mBubbleBarController::showExpandedView,
+                () -> setHiddenForBubbles(false));
         mTaskbarViewPropertiesProvider = taskbarViewPropertiesProvider;
         onBubbleBarConfigurationChanged(/* animate= */ false);
         mActivity.addOnDeviceProfileChangeListener(
