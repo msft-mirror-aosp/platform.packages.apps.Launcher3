@@ -442,6 +442,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         onNavButtonsDarkIntensityChanged(sharedState.navButtonsDarkIntensity);
         onNavigationBarLumaSamplingEnabled(sharedState.mLumaSamplingDisplayId,
                 sharedState.mIsLumaSamplingEnabled);
+        setWallpaperVisible(sharedState.wallpaperVisible);
+        onTransitionModeUpdated(sharedState.barMode, true /* checkBarModes */);
 
         if (ENABLE_TASKBAR_NAVBAR_UNIFICATION) {
             // W/ the flag not set this entire class gets re-created, which resets the value of
