@@ -580,15 +580,23 @@ public class BubbleBarViewController {
 
     /** Returns maximum height of the bubble bar with the flyout view. */
     public int getBubbleBarWithFlyoutMaximumHeight() {
-        if (!isBubbleBarVisible()) return 0;
+        if (!isBubbleBarVisible() && !isAnimatingNewBubble()) return 0;
         int bubbleBarTopOnHome = (int) (mBubbleStashController.getBubbleBarVerticalCenterForHome()
-                + mBarView.getBubbleBarCollapsedHeight() / 2);
-        int result = (int) (bubbleBarTopOnHome + mBarView.getArrowHeight());
+                + mBarView.getBubbleBarCollapsedHeight() / 2 + mBarView.getArrowHeight());
         if (isAnimatingNewBubble()) {
-            // when animating new bubble add the maximum height of the flyout view
-            result += mBubbleBarFlyoutController.getMaximumFlyoutHeight();
+            if (mTaskbarStashController.isInApp() && mBubbleStashController.getHasHandleView()) {
+                // when animating a bubble in an app, the bubble bar will be higher than its
+                // position on home
+                float bubbleBarTopDistanceFromBottom =
+                        -mBubbleStashController.getBubbleBarTranslationYForTaskbar()
+                                + mBarView.getHeight();
+                return (int) bubbleBarTopDistanceFromBottom
+                        + mBubbleBarFlyoutController.getMaximumFlyoutHeight();
+            }
+            return bubbleBarTopOnHome + mBubbleBarFlyoutController.getMaximumFlyoutHeight();
+        } else {
+            return bubbleBarTopOnHome;
         }
-        return result;
     }
 
     /**
