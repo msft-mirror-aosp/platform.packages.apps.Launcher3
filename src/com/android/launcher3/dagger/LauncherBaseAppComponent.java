@@ -18,10 +18,14 @@ package com.android.launcher3.dagger;
 
 import android.content.Context;
 
+import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
 import com.android.launcher3.graphics.IconShape;
+import com.android.launcher3.model.ItemInstallQueue;
 import com.android.launcher3.pm.InstallSessionHelper;
 import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.DaggerSingletonTracker;
+import com.android.launcher3.util.DynamicResource;
+import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.util.ScreenOnTracker;
@@ -43,15 +47,19 @@ import dagger.BindsInstance;
 public interface LauncherBaseAppComponent {
     DaggerSingletonTracker getDaggerSingletonTracker();
     ApiWrapper getApiWrapper();
+    ContextualEduStatsManager getContextualEduStatsManager();
     CustomWidgetManager getCustomWidgetManager();
+    DynamicResource getDynamicResource();
     IconShape getIconShape();
     InstallSessionHelper getInstallSessionHelper();
+    ItemInstallQueue getItemInstallQueue();
     RefreshRateTracker getRefreshRateTracker();
     ScreenOnTracker getScreenOnTracker();
     SettingsCache getSettingsCache();
     PackageManagerHelper getPackageManagerHelper();
     PluginManagerWrapper getPluginManagerWrapper();
     VibratorWrapper getVibratorWrapper();
+    MSDLPlayerWrapper getMSDLPlayerWrapper();
 
     /** Builder for LauncherBaseAppComponent. */
     interface Builder {

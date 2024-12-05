@@ -17,13 +17,14 @@
 package com.android.launcher3.model;
 
 import static com.android.launcher3.Flags.enableSmartspaceRemovalToggle;
-import static com.android.launcher3.LauncherPrefs.IS_FIRST_LOAD_AFTER_RESTORE;
+import static com.android.launcher3.Flags.oneGridSpecs;
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.LauncherSettings.Favorites.TMP_TABLE;
 import static com.android.launcher3.Utilities.SHOULD_SHOW_FIRST_PAGE_WIDGET;
 import static com.android.launcher3.model.LoaderTask.SMARTSPACE_ON_HOME_SCREEN;
 import static com.android.launcher3.provider.LauncherDbUtils.copyTable;
 import static com.android.launcher3.provider.LauncherDbUtils.dropTable;
+import static com.android.launcher3.provider.LauncherDbUtils.shiftTableByXCells;
 
 import android.content.ComponentName;
 import android.content.ContentValues;
@@ -38,7 +39,6 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
-import com.android.launcher3.Flags;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings;
@@ -119,19 +119,33 @@ public class GridSizeMigrationDBController {
             @NonNull DeviceGridState srcDeviceState,
             @NonNull DeviceGridState destDeviceState,
             @NonNull DatabaseHelper target,
-            @NonNull SQLiteDatabase source) {
+            @NonNull SQLiteDatabase source,
+            boolean isDestNewDb) {
 
         if (!needsToMigrate(srcDeviceState, destDeviceState)) {
             return true;
         }
 
-        if (LauncherPrefs.get(context).get(IS_FIRST_LOAD_AFTER_RESTORE)
-                && Flags.enableGridMigrationFix()
+        if (isDestNewDb
                 && srcDeviceState.getColumns().equals(destDeviceState.getColumns())
                 && srcDeviceState.getRows() < destDeviceState.getRows()) {
             // Only use this strategy when comparing the previous grid to the new grid and the
             // columns are the same and the destination has more rows
             copyTable(source, TABLE_NAME, target.getWritableDatabase(), TABLE_NAME, context);
+
+            if (oneGridSpecs()) {
+                DbReader destReader = new DbReader(
+                        target.getWritableDatabase(), TABLE_NAME, context);
+                boolean shouldShiftCells = shouldShiftCells(destReader, srcDeviceState.getRows());
+                if (shouldShiftCells) {
+                    shiftTableByXCells(
+                            target.getWritableDatabase(),
+                            (destDeviceState.getRows() - srcDeviceState.getRows()),
+                            TABLE_NAME);
+                }
+            }
+
+            // Save current configuration, so that the migration does not run again.
             destDeviceState.writeToPrefs(context);
             return true;
         }
@@ -429,16 +443,21 @@ public class GridSizeMigrationDBController {
         }
     }
 
-    static void copyCurrentGridToNewGrid(
-            @NonNull Context context,
-            @NonNull DeviceGridState destDeviceState,
-            @NonNull DatabaseHelper target,
-            @NonNull SQLiteDatabase source) {
-        // Only use this strategy when comparing the previous grid to the new grid and the
-        // columns are the same and the destination has more rows
-        copyTable(source, TABLE_NAME, target.getWritableDatabase(), TABLE_NAME, context);
-        destDeviceState.writeToPrefs(context);
+    private static boolean shouldShiftCells(final DbReader destReader, final int srcGridRowCount) {
+        List<DbEntry> workspaceItems = destReader.loadAllWorkspaceEntries();
+        int firstPageItemsRowPosSum = workspaceItems.stream()
+                .filter(entry -> entry.screenId == 0)
+                .mapToInt(entry -> entry.cellY).sum();
+        int firstPageWorkspaceItemsCount = (int) workspaceItems.stream()
+                .filter(entry -> entry.screenId == 0).count();
+        if (firstPageWorkspaceItemsCount == 0) {
+            return false;
+        }
+        float srcGridMidPoint = srcGridRowCount / 2f;
+        float firstPageItemPosAvg = (float) firstPageItemsRowPosSum / firstPageWorkspaceItemsCount;
+        return (firstPageItemPosAvg >= srcGridMidPoint);
     }
+
 
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     public static class DbReader {

@@ -43,6 +43,7 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.util.Log;
 import android.view.IRemoteAnimationRunner;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
@@ -54,6 +55,7 @@ import android.window.TransitionFilter;
 
 import androidx.annotation.MainThread;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.annotation.WorkerThread;
 
 import com.android.internal.logging.InstanceId;
@@ -69,6 +71,7 @@ import com.android.quickstep.util.ContextualSearchInvoker;
 import com.android.quickstep.util.unfold.ProxyUnfoldTransitionProvider;
 import com.android.systemui.shared.recents.ISystemUiProxy;
 import com.android.systemui.shared.recents.model.ThumbnailData;
+import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 import com.android.systemui.shared.system.RecentsAnimationControllerCompat;
 import com.android.systemui.shared.system.RecentsAnimationListener;
@@ -210,10 +213,10 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle {
     }
 
     @Override
-    public void onBackPressed() {
+    public void onBackEvent(KeyEvent backEvent) {
         if (mSystemUiProxy != null) {
             try {
-                mSystemUiProxy.onBackPressed();
+                mSystemUiProxy.onBackEvent(backEvent);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call onBackPressed", e);
             }
@@ -312,7 +315,7 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle {
         setBackToLauncherCallback(mBackToLauncherCallback, mBackToLauncherRunner);
         setUnfoldAnimationListener(mUnfoldAnimationListener);
         setDesktopTaskListener(mDesktopTaskListener);
-        setAssistantOverridesRequested(ContextualSearchInvoker.newInstance(mContext)
+        setAssistantOverridesRequested(new ContextualSearchInvoker(mContext)
                 .getSysUiAssistOverrideInvocationTypes());
         mStateChangeCallbacks.forEach(Runnable::run);
 
@@ -885,10 +888,12 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle {
     /**
      * Tells SysUI to update the bubble bar location to the new location.
      * @param location new location for the bubble bar
+     * @param source what triggered the location update
      */
-    public void setBubbleBarLocation(BubbleBarLocation location) {
+    public void setBubbleBarLocation(BubbleBarLocation location,
+            @BubbleBarLocation.UpdateSource int source) {
         try {
-            mBubbles.setBubbleBarLocation(location);
+            mBubbles.setBubbleBarLocation(location, source);
         } catch (RemoteException e) {
             Log.w(TAG, "Failed call setBubbleBarLocation");
         }
@@ -1630,5 +1635,25 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle {
         pw.println("\tmUnfoldAnimation=" + mUnfoldAnimation);
         pw.println("\tmUnfoldAnimationListener=" + mUnfoldAnimationListener);
         pw.println("\tmDragAndDrop=" + mDragAndDrop);
+    }
+
+    /**
+     * Adds all interfaces held by this proxy to the bundle
+     */
+    @VisibleForTesting
+    public void addAllInterfaces(Bundle out) {
+        QuickStepContract.addInterface(mSystemUiProxy, out);
+        QuickStepContract.addInterface(mPip, out);
+        QuickStepContract.addInterface(mBubbles, out);
+        QuickStepContract.addInterface(mSysuiUnlockAnimationController, out);
+        QuickStepContract.addInterface(mSplitScreen, out);
+        QuickStepContract.addInterface(mOneHanded, out);
+        QuickStepContract.addInterface(mShellTransitions, out);
+        QuickStepContract.addInterface(mStartingWindow, out);
+        QuickStepContract.addInterface(mRecentTasks, out);
+        QuickStepContract.addInterface(mBackAnimation, out);
+        QuickStepContract.addInterface(mDesktopMode, out);
+        QuickStepContract.addInterface(mUnfoldAnimation, out);
+        QuickStepContract.addInterface(mDragAndDrop, out);
     }
 }

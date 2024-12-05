@@ -115,7 +115,6 @@ public class BubbleBarController extends IBubblesListener.Stub {
     private BubbleBarItem mSelectedBubble;
 
     private TaskbarSharedState mSharedState;
-    private ImeVisibilityChecker mImeVisibilityChecker;
     private BubbleBarViewController mBubbleBarViewController;
     private BubbleStashController mBubbleStashController;
     private Optional<BubbleStashedHandleViewController> mBubbleStashedHandleViewController;
@@ -125,6 +124,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
     // Cache last sent top coordinate to avoid sending duplicate updates to shell
     private int mLastSentBubbleBarTop;
+
+    private boolean mIsImeVisible = false;
 
     /**
      * Similar to {@link BubbleBarUpdate} but rather than {@link BubbleInfo}s it uses
@@ -192,10 +193,8 @@ public class BubbleBarController extends IBubblesListener.Stub {
     /** Initializes controllers. */
     public void init(BubbleControllers bubbleControllers,
             BubbleBarLocationListener bubbleBarLocationListener,
-            ImeVisibilityChecker imeVisibilityChecker,
             TaskbarSharedState sharedState) {
         mSharedState = sharedState;
-        mImeVisibilityChecker = imeVisibilityChecker;
         mBubbleBarViewController = bubbleControllers.bubbleBarViewController;
         mBubbleStashController = bubbleControllers.bubbleStashController;
         mBubbleStashedHandleViewController = bubbleControllers.bubbleStashedHandleViewController;
@@ -234,6 +233,10 @@ public class BubbleBarController extends IBubblesListener.Stub {
 
         boolean sysuiLocked = (flags & MASK_SYSUI_LOCKED) != 0;
         mBubbleStashController.setSysuiLocked(sysuiLocked);
+        mIsImeVisible = (flags & SYSUI_STATE_IME_SHOWING) != 0;
+        if (mIsImeVisible) {
+            mBubbleBarViewController.onImeVisible();
+        }
     }
 
     //
@@ -297,9 +300,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
                 Log.e(TAG, "Could not instantiate BubbleBarBubble for " + bubbleInfos.get(i));
                 continue;
             }
-            addBubbleInternally(bubble,  /* showAppBadge = */
-                    mBubbleBarViewController.isExpanded() || i == 0,
-                    /* isExpanding = */ false,  /* suppressAnimation = */ true);
+            addBubbleInternally(bubble, /* isExpanding= */ false, /* suppressAnimation= */ true);
         }
     }
 
@@ -311,8 +312,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
         // enabling gesture nav. also suppress animation if the bubble bar is hidden for sysui e.g.
         // the shade is open, or we're locked.
         final boolean suppressAnimation =
-                update.initialState || mBubbleBarViewController.isHiddenForSysui()
-                        || mImeVisibilityChecker.isImeVisible();
+                update.initialState || mBubbleBarViewController.isHiddenForSysui() || mIsImeVisible;
 
         if (update.initialState && mSharedState.hasSavedBubbles()) {
             // clear restored state
@@ -390,8 +390,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
             for (int i = update.currentBubbles.size() - 1; i >= 0; i--) {
                 BubbleBarBubble bubble = update.currentBubbles.get(i);
                 if (bubble != null) {
-                    addBubbleInternally(bubble, /* showAppBadge = */ !isCollapsed || i == 0,
-                            isExpanding, suppressAnimation);
+                    addBubbleInternally(bubble, isExpanding, suppressAnimation);
                     if (isCollapsed) {
                         // If we're collapsed, the most recently added bubble will be selected.
                         bubbleToSelect = bubble;
@@ -420,8 +419,13 @@ public class BubbleBarController extends IBubblesListener.Stub {
             // Updates mean the dot state may have changed; any other changes were updated in
             // the populateBubble step.
             BubbleBarBubble bb = mBubbles.get(update.updatedBubble.getKey());
-            mBubbleBarViewController.animateBubbleNotification(
-                    bb, /* isExpanding= */ false, /* isUpdate= */ true);
+            if (suppressAnimation) {
+                // since we're not animating this update, we should update the dot visibility here.
+                bb.getView().updateDotVisibility(/* animate= */ false);
+            } else {
+                mBubbleBarViewController.animateBubbleNotification(
+                        bb, /* isExpanding= */ false, /* isUpdate= */ true);
+            }
         }
         if (update.bubbleKeysInOrder != null && !update.bubbleKeysInOrder.isEmpty()) {
             // Create the new list
@@ -526,9 +530,10 @@ public class BubbleBarController extends IBubblesListener.Stub {
      * <p>
      * Updates the value locally in Launcher and in WMShell.
      */
-    public void updateBubbleBarLocation(BubbleBarLocation location) {
+    public void updateBubbleBarLocation(BubbleBarLocation location,
+            @BubbleBarLocation.UpdateSource int source) {
         updateBubbleBarLocationInternal(location);
-        mSystemUiProxy.setBubbleBarLocation(location);
+        mSystemUiProxy.setBubbleBarLocation(location, source);
     }
 
     private void updateBubbleBarLocationInternal(BubbleBarLocation location) {
@@ -563,18 +568,10 @@ public class BubbleBarController extends IBubblesListener.Stub {
         }
     }
 
-    private void addBubbleInternally(BubbleBarBubble bubble, boolean showAppBadge,
-            boolean isExpanding, boolean suppressAnimation) {
-        //TODO(b/360652359): remove setting scale to the app badge once issue is fixed
-        bubble.getView().setBadgeScale(showAppBadge ? 1 : 0);
+    private void addBubbleInternally(BubbleBarBubble bubble, boolean isExpanding,
+            boolean suppressAnimation) {
         mBubbles.put(bubble.getKey(), bubble);
         mBubbleBarViewController.addBubble(bubble, isExpanding, suppressAnimation);
-    }
-
-    /** Interface for checking whether the IME is visible. */
-    public interface ImeVisibilityChecker {
-        /** Whether the IME is visible. */
-        boolean isImeVisible();
     }
 
     /** Listener of {@link BubbleBarLocation} updates. */

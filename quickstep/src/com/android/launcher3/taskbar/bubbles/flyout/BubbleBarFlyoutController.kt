@@ -21,6 +21,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.core.animation.ValueAnimator
+import com.android.app.animation.InterpolatorsAndroidX
 import com.android.launcher3.R
 import com.android.systemui.util.addListener
 
@@ -34,8 +35,11 @@ constructor(
     private val flyoutScheduler: FlyoutScheduler = HandlerScheduler(container),
 ) {
 
+    val maximumFlyoutHeight: Int = BubbleBarFlyoutView.getMaximumViewHeight(container.context)
+
     private companion object {
-        const val ANIMATION_DURATION_MS = 250L
+        const val EXPAND_ANIMATION_DURATION_MS = 400L
+        const val COLLAPSE_ANIMATION_DURATION_MS = 350L
     }
 
     private var flyout: BubbleBarFlyoutView? = null
@@ -58,6 +62,8 @@ constructor(
             rect.offset(0, flyout.translationY.toInt())
             return rect
         }
+
+    fun getFlyoutMaxHeight(): Int = BubbleBarFlyoutView.getMaximumViewHeight(container.context)
 
     fun setUpAndShowFlyout(message: BubbleBarFlyoutMessage, onInit: () -> Unit, onEnd: () -> Unit) {
         flyout?.let(container::removeView)
@@ -86,9 +92,10 @@ constructor(
     private fun showFlyout(animationType: AnimationType, endAction: () -> Unit) {
         val flyout = this.flyout ?: return
         val startValue = getCurrentAnimatedValueIfRunning() ?: 0f
-        val duration = (ANIMATION_DURATION_MS * (1f - startValue)).toLong()
+        val duration = (EXPAND_ANIMATION_DURATION_MS * (1f - startValue)).toLong()
         animator?.cancel()
         val animator = ValueAnimator.ofFloat(startValue, 1f).setDuration(duration)
+        animator.interpolator = InterpolatorsAndroidX.EMPHASIZED
         this.animator = animator
         when (animationType) {
             AnimationType.FADE ->
@@ -99,11 +106,10 @@ constructor(
                 }
         }
         animator.addListener(
-            onStart = { extendTopBoundary() },
             onEnd = {
                 endAction()
                 flyout.setOnClickListener { callbacks.flyoutClicked() }
-            },
+            }
         )
         animator.start()
     }
@@ -117,7 +123,7 @@ constructor(
 
     fun updateFlyoutWhileExpanding(message: BubbleBarFlyoutMessage) {
         val flyout = flyout ?: return
-        flyout.updateData(message) { extendTopBoundary() }
+        flyout.updateData(message) {}
     }
 
     fun updateFlyoutWhileCollapsing(message: BubbleBarFlyoutMessage, onEnd: () -> Unit) {
@@ -125,14 +131,6 @@ constructor(
         animator?.pause()
         animator?.removeAllListeners()
         flyout.updateData(message) { showFlyout(AnimationType.MORPH, onEnd) }
-    }
-
-    private fun extendTopBoundary() {
-        val flyout = flyout ?: return
-        val flyoutTop = flyout.top + flyout.translationY
-        // If the top position of the flyout is negative, then it's bleeding over the
-        // top boundary of its parent view
-        if (flyoutTop < 0) callbacks.extendTopBoundary(space = -flyoutTop.toInt())
     }
 
     fun cancelFlyout(endAction: () -> Unit) {
@@ -152,9 +150,10 @@ constructor(
     private fun hideFlyout(animationType: AnimationType, endAction: () -> Unit) {
         val flyout = this.flyout ?: return
         val startValue = getCurrentAnimatedValueIfRunning() ?: 1f
-        val duration = (ANIMATION_DURATION_MS * startValue).toLong()
+        val duration = (COLLAPSE_ANIMATION_DURATION_MS * startValue).toLong()
         animator?.cancel()
         val animator = ValueAnimator.ofFloat(startValue, 0f).setDuration(duration)
+        animator.interpolator = InterpolatorsAndroidX.EMPHASIZED
         this.animator = animator
         when (animationType) {
             AnimationType.FADE ->
@@ -179,7 +178,6 @@ constructor(
     private fun cleanupFlyoutView() {
         container.removeView(flyout)
         this@BubbleBarFlyoutController.flyout = null
-        callbacks.resetTopBoundary()
     }
 
     fun hasFlyout() = flyout != null

@@ -14,12 +14,17 @@
  * limitations under the License.
  */
 
-package com.android.quickstep.task.viewmodel
+package com.android.quickstep.views
 
-import androidx.lifecycle.ViewModel
+import android.content.Context
+import android.util.AttributeSet
+import android.widget.ImageButton
 
-class TaskViewModel(private val taskViewData: TaskViewData) : ViewModel() {
-    fun updateScale(scale: Float) {
-        taskViewData.scale.value = scale
-    }
+/**
+ * Button for supporting multiple desktop sessions. The button will be next to the first TaskView
+ * inside overview, while clicking this button will create a new desktop session.
+ */
+class AddDesktopButton @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
+    ImageButton(context, attrs) {
+    // TODO(b/382057498): add this button the overview.
 }
