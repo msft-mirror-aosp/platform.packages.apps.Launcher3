@@ -36,14 +36,10 @@ class AnimatorBackState(private val springAnim: RectFSpringAnim?, private val an
     BackAnimState {
 
     override fun addOnAnimCompleteCallback(r: Runnable) {
-        val springAnimWait = RunnableList()
-        springAnim?.addAnimatorListener(forEndCallback(springAnimWait::executeAllAndDestroy))
-            ?: springAnimWait.executeAllAndDestroy()
-
         val animWait = RunnableList()
-        anim?.addListener(
-            forEndCallback(Runnable { springAnimWait.add(animWait::executeAllAndDestroy) })
-        ) ?: springAnimWait.add(animWait::executeAllAndDestroy)
+        springAnim?.addAnimatorListener(forEndCallback(animWait::executeAllAndDestroy))
+            ?: anim?.addListener(forEndCallback(animWait::executeAllAndDestroy))
+            ?: animWait.executeAllAndDestroy()
         animWait.add(r)
     }
 
