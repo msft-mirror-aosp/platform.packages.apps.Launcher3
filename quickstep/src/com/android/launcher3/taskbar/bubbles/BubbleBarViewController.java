@@ -329,7 +329,7 @@ public class BubbleBarViewController {
         return new BubbleBarParentViewHeightUpdateNotifier() {
             @Override
             public void updateTopBoundary() {
-                mActivity.setTaskbarWindowSize(mActivity.getDefaultTaskbarWindowSize());
+                mActivity.setTaskbarWindowForAnimatingBubble();
             }
         };
     }
