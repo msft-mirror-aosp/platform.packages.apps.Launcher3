@@ -1510,6 +1510,19 @@ public abstract class RecentsView<
     }
 
     /**
+     * Launch DesktopTaskView if found.
+     * @return provides runnable list to attach runnable at end of Desktop Mode launch
+     */
+    public RunnableList launchDesktopTaskView() {
+        for (TaskView taskView : getTaskViews()) {
+            if (taskView instanceof DesktopTaskView) {
+                return taskView.launchWithAnimation();
+            }
+        }
+        return null;
+    }
+
+    /**
      * Returns a {@link TaskView} that has taskId matching {@code taskId} or null if no match.
      */
     @Nullable
