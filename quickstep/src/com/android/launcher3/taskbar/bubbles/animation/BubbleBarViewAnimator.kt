@@ -400,6 +400,8 @@ constructor(
         bubbleBarView.alpha = 1f
         bubbleBarView.scaleX = 1f
         bubbleBarView.scaleY = 1f
+        bubbleBarView.setBackgroundScaleX(1f)
+        bubbleBarView.setBackgroundScaleY(1f)
 
         val translationTracker = TranslationTracker(bubbleBarView.translationY)
 
