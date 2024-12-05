@@ -73,22 +73,29 @@ class TasksRepository(
         getTaskDataById(taskId).map { it?.thumbnail }.distinctUntilChangedBy { it?.snapshotId }
 
     override fun setVisibleTasks(visibleTaskIdList: Set<Int>) {
-        Log.d(TAG, "setVisibleTasks: $visibleTaskIdList")
+        val tasksNoLongerVisible = taskRequests.keys.subtract(visibleTaskIdList)
+        val newlyVisibleTasks = visibleTaskIdList.subtract(taskRequests.keys)
+        if (tasksNoLongerVisible.isNotEmpty() || newlyVisibleTasks.isNotEmpty()) {
+            Log.d(
+                TAG,
+                "setVisibleTasks to: $visibleTaskIdList, " +
+                    "removed: $tasksNoLongerVisible, added: $newlyVisibleTasks",
+            )
+        }
 
         // Remove tasks are no longer visible
-        val tasksNoLongerVisible = taskRequests.keys.subtract(visibleTaskIdList)
         removeTasks(tasksNoLongerVisible)
         // Add new tasks to be requested
-        visibleTaskIdList.subtract(taskRequests.keys).forEach { taskId -> requestTaskData(taskId) }
+        newlyVisibleTasks.forEach { taskId -> requestTaskData(taskId) }
     }
 
     private fun requestTaskData(taskId: Int) {
-        Log.i(TAG, "requestTaskData: $taskId")
         val task = tasks.value[taskId] ?: return
         taskRequests[taskId] =
             Pair(
                 task.key,
                 recentsCoroutineScope.launch {
+                    Log.i(TAG, "requestTaskData: $taskId")
                     fetchIcon(task)
                     fetchThumbnail(task)
                 },
@@ -98,8 +105,8 @@ class TasksRepository(
     private fun removeTasks(tasksToRemove: Set<Int>) {
         if (tasksToRemove.isEmpty()) return
 
+        Log.i(TAG, "removeTasks: $tasksToRemove")
         tasksToRemove.forEach { taskId ->
-            Log.i(TAG, "removeTask: $taskId")
             val request = taskRequests.remove(taskId) ?: return
             val (taskKey, job) = request
             job.cancel()

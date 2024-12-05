@@ -17,6 +17,7 @@
 package com.android.launcher3.widget;
 
 import static android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN;
+import static android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK;
 
 import static com.android.launcher3.Flags.enableWidgetTapToAdd;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_WIDGETS_TRAY;
@@ -40,6 +41,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewPropertyAnimator;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -154,7 +156,21 @@ public class WidgetCell extends LinearLayout {
         mWidgetDescription = findViewById(R.id.widget_description);
         mWidgetTextContainer = findViewById(R.id.widget_text_container);
         mWidgetAddButton = findViewById(R.id.widget_add_button);
+
         if (enableWidgetTapToAdd()) {
+
+            setAccessibilityDelegate(new AccessibilityDelegate() {
+                @Override
+                public void onInitializeAccessibilityNodeInfo(View host,
+                        AccessibilityNodeInfo info) {
+                    super.onInitializeAccessibilityNodeInfo(host, info);
+                    String accessibilityLabel = getResources().getString(mWidgetAddButton.isShown()
+                            ? R.string.widget_cell_tap_to_hide_add_button_label
+                            : R.string.widget_cell_tap_to_show_add_button_label);
+                    info.addAction(new AccessibilityNodeInfo.AccessibilityAction(ACTION_CLICK,
+                            accessibilityLabel));
+                }
+            });
             mWidgetAddButton.setVisibility(INVISIBLE);
         }
     }

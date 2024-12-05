@@ -186,21 +186,22 @@ public class Hotseat extends CellLayout implements Insettable {
      */
     public void adjustForBubbleBar(boolean isBubbleBarVisible) {
         DeviceProfile dp = mActivity.getDeviceProfile();
-
+        boolean shouldAdjust = isBubbleBarVisible
+                && dp.shouldAdjustHotseatOrQsbForBubbleBar(getContext());
+        boolean shouldAdjustHotseat = shouldAdjust
+                && dp.shouldAlignBubbleBarWithHotseat();
         ShortcutAndWidgetContainer icons = getShortcutsAndWidgets();
-        AnimatorSet animatorSet = new AnimatorSet();
-
         // update the translation provider for future layout passes of hotseat icons.
-        if (isBubbleBarVisible) {
+        if (shouldAdjustHotseat) {
             icons.setTranslationProvider(
                     cellX -> dp.getHotseatAdjustedTranslation(getContext(), cellX));
         } else {
             icons.setTranslationProvider(null);
         }
-
+        AnimatorSet animatorSet = new AnimatorSet();
         for (int i = 0; i < icons.getChildCount(); i++) {
             View child = icons.getChildAt(i);
-            float tx = isBubbleBarVisible ? dp.getHotseatAdjustedTranslation(getContext(), i) : 0;
+            float tx = shouldAdjustHotseat ? dp.getHotseatAdjustedTranslation(getContext(), i) : 0;
             if (child instanceof Reorderable) {
                 MultiTranslateDelegate mtd = ((Reorderable) child).getTranslateDelegate();
                 animatorSet.play(
@@ -209,10 +210,13 @@ public class Hotseat extends CellLayout implements Insettable {
                 animatorSet.play(ObjectAnimator.ofFloat(child, VIEW_TRANSLATE_X, tx));
             }
         }
+        //TODO(b/381109832) refactor & simplify adjustment logic
+        boolean shouldAdjustQsb =
+                shouldAdjustHotseat || (shouldAdjust && dp.shouldAlignBubbleBarWithQSB());
         if (mQsb instanceof HorizontalInsettableView horizontalInsettableQsb) {
             final float currentInsetFraction = horizontalInsettableQsb.getHorizontalInsets();
-            final float targetInsetFraction =
-                    isBubbleBarVisible ? (float) dp.iconSizePx / dp.hotseatQsbWidth : 0;
+            final float targetInsetFraction = shouldAdjustQsb
+                    ? (float) dp.iconSizePx / dp.hotseatQsbWidth : 0;
             ValueAnimator qsbAnimator =
                     ValueAnimator.ofFloat(currentInsetFraction, targetInsetFraction);
             qsbAnimator.addUpdateListener(animation -> {

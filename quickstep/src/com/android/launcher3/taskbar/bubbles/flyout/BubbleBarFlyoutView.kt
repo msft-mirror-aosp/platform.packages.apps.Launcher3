@@ -18,6 +18,7 @@ package com.android.launcher3.taskbar.bubbles.flyout
 
 import android.content.Context
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Outline
@@ -35,6 +36,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.animation.ArgbEvaluator
 import com.android.launcher3.R
 import com.android.launcher3.popup.RoundedArrowDrawable
+import kotlin.math.min
 
 /** The flyout view used to notify the user of a new bubble notification. */
 class BubbleBarFlyoutView(
@@ -43,9 +45,27 @@ class BubbleBarFlyoutView(
     scheduler: FlyoutScheduler? = null,
 ) : ConstraintLayout(context) {
 
-    private companion object {
+    companion object {
+        // the rate multiple for the background color animation relative to the morph animation.
+        const val BACKGROUND_COLOR_CHANGE_RATE = 5
         // the minimum progress of the expansion animation before the content starts fading in.
-        const val MIN_EXPANSION_PROGRESS_FOR_CONTENT_ALPHA = 0.75f
+        private const val MIN_EXPANSION_PROGRESS_FOR_CONTENT_ALPHA = 0.75f
+
+        private const val TEXT_ROW_HEIGHT_SP = 20
+        private const val MAX_ROWS_COUNT = 3
+
+        /** Returns the maximum possible height of the flyout view. */
+        fun getMaximumViewHeight(context: Context): Int {
+            val verticalPaddings = getFlyoutPadding(context) * 2
+            val textSizeSp = TEXT_ROW_HEIGHT_SP * MAX_ROWS_COUNT
+            val textSizePx = textSizeSp * Resources.getSystem().displayMetrics.scaledDensity
+            val triangleHeight =
+                context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_triangle_height)
+            return verticalPaddings + textSizePx.toInt() + triangleHeight
+        }
+
+        private fun getFlyoutPadding(context: Context) =
+            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_padding)
     }
 
     private val scheduler: FlyoutScheduler = scheduler ?: HandlerScheduler(this)
@@ -58,10 +78,7 @@ class BubbleBarFlyoutView(
     private val message: TextView by
         lazy(LazyThreadSafetyMode.NONE) { findViewById(R.id.bubble_flyout_text) }
 
-    private val flyoutPadding by
-        lazy(LazyThreadSafetyMode.NONE) {
-            context.resources.getDimensionPixelSize(R.dimen.bubblebar_flyout_padding)
-        }
+    private val flyoutPadding by lazy(LazyThreadSafetyMode.NONE) { getFlyoutPadding(context) }
 
     private val triangleHeight by
         lazy(LazyThreadSafetyMode.NONE) {
@@ -192,18 +209,8 @@ class BubbleBarFlyoutView(
         title.alpha = 0f
         message.alpha = 0f
         setData(flyoutMessage)
-        val txToCollapsedPosition =
-            if (positioner.isOnLeft) {
-                positioner.distanceToCollapsedPosition.x
-            } else {
-                -positioner.distanceToCollapsedPosition.x
-            }
-        // TODO: b/277815200 - before collapsing, recalculate translationToCollapsedPosition because
-        // the collapsed position may have changed
-        val tyToCollapsedPosition =
-            positioner.distanceToCollapsedPosition.y + triangleHeight - triangleOverlap
-        translationToCollapsedPosition = PointF(txToCollapsedPosition, tyToCollapsedPosition)
 
+        updateTranslationToCollapsedPosition()
         collapsedSize = positioner.collapsedSize
         collapsedCornerRadius = collapsedSize / 2
         collapsedColor = positioner.collapsedColor
@@ -212,7 +219,9 @@ class BubbleBarFlyoutView(
         // calculate the expansion progress required before we start showing the triangle as part of
         // the expansion animation
         minExpansionProgressForTriangle =
-            positioner.distanceToRevealTriangle / tyToCollapsedPosition
+            positioner.distanceToRevealTriangle / translationToCollapsedPosition.y
+
+        backgroundPaint.color = collapsedColor
 
         // post the request to start the expand animation to the looper so the view can measure
         // itself
@@ -259,6 +268,22 @@ class BubbleBarFlyoutView(
         message.text = flyoutMessage.message
     }
 
+    /**
+     * This should be called to update [translationToCollapsedPosition] before we start expanding or
+     * collapsing to make sure that we're animating the flyout to and from the correct position.
+     */
+    fun updateTranslationToCollapsedPosition() {
+        val txToCollapsedPosition =
+            if (positioner.isOnLeft) {
+                positioner.distanceToCollapsedPosition.x
+            } else {
+                -positioner.distanceToCollapsedPosition.x
+            }
+        val tyToCollapsedPosition =
+            positioner.distanceToCollapsedPosition.y + triangleHeight - triangleOverlap
+        translationToCollapsedPosition = PointF(txToCollapsedPosition, tyToCollapsedPosition)
+    }
+
     /** Updates the flyout view with the progress of the animation. */
     fun updateExpansionProgress(fraction: Float) {
         expansionProgress = fraction
@@ -301,8 +326,16 @@ class BubbleBarFlyoutView(
             height.toFloat() - triangleHeight + triangleOverlap,
         )
 
+        // transform the flyout color between the collapsed and expanded states. the color
+        // transformation completes at a faster rate (BACKGROUND_COLOR_CHANGE_RATE) than the
+        // expansion animation. this helps make the color change smooth.
         backgroundPaint.color =
-            ArgbEvaluator.getInstance().evaluate(expansionProgress, collapsedColor, backgroundColor)
+            ArgbEvaluator.getInstance()
+                .evaluate(
+                    min(expansionProgress * BACKGROUND_COLOR_CHANGE_RATE, 1f),
+                    collapsedColor,
+                    backgroundColor,
+                )
 
         canvas.save()
         canvas.translate(backgroundRectTx, backgroundRectTy)
@@ -383,18 +416,13 @@ class BubbleBarFlyoutView(
         val isNightModeOn = nightModeFlags == Configuration.UI_MODE_NIGHT_YES
         val defaultBackgroundColor = if (isNightModeOn) Color.BLACK else Color.WHITE
         val defaultTextColor = if (isNightModeOn) Color.WHITE else Color.BLACK
-        val ta =
-            context.obtainStyledAttributes(
-                intArrayOf(
-                    com.android.internal.R.attr.materialColorSurfaceContainer,
-                    com.android.internal.R.attr.materialColorOnSurface,
-                    com.android.internal.R.attr.materialColorOnSurfaceVariant,
-                )
-            )
-        backgroundColor = ta.getColor(0, defaultBackgroundColor)
-        title.setTextColor(ta.getColor(1, defaultTextColor))
-        message.setTextColor(ta.getColor(2, defaultTextColor))
-        ta.recycle()
+
+        backgroundColor =
+            context.getColor(com.android.internal.R.color.materialColorSurfaceContainer)
+        title.setTextColor(context.getColor(com.android.internal.R.color.materialColorOnSurface))
+        message.setTextColor(
+            context.getColor(com.android.internal.R.color.materialColorOnSurfaceVariant)
+        )
         backgroundPaint.color = backgroundColor
     }
 }

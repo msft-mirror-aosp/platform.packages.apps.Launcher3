@@ -36,10 +36,13 @@ import com.android.launcher3.BaseActivity
 import com.android.launcher3.LauncherAnimationRunner
 import com.android.launcher3.LauncherAnimationRunner.RemoteAnimationFactory
 import com.android.launcher3.R
+import com.android.launcher3.compat.AccessibilityManagerCompat
 import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.statemanager.StateManager
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory
 import com.android.launcher3.statemanager.StatefulContainer
+import com.android.launcher3.taskbar.TaskbarUIController
+import com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_ORDINAL
 import com.android.launcher3.util.ContextTracker
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.RunnableList
@@ -117,6 +120,7 @@ class RecentsWindowManager(context: Context) :
 
     private var callbacks: RecentsAnimationCallbacks? = null
 
+    private var taskbarUIController: TaskbarUIController? = null
     private var tisBindHelper: TISBindHelper = TISBindHelper(this) {}
 
     // Callback array that corresponds to events defined in @ActivityEvent
@@ -161,9 +165,19 @@ class RecentsWindowManager(context: Context) :
     }
 
     override fun startHome() {
+        startHome(/* finishRecentsAnimation= */ true)
+    }
+
+    fun startHome(finishRecentsAnimation: Boolean) {
         val recentsView: RecentsView<*, *> = getOverviewPanel()
+
+        if (!finishRecentsAnimation) {
+            recentsView.switchToScreenshot(/* onFinishRunnable= */ null)
+            startHomeInternal()
+            return
+        }
         recentsView.switchToScreenshot {
-            recentsView.finishRecentsAnimation(true) { startHomeInternal() }
+            recentsView.finishRecentsAnimation(/* toRecents= */ true) { startHomeInternal() }
         }
     }
 
@@ -216,6 +230,11 @@ class RecentsWindowManager(context: Context) :
             )
         }
 
+    private val onBackInvokedCallback: () -> Unit = {
+        // If we are in live tile mode, launch the live task, otherwise return home
+        recentsView?.runningTaskView?.launchWithAnimation() ?: startHome()
+    }
+
     private fun cleanupRecentsWindow() {
         RecentsWindowProtoLogProxy.logCleanup(isShowing())
         if (isShowing()) {
@@ -238,6 +257,10 @@ class RecentsWindowManager(context: Context) :
             windowView = layoutInflater.inflate(R.layout.fallback_recents_activity, null)
         }
         windowManager.addView(windowView, windowLayoutParams)
+
+        windowView
+            ?.findOnBackInvokedDispatcher()
+            ?.registerSystemOnBackInvokedCallback(onBackInvokedCallback)
 
         windowView?.systemUiVisibility =
             (View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
@@ -290,6 +313,18 @@ class RecentsWindowManager(context: Context) :
         return tisBindHelper.desktopVisibilityController
     }
 
+    override fun setTaskbarUIController(taskbarUIController: TaskbarUIController?) {
+        this.taskbarUIController = taskbarUIController
+    }
+
+    override fun getTaskbarUIController(): TaskbarUIController? {
+        return taskbarUIController
+    }
+
+    override fun getTISBindHelper(): TISBindHelper {
+        return tisBindHelper
+    }
+
     fun registerInitListener(onInitListener: Predicate<Boolean>) {
         this.onInitListener = onInitListener
     }
@@ -321,6 +356,9 @@ class RecentsWindowManager(context: Context) :
 
         if (state == HOME || state == BG_LAUNCHER) {
             cleanupRecentsWindow()
+        }
+        if (state === DEFAULT) {
+            AccessibilityManagerCompat.sendStateEventToTest(baseContext, OVERVIEW_STATE_ORDINAL)
         }
     }
 
@@ -419,7 +457,7 @@ class RecentsWindowManager(context: Context) :
     }
 
     override fun isRecentsViewVisible(): Boolean {
-        return getStateManager().state!!.isRecentsViewVisible
+        return isShowing() || getStateManager().state!!.isRecentsViewVisible
     }
 
     override fun createAtomicAnimationFactory(): AtomicAnimationFactory<RecentsState?>? {

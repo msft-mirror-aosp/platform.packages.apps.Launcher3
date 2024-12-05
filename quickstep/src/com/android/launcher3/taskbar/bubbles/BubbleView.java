@@ -49,6 +49,8 @@ import com.android.wm.shell.shared.bubbles.BubbleInfo;
 public class BubbleView extends ConstraintLayout {
 
     public static final int DEFAULT_PATH_SIZE = 100;
+    /** Duration for animating the scale of the dot and badge. */
+    private static final int SCALE_ANIMATION_DURATION_MS = 200;
 
     private final ImageView mBubbleIcon;
     private final ImageView mAppIcon;
@@ -222,12 +224,14 @@ public class BubbleView extends ConstraintLayout {
         }
         if (action == R.id.action_move_left) {
             if (mController != null) {
-                mController.updateBubbleBarLocation(BubbleBarLocation.LEFT);
+                mController.updateBubbleBarLocation(BubbleBarLocation.LEFT,
+                        BubbleBarLocation.UpdateSource.A11Y_ACTION_BUBBLE);
             }
         }
         if (action == R.id.action_move_right) {
             if (mController != null) {
-                mController.updateBubbleBarLocation(BubbleBarLocation.RIGHT);
+                mController.updateBubbleBarLocation(BubbleBarLocation.RIGHT,
+                        BubbleBarLocation.UpdateSource.A11Y_ACTION_BUBBLE);
             }
         }
         return false;
@@ -299,7 +303,8 @@ public class BubbleView extends ConstraintLayout {
         return mBubble;
     }
 
-    void updateDotVisibility(boolean animate) {
+    /** Updates the dot visibility if it's not suppressed based on whether it has unseen content. */
+    public void updateDotVisibility(boolean animate) {
         if (mDotSuppressedForBubbleUpdate) {
             // if the dot is suppressed for an update, there's nothing to do
             return;
@@ -315,24 +320,51 @@ public class BubbleView extends ConstraintLayout {
     }
 
     void setBadgeScale(float fraction) {
-        if (mAppIcon.getVisibility() == VISIBLE) {
+        if (hasBadge()) {
             mAppIcon.setScaleX(fraction);
             mAppIcon.setScaleY(fraction);
         }
     }
 
-    /**
-     * Suppresses or un-suppresses drawing the dot due to an update for this bubble.
-     *
-     * <p>If the dot is being suppressed and is already visible, it remains visible because it is
-     * used as a starting point for the animation. If the dot is being unsuppressed, it is
-     * redrawn if needed.
-     */
-    public void suppressDotForBubbleUpdate(boolean suppress) {
-        mDotSuppressedForBubbleUpdate = suppress;
-        if (!suppress) {
-            showDotIfNeeded(/* animate= */ false);
+    void showBadge() {
+        animateBadgeScale(1);
+    }
+
+    void hideBadge() {
+        animateBadgeScale(0);
+    }
+
+    private boolean hasBadge() {
+        return mAppIcon.getVisibility() == VISIBLE;
+    }
+
+    private void animateBadgeScale(float scale) {
+        if (!hasBadge()) {
+            return;
         }
+        mAppIcon.clearAnimation();
+        mAppIcon.animate()
+                .setDuration(SCALE_ANIMATION_DURATION_MS)
+                .setInterpolator(Interpolators.FAST_OUT_SLOW_IN)
+                .scaleX(scale)
+                .scaleY(scale)
+                .start();
+    }
+
+    /** Suppresses drawing the dot due to an update for this bubble. */
+    public void suppressDotForBubbleUpdate() {
+        mDotSuppressedForBubbleUpdate = true;
+        setDotScale(0);
+    }
+
+    /**
+     * Unsuppresses the dot after the bubble update finished animating.
+     *
+     * @param animate whether or not to animate the dot back in
+     */
+    public void unsuppressDotForBubbleUpdate(boolean animate) {
+        mDotSuppressedForBubbleUpdate = false;
+        showDotIfNeeded(animate);
     }
 
     boolean hasUnseenContent() {
@@ -412,7 +444,7 @@ public class BubbleView extends ConstraintLayout {
 
         clearAnimation();
         animate()
-                .setDuration(200)
+                .setDuration(SCALE_ANIMATION_DURATION_MS)
                 .setInterpolator(Interpolators.FAST_OUT_SLOW_IN)
                 .setUpdateListener((valueAnimator) -> {
                     float fraction = valueAnimator.getAnimatedFraction();
@@ -459,6 +491,7 @@ public class BubbleView extends ConstraintLayout {
         void collapse();
 
         /** Request bubble bar location to be updated to the given location */
-        void updateBubbleBarLocation(BubbleBarLocation location);
+        void updateBubbleBarLocation(BubbleBarLocation location,
+                @BubbleBarLocation.UpdateSource int source);
     }
 }
