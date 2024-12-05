@@ -613,7 +613,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // accounted for when comparing current icon count to max number of icons.
         int nonTaskIconsToBeAdded = 1;
 
-        boolean supportsOverflow = Flags.taskbarOverflow();
+        boolean supportsOverflow = Flags.taskbarOverflow() && recentTasks.size() > 1;
         int overflowSize = 0;
         if (supportsOverflow) {
             mIdealNumIcons = mNextViewIndex + recentTasks.size() + nonTaskIconsToBeAdded;
