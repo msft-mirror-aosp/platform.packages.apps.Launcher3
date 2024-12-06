@@ -63,6 +63,7 @@ import com.android.launcher3.util.Partner;
 import com.android.launcher3.util.ResourceHelper;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.WindowBounds;
+import com.android.launcher3.util.window.CachedDisplayInfo;
 import com.android.launcher3.util.window.WindowManagerProxy;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -188,7 +189,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
     @XmlRes
     public int workspaceSpecsId = INVALID_RESOURCE_HANDLE;
     @XmlRes
-    public int rowCountSpecsId = INVALID_RESOURCE_HANDLE;;
+    public int gridSizeSpecsId = INVALID_RESOURCE_HANDLE;;
     @XmlRes
     public int workspaceSpecsTwoPanelId = INVALID_RESOURCE_HANDLE;
     @XmlRes
@@ -216,7 +217,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
     /**
      * Fixed landscape mode is the landscape on the phones.
      */
-    public boolean isFixedLandscapeMode = false;
+    public boolean isFixedLandscape = false;
     private LauncherPrefChangeListener mLandscapeModePreferenceListener;
 
     public String dbFile;
@@ -240,10 +241,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
     @TargetApi(23)
     private InvariantDeviceProfile(Context context) {
         String gridName = getCurrentGridName(context);
-        String newGridName = initGrid(context, gridName);
-        if (!newGridName.equals(gridName)) {
-            LauncherPrefs.get(context).put(GRID_NAME, newGridName);
-        }
+        initGrid(context, gridName);
 
         DisplayController.INSTANCE.get(context).setPriorityListener(
                 (displayContext, info, flags) -> {
@@ -255,9 +253,12 @@ public class InvariantDeviceProfile implements SafeCloseable {
                 });
         if (Flags.oneGridSpecs()) {
             mLandscapeModePreferenceListener = (String s) -> {
-                boolean newFixedLandscapeValue = FIXED_LANDSCAPE_MODE.get(context);
-                if (isFixedLandscapeMode != newFixedLandscapeValue) {
-                    setFixedLandscape(context, newFixedLandscapeValue);
+                if (isFixedLandscape != FIXED_LANDSCAPE_MODE.get(context)) {
+                    MAIN_EXECUTOR.execute(() -> {
+                        Trace.beginSection("InvariantDeviceProfile#setFixedLandscape");
+                        onConfigChanged(context.getApplicationContext());
+                        Trace.endSection();
+                    });
                 }
             };
             LauncherPrefs.INSTANCE.get(context).addListener(
@@ -295,7 +296,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
                         gridName,
                         defaultInfo,
                         /*allowDisabledGrid=*/false,
-                        isFixedLandscapeMode
+                        FIXED_LANDSCAPE_MODE.get(context)
                 ),
                 defaultDeviceType);
 
@@ -309,7 +310,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
                         gridName,
                         myInfo,
                         /*allowDisabledGrid=*/false,
-                        isFixedLandscapeMode
+                        FIXED_LANDSCAPE_MODE.get(context)
                 ),
                 deviceType);
 
@@ -345,13 +346,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
     }
 
     private String initGrid(Context context, String gridName) {
-        if (!Flags.oneGridSpecs() && (isFixedLandscapeMode || FIXED_LANDSCAPE_MODE.get(context))) {
-            LauncherPrefs.get(context).put(FIXED_LANDSCAPE_MODE, false);
-            isFixedLandscapeMode = false;
-        }
-
         Info displayInfo = DisplayController.INSTANCE.get(context).getInfo();
-
         List<DisplayOption> allOptions = getPredefinedDeviceProfiles(
                 context,
                 gridName,
@@ -370,6 +365,11 @@ public class InvariantDeviceProfile implements SafeCloseable {
                                 ? new ArrayList<>(allOptions)
                                 : new ArrayList<>(allOptionsFilteredByColCount),
                         displayInfo.getDeviceType());
+
+        if (!displayOption.grid.name.equals(gridName)) {
+            LauncherPrefs.get(context).put(GRID_NAME, displayOption.grid.name);
+        }
+
         initGrid(context, displayInfo, displayOption);
         return displayOption.grid.name;
     }
@@ -413,7 +413,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         isScalable = closestProfile.isScalable;
         devicePaddingId = closestProfile.devicePaddingId;
         workspaceSpecsId = closestProfile.mWorkspaceSpecsId;
-        rowCountSpecsId = closestProfile.mRowCountSpecsId;
+        gridSizeSpecsId = closestProfile.mGridSizeSpecsId;
         workspaceSpecsTwoPanelId = closestProfile.mWorkspaceSpecsTwoPanelId;
         allAppsSpecsId = closestProfile.mAllAppsSpecsId;
         allAppsSpecsTwoPanelId = closestProfile.mAllAppsSpecsTwoPanelId;
@@ -473,7 +473,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         startAlignTaskbar = displayOption.startAlignTaskbar;
 
         // Fixed Landscape mode
-        isFixedLandscapeMode = FIXED_LANDSCAPE_MODE.get(context) && Flags.oneGridSpecs();
+        isFixedLandscape = closestProfile.mIsFixedLandscape;
 
         // If the partner customization apk contains any grid overrides, apply them
         // Supported overrides: numRows, numColumns, iconSize
@@ -541,24 +541,6 @@ public class InvariantDeviceProfile implements SafeCloseable {
             onConfigChanged(context.getApplicationContext());
             Trace.endSection();
         });
-    }
-
-    /**
-     * Updates the fixed landscape mode, this triggers a new IDP, reloads the database and triggers
-     * a grid migration.
-     */
-    public void setFixedLandscape(Context context, boolean isFixedLandscape) {
-        this.isFixedLandscapeMode = isFixedLandscape;
-        if (isFixedLandscape) {
-            // When in isFixedLandscape there should only be one default grid to choose from
-            MAIN_EXECUTOR.execute(() -> {
-                Trace.beginSection("InvariantDeviceProfile#setFixedLandscape");
-                onConfigChanged(context.getApplicationContext());
-                Trace.endSection();
-            });
-        } else {
-            setCurrentGrid(context, LauncherPrefs.get(context).get(GRID_NAME));
-        }
     }
 
     private Object[] toModelState() {
@@ -651,14 +633,14 @@ public class InvariantDeviceProfile implements SafeCloseable {
     }
 
     /**
-     * Parses through the xml to find GridDimension specs. Then calls findBestRowCount to get the
-     * correct row count for this GridOption.
+     * Parses through the xml to find GridSize specs. Then calls findBestGridSize to get the
+     * correct grid size for this GridOption.
      *
-     * @return the result of {@link #findBestRowCount(List, Info)}.
+     * @return the result of {@link #findBestGridSize(List, int, int)}.
      */
-    public static GridDimension getRowCount(ResourceHelper resourceHelper, Context context,
+    private static GridSize getGridSize(ResourceHelper resourceHelper, Context context,
             Info displayInfo) {
-        ArrayList<GridDimension> rowCounts = new ArrayList<>();
+        ArrayList<GridSize> gridSizes = new ArrayList<>();
 
         try (XmlResourceParser parser = resourceHelper.getXml()) {
             final int depth = parser.getDepth();
@@ -666,52 +648,49 @@ public class InvariantDeviceProfile implements SafeCloseable {
             while (((type = parser.next()) != XmlPullParser.END_TAG
                     || parser.getDepth() > depth) && type != XmlPullParser.END_DOCUMENT) {
                 if ((type == XmlPullParser.START_TAG)
-                        && "GridDimension".equals(parser.getName())) {
-                    rowCounts.add(new GridDimension(context, Xml.asAttributeSet(parser)));
+                        && "GridSize".equals(parser.getName())) {
+                    gridSizes.add(new GridSize(context, Xml.asAttributeSet(parser)));
                 }
             }
         } catch (IOException | XmlPullParserException e) {
             throw new RuntimeException(e);
         }
 
-        return findBestRowCount(rowCounts, displayInfo);
+        // Finds the min width and height in dp for all displays.
+        int[] dimens = findMinWidthAndHeightDpForDevice(displayInfo);
+
+        return findBestGridSize(gridSizes, dimens[0], dimens[1]);
     }
 
     /**
-     * @return the biggest row count that fits the display dimensions spec using GridDimension to
-     * determine that. If no best row count is found, return -1.
+     * @return the biggest grid size that fits the display dimensions.
+     * If no best grid size is found, return null.
      */
-    public static GridDimension findBestRowCount(List<GridDimension> list, Info displayInfo) {
-        int minWidthPx = Integer.MAX_VALUE;
-        int minHeightPx = Integer.MAX_VALUE;
-        for (WindowBounds bounds : displayInfo.supportedBounds) {
-            boolean isTablet = displayInfo.isTablet(bounds);
-            if (isTablet && displayInfo.getDeviceType() == TYPE_MULTI_DISPLAY) {
-                // For split displays, take half width per page
-                minWidthPx = Math.min(minWidthPx, bounds.availableSize.x / 2);
-                minHeightPx = Math.min(minHeightPx, bounds.availableSize.y);
-            } else if (!isTablet && bounds.isLandscape()) {
-                // We will use transposed layout in this case
-                minWidthPx = Math.min(minWidthPx, bounds.availableSize.y);
-                minHeightPx = Math.min(minHeightPx, bounds.availableSize.x);
-            } else {
-                minWidthPx = Math.min(minWidthPx, bounds.availableSize.x);
-                minHeightPx = Math.min(minHeightPx, bounds.availableSize.y);
-            }
-        }
-
-        GridDimension selectedRow = null;
-        for (GridDimension item: list) {
-            if (minWidthPx >= item.mMinDeviceWidthPx && minHeightPx >= item.mMinDeviceHeightPx) {
-                if (selectedRow == null || selectedRow.mNumGridDimension < item.mNumGridDimension) {
-                    selectedRow = item;
+    private static GridSize findBestGridSize(List<GridSize> list, int minWidthDp,
+            int minHeightDp) {
+        GridSize selectedGridSize = null;
+        for (GridSize item: list) {
+            if (minWidthDp >= item.mMinDeviceWidthDp && minHeightDp >= item.mMinDeviceHeightDp) {
+                if (selectedGridSize == null
+                        || (selectedGridSize.mNumColumns <= item.mNumColumns
+                        && selectedGridSize.mNumRows <= item.mNumRows)) {
+                    selectedGridSize = item;
                 }
             }
         }
-        if (selectedRow != null) {
-            return selectedRow;
+        return selectedGridSize;
+    }
+
+    private static int[] findMinWidthAndHeightDpForDevice(Info displayInfo) {
+        int minDisplayWidthDp = Integer.MAX_VALUE;
+        int minDisplayHeightDp = Integer.MAX_VALUE;
+        for (CachedDisplayInfo display: displayInfo.getAllDisplays()) {
+            minDisplayWidthDp = Math.min(minDisplayWidthDp,
+                    (int) dpiFromPx(display.size.x, DisplayMetrics.DENSITY_DEVICE_STABLE));
+            minDisplayHeightDp = Math.min(minDisplayHeightDp,
+                    (int) dpiFromPx(display.size.y, DisplayMetrics.DENSITY_DEVICE_STABLE));
         }
-        return null;
+        return new int[]{minDisplayWidthDp, minDisplayHeightDp};
     }
 
     /**
@@ -759,7 +738,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         return parseAllDefinedGridOptions(context, displayInfo)
                 .stream()
                 .filter(go -> go.isEnabled(deviceType))
-                .filter(go -> go.filterByFlag(deviceType, isFixedLandscapeMode))
+                .filter(go -> go.filterByFlag(deviceType, isFixedLandscape))
                 .collect(Collectors.toList());
     }
 
@@ -1029,7 +1008,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
         private final int mWorkspaceCellSpecsTwoPanelId;
         private final int mAllAppsCellSpecsId;
         private final int mAllAppsCellSpecsTwoPanelId;
-        private final int mRowCountSpecsId;
+        private final int mGridSizeSpecsId;
         private final boolean mIsFixedLandscape;
         private final boolean mIsOldGrid;
 
@@ -1040,18 +1019,20 @@ public class InvariantDeviceProfile implements SafeCloseable {
             title = a.getString(R.styleable.GridDisplayOption_title);
             deviceCategory = a.getInt(R.styleable.GridDisplayOption_deviceCategory,
                     DEVICE_CATEGORY_ALL);
-            mRowCountSpecsId = a.getResourceId(
-                    R.styleable.GridDisplayOption_rowCountSpecsId, INVALID_RESOURCE_HANDLE);
+            mGridSizeSpecsId = a.getResourceId(
+                    R.styleable.GridDisplayOption_gridSizeSpecsId, INVALID_RESOURCE_HANDLE);
             mIsDualGrid = a.getBoolean(R.styleable.GridDisplayOption_isDualGrid, false);
-            if (mRowCountSpecsId != INVALID_RESOURCE_HANDLE) {
-                ResourceHelper resourceHelper = new ResourceHelper(context, mRowCountSpecsId);
-                GridDimension numR = getRowCount(resourceHelper, context, displayInfo);
-                numRows = numR.mNumGridDimension;
-                dbFile = numR.mDbFile;
-                defaultLayoutId = numR.mDefaultLayoutId;
-                demoModeLayoutId = numR.mDemoModeLayoutId;
+            if (mGridSizeSpecsId != INVALID_RESOURCE_HANDLE) {
+                ResourceHelper resourceHelper = new ResourceHelper(context, mGridSizeSpecsId);
+                GridSize gridSize = getGridSize(resourceHelper, context, displayInfo);
+                numColumns = gridSize.mNumColumns;
+                numRows = gridSize.mNumRows;
+                dbFile = gridSize.mDbFile;
+                defaultLayoutId = gridSize.mDefaultLayoutId;
+                demoModeLayoutId = gridSize.mDemoModeLayoutId;
             } else {
                 numRows = a.getInt(R.styleable.GridDisplayOption_numRows, 0);
+                numColumns = a.getInt(R.styleable.GridDisplayOption_numColumns, 0);
                 dbFile = a.getString(R.styleable.GridDisplayOption_dbFile);
                 defaultLayoutId = a.getResourceId(
                         R.styleable.GridDisplayOption_defaultLayoutId, 0);
@@ -1059,7 +1040,6 @@ public class InvariantDeviceProfile implements SafeCloseable {
                         R.styleable.GridDisplayOption_demoModeLayoutId, defaultLayoutId);
             }
 
-            numColumns = a.getInt(R.styleable.GridDisplayOption_numColumns, 0);
             numSearchContainerColumns = a.getInt(
                     R.styleable.GridDisplayOption_numSearchContainerColumns, numColumns);
 
@@ -1222,7 +1202,7 @@ public class InvariantDeviceProfile implements SafeCloseable {
             }
 
             // Here we return true if we want to show the new grids.
-            if (mRowCountSpecsId != INVALID_RESOURCE_HANDLE) {
+            if (mGridSizeSpecsId != INVALID_RESOURCE_HANDLE) {
                 return Flags.oneGridSpecs();
             }
 
@@ -1235,26 +1215,28 @@ public class InvariantDeviceProfile implements SafeCloseable {
         }
     }
 
-    public static final class GridDimension {
-        final int mNumGridDimension;
-        final float mMinDeviceWidthPx;
-        final float mMinDeviceHeightPx;
+    public static final class GridSize {
+        final int mNumRows;
+        final int mNumColumns;
+        final float mMinDeviceWidthDp;
+        final float mMinDeviceHeightDp;
         final String mDbFile;
         final int mDefaultLayoutId;
         final int mDemoModeLayoutId;
 
 
-        GridDimension(Context context, AttributeSet attrs) {
-            TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.GridDimension);
+        GridSize(Context context, AttributeSet attrs) {
+            TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.GridSize);
 
-            mNumGridDimension = (int) a.getFloat(R.styleable.GridDimension_numGridDimension, 0);
-            mMinDeviceWidthPx = a.getFloat(R.styleable.GridDimension_minDeviceWidthPx, 0);
-            mMinDeviceHeightPx = a.getFloat(R.styleable.GridDimension_minDeviceHeightPx, 0);
-            mDbFile = a.getString(R.styleable.GridDimension_dbFile);
+            mNumRows = (int) a.getFloat(R.styleable.GridSize_numGridRows, 0);
+            mNumColumns = (int) a.getFloat(R.styleable.GridSize_numGridColumns, 0);
+            mMinDeviceWidthDp = a.getFloat(R.styleable.GridSize_minDeviceWidthDp, 0);
+            mMinDeviceHeightDp = a.getFloat(R.styleable.GridSize_minDeviceHeightDp, 0);
+            mDbFile = a.getString(R.styleable.GridSize_dbFile);
             mDefaultLayoutId = a.getResourceId(
-                    R.styleable.GridDimension_defaultLayoutId, 0);
+                    R.styleable.GridSize_defaultLayoutId, 0);
             mDemoModeLayoutId = a.getResourceId(
-                    R.styleable.GridDimension_demoModeLayoutId, mDefaultLayoutId);
+                    R.styleable.GridSize_demoModeLayoutId, mDefaultLayoutId);
 
             a.recycle();
         }

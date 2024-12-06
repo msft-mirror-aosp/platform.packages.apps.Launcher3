@@ -18,6 +18,7 @@ package com.android.launcher3.taskbar;
 
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_LONG_PRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP;
+import static com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_TASKBAR_OVERFLOW;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -91,6 +92,7 @@ public class TaskbarViewCallbacks {
     public View.OnTouchListener getTaskbarDividerRightClickListener() {
         return (v, event) -> {
             if (event.isFromSource(InputDevice.SOURCE_MOUSE)
+                    && event.getAction() == MotionEvent.ACTION_DOWN
                     && event.getButtonState() == MotionEvent.BUTTON_SECONDARY) {
                 mControllers.taskbarPinningController.showPinningView(v, getDividerCenterX());
                 return true;
@@ -179,6 +181,9 @@ public class TaskbarViewCallbacks {
         if (mTaskbarView.getTaskbarOverflowView() != null) {
             mTaskbarView.getTaskbarOverflowView().setIsActive(
                     !mTaskbarView.getTaskbarOverflowView().getIsActive());
+            mControllers.taskbarAutohideSuspendController
+                    .updateFlag(FLAG_AUTOHIDE_SUSPEND_TASKBAR_OVERFLOW,
+                            mTaskbarView.getTaskbarOverflowView().getIsActive());
         }
         mControllers.keyboardQuickSwitchController.toggleQuickSwitchViewForTaskbar(
                 mControllers.taskbarViewController.getTaskIdsForPinnedApps(),
@@ -189,6 +194,8 @@ public class TaskbarViewCallbacks {
         if (mTaskbarView.getTaskbarOverflowView() != null) {
             mTaskbarView.getTaskbarOverflowView().setIsActive(false);
         }
+        mControllers.taskbarAutohideSuspendController.updateFlag(
+                FLAG_AUTOHIDE_SUSPEND_TASKBAR_OVERFLOW, false);
     }
 
     private float getDividerCenterX() {
@@ -202,6 +209,10 @@ public class TaskbarViewCallbacks {
     private class TaskbarViewGestureListener extends GestureDetector.SimpleOnGestureListener {
         @Override
         public boolean onDown(@NonNull MotionEvent event) {
+            if (event.isFromSource(InputDevice.SOURCE_MOUSE)
+                    && event.getButtonState() == MotionEvent.BUTTON_SECONDARY) {
+                maybeShowPinningView(event);
+            }
             return true;
         }
 
@@ -211,11 +222,16 @@ public class TaskbarViewCallbacks {
         }
 
         @Override
-        public void onLongPress(MotionEvent event) {
-            if (DisplayController.isPinnedTaskbar(mActivity)) {
-                mControllers.taskbarPinningController.showPinningView(mTaskbarView,
-                        event.getRawX());
+        public void onLongPress(@NonNull MotionEvent event) {
+            maybeShowPinningView(event);
+        }
+
+        private void maybeShowPinningView(@NonNull MotionEvent event) {
+            if (!DisplayController.isPinnedTaskbar(mActivity) || mTaskbarView.isEventOverAnyItem(
+                    event)) {
+                return;
             }
+            mControllers.taskbarPinningController.showPinningView(mTaskbarView, event.getRawX());
         }
     }
 }

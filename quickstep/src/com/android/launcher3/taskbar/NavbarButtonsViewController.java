@@ -1314,7 +1314,8 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             // If the task bar is not start aligned, the navigation bar is located in the center
             // between the taskbar and screen edges, depending on the bubble bar location.
             float navbarWidth = mNavButtonContainer.getWidth();
-            Rect taskbarBounds = mControllers.taskbarViewController.getIconLayoutBounds();
+            Rect taskbarBounds = mControllers.taskbarViewController
+                    .getTransientTaskbarIconLayoutBoundsInParent();
             if (isNavbarOnRight) {
                 if (mNavButtonsView.isLayoutRtl()) {
                     float taskBarEnd = taskbarBounds.right;
@@ -1334,8 +1335,10 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     public void onLayoutsUpdated() {
         // no need to do anything if on phone, or if taskbar or navbar views were not placed on
         // screen.
+        Rect transientTaskbarIconLayoutBoundsInParent = mControllers.taskbarViewController
+                .getTransientTaskbarIconLayoutBoundsInParent();
         if (mContext.getDeviceProfile().isPhone
-                || mControllers.taskbarViewController.getIconLayoutBounds().isEmpty()
+                || transientTaskbarIconLayoutBoundsInParent.isEmpty()
                 || mNavButtonsView.getWidth() == 0) {
             return;
         }

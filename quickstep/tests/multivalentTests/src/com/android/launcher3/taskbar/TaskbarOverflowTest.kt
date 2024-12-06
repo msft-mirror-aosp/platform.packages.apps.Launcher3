@@ -16,6 +16,7 @@
 
 package com.android.launcher3.taskbar
 
+import android.animation.AnimatorTestRule
 import android.content.ComponentName
 import android.content.Intent
 import android.platform.test.annotations.EnableFlags
@@ -75,7 +76,9 @@ class TaskbarOverflowTest {
 
     @get:Rule(order = 3) val taskbarModeRule = TaskbarModeRule(context)
 
-    @get:Rule(order = 4) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
+    @get:Rule(order = 4) val animatorTestRule = AnimatorTestRule(this)
+
+    @get:Rule(order = 5) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
 
     @InjectController lateinit var taskbarViewController: TaskbarViewController
     @InjectController lateinit var recentAppsController: TaskbarRecentAppsController
@@ -208,7 +211,10 @@ class TaskbarOverflowTest {
         val initialNumIcons = currentNumberOfTaskbarIcons
         val initialMaxNumIconViews = addRunningAppsAndVerifyOverflowState(5)
 
-        runOnMainSync { bubbleBarViewController.setHiddenForBubbles(true) }
+        runOnMainSync {
+            bubbleBarViewController.setHiddenForBubbles(true)
+            animatorTestRule.advanceTimeBy(150)
+        }
 
         val maxNumIconViews = maxNumberOfTaskbarIcons
         assertThat(maxNumIconViews).isGreaterThan(initialMaxNumIconViews)
@@ -226,7 +232,10 @@ class TaskbarOverflowTest {
         val initialNumIcons = currentNumberOfTaskbarIcons
         val initialMaxNumIconViews = addRunningAppsAndVerifyOverflowState(5)
 
-        runOnMainSync { bubbleBarViewController.setHiddenForBubbles(true) }
+        runOnMainSync {
+            bubbleBarViewController.setHiddenForBubbles(true)
+            animatorTestRule.advanceTimeBy(150)
+        }
 
         val maxNumIconViews = maxNumberOfTaskbarIcons
         assertThat(maxNumIconViews).isGreaterThan(initialMaxNumIconViews)
@@ -272,7 +281,8 @@ class TaskbarOverflowTest {
     private val taskbarIconsCentered: Boolean
         get() {
             return getOnUiThread {
-                val iconLayoutBounds = taskbarViewController.iconLayoutBounds
+                val iconLayoutBounds =
+                    taskbarViewController.transientTaskbarIconLayoutBoundsInParent
                 val availableWidth = taskbarUnitTestRule.activityContext.deviceProfile.widthPx
                 iconLayoutBounds.left - (availableWidth - iconLayoutBounds.right) < 2
             }
@@ -282,7 +292,7 @@ class TaskbarOverflowTest {
         get() {
             return getOnUiThread {
                 taskbarUnitTestRule.activityContext.deviceProfile.widthPx -
-                    taskbarViewController.iconLayoutBounds.right
+                    taskbarViewController.transientTaskbarIconLayoutBoundsInParent.right
             }
         }
 

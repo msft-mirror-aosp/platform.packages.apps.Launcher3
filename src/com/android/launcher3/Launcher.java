@@ -46,6 +46,7 @@ import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_PENDING_ACTIVITY_RESULT;
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_PENDING_REQUEST_ARGS;
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_PENDING_REQUEST_CODE;
+import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_RECREATE_TO_UPDATE_THEME;
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_WIDGET_PANEL;
 import static com.android.launcher3.LauncherConstants.TraceEvents.COLD_STARTUP_TRACE_COOKIE;
 import static com.android.launcher3.LauncherConstants.TraceEvents.COLD_STARTUP_TRACE_METHOD_NAME;
@@ -422,6 +423,8 @@ public class Launcher extends StatefulActivity<LauncherState>
     private final SettingsCache.OnChangeListener mNaturalScrollingChangedListener =
             enabled -> mIsNaturalScrollingEnabled = enabled;
 
+    private boolean mRecreateToUpdateTheme = false;
+
     public static Launcher getLauncher(Context context) {
         return fromContext(context);
     }
@@ -789,7 +792,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             LauncherPrefs.get(this).put(LauncherPrefs.ALLOW_ROTATION, false);
         }
         getRotationHelper().setFixedLandscape(
-                Objects.requireNonNull(mDeviceProfile.inv).isFixedLandscapeMode
+                Objects.requireNonNull(mDeviceProfile.inv).isFixedLandscape
         );
     }
 
@@ -1352,7 +1355,8 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         NonConfigInstance lastInstance = (NonConfigInstance) getLastNonConfigurationInstance();
         boolean forceRestore = lastInstance != null
-                && (lastInstance.config.diff(mOldConfig) & CONFIG_UI_MODE) != 0;
+                && ((lastInstance.config.diff(mOldConfig) & CONFIG_UI_MODE) != 0
+                || savedState.getBoolean(RUNTIME_STATE_RECREATE_TO_UPDATE_THEME));
         if (forceRestore || !state.shouldDisableRestore()) {
             mStateManager.goToState(state, false /* animated */);
         }
@@ -1747,6 +1751,12 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
+    protected void recreateToUpdateTheme() {
+        mRecreateToUpdateTheme = true;
+        super.recreateToUpdateTheme();
+    }
+
+    @Override
     public void onRestoreInstanceState(Bundle state) {
         super.onRestoreInstanceState(state);
         IntSet synchronouslyBoundPages = mModelCallbacks.getSynchronouslyBoundPages();
@@ -1790,6 +1800,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (mPendingActivityResult != null) {
             outState.putParcelable(RUNTIME_STATE_PENDING_ACTIVITY_RESULT, mPendingActivityResult);
         }
+
+        outState.putBoolean(RUNTIME_STATE_RECREATE_TO_UPDATE_THEME, mRecreateToUpdateTheme);
 
         super.onSaveInstanceState(outState);
     }

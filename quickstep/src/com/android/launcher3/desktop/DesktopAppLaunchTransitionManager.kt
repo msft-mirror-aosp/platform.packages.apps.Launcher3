@@ -45,7 +45,8 @@ class DesktopAppLaunchTransitionManager(
         }
         remoteWindowLimitUnminimizeTransition =
             RemoteTransition(
-                DesktopAppLaunchTransition(context, MAIN_EXECUTOR, AppLaunchType.UNMINIMIZE)
+                DesktopAppLaunchTransition(context, MAIN_EXECUTOR, AppLaunchType.UNMINIMIZE),
+                "DesktopWindowLimitUnminimize"
             )
         systemUiProxy.registerRemoteTransition(
             remoteWindowLimitUnminimizeTransition,
@@ -67,7 +68,8 @@ class DesktopAppLaunchTransitionManager(
 
     private fun shouldRegisterTransitions(): Boolean =
         DesktopModeStatus.canEnterDesktopMode(context) &&
-            DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS.isTrue
+            (DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS.isTrue ||
+                DesktopModeFlags.ENABLE_DESKTOP_APP_LAUNCH_TRANSITIONS_BUGFIX.isTrue)
 
     companion object {
         private fun buildAppLaunchFilter(): TransitionFilter {
