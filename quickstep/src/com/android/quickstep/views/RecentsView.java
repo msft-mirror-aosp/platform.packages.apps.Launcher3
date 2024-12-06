@@ -1510,6 +1510,19 @@ public abstract class RecentsView<
     }
 
     /**
+     * Launch DesktopTaskView if found.
+     * @return provides runnable list to attach runnable at end of Desktop Mode launch
+     */
+    public RunnableList launchDesktopTaskView() {
+        for (TaskView taskView : getTaskViews()) {
+            if (taskView instanceof DesktopTaskView) {
+                return taskView.launchWithAnimation();
+            }
+        }
+        return null;
+    }
+
+    /**
      * Returns a {@link TaskView} that has taskId matching {@code taskId} or null if no match.
      */
     @Nullable
@@ -1957,18 +1970,20 @@ public abstract class RecentsView<
         }
 
         // Keep same previous focused task
-        TaskView newFocusedTaskView = getTaskViewByTaskIds(focusedTaskIds);
-        if (enableLargeDesktopWindowingTile() && newFocusedTaskView instanceof DesktopTaskView) {
-            newFocusedTaskView = null;
+        TaskView newFocusedTaskView = null;
+        if (!enableGridOnlyOverview()) {
+            newFocusedTaskView = getTaskViewByTaskIds(focusedTaskIds);
+            if (enableLargeDesktopWindowingTile()
+                    && newFocusedTaskView instanceof DesktopTaskView) {
+                newFocusedTaskView = null;
+            }
+            // If the list changed, maybe the focused task doesn't exist anymore.
+            if (newFocusedTaskView == null) {
+                newFocusedTaskView = mUtils.getExpectedFocusedTask(getTaskViews());
+            }
         }
-        // If the list changed, maybe the focused task doesn't exist anymore
-        int newFocusedTaskViewIndex = mUtils.getFocusedTaskIndex(taskGroups);
-        if (newFocusedTaskView == null && getTaskViewCount() > newFocusedTaskViewIndex) {
-            newFocusedTaskView = getTaskViewAt(newFocusedTaskViewIndex);
-        }
-
-        setFocusedTaskViewId(newFocusedTaskView != null && !enableGridOnlyOverview()
-                ? newFocusedTaskView.getTaskViewId() : INVALID_TASK_ID);
+        setFocusedTaskViewId(
+                newFocusedTaskView != null ? newFocusedTaskView.getTaskViewId() : INVALID_TASK_ID);
 
         updateTaskSize();
         updateChildTaskOrientations();
@@ -1987,6 +2002,7 @@ public abstract class RecentsView<
                     // for cases where the running task isn't included in this load plan (e.g. if
                     // the current running task is excludedFromRecents.)
                     showCurrentTask(mActiveGestureRunningTasks, "applyLoadPlan");
+                    newRunningTaskView = getRunningTaskView();
                 } else {
                     setRunningTaskViewId(INVALID_TASK_ID);
                 }
@@ -2006,12 +2022,9 @@ public abstract class RecentsView<
         } else if (previousFocusedPage != INVALID_PAGE) {
             targetPage = previousFocusedPage;
         } else {
-            // Set the current page to the running task, but not if settling on new task.
-            if (hasAllValidTaskIds(runningTaskIds)) {
-                targetPage = indexOfChild(newRunningTaskView);
-            } else if (getTaskViewCount() > newFocusedTaskViewIndex) {
-                targetPage = indexOfChild(requireTaskViewAt(newFocusedTaskViewIndex));
-            }
+            targetPage = indexOfChild(
+                    mUtils.getExpectedCurrentTask(newRunningTaskView, newFocusedTaskView,
+                            getTaskViews()));
         }
         if (targetPage != -1 && mCurrentPage != targetPage) {
             int finalTargetPage = targetPage;
@@ -5888,11 +5901,18 @@ public abstract class RecentsView<
     }
 
     /**
+     * Finish recents animation.
+     */
+    public void finishRecentsAnimation(boolean toRecents, boolean shouldPip,
+            @Nullable Runnable onFinishComplete) {
+        finishRecentsAnimation(toRecents, shouldPip, false, onFinishComplete);
+    }
+    /**
      * NOTE: Whatever value gets passed through to the toRecents param may need to also be set on
      * {@link #mRecentsAnimationController#setWillFinishToHome}.
      */
     public void finishRecentsAnimation(boolean toRecents, boolean shouldPip,
-            @Nullable Runnable onFinishComplete) {
+            boolean allAppTargetsAreTranslucent, @Nullable Runnable onFinishComplete) {
         Log.d(TAG, "finishRecentsAnimation - mRecentsAnimationController: "
                 + mRecentsAnimationController);
         // TODO(b/197232424#comment#10) Move this back into onRecentsAnimationComplete(). Maybe?
@@ -5906,8 +5926,9 @@ public abstract class RecentsView<
         }
 
         final boolean sendUserLeaveHint = toRecents && shouldPip;
-        if (sendUserLeaveHint) {
+        if (sendUserLeaveHint && !com.android.wm.shell.Flags.enablePip2()) {
             // Notify the SysUI to use fade-in animation when entering PiP from live tile.
+            // Note: PiP2 handles entering differently, so skip if enable_pip2=true.
             final SystemUiProxy systemUiProxy = SystemUiProxy.INSTANCE.get(getContext());
             systemUiProxy.setPipAnimationTypeToAlpha();
             systemUiProxy.setShelfHeight(true, mContainer.getDeviceProfile().hotseatBarSizePx);
@@ -5924,7 +5945,7 @@ public abstract class RecentsView<
                         tx, null /* overlay */);
             }
         }
-        mRecentsAnimationController.finish(toRecents, () -> {
+        mRecentsAnimationController.finish(toRecents, allAppTargetsAreTranslucent, () -> {
             if (onFinishComplete != null) {
                 onFinishComplete.run();
             }

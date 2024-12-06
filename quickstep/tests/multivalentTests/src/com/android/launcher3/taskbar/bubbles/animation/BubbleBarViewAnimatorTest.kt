@@ -23,6 +23,7 @@ import android.graphics.PointF
 import android.graphics.drawable.ColorDrawable
 import android.view.LayoutInflater
 import android.view.View
+import android.view.View.INVISIBLE
 import android.view.View.VISIBLE
 import android.widget.FrameLayout
 import android.widget.TextView
@@ -78,7 +79,7 @@ class BubbleBarViewAnimatorTest {
     private lateinit var flyoutContainer: FrameLayout
     private lateinit var bubbleStashController: BubbleStashController
     private lateinit var flyoutController: BubbleBarFlyoutController
-    private val onExpandedNoOp = Runnable {}
+    private val emptyRunnable = Runnable {}
 
     private val flyoutView: View?
         get() = flyoutContainer.findViewById(R.id.bubble_bar_flyout_view)
@@ -106,7 +107,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -162,7 +164,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -219,7 +222,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -268,7 +272,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -320,7 +325,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -359,7 +365,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpanded,
+                onExpanded = onExpanded,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -405,7 +412,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpanded,
+                onExpanded = onExpanded,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -457,7 +465,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpanded,
+                onExpanded = onExpanded,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -508,17 +517,21 @@ class BubbleBarViewAnimatorTest {
 
         val barAnimator = PhysicsAnimator.getInstance(bubbleBarView)
 
+        var notifiedBubbleBarVisible = false
+        val onBubbleBarVisible = Runnable { notifiedBubbleBarVisible = true }
         val animator =
             BubbleBarViewAnimator(
                 bubbleBarView,
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = onBubbleBarVisible,
                 animatorScheduler,
             )
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleBarView.visibility = INVISIBLE
             animator.animateToInitialState(bubble, isInApp = true, isExpanding = false)
         }
 
@@ -546,6 +559,8 @@ class BubbleBarViewAnimatorTest {
         assertThat(bubbleBarView.alpha).isEqualTo(0)
         assertThat(handle.translationY).isEqualTo(0)
         assertThat(handle.alpha).isEqualTo(1)
+        assertThat(bubbleBarView.visibility).isEqualTo(VISIBLE)
+        assertThat(notifiedBubbleBarVisible).isTrue()
 
         verify(bubbleStashController).stashBubbleBarImmediate()
     }
@@ -571,7 +586,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpanded,
+                onExpanded = onExpanded,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -607,7 +623,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -653,7 +670,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpanded,
+                onExpanded = onExpanded,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -703,7 +721,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpanded,
+                onExpanded = onExpanded,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -751,7 +770,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -807,7 +827,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpanded,
+                onExpanded = onExpanded,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -862,7 +883,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpanded,
+                onExpanded = onExpanded,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -927,7 +949,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpanded,
+                onExpanded = onExpanded,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -987,7 +1010,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -1057,7 +1081,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -1133,7 +1158,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -1220,7 +1246,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
@@ -1334,7 +1361,8 @@ class BubbleBarViewAnimatorTest {
                 bubbleStashController,
                 flyoutController,
                 bubbleBarParentViewController,
-                onExpandedNoOp,
+                onExpanded = emptyRunnable,
+                onBubbleBarVisible = emptyRunnable,
                 animatorScheduler,
             )
 
