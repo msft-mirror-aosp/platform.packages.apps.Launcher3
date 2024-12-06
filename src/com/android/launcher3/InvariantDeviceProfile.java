@@ -16,6 +16,7 @@
 
 package com.android.launcher3;
 
+import static com.android.launcher3.LauncherPrefs.DB_FILE;
 import static com.android.launcher3.LauncherPrefs.FIXED_LANDSCAPE_MODE;
 import static com.android.launcher3.LauncherPrefs.GRID_NAME;
 import static com.android.launcher3.Utilities.dpiFromPx;
@@ -53,6 +54,7 @@ import androidx.core.content.res.ResourcesCompat;
 
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.DotRenderer;
+import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.DeviceGridState;
 import com.android.launcher3.provider.RestoreDbTask;
 import com.android.launcher3.testing.shared.ResourceUtils;
@@ -85,6 +87,8 @@ public class InvariantDeviceProfile implements SafeCloseable {
     // We do not need any synchronization for this variable as its only written on UI thread.
     public static final MainThreadInitializedObject<InvariantDeviceProfile> INSTANCE =
             new MainThreadInitializedObject<>(InvariantDeviceProfile::new);
+
+    public static final String GRID_NAME_PREFS_KEY = "idp_grid_name";
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({TYPE_PHONE, TYPE_MULTI_DISPLAY, TYPE_TABLET})
@@ -241,8 +245,11 @@ public class InvariantDeviceProfile implements SafeCloseable {
     @TargetApi(23)
     private InvariantDeviceProfile(Context context) {
         String gridName = getCurrentGridName(context);
+        FileLog.d(TAG, "New InvariantDeviceProfile, before initGrid(): "
+                + "gridName:" + gridName
+                + ", LauncherPrefs GRID_NAME:" + LauncherPrefs.get(context).get(GRID_NAME)
+                + ", LauncherPrefs DB_FILE:" + LauncherPrefs.get(context).get(DB_FILE));
         initGrid(context, gridName);
-
         DisplayController.INSTANCE.get(context).setPriorityListener(
                 (displayContext, info, flags) -> {
                     if ((flags & (CHANGE_DENSITY | CHANGE_SUPPORTED_BOUNDS
@@ -371,6 +378,10 @@ public class InvariantDeviceProfile implements SafeCloseable {
         }
 
         initGrid(context, displayInfo, displayOption);
+        FileLog.d(TAG, "initGrid: "
+                + "gridName:" + gridName
+                + ", LauncherPrefs GRID_NAME:" + LauncherPrefs.get(context).get(GRID_NAME)
+                + ", LauncherPrefs DB_FILE:" + LauncherPrefs.get(context).get(DB_FILE));
         return displayOption.grid.name;
     }
 
