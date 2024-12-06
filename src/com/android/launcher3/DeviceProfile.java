@@ -425,7 +425,9 @@ public class DeviceProfile {
                 && WindowManagerProxy.INSTANCE.get(context).isTaskbarDrawnInProcess();
 
         // Some more constants.
-        context = getContext(context, info, isVerticalBarLayout() || (isTablet && isLandscape)
+        context = getContext(context, info, inv.isFixedLandscape
+                        || isVerticalBarLayout()
+                        || (isTablet && isLandscape)
                         ? Configuration.ORIENTATION_LANDSCAPE
                         : Configuration.ORIENTATION_PORTRAIT,
                 windowBounds);
