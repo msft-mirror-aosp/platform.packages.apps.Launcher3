@@ -65,31 +65,18 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         val heightSize = MeasureSpec.getSize(heightMeasureSpec)
         setMeasuredDimension(widthSize, heightSize)
         val splitBoundsConfig = splitBoundsConfig ?: return
-        val initSplitTaskId = getThisTaskCurrentlyInSplitSelection()
-        if (initSplitTaskId == INVALID_TASK_ID) {
-            pagedOrientationHandler.measureGroupedTaskViewThumbnailBounds(
-                taskContainers[0].snapshotView,
-                taskContainers[1].snapshotView,
-                widthSize,
-                heightSize,
-                splitBoundsConfig,
-                container.deviceProfile,
-                layoutDirection == LAYOUT_DIRECTION_RTL
-            )
-        } else {
-            // Currently being split with this taskView, let the non-split selected thumbnail
-            // take up full thumbnail area
-            taskContainers
-                .firstOrNull { it.task.key.id != initSplitTaskId }
-                ?.snapshotView
-                ?.measure(
-                    widthMeasureSpec,
-                    MeasureSpec.makeMeasureSpec(
-                        heightSize - container.deviceProfile.overviewTaskThumbnailTopMarginPx,
-                        MeasureSpec.EXACTLY
-                    )
-                )
-        }
+        val inSplitSelection = getThisTaskCurrentlyInSplitSelection() != INVALID_TASK_ID
+        pagedOrientationHandler.measureGroupedTaskViewThumbnailBounds(
+            taskContainers[0].snapshotView,
+            taskContainers[1].snapshotView,
+            widthSize,
+            heightSize,
+            splitBoundsConfig,
+            container.deviceProfile,
+            layoutDirection == LAYOUT_DIRECTION_RTL,
+            inSplitSelection,
+        )
+
         if (!enableOverviewIconMenu()) {
             updateIconPlacement()
         }
@@ -117,7 +104,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                     R.id.show_windows,
                     R.id.digital_wellbeing_toast,
                     STAGE_POSITION_TOP_OR_LEFT,
-                    taskOverlayFactory
+                    taskOverlayFactory,
                 ),
                 createTaskContainer(
                     secondaryTask,
@@ -126,14 +113,12 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                     R.id.show_windows_right,
                     R.id.bottomRight_digital_wellbeing_toast,
                     STAGE_POSITION_BOTTOM_OR_RIGHT,
-                    taskOverlayFactory
-                )
+                    taskOverlayFactory,
+                ),
             )
-        taskContainers.forEach { it.bind() }
-
         this.splitBoundsConfig = splitBoundsConfig
         taskContainers.forEach { it.digitalWellBeingToast?.splitBounds = splitBoundsConfig }
-        setOrientationState(orientedState)
+        onBind(orientedState)
     }
 
     override fun setOrientationState(orientationState: RecentsOrientedState) {
@@ -144,7 +129,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                         container.deviceProfile,
                         it,
                         layoutParams.width,
-                        layoutParams.height
+                        layoutParams.height,
                     )
                 val iconViewMarginStart =
                     resources.getDimensionPixelSize(
@@ -173,13 +158,15 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         val splitBoundsConfig = splitBoundsConfig ?: return
         val taskIconHeight = container.deviceProfile.overviewTaskIconSizePx
         val isRtl = layoutDirection == LAYOUT_DIRECTION_RTL
+        val inSplitSelection = getThisTaskCurrentlyInSplitSelection() != INVALID_TASK_ID
+
         if (enableOverviewIconMenu()) {
             val groupedTaskViewSizes =
                 pagedOrientationHandler.getGroupedTaskViewSizes(
                     container.deviceProfile,
                     splitBoundsConfig,
                     layoutParams.width,
-                    layoutParams.height
+                    layoutParams.height,
                 )
             pagedOrientationHandler.setSplitIconParams(
                 taskContainers[0].iconView.asView(),
@@ -191,7 +178,8 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 layoutParams.width,
                 isRtl,
                 container.deviceProfile,
-                splitBoundsConfig
+                splitBoundsConfig,
+                inSplitSelection,
             )
         } else {
             pagedOrientationHandler.setSplitIconParams(
@@ -204,7 +192,8 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 measuredWidth,
                 isRtl,
                 container.deviceProfile,
-                splitBoundsConfig
+                splitBoundsConfig,
+                inSplitSelection,
             )
         }
     }
@@ -225,7 +214,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         InteractionJankMonitorWrapper.begin(
             this,
             Cuj.CUJ_SPLIT_SCREEN_ENTER,
-            "Enter form GroupedTaskView"
+            "Enter form GroupedTaskView",
         )
         launchTaskInternal(isQuickSwitch = false, launchingExistingTaskView = true) {
             endCallback.executeAllAndDestroy()
@@ -239,7 +228,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
 
     override fun launchWithoutAnimation(
         isQuickSwitch: Boolean,
-        callback: (launched: Boolean) -> Unit
+        callback: (launched: Boolean) -> Unit,
     ) {
         launchTaskInternal(isQuickSwitch, launchingExistingTaskView = false, callback)
     }
@@ -253,7 +242,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
     private fun launchTaskInternal(
         isQuickSwitch: Boolean,
         launchingExistingTaskView: Boolean,
-        callback: (launched: Boolean) -> Unit
+        callback: (launched: Boolean) -> Unit,
     ) {
         recentsView?.let {
             it.splitSelectController.launchExistingSplitPair(
@@ -263,11 +252,11 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 STAGE_POSITION_TOP_OR_LEFT,
                 callback,
                 isQuickSwitch,
-                snapPosition
+                snapPosition,
             )
             Log.d(
                 TAG,
-                "launchTaskInternal - launchExistingSplitPair: ${taskIds.contentToString()}, launchingExistingTaskView: $launchingExistingTaskView"
+                "launchTaskInternal - launchExistingSplitPair: ${taskIds.contentToString()}, launchingExistingTaskView: $launchingExistingTaskView",
             )
         }
     }

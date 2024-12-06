@@ -192,7 +192,9 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
 
 
     public void onDestroy() {
-        mRegionSamplingHelper.stopAndDestroy();
+        if (mRegionSamplingHelper != null) {
+            mRegionSamplingHelper.stopAndDestroy();
+        }
         mRegionSamplingHelper = null;
     }
 
@@ -208,12 +210,10 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
      * Creates and returns a {@link RevealOutlineAnimation} Animator that updates the stashed handle
      * shape and size. When stashed, the shape is a thin rounded pill. When unstashed, the shape
      * morphs into the size of where the taskbar icons will be.
-     *
-     * @param taskbarToHotseatOffsets A Rect of offsets used to transform the bounds of the
-     *                                stashed handle to wrap around the hotseat items.
      */
-    public Animator createRevealAnimToIsStashed(boolean isStashed, Rect taskbarToHotseatOffsets) {
-        Rect visualBounds = mControllers.taskbarViewController.getIconLayoutVisualBounds();
+    public Animator createRevealAnimToIsStashed(boolean isStashed) {
+        Rect visualBounds = mControllers.taskbarViewController
+                .getTransientTaskbarIconLayoutBounds();
         float startRadius = mStashedHandleRadius;
 
         if (DisplayController.isTransientTaskbar(mActivity)) {
@@ -223,13 +223,6 @@ public class StashedHandleViewController implements TaskbarControllers.LoggableT
             visualBounds.bottom += heightDiff;
 
             startRadius = visualBounds.height() / 2f;
-
-            // We use these offsets to create a larger stashed handle to wrap around the items
-            // of the hotseat. This is only used for certain animations.
-            visualBounds.top +=  taskbarToHotseatOffsets.top;
-            visualBounds.bottom += taskbarToHotseatOffsets.bottom;
-            visualBounds.left += taskbarToHotseatOffsets.left;
-            visualBounds.right += taskbarToHotseatOffsets.right;
         }
 
         final RevealOutlineAnimation handleRevealProvider = new RoundedRectRevealOutlineProvider(

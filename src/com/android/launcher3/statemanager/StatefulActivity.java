@@ -20,9 +20,11 @@ import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 
 import static com.android.launcher3.LauncherState.FLAG_NON_INTERACTIVE;
 
+import android.content.Context;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Trace;
 import android.view.LayoutInflater;
 import android.view.View;
 
@@ -175,8 +177,10 @@ public abstract class StatefulActivity<STATE_TYPE extends BaseState<STATE_TYPE>>
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
+        Trace.beginSection("statefulActivity#onConfigurationChanged");
         handleConfigurationChanged(newConfig);
         super.onConfigurationChanged(newConfig);
+        Trace.endSection();
     }
 
     /**
@@ -195,15 +199,15 @@ public abstract class StatefulActivity<STATE_TYPE extends BaseState<STATE_TYPE>>
         mOldRotation = rotation;
     }
 
+    @Override
+    public Context getContext() {
+        return this;
+    }
+
     /**
      * Logic for when device configuration changes (rotation, screen size change, multi-window,
      * etc.)
      */
     protected abstract void onHandleConfigurationChanged();
 
-    /**
-     * Enter staged split directly from the current running app.
-     * @param leftOrTop if the staged split will be positioned left or top.
-     */
-    public void enterStageSplitFromRunningApp(boolean leftOrTop) { }
 }

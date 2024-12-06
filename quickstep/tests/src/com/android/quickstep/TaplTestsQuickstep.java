@@ -47,6 +47,7 @@ import com.android.launcher3.tapl.OverviewTask;
 import com.android.launcher3.tapl.SelectModeButtons;
 import com.android.launcher3.tapl.Workspace;
 import com.android.launcher3.ui.PortraitLandscapeRunner.PortraitLandscape;
+import com.android.launcher3.util.TestUtil;
 import com.android.launcher3.util.Wait;
 import com.android.launcher3.util.rule.ScreenRecordRule.ScreenRecord;
 import com.android.launcher3.util.rule.TestStabilityRule;
@@ -145,7 +146,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
         assertNotNull("OverviewTask.open returned null", task.open());
         assertTrue("Test activity didn't open from Overview", mDevice.wait(Until.hasObject(
                         By.pkg(getAppPackageName()).text("TestActivity2")),
-                DEFAULT_UI_TIMEOUT));
+                TestUtil.DEFAULT_UI_TIMEOUT));
         executeOnLauncher(launcher -> assertTrue(
                 "Launcher activity is the top activity; expecting another activity to be the top "
                         + "one",
@@ -350,7 +351,6 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
 
     @Test
     @TaskbarModeSwitch
-    @ScreenRecord // b/358607191
     public void testQuickSwitchToPreviousAppForTablet() throws Exception {
         assumeTrue(mLauncher.isTablet());
         startTestActivity(2);
@@ -396,7 +396,6 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     @Test
     @NavigationModeSwitch
     @PortraitLandscape
-    @TestStabilityRule.Stability(flavors = LOCAL | PLATFORM_POSTSUBMIT) // b/325659406
     public void testQuickSwitchFromHome() throws Exception {
         startTestActivity(2);
         mLauncher.goHome().quickSwitchToPreviousApp();
@@ -450,7 +449,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
                 mDevice.wait(Until.hasObject(By.pkg(getAppPackageName()).text(
                                 mLauncher.isGridOnlyOverviewEnabled() ? "TestActivity12"
                                         : "TestActivity13")),
-                        DEFAULT_UI_TIMEOUT));
+                        TestUtil.DEFAULT_UI_TIMEOUT));
 
         // Scroll the task offscreen as it is now first
         overview = mLauncher.goHome().switchToOverview();
@@ -565,7 +564,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
             mLauncher.getDevice().setOrientationLeft();
             startTestActivity(7);
             Wait.atMost("Device should not be in natural orientation",
-                    () -> !mDevice.isNaturalOrientation(), DEFAULT_UI_TIMEOUT, mLauncher);
+                    () -> !mDevice.isNaturalOrientation(), mLauncher);
             mLauncher.goHome();
         } finally {
             mLauncher.setExpectedRotationCheckEnabled(true);
@@ -578,7 +577,7 @@ public class TaplTestsQuickstep extends AbstractQuickStepTest {
     public void testExcludeFromRecents() throws Exception {
         startExcludeFromRecentsTestActivity();
         OverviewTask currentTask = getAndAssertLaunchedApp().switchToOverview().getCurrentTask();
-        // TODO(b/326565120): the expected content description shouldn't be null but for now there
+        // TODO(b/342627272): the expected content description shouldn't be null but for now there
         // is a bug that causes it to sometimes be for excludeForRecents tasks.
         assertTrue("Can't find ExcludeFromRecentsTestActivity after entering Overview from it",
                 currentTask.containsContentDescription("ExcludeFromRecents")

@@ -4,12 +4,9 @@ import static android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREE
 import static android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_KEYGUARD;
 import static android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_SEARCHBOX;
 
-import static com.android.launcher3.Utilities.ATLEAST_S;
-
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.util.SparseArray;
 import android.widget.RemoteViews;
@@ -48,7 +45,7 @@ public class WidgetItem extends ComponentKey {
         super(info.provider, info.getProfile());
 
         label = iconCache.getTitleNoCache(info);
-        description = ATLEAST_S ? info.loadDescription(context) : null;
+        description = info.loadDescription(context);
         widgetInfo = info;
         activityInfo = null;
 
@@ -77,10 +74,10 @@ public class WidgetItem extends ComponentKey {
         this(info, idp, iconCache, context, new WidgetManagerHelper(context));
     }
 
-    public WidgetItem(ShortcutConfigActivityInfo info, IconCache iconCache, PackageManager pm) {
+    public WidgetItem(ShortcutConfigActivityInfo info, IconCache iconCache) {
         super(info.getComponent(), info.getUser());
         label = info.isPersistable() ? iconCache.getTitleNoCache(info) :
-                Utilities.trim(info.getLabel(pm));
+                Utilities.trim(info.getLabel());
         description = null;
         widgetInfo = null;
         activityInfo = info;
@@ -107,7 +104,7 @@ public class WidgetItem extends ComponentKey {
     /** Returns whether this {@link WidgetItem} has a preview layout that can be used. */
     @SuppressLint("NewApi") // Already added API check.
     public boolean hasPreviewLayout() {
-        return ATLEAST_S && widgetInfo != null && widgetInfo.previewLayout != Resources.ID_NULL;
+        return widgetInfo != null && widgetInfo.previewLayout != Resources.ID_NULL;
     }
 
     /** Returns whether this {@link WidgetItem} is for a shortcut rather than an app widget. */

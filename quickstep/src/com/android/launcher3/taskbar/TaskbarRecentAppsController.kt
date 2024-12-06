@@ -16,18 +16,18 @@
 package com.android.launcher3.taskbar
 
 import android.content.Context
+import android.window.DesktopModeFlags
 import androidx.annotation.VisibleForTesting
+import com.android.launcher3.BubbleTextView.RunningAppState
 import com.android.launcher3.Flags.enableRecentsInTaskbar
 import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.model.data.TaskItemInfo
 import com.android.launcher3.model.data.WorkspaceItemInfo
-import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.taskbar.TaskbarControllers.LoggableTaskbarController
 import com.android.launcher3.util.CancellableTask
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.util.DesktopTask
 import com.android.quickstep.util.GroupTask
-import com.android.wm.shell.shared.desktopmode.DesktopModeFlags
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import java.io.PrintWriter
 
@@ -36,17 +36,12 @@ import java.io.PrintWriter
  * - When in Fullscreen mode: show the N most recent Tasks
  * - When in Desktop Mode: show the currently running (open) Tasks
  */
-class TaskbarRecentAppsController(
-    context: Context,
-    private val recentsModel: RecentsModel,
-    // Pass a provider here instead of the actual DesktopVisibilityController instance since that
-    // instance might not be available when this constructor is called.
-    private val desktopVisibilityControllerProvider: () -> DesktopVisibilityController?,
-) : LoggableTaskbarController {
+class TaskbarRecentAppsController(context: Context, private val recentsModel: RecentsModel) :
+    LoggableTaskbarController {
 
     var canShowRunningApps =
         DesktopModeStatus.canEnterDesktopMode(context) &&
-            DesktopModeFlags.TASKBAR_RUNNING_APPS.isEnabled(context)
+            DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_TASKBAR_RUNNING_APPS.isTrue
         @VisibleForTesting
         set(isEnabledFromTest) {
             field = isEnabledFromTest
@@ -78,31 +73,69 @@ class TaskbarRecentAppsController(
     var shownTasks: List<GroupTask> = emptyList()
         private set
 
-    private val desktopVisibilityController: DesktopVisibilityController?
-        get() = desktopVisibilityControllerProvider()
+    /**
+     * Returns the state of the most active Desktop task represented by the given [ItemInfo].
+     *
+     * If there are several tasks represented by the same [ItemInfo] we return the most active one,
+     * i.e. we return [DesktopAppState.RUNNING] over [DesktopAppState.MINIMIZED], and
+     * [DesktopAppState.MINIMIZED] over [DesktopAppState.NOT_RUNNING].
+     */
+    fun getDesktopItemState(itemInfo: ItemInfo?): RunningAppState {
+        val packageName = itemInfo?.getTargetPackage() ?: return RunningAppState.NOT_RUNNING
+        return getDesktopAppState(packageName, itemInfo.user.identifier)
+    }
 
-    val isInDesktopMode: Boolean
-        get() = desktopVisibilityController?.areDesktopTasksVisible() ?: false
+    private fun getDesktopAppState(packageName: String, userId: Int): RunningAppState {
+        val tasks = desktopTask?.tasks ?: return RunningAppState.NOT_RUNNING
+        val appTasks =
+            tasks.filter { task ->
+                packageName == task.key.packageName && task.key.userId == userId
+            }
+        if (appTasks.find { getRunningAppState(it.key.id) == RunningAppState.RUNNING } != null) {
+            return RunningAppState.RUNNING
+        }
+        if (appTasks.find { getRunningAppState(it.key.id) == RunningAppState.MINIMIZED } != null) {
+            return RunningAppState.MINIMIZED
+        }
+        return RunningAppState.NOT_RUNNING
+    }
 
+    /** Get the [RunningAppState] for the given task. */
+    fun getRunningAppState(taskId: Int): RunningAppState {
+        return when (taskId) {
+            in minimizedTaskIds -> RunningAppState.MINIMIZED
+            in runningTaskIds -> RunningAppState.RUNNING
+            else -> RunningAppState.NOT_RUNNING
+        }
+    }
+
+    @VisibleForTesting
     val runningTaskIds: Set<Int>
         /**
          * Returns the task IDs of apps that should be indicated as "running" to the user.
          * Specifically, we return all the open tasks if we are in Desktop mode, else emptySet().
          */
         get() {
-            if (!canShowRunningApps || !isInDesktopMode) {
+            if (
+                !canShowRunningApps ||
+                    !controllers.taskbarDesktopModeController.areDesktopTasksVisible
+            ) {
                 return emptySet()
             }
             val tasks = desktopTask?.tasks ?: return emptySet()
             return tasks.map { task -> task.key.id }.toSet()
         }
 
+    @VisibleForTesting
     val minimizedTaskIds: Set<Int>
         /**
          * Returns the task IDs for the tasks that should be indicated as "minimized" to the user.
          */
         get() {
-            if (!canShowRunningApps || !isInDesktopMode) {
+            if (
+                !canShowRunningApps ||
+                    !controllers.taskbarDesktopModeController.areDesktopTasksVisible
+            ) {
                 return emptySet()
             }
             val desktopTasks = desktopTask?.tasks ?: return emptySet()
@@ -124,7 +157,7 @@ class TaskbarRecentAppsController(
         controllers = taskbarControllers
         if (canShowRunningApps || canShowRecentApps) {
             recentsModel.registerRecentTasksChangedListener(recentTasksChangedListener)
-            reloadRecentTasksIfNeeded()
+            controllers.runAfterInit { reloadRecentTasksIfNeeded() }
         }
     }
 
@@ -137,8 +170,10 @@ class TaskbarRecentAppsController(
     /** Called to update hotseatItems, in order to de-dupe them from Recent/Running tasks later. */
     fun updateHotseatItemInfos(hotseatItems: Array<ItemInfo?>): Array<ItemInfo?> {
         // Ignore predicted apps - we show running or recent apps instead.
+        val areDesktopTasksVisible = controllers.taskbarDesktopModeController.areDesktopTasksVisible
         val removePredictions =
-            (isInDesktopMode && canShowRunningApps) || (!isInDesktopMode && canShowRecentApps)
+            (areDesktopTasksVisible && canShowRunningApps) ||
+                (!areDesktopTasksVisible && canShowRecentApps)
         if (!removePredictions) {
             shownHotseatItems = hotseatItems.filterNotNull()
             onRecentsOrHotseatChanged()
@@ -150,11 +185,11 @@ class TaskbarRecentAppsController(
                 .filter { itemInfo -> !itemInfo.isPredictedItem }
                 .toMutableList()
 
-        if (isInDesktopMode && canShowRunningApps) {
+        if (areDesktopTasksVisible && canShowRunningApps) {
             shownHotseatItems =
                 updateHotseatItemsFromRunningTasks(
                     getOrderedAndWrappedDesktopTasks(),
-                    shownHotseatItems
+                    shownHotseatItems,
                 )
         }
 
@@ -199,7 +234,7 @@ class TaskbarRecentAppsController(
         val oldShownTasks = shownTasks
         orderedRunningTaskIds = updateOrderedRunningTaskIds()
         shownTasks =
-            if (isInDesktopMode) {
+            if (controllers.taskbarDesktopModeController.areDesktopTasksVisible) {
                 computeShownRunningTasks()
             } else {
                 computeShownRecentTasks()
@@ -255,7 +290,7 @@ class TaskbarRecentAppsController(
         // Remove any newly-missing Tasks, and actual group-tasks
         val newShownTasks =
             shownTasks
-                .filter { !it.hasMultipleTasks() }
+                .filter { !it.supportsMultipleTasks() }
                 .filter { it.task1.key.id in desktopTaskIds }
                 .toMutableList()
         // Add any new Tasks, maintaining the order from previous shownTasks.
@@ -281,7 +316,7 @@ class TaskbarRecentAppsController(
 
     private fun dedupeHotseatTasks(
         groupTasks: List<GroupTask>,
-        shownHotseatItems: List<ItemInfo>
+        shownHotseatItems: List<ItemInfo>,
     ): List<GroupTask> {
         val hotseatPackages = shownHotseatItems.map { item -> item.targetPackage }
         return groupTasks.filter { groupTask ->
@@ -291,20 +326,22 @@ class TaskbarRecentAppsController(
     }
 
     /**
-     * Returns the hotseat items updated so that any item that points to a package with a running
-     * task also references that task.
+     * Returns the hotseat items updated so that any item that points to a package+user with a
+     * running task also references that task.
      */
     private fun updateHotseatItemsFromRunningTasks(
         groupTasks: List<GroupTask>,
-        shownHotseatItems: List<ItemInfo>
+        shownHotseatItems: List<ItemInfo>,
     ): List<ItemInfo> =
         shownHotseatItems.map { itemInfo ->
             if (itemInfo is TaskItemInfo) {
                 itemInfo
             } else {
                 val foundTask =
-                    groupTasks.find { task -> task.task1.key.packageName == itemInfo.targetPackage }
-                        ?: return@map itemInfo
+                    groupTasks.find { task ->
+                        task.task1.key.packageName == itemInfo.targetPackage &&
+                            task.task1.key.userId == itemInfo.user.identifier
+                    } ?: return@map itemInfo
                 TaskItemInfo(foundTask.task1.key.id, itemInfo as WorkspaceItemInfo)
             }
         }
