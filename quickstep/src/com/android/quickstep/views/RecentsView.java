@@ -691,7 +691,7 @@ public abstract class RecentsView<
     protected boolean mRunningTaskTileHidden;
     protected int mFocusedTaskViewId = INVALID_TASK_ID;
 
-    private boolean mTaskIconScaledDown = false;
+    private boolean mTaskIconVisible = true;
     private boolean mRunningTaskShowScreenshot = false;
     private float mRunningTaskAttachAlpha;
 
@@ -1244,22 +1244,19 @@ public abstract class RecentsView<
         // - It's the focused task to be moved to the front, we immediately re-add the task
         if (child instanceof TaskView && child != mSplitHiddenTaskView
                 && child != mMovingTaskView) {
-            clearAndRecycleTaskView((TaskView) child);
+            TaskView taskView = (TaskView) child;
+            for (int i : taskView.getTaskIds()) {
+                mHasVisibleTaskData.delete(i);
+            }
+            if (child instanceof GroupedTaskView) {
+                mGroupedTaskViewPool.recycle((GroupedTaskView) taskView);
+            } else if (child instanceof DesktopTaskView) {
+                mDesktopTaskViewPool.recycle((DesktopTaskView) taskView);
+            } else {
+                mTaskViewPool.recycle(taskView);
+            }
+            mActionsView.updateHiddenFlags(HIDDEN_NO_TASKS, getTaskViewCount() == 0);
         }
-    }
-
-    private void clearAndRecycleTaskView(TaskView taskView) {
-        for (int taskId : taskView.getTaskIds()) {
-            mHasVisibleTaskData.delete(taskId);
-        }
-        if (taskView instanceof GroupedTaskView) {
-            mGroupedTaskViewPool.recycle((GroupedTaskView) taskView);
-        } else if (taskView instanceof DesktopTaskView) {
-            mDesktopTaskViewPool.recycle((DesktopTaskView) taskView);
-        } else {
-            mTaskViewPool.recycle(taskView);
-        }
-        mActionsView.updateHiddenFlags(HIDDEN_NO_TASKS, getTaskViewCount() == 0);
     }
 
     @Override
@@ -2120,7 +2117,7 @@ public abstract class RecentsView<
             if (Arrays.stream(taskView.getTaskIds()).noneMatch(
                     taskId -> taskId == mIgnoreResetTaskId)) {
                 taskView.resetViewTransforms();
-                taskView.setIconScaleAndDim(mTaskIconScaledDown ? 0 : 1);
+                taskView.setIconVisibleForGesture(mTaskIconVisible);
                 taskView.setStableAlpha(mContentAlpha);
                 taskView.setFullscreenProgress(mFullscreenProgress);
                 taskView.setModalness(mTaskModalness);
@@ -2788,7 +2785,7 @@ public abstract class RecentsView<
         setEnableFreeScroll(false);
         setEnableDrawingLiveTile(false);
         setRunningTaskHidden(true);
-        setTaskIconScaledDown(true);
+        setTaskIconVisible(false);
     }
 
     /**
@@ -2807,7 +2804,7 @@ public abstract class RecentsView<
      * {@link #onGestureAnimationStart} and {@link #onGestureAnimationEnd()}.
      */
     public void onSwipeUpAnimationSuccess() {
-        animateUpTaskIconScale();
+        startIconFadeInOnGestureComplete();
         setSwipeDownShouldLaunchApp(true);
     }
 
@@ -2934,7 +2931,7 @@ public abstract class RecentsView<
         setEnableDrawingLiveTile(mCurrentGestureEndTarget == GestureState.GestureEndTarget.RECENTS);
         Log.d(TAG, "onGestureAnimationEnd - mEnableDrawingLiveTile: " + mEnableDrawingLiveTile);
         setRunningTaskHidden(false);
-        animateUpTaskIconScale();
+        startIconFadeInOnGestureComplete();
         animateActionsViewIn();
 
         mCurrentGestureEndTarget = null;
@@ -3058,7 +3055,7 @@ public abstract class RecentsView<
 
         if (mRunningTaskViewId != -1) {
             // Reset the state on the old running task view
-            setTaskIconScaledDown(false);
+            setTaskIconVisible(true);
             setRunningTaskViewShowScreenshot(true);
             setRunningTaskHidden(false);
         }
@@ -3127,25 +3124,31 @@ public abstract class RecentsView<
         }
     }
 
-    public void setTaskIconScaledDown(boolean isScaledDown) {
-        if (mTaskIconScaledDown != isScaledDown) {
-            mTaskIconScaledDown = isScaledDown;
+    /**
+     * Updates icon visibility when going in or out of overview.
+     */
+    public void setTaskIconVisible(boolean isVisible) {
+        if (mTaskIconVisible != isVisible) {
+            mTaskIconVisible = isVisible;
             for (TaskView taskView : getTaskViews()) {
-                taskView.setIconScaleAndDim(mTaskIconScaledDown ? 0 : 1);
+                taskView.setIconVisibleForGesture(mTaskIconVisible);
             }
         }
     }
 
     private void animateActionsViewIn() {
         if (!showAsGrid() || isFocusedTaskInExpectedScrollPosition()) {
-            animateActionsViewAlpha(1, TaskView.SCALE_ICON_DURATION);
+            animateActionsViewAlpha(1, TaskView.FADE_IN_ICON_DURATION);
         }
     }
 
-    public void animateUpTaskIconScale() {
-        mTaskIconScaledDown = false;
+    /**
+     * Updates icon visibility when gesture is settled.
+     */
+    public void startIconFadeInOnGestureComplete() {
+        mTaskIconVisible = true;
         for (TaskView taskView : getTaskViews()) {
-            taskView.animateIconScaleAndDimIntoView();
+            taskView.startIconFadeInOnGestureComplete();
         }
     }
 
@@ -3935,7 +3938,7 @@ public abstract class RecentsView<
                     anim.setFloat(taskView, taskView.getSecondaryDismissTranslationProperty(),
                             secondaryTranslation, clampToProgress(LINEAR, animationStartProgress,
                                     dismissTranslationInterpolationEnd));
-                    anim.add(taskView.getFocusTransitionScaleAndDimOutAnimator(),
+                    anim.add(taskView.getDismissIconFadeOutAnimator(),
                             clampToProgress(LINEAR, 0f, ANIMATION_DISMISS_PROGRESS_MIDPOINT));
                 } else if ((isFocusedTaskDismissed && nextFocusedTaskView != null && isSameGridRow(
                         taskView, nextFocusedTaskView))
@@ -4119,7 +4122,7 @@ public abstract class RecentsView<
                                     ? INVALID_TASK_ID
                                     : finalNextFocusedTaskView.getTaskViewId());
                             mTopRowIdSet.remove(mFocusedTaskViewId);
-                            finalNextFocusedTaskView.animateIconScaleAndDimIntoView();
+                            finalNextFocusedTaskView.getDismissIconFadeInAnimator().start();
                         }
                         updateTaskSize();
                         updateChildTaskOrientations();
@@ -5407,13 +5410,6 @@ public abstract class RecentsView<
         mSplitHiddenTaskViewIndex = -1;
         if (mSplitHiddenTaskView != null) {
             mSplitHiddenTaskView.setThumbnailVisibility(VISIBLE, INVALID_TASK_ID);
-            // mSplitHiddenTaskView is set when split select animation starts. The TaskView is only
-            // removed when when the animation finishes. So in the case of overview being dismissed
-            // during the animation, we should not call clearAndRecycleTaskView() because it has
-            // not been removed yet.
-            if (mSplitHiddenTaskView.getParent() == null) {
-                clearAndRecycleTaskView(mSplitHiddenTaskView);
-            }
             mSplitHiddenTaskView = null;
         }
     }
