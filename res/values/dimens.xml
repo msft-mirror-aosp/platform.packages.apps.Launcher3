@@ -300,10 +300,6 @@
     <!-- the distance an icon must be dragged before button drop targets accept it -->
     <dimen name="drag_distanceThreshold">30dp</dimen>
 
-    <!-- Elevation for the drag view. It should be larger than elevation of all other drag sources
-         and drop targets like all-apps and folders -->
-    <dimen name="drag_elevation">30dp</dimen>
-
     <dimen name="drag_flingToDeleteMinVelocity">-1500dp</dimen>
 
     <dimen name="spring_loaded_panel_border">2dp</dimen>
