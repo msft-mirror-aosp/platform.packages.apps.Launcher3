@@ -148,7 +148,7 @@ public class WorkProfileManager extends UserProfileManager
         if (getAH() != null) {
             getAH().applyPadding();
         }
-        mWorkUtilityView.getWorkFAB().setOnClickListener(this::onWorkFabClicked);
+        mWorkUtilityView.setOnClickListener(this::onWorkFabClicked);
         return true;
     }
     /**

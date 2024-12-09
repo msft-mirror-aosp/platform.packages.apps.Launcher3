@@ -23,7 +23,6 @@ import static org.junit.Assert.assertTrue;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Process;
 import android.os.UserHandle;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -50,17 +49,16 @@ public final class FolderNameProviderTest {
     @Before
     public void setUp() {
         mContext = new ActivityContextWrapper(getApplicationContext());
-        int workUserId = Process.myUserHandle().hashCode() + 1;
         mItem1 = new WorkspaceItemInfo(new AppInfo(
                 new ComponentName("a.b.c", "a.b.c/a.b.c.d"),
                 "title1",
-                UserHandle.of(workUserId),
+                UserHandle.of(10),
                 new Intent().setComponent(new ComponentName("a.b.c", "a.b.c/a.b.c.d"))
         ));
         mItem2 = new WorkspaceItemInfo(new AppInfo(
                 new ComponentName("a.b.c", "a.b.c/a.b.c.d"),
                 "title2",
-                UserHandle.of(workUserId),
+                UserHandle.of(10),
                 new Intent().setComponent(new ComponentName("a.b.c", "a.b.c/a.b.c.d"))
         ));
     }

@@ -20,7 +20,6 @@ import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
 import androidx.annotation.VisibleForTesting
 import com.android.launcher3.BuildConfig.WIDGET_ON_FIRST_SCREEN
-import com.android.launcher3.InvariantDeviceProfile.GRID_NAME_PREFS_KEY
 import com.android.launcher3.LauncherFiles.DEVICE_PREFERENCES_KEY
 import com.android.launcher3.LauncherFiles.SHARED_PREFERENCES_KEY
 import com.android.launcher3.model.DeviceGridState
@@ -139,7 +138,7 @@ abstract class LauncherPrefs : SafeCloseable {
         @JvmField
         val GRID_NAME =
             ConstantItem(
-                GRID_NAME_PREFS_KEY,
+                "idp_grid_name",
                 isBackedUp = true,
                 defaultValue = null,
                 encryptionType = EncryptionType.ENCRYPTED,

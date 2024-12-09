@@ -423,6 +423,8 @@ public class Launcher extends StatefulActivity<LauncherState>
     private final SettingsCache.OnChangeListener mNaturalScrollingChangedListener =
             enabled -> mIsNaturalScrollingEnabled = enabled;
 
+    private boolean mRecreateToUpdateTheme = false;
+
     public static Launcher getLauncher(Context context) {
         return fromContext(context);
     }
@@ -1749,6 +1751,12 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
+    protected void recreateToUpdateTheme() {
+        mRecreateToUpdateTheme = true;
+        super.recreateToUpdateTheme();
+    }
+
+    @Override
     public void onRestoreInstanceState(Bundle state) {
         super.onRestoreInstanceState(state);
         IntSet synchronouslyBoundPages = mModelCallbacks.getSynchronouslyBoundPages();
@@ -1792,6 +1800,8 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (mPendingActivityResult != null) {
             outState.putParcelable(RUNTIME_STATE_PENDING_ACTIVITY_RESULT, mPendingActivityResult);
         }
+
+        outState.putBoolean(RUNTIME_STATE_RECREATE_TO_UPDATE_THEME, mRecreateToUpdateTheme);
 
         super.onSaveInstanceState(outState);
     }

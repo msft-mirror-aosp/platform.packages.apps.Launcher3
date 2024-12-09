@@ -907,8 +907,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         ActivityOptions options = ActivityOptions.makeRemoteTransition(
                 new RemoteTransition(
                         new DesktopAppLaunchTransition(
-                                /* context= */ this, getMainExecutor(), launchType),
-                        "TaskbarDesktopLaunch"));
+                                /* context= */ this, getMainExecutor(), launchType)));
         return new ActivityOptionsWrapper(options, new RunnableList());
     }
 
@@ -1498,8 +1497,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     private RemoteTransition createUnminimizeRemoteTransition() {
         return new RemoteTransition(
-                new DesktopAppLaunchTransition(this, getMainExecutor(), AppLaunchType.UNMINIMIZE),
-                "TaskbarDesktopUnminimize");
+                new DesktopAppLaunchTransition(
+                        this, getMainExecutor(), AppLaunchType.UNMINIMIZE));
     }
 
     /**

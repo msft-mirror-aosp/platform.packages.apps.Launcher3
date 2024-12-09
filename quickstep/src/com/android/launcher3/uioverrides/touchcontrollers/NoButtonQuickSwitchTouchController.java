@@ -256,7 +256,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         mRecentsView.setFullscreenProgress(fromState.getOverviewFullscreenProgress());
         mLauncher.getActionsView().getVisibilityAlpha().updateValue(
                 (fromState.getVisibleElements(mLauncher) & OVERVIEW_ACTIONS) != 0 ? 1f : 0f);
-        mRecentsView.setTaskIconVisible(false);
+        mRecentsView.setTaskIconScaledDown(true);
 
         float[] scaleAndOffset = toState.getOverviewScaleAndOffset(mLauncher);
         // As we drag right, animate the following properties:
@@ -340,7 +340,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
                 public void onAnimationEnd(Animator animation) {
                     onAnimationToStateCompleted(OVERVIEW);
                     // Animate the icon after onAnimationToStateCompleted() so it doesn't clobber.
-                    mRecentsView.startIconFadeInOnGestureComplete();
+                    mRecentsView.animateUpTaskIconScale();
                 }
             });
             overviewAnim.start();
