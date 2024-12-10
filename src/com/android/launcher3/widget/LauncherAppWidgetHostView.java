@@ -123,7 +123,7 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
     @Override
     public void setAppWidget(int appWidgetId, AppWidgetProviderInfo info) {
         super.setAppWidget(appWidgetId, info);
-        if (!mTrackingWidgetUpdate) {
+        if (!mTrackingWidgetUpdate && appWidgetId != -1) {
             mTrackingWidgetUpdate = true;
             Trace.beginAsyncSection(TRACE_METHOD_NAME + info.provider, appWidgetId);
             Log.i(TAG, "App widget created with id: " + appWidgetId);
@@ -252,16 +252,6 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
     public void cancelLongPress() {
         super.cancelLongPress();
         mLongPressHelper.cancelLongPress();
-    }
-
-    @Override
-    public AppWidgetProviderInfo getAppWidgetInfo() {
-        AppWidgetProviderInfo info = super.getAppWidgetInfo();
-        if (info != null && !(info instanceof LauncherAppWidgetProviderInfo)) {
-            throw new IllegalStateException("Launcher widget must have"
-                    + " LauncherAppWidgetProviderInfo");
-        }
-        return info;
     }
 
     @Override
