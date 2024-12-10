@@ -562,7 +562,7 @@ public final class TaskViewUtils {
      * Start recents to desktop animation
      */
     public static AnimatorSet composeRecentsDesktopLaunchAnimator(
-            @NonNull DesktopTaskView launchingTaskView,
+            @NonNull TaskView launchingTaskView,
             @NonNull StateManager stateManager, @Nullable DepthController depthController,
             @NonNull TransitionInfo transitionInfo,
             SurfaceControl.Transaction t, @NonNull Runnable finishCallback) {
