@@ -846,6 +846,11 @@ public abstract class RecentsView<
 
     private final Matrix mTmpMatrix = new Matrix();
 
+    @Nullable
+    public TaskView getFirstTaskView() {
+        return mUtils.getFirstTaskView(getTaskViews());
+    }
+
     public RecentsView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         setEnableFreeScroll(true);
@@ -1493,17 +1498,16 @@ public abstract class RecentsView<
     }
 
     /**
-     * Returns true if the task is in expected scroll position.
-     *
-     * @param taskIndex the index of the task
+     * Returns true if the given TaskView is in expected scroll position.
      */
-    public boolean isTaskInExpectedScrollPosition(int taskIndex) {
-        return getScrollForPage(taskIndex) == getPagedOrientationHandler().getPrimaryScroll(this);
+    public boolean isTaskInExpectedScrollPosition(TaskView taskView) {
+        return getScrollForPage(indexOfChild(taskView))
+                == getPagedOrientationHandler().getPrimaryScroll(this);
     }
 
     private boolean isFocusedTaskInExpectedScrollPosition() {
         TaskView focusedTask = getFocusedTaskView();
-        return focusedTask != null && isTaskInExpectedScrollPosition(indexOfChild(focusedTask));
+        return focusedTask != null && isTaskInExpectedScrollPosition(focusedTask);
     }
 
     /**
@@ -4717,7 +4721,7 @@ public abstract class RecentsView<
     /**
      * Returns the current list of [TaskView] children.
      */
-    private Iterable<TaskView> getTaskViews() {
+    public Iterable<TaskView> getTaskViews() {
         return mUtils.getTaskViews(getTaskViewCount(), this::requireTaskViewAt);
     }
 
