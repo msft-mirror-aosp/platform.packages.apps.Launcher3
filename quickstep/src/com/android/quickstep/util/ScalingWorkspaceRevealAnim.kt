@@ -54,15 +54,14 @@ class ScalingWorkspaceRevealAnim(
     private val launcher: QuickstepLauncher,
     siblingAnimation: RectFSpringAnim?,
     windowTargetRect: RectF?,
-    playAlphaReveal: Boolean = true,
 ) {
     companion object {
         private const val FADE_DURATION_MS = 200L
         private const val SCALE_DURATION_MS = 1000L
         private const val MAX_ALPHA = 1f
         private const val MIN_ALPHA = 0f
-        internal const val MAX_SIZE = 1f
-        internal const val MIN_SIZE = 0.85f
+        private const val MAX_SIZE = 1f
+        private const val MIN_SIZE = 0.85f
 
         /**
          * Custom interpolator for both the home and wallpaper scaling. Necessary because EMPHASIZED
@@ -133,23 +132,21 @@ class ScalingWorkspaceRevealAnim(
             SCALE_INTERPOLATOR,
         )
 
-        if (playAlphaReveal) {
-            // Fade in quickly at the beginning of the animation, so the content doesn't look like
-            // it's popping into existence out of nowhere.
-            val fadeClamp = FADE_DURATION_MS.toFloat() / SCALE_DURATION_MS
-            workspace.alpha = MIN_ALPHA
-            animation.setViewAlpha(
-                workspace,
-                MAX_ALPHA,
-                Interpolators.clampToProgress(LINEAR, 0f, fadeClamp),
-            )
-            hotseat.alpha = MIN_ALPHA
-            animation.setViewAlpha(
-                hotseat,
-                MAX_ALPHA,
-                Interpolators.clampToProgress(LINEAR, 0f, fadeClamp),
-            )
-        }
+        // Fade in quickly at the beginning of the animation, so the content doesn't look like it's
+        // popping into existence out of nowhere.
+        val fadeClamp = FADE_DURATION_MS.toFloat() / SCALE_DURATION_MS
+        workspace.alpha = MIN_ALPHA
+        animation.setViewAlpha(
+            workspace,
+            MAX_ALPHA,
+            Interpolators.clampToProgress(LINEAR, 0f, fadeClamp),
+        )
+        hotseat.alpha = MIN_ALPHA
+        animation.setViewAlpha(
+            hotseat,
+            MAX_ALPHA,
+            Interpolators.clampToProgress(LINEAR, 0f, fadeClamp),
+        )
 
         val transitionConfig = StateAnimationConfig()
 
