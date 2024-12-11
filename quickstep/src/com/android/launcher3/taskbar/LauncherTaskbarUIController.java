@@ -217,7 +217,8 @@ public class LauncherTaskbarUIController extends TaskbarUIController {
 
     private int getTaskbarAnimationDuration(boolean isVisible) {
         // fast animation duration since we will not be playing workspace reveal animation.
-        boolean shouldOverrideToFastAnimation = !isHotseatIconOnTopWhenAligned();
+        boolean shouldOverrideToFastAnimation =
+                !isHotseatIconOnTopWhenAligned() || mLauncher.getPredictiveBackToHomeInProgress();
         boolean isPinnedTaskbar = DisplayController.isPinnedTaskbar(mLauncher);
         if (isVisible || isPinnedTaskbar) {
             return getTaskbarToHomeDuration(shouldOverrideToFastAnimation, isPinnedTaskbar);

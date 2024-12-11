@@ -1670,7 +1670,7 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 || mLauncher.getWorkspace().isOverlayShown()
                 || shouldPlayFallbackClosingAnimation(appTargets);
 
-        boolean playWorkspaceReveal = true;
+        boolean playWorkspaceReveal = !fromPredictiveBack;
         boolean skipAllAppsScale = false;
         if (!playFallBackAnimation) {
             PointF velocity;
@@ -1689,12 +1689,12 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                 // Skip scaling all apps, otherwise FloatingIconView will get wrong
                 // layout bounds.
                 skipAllAppsScale = true;
-            } else {
+            } else if (!fromPredictiveBack) {
                 if (enableScalingRevealHomeAnimation()) {
                     anim.play(
-                            new ScalingWorkspaceRevealAnim(mLauncher, rectFSpringAnim,
-                                    rectFSpringAnim.getTargetRect(),
-                                    !fromPredictiveBack /* playAlphaReveal */).getAnimators());
+                            new ScalingWorkspaceRevealAnim(
+                                    mLauncher, rectFSpringAnim,
+                                    rectFSpringAnim.getTargetRect()).getAnimators());
                 } else {
                     anim.play(new StaggeredWorkspaceAnim(mLauncher, velocity.y,
                             true /* animateOverviewScrim */, launcherView).getAnimators());
@@ -1713,20 +1713,6 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
             anim.play(getFallbackClosingWindowAnimators(appTargets));
         }
 
-        AnimatorListenerAdapter endListener = new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                super.onAnimationEnd(animation);
-                AccessibilityManagerCompat.sendTestProtocolEventToTest(
-                        mLauncher, WALLPAPER_OPEN_ANIMATION_FINISHED_MESSAGE);
-            }
-        };
-        if (rectFSpringAnim != null) {
-            rectFSpringAnim.addAnimatorListener(endListener);
-        } else {
-            anim.addListener(endListener);
-        }
-
         // Normally, we run the launcher content animation when we are transitioning
         // home, but if home is already visible, then we don't want to animate the
         // contents of launcher unless we know that we are animating home as a result
@@ -1735,7 +1721,16 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
         // targets list because it is already visible). In that case, we force
         // invisibility on touch down, and only reset it after the animation to home
         // is initialized.
-        if (launcherIsForceInvisibleOrOpening) {
+        if (launcherIsForceInvisibleOrOpening || fromPredictiveBack) {
+            AnimatorListenerAdapter endListener = new AnimatorListenerAdapter() {
+                @Override
+                public void onAnimationEnd(Animator animation) {
+                    super.onAnimationEnd(animation);
+                    AccessibilityManagerCompat.sendTestProtocolEventToTest(
+                            mLauncher, WALLPAPER_OPEN_ANIMATION_FINISHED_MESSAGE);
+                }
+            };
+
             if (rectFSpringAnim != null && anim.getChildAnimations().isEmpty()) {
                 addCujInstrumentation(rectFSpringAnim, Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_HOME);
             } else {
@@ -1744,10 +1739,16 @@ public class QuickstepTransitionManager implements OnDeviceProfileChangeListener
                         : Cuj.CUJ_LAUNCHER_APP_CLOSE_TO_HOME);
             }
 
+            if (fromPredictiveBack && rectFSpringAnim != null) {
+                rectFSpringAnim.addAnimatorListener(endListener);
+            } else {
+                anim.addListener(endListener);
+            }
+
             // Only register the content animation for cancellation when state changes
             mLauncher.getStateManager().setCurrentAnimation(anim);
 
-            if (mLauncher.isInState(LauncherState.ALL_APPS)) {
+            if (mLauncher.isInState(LauncherState.ALL_APPS) && !fromPredictiveBack) {
                 Pair<AnimatorSet, Runnable> contentAnimator =
                         getLauncherContentAnimator(false, LAUNCHER_RESUME_START_DELAY,
                                 skipAllAppsScale);
