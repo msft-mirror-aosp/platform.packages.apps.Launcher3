@@ -237,12 +237,14 @@ import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 
 import kotlin.Unit;
+import kotlin.collections.CollectionsKt;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -847,6 +849,59 @@ public abstract class RecentsView<
     private final Matrix mTmpMatrix = new Matrix();
 
     private int mTaskViewCount = 0;
+
+    private final TaskViewsIterable mTaskViewsIterable = new TaskViewsIterable();
+
+    public class TaskViewsIterable implements Iterable<TaskView> {
+        @Override
+        public TaskViewsIterator iterator() {
+            return new TaskViewsIterator();
+        }
+    }
+
+    // An Iterator to iterate all the current TaskViews inside the RecentsView.
+    public class TaskViewsIterator implements Iterator<TaskView> {
+        // Refers to the index of the `TaskView` that will be returned when `next()` is called.
+        private int mNextIndex = 0;
+
+        // The "limit" of this iterator. This is the number of children of the RecentsView when
+        // the iterator was created. Adding & removing elements will invalidate the iteration
+        // anyway (and cause next() to throw) so saving this value will guarantee that the
+        // value of hasNext() remains stable and won't flap between true and false when elements
+        // are added and removed from the RecentsView.
+        private final int mLimit = getChildCount();
+
+        TaskViewsIterator() {
+            advanceIfNeeded();
+        }
+
+        @Override
+        public boolean hasNext() {
+            return mNextIndex < mLimit && mNextIndex < getChildCount();
+        }
+
+        @Override
+        public TaskView next() {
+            if (!hasNext()) {
+                throw new IndexOutOfBoundsException(
+                        String.format("mNextIndex: %d, child count: %d", mNextIndex,
+                                getChildCount()));
+            }
+            TaskView taskView = requireTaskViewAt(mNextIndex);
+            mNextIndex++;
+            advanceIfNeeded();
+            return taskView;
+        }
+
+        // Advances `mNextIndex` until it either points to a `TaskView` or to the end of the
+        // Iterator.
+        private void advanceIfNeeded() {
+            while (mNextIndex < mLimit && mNextIndex < getChildCount() && !(getChildAt(
+                    mNextIndex) instanceof TaskView)) {
+                mNextIndex++;
+            }
+        }
+    }
 
     @Nullable
     public TaskView getFirstTaskView() {
@@ -2074,14 +2129,11 @@ public abstract class RecentsView<
     }
 
     private void removeTasksViewsAndClearAllButton() {
-        for (TaskView taskView : getTaskViews()) {
-            if (isGestureActive() && taskView.isRunningTask()) {
-                // This handles an edge case where applyLoadPlan happens during a gesture when the
-                // only Task is one with excludeFromRecents, in which case we should not remove it.
-                continue;
-            }
-            removeView(taskView);
-        }
+        // This handles an edge case where applyLoadPlan happens during a gesture when the only
+        // Task is one with excludeFromRecents, in which case we should not remove it.
+        CollectionsKt
+                .filter(getTaskViews(), taskView -> !isGestureActive() || !taskView.isRunningTask())
+                .forEach(this::removeView);
         if (getTaskViewCount() == 0 && indexOfChild(mClearAllButton) != -1) {
             removeView(mClearAllButton);
         }
@@ -4721,10 +4773,10 @@ public abstract class RecentsView<
     }
 
     /**
-     * Returns the current list of [TaskView] children.
+     * Returns iterable [TaskView] children.
      */
-    public Iterable<TaskView> getTaskViews() {
-        return mUtils.getTaskViews(getTaskViewCount(), this::requireTaskViewAt);
+    public TaskViewsIterable getTaskViews() {
+        return mTaskViewsIterable;
     }
 
     public void setOnEmptyMessageUpdatedListener(OnEmptyMessageUpdatedListener listener) {

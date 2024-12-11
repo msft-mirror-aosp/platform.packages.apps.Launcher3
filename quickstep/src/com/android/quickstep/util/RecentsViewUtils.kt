@@ -136,10 +136,6 @@ class RecentsViewUtils {
         isTaskViewFullyVisible: (TaskView) -> Boolean,
     ): Boolean = taskViews.any { !it.isLargeTile && isTaskViewFullyVisible(it) }
 
-    /** Returns the current list of [TaskView] children. */
-    fun getTaskViews(taskViewCount: Int, requireTaskViewAt: (Int) -> TaskView): Iterable<TaskView> =
-        (0 until taskViewCount).map(requireTaskViewAt)
-
     /** Apply attachAlpha to all [TaskView] accordingly to different conditions. */
     fun applyAttachAlpha(
         taskViews: Iterable<TaskView>,
