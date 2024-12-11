@@ -86,6 +86,8 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
     private TaskbarControllers mControllers;
     private boolean mAllowInitialSplitSelection;
     private AppInfo[] mAppInfosList;
+    private ManageWindowsTaskbarShortcut<BaseTaskbarContext> mManageWindowsTaskbarShortcut;
+
 
     public TaskbarPopupController(TaskbarActivityContext context) {
         mContext = context;
@@ -109,6 +111,19 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
 
     public void setDeepShortcutMap(HashMap<ComponentKey, Integer> deepShortcutMapCopy) {
         mPopupDataProvider.setDeepShortcutMap(deepShortcutMapCopy);
+    }
+
+    /** Closes the multi-instance menu if it is enabled and currently open. */
+    public void maybeCloseMultiInstanceMenu() {
+        if (Flags.enableMultiInstanceMenuTaskbar() && mManageWindowsTaskbarShortcut != null) {
+            mManageWindowsTaskbarShortcut.closeMultiInstanceMenu();
+            cleanUpMultiInstanceMenuReference();
+        }
+    }
+
+    /** Releases the reference to the Taskbar multi-instance menu */
+    public void cleanUpMultiInstanceMenuReference() {
+        mManageWindowsTaskbarShortcut = null;
     }
 
     public void setAllowInitialSplitSelection(boolean allowInitialSplitSelection) {
@@ -206,6 +221,7 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
         if (Flags.enableMultiInstanceMenuTaskbar()
                 && DesktopModeStatus.canEnterDesktopMode(mContext)
                 && !mControllers.taskbarStashController.isInOverview()) {
+            maybeCloseMultiInstanceMenu();
             shortcuts.addAll(getMultiInstanceMenuOptions().toList());
         }
         return shortcuts.stream();
@@ -325,8 +341,9 @@ public class TaskbarPopupController implements TaskbarControllers.LoggableTaskba
     public SystemShortcut.Factory<BaseTaskbarContext> createManageWindowsShortcutFactory() {
         return (context, itemInfo, originalView) -> {
             if (shouldShowMultiInstanceOptions(itemInfo)) {
-                return new ManageWindowsTaskbarShortcut<>(context, itemInfo, originalView,
-                        mControllers);
+                mManageWindowsTaskbarShortcut = new ManageWindowsTaskbarShortcut<>(
+                        context, itemInfo, originalView, mControllers);
+                return mManageWindowsTaskbarShortcut;
             }
             return null;
         };
