@@ -908,6 +908,11 @@ public abstract class RecentsView<
         return mUtils.getFirstTaskView(getTaskViews());
     }
 
+    @Nullable
+    private TaskView getLastTaskView() {
+        return mUtils.getLastTaskView(getTaskViews());
+    }
+
     public RecentsView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         setEnableFreeScroll(true);
@@ -1222,7 +1227,7 @@ public abstract class RecentsView<
     public void init(OverviewActionsView actionsView, SplitSelectStateController splitController,
             @Nullable DesktopRecentsTransitionController desktopRecentsTransitionController) {
         mActionsView = actionsView;
-        mActionsView.updateHiddenFlags(HIDDEN_NO_TASKS, getTaskViewCount() == 0);
+        mActionsView.updateHiddenFlags(HIDDEN_NO_TASKS, !hasTaskViews());
         // Update flags for 1p/3p launchers
         mActionsView.updateFor3pLauncher(!supportsAppPairs());
         mSplitSelectStateController = splitController;
@@ -1318,7 +1323,7 @@ public abstract class RecentsView<
                 } else {
                     mTaskViewPool.recycle(taskView);
                 }
-                mActionsView.updateHiddenFlags(HIDDEN_NO_TASKS, getTaskViewCount() == 0);
+                mActionsView.updateHiddenFlags(HIDDEN_NO_TASKS, !hasTaskViews());
             }
         }
     }
@@ -2134,9 +2139,14 @@ public abstract class RecentsView<
         CollectionsKt
                 .filter(getTaskViews(), taskView -> !isGestureActive() || !taskView.isRunningTask())
                 .forEach(this::removeView);
-        if (getTaskViewCount() == 0 && indexOfChild(mClearAllButton) != -1) {
+        if (!hasTaskViews() && indexOfChild(mClearAllButton) != -1) {
             removeView(mClearAllButton);
         }
+    }
+
+    /** Returns true if there are at least one TaskView has been added to the RecentsView. */
+    public boolean hasTaskViews() {
+        return CollectionsKt.any(getTaskViews());
     }
 
     public int getTaskViewCount() {
@@ -2346,7 +2356,7 @@ public abstract class RecentsView<
      * Updates TaskView scaling and translation required to support variable width.
      */
     private void updateTaskSize() {
-        if (getTaskViewCount() == 0) {
+        if (!hasTaskViews()) {
             return;
         }
 
@@ -3231,8 +3241,7 @@ public abstract class RecentsView<
      *                            to skip rebalance
      */
     private void updateGridProperties(int startRebalanceAfter) {
-        int taskCount = getTaskViewCount();
-        if (taskCount == 0) {
+        if (!hasTaskViews()) {
             return;
         }
 
@@ -3249,6 +3258,7 @@ public abstract class RecentsView<
         IntSet topSet = new IntSet();
         IntSet bottomSet = new IntSet();
 
+        final int taskCount = getTaskViewCount();
         // Horizontal grid translation for each task
         float[] gridTranslations = new float[taskCount];
 
@@ -4793,7 +4803,7 @@ public abstract class RecentsView<
     }
 
     public void updateEmptyMessage() {
-        boolean isEmpty = getTaskViewCount() == 0;
+        boolean isEmpty = !hasTaskViews();
         boolean hasSizeChanged = mLastMeasureSize.x != getWidth()
                 || mLastMeasureSize.y != getHeight();
         if (isEmpty == mShowEmptyMessage && !hasSizeChanged) {
@@ -5552,12 +5562,12 @@ public abstract class RecentsView<
 
         // Get the deadzone rect between the task views
         mTaskViewDeadZoneRect.setEmpty();
-        int count = getTaskViewCount();
-        if (count > 0) {
-            final View taskView = requireTaskViewAt(0);
-            requireTaskViewAt(count - 1).getHitRect(mTaskViewDeadZoneRect);
-            mTaskViewDeadZoneRect.union(taskView.getLeft(), taskView.getTop(), taskView.getRight(),
-                    taskView.getBottom());
+        if (hasTaskViews()) {
+            final View firstTaskView = getFirstTaskView();
+            getLastTaskView().getHitRect(mTaskViewDeadZoneRect);
+            mTaskViewDeadZoneRect.union(firstTaskView.getLeft(), firstTaskView.getTop(),
+                    firstTaskView.getRight(),
+                    firstTaskView.getBottom());
         }
     }
 
@@ -5721,7 +5731,7 @@ public abstract class RecentsView<
             throw new IllegalStateException("Another pending animation is still running");
         }
 
-        if (getTaskViewCount() == 0) {
+        if (!hasTaskViews()) {
             return new PendingAnimation(duration);
         }
 
@@ -5846,10 +5856,11 @@ public abstract class RecentsView<
     @Override
     public void onInitializeAccessibilityEvent(AccessibilityEvent event) {
         super.onInitializeAccessibilityEvent(event);
+        event.setScrollable(hasTaskViews());
 
+        // TODO(b/379942019): Revisit the logic below to make sure it does not rely on the
+        //  `taskViewCount` to update the indices or make it indices free.
         final int taskViewCount = getTaskViewCount();
-        event.setScrollable(taskViewCount > 0);
-
         if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
             final int[] visibleTasks = getVisibleChildrenRange();
             event.setFromIndex(taskViewCount - visibleTasks[1]);
@@ -6080,7 +6091,7 @@ public abstract class RecentsView<
 
     @Override
     protected int computeMinScroll() {
-        if (getTaskViewCount() <= 0) {
+        if (!hasTaskViews()) {
             return super.computeMinScroll();
         }
 
@@ -6089,7 +6100,7 @@ public abstract class RecentsView<
 
     @Override
     protected int computeMaxScroll() {
-        if (getTaskViewCount() <= 0) {
+        if (!hasTaskViews()) {
             return super.computeMaxScroll();
         }
 
