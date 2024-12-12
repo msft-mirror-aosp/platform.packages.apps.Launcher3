@@ -51,7 +51,6 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_S
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SHORTCUT_HELPER_SHOWING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_VOICE_INTERACTION_WINDOW_SHOWING;
 import static com.android.window.flags.Flags.predictiveBackThreeButtonNav;
-import static com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar;
 
 import android.animation.Animator;
 import android.animation.ArgbEvaluator;
@@ -866,13 +865,19 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             TaskbarNavButtonController navButtonController) {
         final RectF rect = new RectF();
         buttonView.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            int motionEventAction = event.getAction();
+            if (motionEventAction == MotionEvent.ACTION_DOWN) {
                 rect.set(0, 0, v.getWidth(), v.getHeight());
             }
-            boolean isCancelled = event.getAction() == MotionEvent.ACTION_CANCEL
-                    || !rect.contains(event.getX(), event.getY());
-            if (event.getAction() == MotionEvent.ACTION_MOVE && !isCancelled) return false;
-            int motionEventAction = event.getAction();
+            boolean isCancelled = motionEventAction == MotionEvent.ACTION_CANCEL
+                    || (!rect.contains(event.getX(), event.getY())
+                    && (motionEventAction == MotionEvent.ACTION_MOVE
+                    || motionEventAction == MotionEvent.ACTION_UP));
+            if (motionEventAction != MotionEvent.ACTION_DOWN
+                    && motionEventAction != MotionEvent.ACTION_UP && !isCancelled) {
+                // return early. we don't care about any other cases than DOWN, UP and CANCEL
+                return false;
+            }
             int keyEventAction = motionEventAction == MotionEvent.ACTION_DOWN
                     ? KeyEvent.ACTION_DOWN : ACTION_UP;
             navButtonController.sendBackKeyEvent(keyEventAction, isCancelled);
@@ -1342,8 +1347,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 || mNavButtonsView.getWidth() == 0) {
             return;
         }
-        if (enableBubbleBarInPersistentTaskBar()
-                && mControllers.bubbleControllers.isPresent()) {
+        if (mControllers.bubbleControllers.isPresent()) {
             if (mBubbleBarTargetLocation == null) {
                 // only set bubble bar location if it was not set before
                 mBubbleBarTargetLocation = mControllers.bubbleControllers.get()

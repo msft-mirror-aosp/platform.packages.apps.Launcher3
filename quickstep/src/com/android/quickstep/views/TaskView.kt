@@ -31,7 +31,6 @@ import android.util.AttributeSet
 import android.util.FloatProperty
 import android.util.Log
 import android.view.Display
-import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.View.OnClickListener
@@ -78,7 +77,6 @@ import com.android.quickstep.RemoteAnimationTargets
 import com.android.quickstep.TaskOverlayFactory
 import com.android.quickstep.TaskViewUtils
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler
-import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.util.ActiveGestureErrorDetector
 import com.android.quickstep.util.ActiveGestureLog
 import com.android.quickstep.util.BorderAnimator
@@ -434,37 +432,54 @@ constructor(
     // Used to cache thumbnail bounds to avoid recalculating on every hover move.
     private var thumbnailBounds = Rect()
 
-    private var focusTransitionProgress = 1f
+    // Progress variable indicating if the TaskView is in a settled state:
+    // 0 = The TaskView is in a transitioning state e.g. during gesture, in quickswitch carousel,
+    // becoming focus task etc.
+    // 1 = The TaskView is settled and no longer transitioning
+    private var settledProgress = 1f
         set(value) {
             field = value
-            onFocusTransitionProgressUpdated(field)
+            onSettledProgressUpdated(field)
         }
 
-    private val focusTransitionPropertyFactory =
+    private val settledProgressPropertyFactory =
         MultiPropertyFactory(
             this,
-            FOCUS_TRANSITION,
-            FOCUS_TRANSITION_INDEX_COUNT,
+            SETTLED_PROGRESS,
+            SETTLED_PROGRESS_INDEX_COUNT,
             { x: Float, y: Float -> x * y },
             1f,
         )
-    private val focusTransitionFullscreen =
-        focusTransitionPropertyFactory.get(FOCUS_TRANSITION_INDEX_FULLSCREEN)
-    private val focusTransitionScaleAndDim =
-        focusTransitionPropertyFactory.get(FOCUS_TRANSITION_INDEX_SCALE_AND_DIM)
+    private val settledProgressFullscreen =
+        settledProgressPropertyFactory.get(SETTLED_PROGRESS_INDEX_FULLSCREEN)
+    private val settledProgressGesture =
+        settledProgressPropertyFactory.get(SETTLED_PROGRESS_INDEX_GESTURE)
+    private val settledProgressDismiss =
+        settledProgressPropertyFactory.get(SETTLED_PROGRESS_INDEX_DISMISS)
 
     /**
-     * Returns an animator of [focusTransitionScaleAndDim] that transition out with a built-in
+     * Returns an animator of [settledProgressDismiss] that transition in with a built-in
      * interpolator.
      */
-    fun getFocusTransitionScaleAndDimOutAnimator(): ObjectAnimator =
+    fun getDismissIconFadeInAnimator(): ObjectAnimator =
+        ObjectAnimator.ofFloat(settledProgressDismiss, MULTI_PROPERTY_VALUE, 1f).apply {
+            duration = FADE_IN_ICON_DURATION
+            interpolator = FADE_IN_ICON_INTERPOLATOR
+        }
+
+    /**
+     * Returns an animator of [settledProgressDismiss] that transition out with a built-in
+     * interpolator. [AnimatedFloat] is used to apply another level of interpolation, on top of
+     * interpolator set to the [Animator] by the caller.
+     */
+    fun getDismissIconFadeOutAnimator(): ObjectAnimator =
         AnimatedFloat { v ->
-                focusTransitionScaleAndDim.value =
-                    FOCUS_TRANSITION_FAST_OUT_INTERPOLATOR.getInterpolation(v)
+                settledProgressDismiss.value =
+                    SETTLED_PROGRESS_FAST_OUT_INTERPOLATOR.getInterpolation(v)
             }
             .animateToValue(1f, 0f)
 
-    private var iconAndDimAnimator: ObjectAnimator? = null
+    private var iconFadeInOnGestureCompleteAnimator: ObjectAnimator? = null
     // The current background requests to load the task thumbnail and icon
     private val pendingThumbnailLoadRequests = mutableListOf<CancellableTask<*>>()
     private val pendingIconLoadRequests = mutableListOf<CancellableTask<*>>()
@@ -677,6 +692,28 @@ constructor(
         return super.performAccessibilityAction(action, arguments)
     }
 
+    override fun onFinishInflate() {
+        super.onFinishInflate()
+        inflateViewStubs()
+    }
+
+    protected open fun inflateViewStubs() {
+        findViewById<ViewStub>(R.id.snapshot)
+            ?.apply {
+                layoutResource =
+                    if (enableRefactorTaskThumbnail()) R.layout.task_thumbnail
+                    else R.layout.task_thumbnail_deprecated
+            }
+            ?.inflate()
+        findViewById<ViewStub>(R.id.icon)
+            ?.apply {
+                layoutResource =
+                    if (enableOverviewIconMenu()) R.layout.icon_app_chip_view
+                    else R.layout.icon_view
+            }
+            ?.inflate()
+    }
+
     /** Updates this task view to the given {@param task}. */
     open fun bind(
         task: Task,
@@ -718,27 +755,11 @@ constructor(
         @StagePosition stagePosition: Int,
         taskOverlayFactory: TaskOverlayFactory,
     ): TaskContainer {
-        val existingThumbnailView: View = findViewById(thumbnailViewId)!!
-        val snapshotView =
-            when {
-                !enableRefactorTaskThumbnail() -> existingThumbnailView
-                existingThumbnailView is TaskThumbnailView -> existingThumbnailView
-                else -> {
-                    val indexOfSnapshotView = indexOfChild(existingThumbnailView)
-                    LayoutInflater.from(context)
-                        .inflate(R.layout.task_thumbnail, this, false)
-                        .also {
-                            it.id = thumbnailViewId
-                            addView(it, indexOfSnapshotView, existingThumbnailView.layoutParams)
-                            removeView(existingThumbnailView)
-                        }
-                }
-            }
-        val iconView = getOrInflateIconView(iconViewId)
+        val iconView = findViewById<View>(iconViewId) as TaskViewIcon
         return TaskContainer(
             this,
             task,
-            snapshotView,
+            findViewById(thumbnailViewId),
             iconView,
             TransformingTouchDelegate(iconView.asView()),
             stagePosition,
@@ -746,18 +767,6 @@ constructor(
             findViewById(showWindowViewId)!!,
             taskOverlayFactory,
         )
-    }
-
-    protected fun getOrInflateIconView(@IdRes iconViewId: Int): TaskViewIcon {
-        val iconView = findViewById<View>(iconViewId)!!
-        return iconView as? TaskViewIcon
-            ?: (iconView as ViewStub)
-                .apply {
-                    layoutResource =
-                        if (enableOverviewIconMenu()) R.layout.icon_app_chip_view
-                        else R.layout.icon_view
-                }
-                .inflate() as TaskViewIcon
     }
 
     fun containsMultipleTasks() = taskContainers.size > 1
@@ -1423,23 +1432,23 @@ constructor(
      * Called to animate a smooth transition when going directly from an app into Overview (and vice
      * versa). Icons fade in, and DWB banners slide in with a "shift up" animation.
      */
-    private fun onFocusTransitionProgressUpdated(focusTransitionProgress: Float) {
+    private fun onSettledProgressUpdated(settledProgress: Float) {
         taskContainers.forEach {
-            it.iconView.setContentAlpha(focusTransitionProgress)
-            it.digitalWellBeingToast?.bannerOffsetPercentage = 1f - focusTransitionProgress
+            it.iconView.setContentAlpha(settledProgress)
+            it.digitalWellBeingToast?.bannerOffsetPercentage = 1f - settledProgress
         }
     }
 
-    fun animateIconScaleAndDimIntoView() {
-        iconAndDimAnimator?.cancel()
-        iconAndDimAnimator =
-            ObjectAnimator.ofFloat(focusTransitionScaleAndDim, MULTI_PROPERTY_VALUE, 0f, 1f).apply {
-                duration = SCALE_ICON_DURATION
+    fun startIconFadeInOnGestureComplete() {
+        iconFadeInOnGestureCompleteAnimator?.cancel()
+        iconFadeInOnGestureCompleteAnimator =
+            ObjectAnimator.ofFloat(settledProgressGesture, MULTI_PROPERTY_VALUE, 1f).apply {
+                duration = FADE_IN_ICON_DURATION
                 interpolator = Interpolators.LINEAR
                 addListener(
                     object : AnimatorListenerAdapter() {
                         override fun onAnimationEnd(animation: Animator) {
-                            iconAndDimAnimator = null
+                            iconFadeInOnGestureCompleteAnimator = null
                         }
                     }
                 )
@@ -1447,9 +1456,9 @@ constructor(
             }
     }
 
-    fun setIconScaleAndDim(iconScale: Float) {
-        iconAndDimAnimator?.cancel()
-        focusTransitionScaleAndDim.value = iconScale
+    fun setIconVisibleForGesture(isVisible: Boolean) {
+        iconFadeInOnGestureCompleteAnimator?.cancel()
+        settledProgressGesture.value = if (isVisible) 1f else 0f
     }
 
     /** Set a color tint on the snapshot and supporting views. */
@@ -1544,8 +1553,8 @@ constructor(
             it.iconView.setVisibility(if (fullscreenProgress < 1) VISIBLE else INVISIBLE)
             it.overlay.setFullscreenProgress(fullscreenProgress)
         }
-        focusTransitionFullscreen.value =
-            FOCUS_TRANSITION_FAST_OUT_INTERPOLATOR.getInterpolation(1 - fullscreenProgress)
+        settledProgressFullscreen.value =
+            SETTLED_PROGRESS_FAST_OUT_INTERPOLATOR.getInterpolation(1 - fullscreenProgress)
         updateFullscreenParams()
     }
 
@@ -1602,7 +1611,8 @@ constructor(
         }
         dismissScale = 1f
         translationZ = 0f
-        setIconScaleAndDim(1f)
+        setIconVisibleForGesture(true)
+        settledProgressDismiss.value = 1f
         setColorTint(0f, 0)
     }
 
@@ -1630,9 +1640,10 @@ constructor(
         const val FLAG_UPDATE_ALL =
             (FLAG_UPDATE_ICON or FLAG_UPDATE_THUMBNAIL or FLAG_UPDATE_CORNER_RADIUS)
 
-        const val FOCUS_TRANSITION_INDEX_FULLSCREEN = 0
-        const val FOCUS_TRANSITION_INDEX_SCALE_AND_DIM = 1
-        const val FOCUS_TRANSITION_INDEX_COUNT = 2
+        const val SETTLED_PROGRESS_INDEX_FULLSCREEN = 0
+        const val SETTLED_PROGRESS_INDEX_GESTURE = 1
+        const val SETTLED_PROGRESS_INDEX_DISMISS = 2
+        const val SETTLED_PROGRESS_INDEX_COUNT = 3
 
         private const val ALPHA_INDEX_STABLE = 0
         private const val ALPHA_INDEX_ATTACH = 1
@@ -1642,25 +1653,26 @@ constructor(
 
         /** The maximum amount that a task view can be scrimmed, dimmed or tinted. */
         const val MAX_PAGE_SCRIM_ALPHA = 0.4f
-        const val SCALE_ICON_DURATION: Long = 120
+        const val FADE_IN_ICON_DURATION: Long = 120
         private const val DIM_ANIM_DURATION: Long = 700
-        private const val FOCUS_TRANSITION_THRESHOLD =
-            SCALE_ICON_DURATION.toFloat() / DIM_ANIM_DURATION
-        val FOCUS_TRANSITION_FAST_OUT_INTERPOLATOR =
+        private const val SETTLE_TRANSITION_THRESHOLD =
+            FADE_IN_ICON_DURATION.toFloat() / DIM_ANIM_DURATION
+        val SETTLED_PROGRESS_FAST_OUT_INTERPOLATOR =
             Interpolators.clampToProgress(
                 Interpolators.FAST_OUT_SLOW_IN,
-                1f - FOCUS_TRANSITION_THRESHOLD,
+                1f - SETTLE_TRANSITION_THRESHOLD,
                 1f,
             )!!
+        private val FADE_IN_ICON_INTERPOLATOR = Interpolators.LINEAR
         private val SYSTEM_GESTURE_EXCLUSION_RECT = listOf(Rect())
 
-        private val FOCUS_TRANSITION: FloatProperty<TaskView> =
-            object : FloatProperty<TaskView>("focusTransition") {
+        private val SETTLED_PROGRESS: FloatProperty<TaskView> =
+            object : FloatProperty<TaskView>("settleTransition") {
                 override fun setValue(taskView: TaskView, v: Float) {
-                    taskView.focusTransitionProgress = v
+                    taskView.settledProgress = v
                 }
 
-                override fun get(taskView: TaskView) = taskView.focusTransitionProgress
+                override fun get(taskView: TaskView) = taskView.settledProgress
             }
 
         private val SPLIT_SELECT_TRANSLATION_X: FloatProperty<TaskView> =

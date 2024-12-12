@@ -25,6 +25,7 @@ import android.content.Intent;
 import android.graphics.Rect;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.widget.ImageButton;
@@ -83,6 +84,7 @@ public class WorkUtilityView extends LinearLayout implements Insettable,
     // Threshold when user scrolls up/down to determine when should button extend/collapse
     private final int mScrollThreshold;
     private ValueAnimator mPauseFABAnim;
+    private View mWorkFAB;
     private TextView mPauseText;
     private ImageView mWorkIcon;
     private ImageButton mSchedulerButton;
@@ -117,6 +119,7 @@ public class WorkUtilityView extends LinearLayout implements Insettable,
 
         mPauseText = findViewById(R.id.pause_text);
         mWorkIcon = findViewById(R.id.work_icon);
+        mWorkFAB = findViewById(R.id.work_mode_toggle);
         mSchedulerButton = findViewById(R.id.work_scheduler);
         setSelected(true);
         KeyboardInsetAnimationCallback keyboardInsetAnimationCallback =
@@ -386,6 +389,10 @@ public class WorkUtilityView extends LinearLayout implements Insettable,
 
     public int getScrollThreshold() {
         return mScrollThreshold;
+    }
+
+    public View getWorkFAB() {
+        return mWorkFAB;
     }
 
     public void updateStringFromCache(){
