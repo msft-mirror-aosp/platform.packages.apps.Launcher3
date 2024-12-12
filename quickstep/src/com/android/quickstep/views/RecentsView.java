@@ -846,6 +846,8 @@ public abstract class RecentsView<
 
     private final Matrix mTmpMatrix = new Matrix();
 
+    private int mTaskViewCount = 0;
+
     @Nullable
     public TaskView getFirstTaskView() {
         return mUtils.getFirstTaskView(getTaskViews());
@@ -1247,26 +1249,31 @@ public abstract class RecentsView<
         // - It's the initial taskview for entering split screen, we only pretend to dismiss the
         // task
         // - It's the focused task to be moved to the front, we immediately re-add the task
-        if (child instanceof TaskView && child != mSplitHiddenTaskView
-                && child != mMovingTaskView) {
-            TaskView taskView = (TaskView) child;
-            for (int i : taskView.getTaskIds()) {
-                mHasVisibleTaskData.delete(i);
+        if (child instanceof TaskView) {
+            mTaskViewCount = Math.max(0, --mTaskViewCount);
+            if (child != mSplitHiddenTaskView && child != mMovingTaskView) {
+                TaskView taskView = (TaskView) child;
+                for (int i : taskView.getTaskIds()) {
+                    mHasVisibleTaskData.delete(i);
+                }
+                if (child instanceof GroupedTaskView) {
+                    mGroupedTaskViewPool.recycle((GroupedTaskView) taskView);
+                } else if (child instanceof DesktopTaskView) {
+                    mDesktopTaskViewPool.recycle((DesktopTaskView) taskView);
+                } else {
+                    mTaskViewPool.recycle(taskView);
+                }
+                mActionsView.updateHiddenFlags(HIDDEN_NO_TASKS, getTaskViewCount() == 0);
             }
-            if (child instanceof GroupedTaskView) {
-                mGroupedTaskViewPool.recycle((GroupedTaskView) taskView);
-            } else if (child instanceof DesktopTaskView) {
-                mDesktopTaskViewPool.recycle((DesktopTaskView) taskView);
-            } else {
-                mTaskViewPool.recycle(taskView);
-            }
-            mActionsView.updateHiddenFlags(HIDDEN_NO_TASKS, getTaskViewCount() == 0);
         }
     }
 
     @Override
     public void onViewAdded(View child) {
         super.onViewAdded(child);
+        if (child instanceof TaskView) {
+            mTaskViewCount++;
+        }
         child.setAlpha(mContentAlpha);
         // RecentsView is set to RTL in the constructor when system is using LTR. Here we set the
         // child direction back to match system settings.
@@ -2081,11 +2088,7 @@ public abstract class RecentsView<
     }
 
     public int getTaskViewCount() {
-        int taskViewCount = getChildCount();
-        if (indexOfChild(mClearAllButton) != -1) {
-            taskViewCount--;
-        }
-        return taskViewCount;
+        return mTaskViewCount;
     }
 
     /**
@@ -2291,8 +2294,7 @@ public abstract class RecentsView<
      * Updates TaskView scaling and translation required to support variable width.
      */
     private void updateTaskSize() {
-        final int taskCount = getTaskViewCount();
-        if (taskCount == 0) {
+        if (getTaskViewCount() == 0) {
             return;
         }
 
@@ -5658,8 +5660,7 @@ public abstract class RecentsView<
             throw new IllegalStateException("Another pending animation is still running");
         }
 
-        int count = getTaskViewCount();
-        if (count == 0) {
+        if (getTaskViewCount() == 0) {
             return new PendingAnimation(duration);
         }
 
