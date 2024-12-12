@@ -3958,25 +3958,40 @@ public abstract class RecentsView<
                         : distanceFromDismissedTask;
                 // Set timings based on if user is initiating splitscreen on the focused task,
                 // or splitting/dismissing some other task.
-                float animationStartProgress = isSlidingTasks
-                        ? Utilities.boundToRange(
-                        splitTimings.getGridSlideStartOffset()
-                                + (splitTimings.getGridSlideStaggerOffset()
-                                * staggerColumn),
-                        0f,
-                        dismissTranslationInterpolationEnd)
-                        : Utilities.boundToRange(
-                                INITIAL_DISMISS_TRANSLATION_INTERPOLATION_OFFSET
-                                        + ADDITIONAL_DISMISS_TRANSLATION_INTERPOLATION_OFFSET
-                                        * staggerColumn, 0f, dismissTranslationInterpolationEnd);
-                float animationEndProgress = isSlidingTasks
-                        ? Utilities.boundToRange(
-                        splitTimings.getGridSlideStartOffset()
-                                + (splitTimings.getGridSlideStaggerOffset() * staggerColumn)
-                                + splitTimings.getGridSlideDurationOffset(),
-                        0f,
-                        dismissTranslationInterpolationEnd)
-                        : dismissTranslationInterpolationEnd;
+                final float animationStartProgress;
+                if (isSlidingTasks) {
+                    float slidingStartOffset = splitTimings.getGridSlideStartOffset()
+                            + (splitTimings.getGridSlideStaggerOffset() * staggerColumn);
+                    if (areAllDesktopTasksDismissed) {
+                        animationStartProgress = Utilities.boundToRange(
+                                slidingStartOffset
+                                        + splitTimings.getDesktopFadeSplitAnimationEndOffset(),
+                                0f,
+                                dismissTranslationInterpolationEnd);
+                    } else {
+                        animationStartProgress = Utilities.boundToRange(
+                                slidingStartOffset,
+                                0f,
+                                dismissTranslationInterpolationEnd);
+                    }
+                } else {
+                    animationStartProgress = Utilities.boundToRange(
+                            INITIAL_DISMISS_TRANSLATION_INTERPOLATION_OFFSET
+                                    + ADDITIONAL_DISMISS_TRANSLATION_INTERPOLATION_OFFSET
+                                    * staggerColumn, 0f, dismissTranslationInterpolationEnd);
+                }
+
+                final float animationEndProgress;
+                if (isSlidingTasks && taskView != nextFocusedTaskView) {
+                    animationEndProgress = Utilities.boundToRange(
+                            splitTimings.getGridSlideStartOffset()
+                                    + (splitTimings.getGridSlideStaggerOffset() * staggerColumn)
+                                    + splitTimings.getGridSlideDurationOffset(),
+                            0f,
+                            dismissTranslationInterpolationEnd);
+                } else {
+                    animationEndProgress = dismissTranslationInterpolationEnd;
+                }
 
                 Interpolator dismissInterpolator = isSlidingTasks ? EMPHASIZED : LINEAR;
 
@@ -3988,7 +4003,6 @@ public abstract class RecentsView<
                             clampToProgress(LINEAR, animationStartProgress,
                                     dismissTranslationInterpolationEnd));
                     primaryTranslation += dismissedTaskWidth;
-                    animationEndProgress = dismissTranslationInterpolationEnd;
                     float secondaryTranslation = -mTaskGridVerticalDiff;
                     if (!nextFocusedTaskFromTop) {
                         secondaryTranslation -= mTopBottomRowHeightDiff;
@@ -4016,11 +4030,6 @@ public abstract class RecentsView<
                         startTranslation = isTaskViewVisible(taskView) ? 0
                                 : finalTranslation + (mIsRtl ? -mLastComputedTaskSize.right
                                         : mLastComputedTaskSize.right);
-                        animationStartProgress = Utilities.boundToRange(
-                                animationStartProgress
-                                        + splitTimings.getDesktopFadeSplitAnimationEndOffset(),
-                                0f,
-                                dismissTranslationInterpolationEnd);
                     }
                     Animator dismissAnimator = ObjectAnimator.ofFloat(taskView,
                             taskView.getPrimaryDismissTranslationProperty(),
