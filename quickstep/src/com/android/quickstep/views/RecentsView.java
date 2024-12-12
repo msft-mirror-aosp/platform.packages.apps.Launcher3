@@ -6186,10 +6186,12 @@ public abstract class RecentsView<
             }
         }
 
-        final int taskCount = getTaskViewCount();
         int lastTaskScroll = getLastTaskScroll(clearAllScroll, clearAllWidth);
-        for (int i = 0; i < taskCount; i++) {
-            TaskView taskView = requireTaskViewAt(i);
+        for (int i = 0; i < getChildCount(); i++) {
+            TaskView taskView = getTaskViewAt(i);
+            if (taskView == null) {
+                continue;
+            }
             float scrollDiff = taskView.getScrollAdjustment(showAsGrid);
             int pageScroll = newPageScrolls[i] + Math.round(scrollDiff);
             if ((mIsRtl && pageScroll < lastTaskScroll)
