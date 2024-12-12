@@ -26,6 +26,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
 
+import android.os.Process;
 import android.util.Log;
 import android.view.View;
 
@@ -73,7 +74,9 @@ public class WorkProfileTest extends BaseLauncherActivityTest<Launcher> {
 
     @Before
     public void setUp() throws Exception {
-        String output = executeShellCommand("pm create-user --profileOf 0 --managed TestProfile");
+        String output = executeShellCommand(String.format(
+                "pm create-user --profileOf %d --managed TestProfile",
+                Process.myUserHandle().getIdentifier()));
         updateWorkProfileSetupSuccessful("pm create-user", output);
 
         String[] tokens = output.split("\\s+");
@@ -146,7 +149,7 @@ public class WorkProfileTest extends BaseLauncherActivityTest<Launcher> {
         executeOnLauncher(l -> {
             // Ensure updates are not deferred so notification happens when apps pause.
             l.getAppsView().getAppsStore().disableDeferUpdates(DEFER_UPDATES_TEST);
-            l.getAppsView().getWorkManager().getWorkUtilityView().performClick();
+            l.getAppsView().getWorkManager().getWorkUtilityView().getWorkFAB().performClick();
         });
 
         waitForLauncherCondition("Work profile toggle OFF failed", launcher -> {

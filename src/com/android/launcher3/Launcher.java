@@ -423,8 +423,6 @@ public class Launcher extends StatefulActivity<LauncherState>
     private final SettingsCache.OnChangeListener mNaturalScrollingChangedListener =
             enabled -> mIsNaturalScrollingEnabled = enabled;
 
-    private boolean mRecreateToUpdateTheme = false;
-
     public static Launcher getLauncher(Context context) {
         return fromContext(context);
     }
@@ -1751,12 +1749,6 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     @Override
-    protected void recreateToUpdateTheme() {
-        mRecreateToUpdateTheme = true;
-        super.recreateToUpdateTheme();
-    }
-
-    @Override
     public void onRestoreInstanceState(Bundle state) {
         super.onRestoreInstanceState(state);
         IntSet synchronouslyBoundPages = mModelCallbacks.getSynchronouslyBoundPages();
@@ -1800,8 +1792,6 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (mPendingActivityResult != null) {
             outState.putParcelable(RUNTIME_STATE_PENDING_ACTIVITY_RESULT, mPendingActivityResult);
         }
-
-        outState.putBoolean(RUNTIME_STATE_RECREATE_TO_UPDATE_THEME, mRecreateToUpdateTheme);
 
         super.onSaveInstanceState(outState);
     }
@@ -2308,7 +2298,8 @@ public class Launcher extends StatefulActivity<LauncherState>
             if (item.container == CONTAINER_DESKTOP) {
                 CellLayout cl = mWorkspace.getScreenWithId(presenterPos.screenId);
                 if (cl != null && cl.isOccupied(presenterPos.cellX, presenterPos.cellY)) {
-                    Object tag = cl.getChildAt(presenterPos.cellX, presenterPos.cellY).getTag();
+                    View occupiedView = cl.getChildAt(presenterPos.cellX, presenterPos.cellY);
+                    Object tag = occupiedView == null ? null : occupiedView.getTag();
                     String desc = "Collision while binding workspace item: " + item
                             + ". Collides with " + tag;
                     if (FeatureFlags.IS_STUDIO_BUILD) {

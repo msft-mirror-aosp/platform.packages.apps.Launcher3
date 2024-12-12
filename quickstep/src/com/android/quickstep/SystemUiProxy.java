@@ -1478,10 +1478,11 @@ public class SystemUiProxy implements ISystemUiProxy, NavHandle {
     }
 
     /** Call shell to move a task with given `taskId` to desktop  */
-    public void moveToDesktop(int taskId, DesktopModeTransitionSource transitionSource) {
+    public void moveToDesktop(int taskId, DesktopModeTransitionSource transitionSource,
+            @Nullable RemoteTransition transition) {
         if (mDesktopMode != null) {
             try {
-                mDesktopMode.moveToDesktop(taskId, transitionSource);
+                mDesktopMode.moveToDesktop(taskId, transitionSource, transition);
             } catch (RemoteException e) {
                 Log.w(TAG, "Failed call moveToDesktop", e);
             }
