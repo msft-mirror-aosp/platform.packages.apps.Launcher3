@@ -29,6 +29,7 @@ import static com.android.launcher3.util.window.WindowManagerProxy.MIN_TABLET_WI
 import android.content.Context;
 import android.os.Handler;
 import android.os.Message;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.WorkerThread;
@@ -230,6 +231,7 @@ public class RotationHelper implements LauncherPrefChangeListener,
         }
         if (activityFlags != mLastActivityFlags) {
             mLastActivityFlags = activityFlags;
+            Log.d("b/380940677", toString());
             mRequestOrientationHandler.sendEmptyMessage(activityFlags);
         }
     }
@@ -257,9 +259,9 @@ public class RotationHelper implements LauncherPrefChangeListener,
         return String.format("[mStateHandlerRequest=%d, mCurrentStateRequest=%d, "
                         + "mLastActivityFlags=%d, mIgnoreAutoRotateSettings=%b, "
                         + "mHomeRotationEnabled=%b, mForceAllowRotationForTesting=%b,"
-                        + " mDestroyed=%b]",
+                        + " mDestroyed=%b, mIsFixedLandscape=%b]",
                 mStateHandlerRequest, mCurrentStateRequest, mLastActivityFlags,
                 mIgnoreAutoRotateSettings, mHomeRotationEnabled, mForceAllowRotationForTesting,
-                mDestroyed);
+                mDestroyed, mIsFixedLandscape);
     }
 }
