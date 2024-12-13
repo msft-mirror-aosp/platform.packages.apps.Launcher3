@@ -3931,6 +3931,7 @@ public abstract class RecentsView<
                     : -newClearAllShortTotalWidthTranslation;
         }
         mDismissPrimaryTranslations = new int[taskCount];
+        int lastTaskViewIndex = indexOfChild(mUtils.getLastTaskView());
         for (int i = 0; i < count; i++) {
             View child = getChildAt(i);
             if (child == dismissedTaskView) {
@@ -3940,7 +3941,8 @@ public abstract class RecentsView<
             } else if (!showAsGrid || (enableLargeDesktopWindowingTile()
                     && dismissedTaskView != null && dismissedTaskView.isLargeTile()
                     && nextFocusedTaskView == null && !dismissingForSplitSelection)) {
-                int offset = getOffsetToDismissedTask(scrollDiffPerPage, dismissedIndex, taskCount);
+                int offset = getOffsetToDismissedTask(scrollDiffPerPage, dismissedIndex,
+                        lastTaskViewIndex);
                 int scrollDiff = newScroll[i] - oldScroll[i] + offset;
                 if (scrollDiff != 0) {
                     translateTaskWhenDismissed(
@@ -4290,14 +4292,14 @@ public abstract class RecentsView<
      * - Current page is rightmost page (leftmost for RTL)
      * - Dragging an adjacent page on the left side (right side for RTL)
      */
-    private int getOffsetToDismissedTask(int scrollDiffPerPage, int dismissedIndex, int taskCount) {
-        // When mCurrentPage is ClearAllButton, use the last TaskView instead to calculate
-        // offset.
-        int currentPage = mCurrentPage == taskCount ? taskCount - 1 : mCurrentPage;
+    private int getOffsetToDismissedTask(int scrollDiffPerPage, int dismissedIndex,
+            int lastTaskViewIndex) {
+        // If `mCurrentPage` is beyond `lastTaskViewIndex`, use the last TaskView instead to
+        // calculate offset.
+        int currentPage = Math.min(mCurrentPage, lastTaskViewIndex);
         int offset = mIsRtl ? scrollDiffPerPage : 0;
         if (currentPage == dismissedIndex) {
-            int lastPage = taskCount - 1;
-            if (currentPage == lastPage) {
+            if (currentPage == lastTaskViewIndex) {
                 offset += mIsRtl ? -scrollDiffPerPage : scrollDiffPerPage;
             }
         } else {
