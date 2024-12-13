@@ -324,6 +324,8 @@ public class LauncherBackAnimationController {
                 && !mLauncher.isInState(LauncherState.ALL_APPS)) {
             Animations.cancelOngoingAnimation(mLauncher.getWorkspace());
             Animations.cancelOngoingAnimation(mLauncher.getHotseat());
+            mLauncher.getDepthController().stateDepth.setValue(
+                    LauncherState.BACKGROUND_APP.getDepth(mLauncher));
             setLauncherScale(ScalingWorkspaceRevealAnim.MIN_SIZE);
         }
         if (mScrimLayer == null) {
