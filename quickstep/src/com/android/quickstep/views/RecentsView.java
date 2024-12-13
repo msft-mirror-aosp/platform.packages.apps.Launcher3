@@ -5219,17 +5219,20 @@ public abstract class RecentsView<
         SplitAnimationTimings timings = AnimUtils.getDeviceOverviewToSplitTimings(
                 mContainer.getDeviceProfile().isTablet);
         if (enableLargeDesktopWindowingTile()) {
-            for (int i = 0; i < getTaskViewCount(); i++) {
-                TaskView taskView = requireTaskViewAt(i);
+            TaskView currentPageTaskView = getCurrentPageTaskView();
+            TaskView nextPageTaskView = getTaskViewAt(mCurrentPage + 1);
+            TaskView previousPageTaskView = getTaskViewAt(mCurrentPage - 1);
+            for (TaskView taskView : getTaskViews()) {
                 if (taskView instanceof DesktopTaskView) {
                     // Setting pivot to scale down from screen centre.
-                    if (i >= mCurrentPage - 1 && i <= mCurrentPage + 1) {
-                        float pivotX;
-                        if (i == mCurrentPage - 1) {
+                    if (taskView == previousPageTaskView || taskView == currentPageTaskView
+                            || taskView == nextPageTaskView) {
+                        float pivotX = 0f;
+                        if (taskView == previousPageTaskView) {
                             pivotX = mIsRtl ? taskView.getWidth() / 2f - mPageSpacing
                                     - taskView.getWidth()
                                     : taskView.getWidth() / 2f + mPageSpacing + taskView.getWidth();
-                        } else if (i == mCurrentPage) {
+                        } else if (taskView == currentPageTaskView) {
                             pivotX = taskView.getWidth() / 2f;
                         } else {
                             pivotX = mIsRtl ? taskView.getWidth() + mPageSpacing
