@@ -62,6 +62,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.SpringAnimationBuilder;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.quickstep.AbsSwipeUpHandler;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.RecentsAnimationController;
@@ -110,9 +111,9 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
     public RecentsWindowSwipeHandler(Context context, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState, long touchTimeMs,
             boolean continuingLastGesture, InputConsumerController inputConsumer,
-            RecentsWindowManager recentsWindowManager) {
+            RecentsWindowFactory recentsWindowFactory, MSDLPlayerWrapper msdlPlayerWrapper) {
         super(context, deviceState, taskAnimationManager, gestureState, touchTimeMs,
-                continuingLastGesture, inputConsumer, recentsWindowManager);
+                continuingLastGesture, inputConsumer, recentsWindowFactory, msdlPlayerWrapper);
 
         mRunningOverHome = mGestureState.getRunningTask() != null
                 && mGestureState.getRunningTask().isHomeTask();
@@ -159,7 +160,10 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
         boolean fromHomeToHome = mRunningOverHome
                 && endTarget == GestureState.GestureEndTarget.HOME;
         if (fromHomeToHome) {
-            mRecentsWindowManager.startHome(/* finishRecentsAnimation= */ false);
+            RecentsWindowManager manager = mRecentsWindowFactory.get(mDeviceState.getDisplayId());
+            if (manager != null) {
+                manager.startHome(/* finishRecentsAnimation= */ false);
+            }
         }
         super.animateGestureEnd(
                 startShift,
@@ -220,7 +224,11 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
             // the PiP task appearing.
             recentsCallback = () -> {
                 callback.run();
-                mRecentsWindowManager.startHome();
+                RecentsWindowManager manager =
+                        mRecentsWindowFactory.get(mDeviceState.getDisplayId());
+                if (manager != null) {
+                    manager.startHome();
+                }
             };
         } else {
             recentsCallback = callback;

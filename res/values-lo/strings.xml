@@ -68,6 +68,8 @@
     <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"ວຽກ"</string>
     <string name="widget_category_conversations" msgid="8894438636213590446">"ການສົນທະນາ"</string>
     <string name="widget_category_note_taking" msgid="3469689394504266039">"ການຈົດບັນທຶກ"</string>
+    <string name="widget_cell_tap_to_show_add_button_label" msgid="4354194214317043581">"ສະແດງປຸ່ມເພີ່ມ"</string>
+    <string name="widget_cell_tap_to_hide_add_button_label" msgid="6117805205101555997">"ເຊື່ອງປຸ່ມເພີ່ມ"</string>
     <string name="widget_add_button_label" msgid="2761267068711937179">"ເພີ່ມ"</string>
     <string name="widget_add_button_content_description" msgid="1810530016360039643">"ເພີ່ມວິດເຈັດ <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>
     <string name="widgets_list_expand_button_label" msgid="7912016136574932622">"ສະແດງທັງໝົດ"</string>
@@ -178,8 +180,7 @@
     <string name="action_decrease_width" msgid="1374549771083094654">"ຫຼຸດ​ລວງ​ກ້​ວາງ​ລົງ"</string>
     <string name="action_decrease_height" msgid="282377193880900022">"ຫຼຸດ​ລວງ​ສູງ​ລົງ"</string>
     <string name="widget_resized" msgid="9130327887929620">"ປ່ຽນ​ຂະ​ໜາດ​ວິດ​ເຈັດ​ເປັນ​ລວງ​ກ້​ວາງ <xliff:g id="NUMBER_0">%1$s</xliff:g> ລວງ​ສູງ <xliff:g id="NUMBER_1">%2$s</xliff:g> ແລ້ວ"</string>
-    <!-- no translation found for action_deep_shortcut (4766835855579976045) -->
-    <skip />
+    <string name="action_deep_shortcut" msgid="4766835855579976045">"ເມນູທາງລັດ"</string>
     <string name="action_dismiss_notification" msgid="5909461085055959187">"ປິດໄວ້"</string>
     <string name="accessibility_close" msgid="2277148124685870734">"ປິດ"</string>
     <string name="all_apps_personal_tab" msgid="4190252696685155002">"ສ່ວນຕົວ"</string>

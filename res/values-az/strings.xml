@@ -68,6 +68,8 @@
     <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"İş"</string>
     <string name="widget_category_conversations" msgid="8894438636213590446">"Söhbətlər"</string>
     <string name="widget_category_note_taking" msgid="3469689394504266039">"Qeydgötürmə"</string>
+    <string name="widget_cell_tap_to_show_add_button_label" msgid="4354194214317043581">"Əlavə edin düyməsini göstərin"</string>
+    <string name="widget_cell_tap_to_hide_add_button_label" msgid="6117805205101555997">"Əlavə edin düyməsini gizlədin"</string>
     <string name="widget_add_button_label" msgid="2761267068711937179">"Əlavə edin"</string>
     <string name="widget_add_button_content_description" msgid="1810530016360039643">"<xliff:g id="WIDGET_NAME">%1$s</xliff:g> vidcet əlavə edin"</string>
     <string name="widgets_list_expand_button_label" msgid="7912016136574932622">"Hamısını göstər"</string>
@@ -178,8 +180,7 @@
     <string name="action_decrease_width" msgid="1374549771083094654">"Eni azaldın"</string>
     <string name="action_decrease_height" msgid="282377193880900022">"Hündürlüyü azaldın"</string>
     <string name="widget_resized" msgid="9130327887929620">"Vidcetin eni <xliff:g id="NUMBER_0">%1$s</xliff:g> hündürlüyü <xliff:g id="NUMBER_1">%2$s</xliff:g> kimi ölçüləndirildi"</string>
-    <!-- no translation found for action_deep_shortcut (4766835855579976045) -->
-    <skip />
+    <string name="action_deep_shortcut" msgid="4766835855579976045">"Qısayol menyusu"</string>
     <string name="action_dismiss_notification" msgid="5909461085055959187">"Rədd edin"</string>
     <string name="accessibility_close" msgid="2277148124685870734">"Bağlayın"</string>
     <string name="all_apps_personal_tab" msgid="4190252696685155002">"Şəxsi"</string>
@@ -200,7 +201,7 @@
     <string name="remote_action_failed" msgid="1383965239183576790">"Alınmadı: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"Məxfi sahə"</string>
     <string name="private_space_secondary_label" msgid="9203933341714508907">"Toxunaraq ayarlayın və ya açın"</string>
-    <string name="ps_container_title" msgid="4391796149519594205">"Şəxsi"</string>
+    <string name="ps_container_title" msgid="4391796149519594205">"Məxfi"</string>
     <string name="ps_container_settings" msgid="6059734123353320479">"Şəxsi məkan ayarları"</string>
     <string name="ps_container_unlock_button_content_description" msgid="9181551784092204234">"Şəxsi, kilidli deyil."</string>
     <string name="ps_container_lock_button_content_description" msgid="5961993384382649530">"Şəxsi, kilidli."</string>

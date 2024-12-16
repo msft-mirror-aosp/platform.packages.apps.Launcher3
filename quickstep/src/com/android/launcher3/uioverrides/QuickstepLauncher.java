@@ -48,6 +48,7 @@ import static com.android.launcher3.popup.SystemShortcut.APP_INFO;
 import static com.android.launcher3.popup.SystemShortcut.BUBBLE_SHORTCUT;
 import static com.android.launcher3.popup.SystemShortcut.DONT_SUGGEST_APP;
 import static com.android.launcher3.popup.SystemShortcut.INSTALL;
+import static com.android.launcher3.popup.SystemShortcut.PIN_UNPIN_ITEM;
 import static com.android.launcher3.popup.SystemShortcut.PRIVATE_PROFILE_INSTALL;
 import static com.android.launcher3.popup.SystemShortcut.UNINSTALL_APP;
 import static com.android.launcher3.popup.SystemShortcut.WIDGETS;
@@ -65,7 +66,6 @@ import static com.android.quickstep.util.AnimUtils.completeRunnableListCallback;
 import static com.android.quickstep.util.SplitAnimationTimings.TABLET_HOME_TO_SPLIT;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_HOME_KEY;
 import static com.android.wm.shell.Flags.enableBubbleAnything;
-import static com.android.wm.shell.Flags.enableBubbleBarInPersistentTaskBar;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.SNAP_TO_2_50_50;
 
 import android.animation.Animator;
@@ -458,6 +458,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         // Order matters as it affects order of appearance in popup container
         List<SystemShortcut.Factory> shortcuts = new ArrayList(Arrays.asList(
                 APP_INFO, WellbeingModel.SHORTCUT_FACTORY, mHotseatPredictionController));
+
+        if (Flags.enablePinningAppWithContextMenu()) {
+            shortcuts.add(0, PIN_UNPIN_ITEM);
+        }
         shortcuts.addAll(getSplitShortcuts());
         shortcuts.add(WIDGETS);
         shortcuts.add(INSTALL);
@@ -601,7 +605,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
             case QUICK_SWITCH_STATE_ORDINAL: {
                 RecentsView rv = getOverviewPanel();
                 TaskView currentPageTask = rv.getCurrentPageTaskView();
-                TaskView fallbackTask = rv.getTaskViewAt(0);
+                TaskView fallbackTask = rv.getFirstTaskView();
                 if (currentPageTask != null || fallbackTask != null) {
                     TaskView taskToLaunch = currentPageTask;
                     if (currentPageTask == null) {
@@ -801,6 +805,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         if (mLauncherUnfoldAnimationController != null) {
             mLauncherUnfoldAnimationController.onResume();
         }
+
+        if (mTaskbarUIController != null && FeatureFlags.enableHomeTransitionListener()) {
+            mTaskbarUIController.onLauncherResume();
+        }
     }
 
     @Override
@@ -820,6 +828,18 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
                 mSplitSelectStateController.getSplitAnimationController()
                         .playPlaceholderDismissAnim(this, LAUNCHER_SPLIT_SELECTION_EXIT_INTERRUPTED);
             }
+        }
+
+        if (mTaskbarUIController != null && FeatureFlags.enableHomeTransitionListener()) {
+            mTaskbarUIController.onLauncherPause();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (mTaskbarUIController != null && FeatureFlags.enableHomeTransitionListener()) {
+            mTaskbarUIController.onLauncherStop();
         }
     }
 
@@ -1118,9 +1138,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     /** Provides the translation X for the hotseat item. */
     public int getHotseatItemTranslationX(ItemInfo itemInfo) {
         int translationX = 0;
-        if (isBubbleBarEnabled()
-                && enableBubbleBarInPersistentTaskBar()
-                && mBubbleBarLocation != null) {
+        if (isBubbleBarEnabled() && mBubbleBarLocation != null) {
             boolean isBubblesOnLeft = mBubbleBarLocation.isOnLeft(isRtl(getResources()));
             translationX += mDeviceProfile
                     .getHotseatTranslationXForNavBar(this, isBubblesOnLeft);

@@ -16,6 +16,7 @@
 
 package com.android.quickstep;
 
+import static android.util.MathUtils.lerp;
 import static android.view.RemoteAnimationTarget.MODE_CLOSING;
 import static android.view.RemoteAnimationTarget.MODE_OPENING;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
@@ -51,11 +52,15 @@ import android.window.BackMotionEvent;
 import android.window.BackProgressAnimator;
 import android.window.IBackAnimationHandoffHandler;
 import android.window.IOnBackInvokedCallback;
+
+import com.android.app.animation.Animations;
 import com.android.app.animation.Interpolators;
 import com.android.internal.policy.SystemBarUtils;
 import com.android.internal.view.AppearanceRegion;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
+import com.android.launcher3.Flags;
+import com.android.launcher3.LauncherState;
 import com.android.launcher3.QuickstepTransitionManager;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
@@ -65,6 +70,7 @@ import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
 import com.android.quickstep.util.BackAnimState;
+import com.android.quickstep.util.ScalingWorkspaceRevealAnim;
 import com.android.systemui.shared.system.QuickStepContract;
 
 import java.lang.ref.WeakReference;
@@ -87,9 +93,12 @@ import java.lang.ref.WeakReference;
  */
 public class LauncherBackAnimationController {
     private static final int SCRIM_FADE_DURATION = 233;
-    private static final float MIN_WINDOW_SCALE = 0.85f;
+    private static final float MIN_WINDOW_SCALE =
+            Flags.predictiveBackToHomePolish() ? 0.75f : 0.85f;
     private static final float MAX_SCRIM_ALPHA_DARK = 0.8f;
     private static final float MAX_SCRIM_ALPHA_LIGHT = 0.2f;
+    private static final int MAX_BLUR_RADIUS = 20;
+    private static final int MIN_BLUR_RADIUS_PRE_COMMIT = 10;
 
     private final QuickstepTransitionManager mQuickstepTransitionManager;
     private final Matrix mTransformMatrix = new Matrix();
@@ -119,6 +128,7 @@ public class LauncherBackAnimationController {
     private ValueAnimator mScrimAlphaAnimator;
     private float mScrimAlpha;
     private boolean mOverridingStatusBarFlags;
+    private int mLastBlurRadius = 0;
 
     private final ComponentCallbacks mComponentCallbacks = new ComponentCallbacks() {
         @Override
@@ -314,6 +324,17 @@ public class LauncherBackAnimationController {
                 new RemoteAnimationTarget[]{ mBackTarget });
         setLauncherTargetViewVisible(false);
         mCurrentRect.set(mStartRect);
+        if (Flags.predictiveBackToHomePolish() && !mLauncher.getWorkspace().isOverlayShown()
+                && !mLauncher.isInState(LauncherState.ALL_APPS)) {
+            Animations.cancelOngoingAnimation(mLauncher.getWorkspace());
+            Animations.cancelOngoingAnimation(mLauncher.getHotseat());
+            if (Flags.predictiveBackToHomeBlur()) {
+                mLauncher.getDepthController().pauseBlursOnWindows(true);
+            }
+            mLauncher.getDepthController().stateDepth.setValue(
+                    LauncherState.BACKGROUND_APP.getDepth(mLauncher));
+            setLauncherScale(ScalingWorkspaceRevealAnim.MIN_SIZE);
+        }
         if (mScrimLayer == null) {
             addScrimLayer();
         }
@@ -326,6 +347,13 @@ public class LauncherBackAnimationController {
         } else if (mLauncherTargetView instanceof LauncherAppWidgetHostView) {
             mLauncherTargetView.setAlpha(isVisible ? 1f : 0f);
         }
+    }
+
+    private void setLauncherScale(float scale) {
+        mLauncher.getWorkspace().setScaleX(scale);
+        mLauncher.getWorkspace().setScaleY(scale);
+        mLauncher.getHotseat().setScaleX(scale);
+        mLauncher.getHotseat().setScaleY(scale);
     }
 
     void addScrimLayer() {
@@ -346,6 +374,7 @@ public class LauncherBackAnimationController {
         final float[] colorComponents = new float[] { 0f, 0f, 0f };
         mScrimAlpha = (isDarkTheme)
                 ? MAX_SCRIM_ALPHA_DARK : MAX_SCRIM_ALPHA_LIGHT;
+        setBlur(MAX_BLUR_RADIUS);
         mTransaction
                 .setColor(mScrimLayer, colorComponents)
                 .setAlpha(mScrimLayer, mScrimAlpha)
@@ -372,6 +401,9 @@ public class LauncherBackAnimationController {
         if (mScrimLayer == null) {
             // Scrim hasn't been attached yet. Let's attach it.
             addScrimLayer();
+        } else {
+            mLastBlurRadius = (int) lerp(MAX_BLUR_RADIUS, MIN_BLUR_RADIUS_PRE_COMMIT, progress);
+            setBlur(mLastBlurRadius);
         }
         float screenWidth = mStartRect.width();
         float screenHeight = mStartRect.height();
@@ -401,6 +433,12 @@ public class LauncherBackAnimationController {
         applyTransform(mCurrentRect, cornerRadius);
 
         customizeStatusBarAppearance(top > mStatusBarHeight / 2);
+    }
+
+    private void setBlur(int blurRadius) {
+        if (Flags.predictiveBackToHomeBlur()) {
+            mTransaction.setBackgroundBlurRadius(mScrimLayer, blurRadius);
+        }
     }
 
     /** Transform the target window to match the target rect. */
@@ -500,6 +538,14 @@ public class LauncherBackAnimationController {
         if (mScrimLayer != null) {
             removeScrimLayer();
         }
+        if (Flags.predictiveBackToHomePolish() && !mLauncher.getWorkspace().isOverlayShown()
+                && !mLauncher.isInState(LauncherState.ALL_APPS)) {
+            setLauncherScale(ScalingWorkspaceRevealAnim.MAX_SIZE);
+            if (Flags.predictiveBackToHomeBlur()) {
+                mLauncher.getDepthController().pauseBlursOnWindows(false);
+            }
+        }
+        mLastBlurRadius = 0;
     }
 
     private void startTransitionAnimations(BackAnimState backAnim) {
@@ -513,6 +559,7 @@ public class LauncherBackAnimationController {
             float value = (Float) animation.getAnimatedValue();
             if (mScrimLayer != null && mScrimLayer.isValid()) {
                 mTransaction.setAlpha(mScrimLayer, value * mScrimAlpha);
+                setBlur((int) lerp(mLastBlurRadius, 0, 1f - value));
                 applyTransaction();
             }
         });

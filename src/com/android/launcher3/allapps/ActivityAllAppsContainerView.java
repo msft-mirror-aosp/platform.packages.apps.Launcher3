@@ -315,8 +315,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
                 0,
                 0 // Bottom left
         };
-        mBottomSheetBackgroundColor =
-                Themes.getAttrColor(getContext(), R.attr.materialColorSurfaceDim);
+        mBottomSheetBackgroundColor = getContext().getColor(R.color.materialColorSurfaceDim);
         updateBackgroundVisibility(mActivityContext.getDeviceProfile());
         mSearchUiManager.initializeSearch(this);
     }
@@ -759,6 +758,22 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     public void forceUpdateHeaderHeight(int offset) {
         if (Flags.multilineSearchBar()) {
             mHeader.updateSearchBarOffset(offset);
+        }
+    }
+
+    @Override
+    public void addChildrenForAccessibility(ArrayList<View> arrayList) {
+        super.addChildrenForAccessibility(arrayList);
+        if (!Flags.floatingSearchBar()) {
+            // Searchbox container is visually at the top of the all apps UI but it's present in
+            // end of the children list.
+            // We need to move the searchbox to the top in a11y tree for a11y services to read the
+            // all apps screen in same as visual order.
+            arrayList.stream().filter(v -> v.getId() == R.id.search_container_all_apps)
+                    .findFirst().ifPresent(v -> {
+                        arrayList.remove(v);
+                        arrayList.add(0, v);
+                    });
         }
     }
 

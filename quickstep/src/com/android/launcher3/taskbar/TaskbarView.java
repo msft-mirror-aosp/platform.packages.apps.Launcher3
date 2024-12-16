@@ -34,6 +34,7 @@ import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.util.ArraySet;
 import android.util.AttributeSet;
 import android.view.DisplayCutout;
 import android.view.InputDevice;
@@ -74,8 +75,10 @@ import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -133,6 +136,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     private final int mAllAppsButtonTranslationOffset;
 
     private final int mNumStaticViews;
+
+    private Set<GroupTask> mPrevRecentTasks = Collections.emptySet();
 
     public TaskbarView(@NonNull Context context) {
         this(context, null);
@@ -389,6 +394,10 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         if (!(view.getTag() instanceof CollectionInfo)) {
             mActivityContext.getViewCache().recycleView(view.getSourceLayoutResId(), view);
         }
+        if (view instanceof FolderIcon fi) {
+            // We should clear FolderInfo's Folder and FolderIcon to avoid memory leak.
+            fi.removeListeners();
+        }
         view.setTag(null);
     }
 
@@ -454,7 +463,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
 
         // Skip static views and potential All Apps divider, if they are on the left.
         mNextViewIndex = mIsRtl ? 0 : mNumStaticViews;
-        if (getChildAt(mNextViewIndex) == mTaskbarDividerContainer) {
+        if (getChildAt(mNextViewIndex) == mTaskbarDividerContainer && !mAddedDividerForRecents) {
             mNextViewIndex++;
         }
 
@@ -609,7 +618,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         // accounted for when comparing current icon count to max number of icons.
         int nonTaskIconsToBeAdded = 1;
 
-        boolean supportsOverflow = Flags.taskbarOverflow();
+        boolean supportsOverflow = Flags.taskbarOverflow() && recentTasks.size() > 1;
         int overflowSize = 0;
         if (supportsOverflow) {
             mIdealNumIcons = mNextViewIndex + recentTasks.size() + nonTaskIconsToBeAdded;
@@ -632,6 +641,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         }
 
         // Add Recent/Running icons.
+        final Set<GroupTask> recentTasksSet = new ArraySet<>(recentTasks);
         for (GroupTask task : recentTasks) {
             if (mTaskbarOverflowView != null && overflownTasks != null
                     && overflownTasks.size() < itemsToAddToOverflow) {
@@ -660,12 +670,18 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             }
 
             View recentIcon = null;
-            while (isNextViewInSection(GroupTask.class)) {
+            // If a task is new, we should not reuse a view so that it animates in when it is added.
+            final boolean canReuseView = !taskbarRecentsLayoutTransition()
+                    || mPrevRecentTasks.contains(task);
+            while (canReuseView && isNextViewInSection(GroupTask.class)) {
                 recentIcon = getChildAt(mNextViewIndex);
 
                 // see if the view can be reused
                 if ((recentIcon.getSourceLayoutResId() != expectedLayoutResId)
-                        || (isCollection && (recentIcon.getTag() != task))) {
+                        || (isCollection && (recentIcon.getTag() != task))
+                        // Remove view corresponding to removed task so that it animates out.
+                        || (taskbarRecentsLayoutTransition()
+                                && !recentTasksSet.contains(recentIcon.getTag()))) {
                     removeAndRecycle(recentIcon);
                     recentIcon = null;
                 } else {
@@ -695,6 +711,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         while (isNextViewInSection(GroupTask.class)) {
             removeAndRecycle(getChildAt(mNextViewIndex));
         }
+
+        mPrevRecentTasks = recentTasksSet;
     }
 
     private boolean isNextViewInSection(Class<?> tagClass) {
@@ -754,13 +772,13 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
      * aligned - returns 0.
      */
     public float getTranslationXForBubbleBarPosition(BubbleBarLocation location) {
-        if (!mControllerCallbacks.isBubbleBarEnabledInPersistentTaskbar()
+        if (!mControllerCallbacks.isBubbleBarEnabled()
                 || location == mBubbleBarLocation
                 || !mActivityContext.shouldStartAlignTaskbar()
         ) {
             return 0;
         }
-        Rect iconsBounds = getIconLayoutBounds();
+        Rect iconsBounds = getTransientTaskbarIconLayoutBoundsInParent();
         return getTaskBarIconsEndForBubbleBarLocation(location) - iconsBounds.right;
     }
 
@@ -774,7 +792,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
         int iconEnd = centerAlignIconEnd;
         if (mShouldTryStartAlign) {
             int startSpacingPx = deviceProfile.inlineNavButtonsEndSpacingPx;
-            if (mControllerCallbacks.isBubbleBarEnabledInPersistentTaskbar()
+            if (mControllerCallbacks.isBubbleBarEnabled()
                     && mBubbleBarLocation != null
                     && mActivityContext.shouldStartAlignTaskbar()) {
                 iconEnd = (int) getTaskBarIconsEndForBubbleBarLocation(mBubbleBarLocation);
@@ -835,6 +853,8 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             iconEnd += mAllAppsButtonTranslationOffset;
         }
 
+        mControllerCallbacks.onPreLayoutChildren();
+
         int count = getChildCount();
         for (int i = count; i > 0; i--) {
             View child = getChildAt(i - 1);
@@ -888,26 +908,46 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
     }
 
     /**
-     * Returns whether the given MotionEvent, *in screen coorindates*, is within any Taskbar item's
+     * Returns whether the given MotionEvent, *in screen coordinates*, is within any Taskbar item's
      * touch bounds.
      */
     public boolean isEventOverAnyItem(MotionEvent ev) {
         getLocationOnScreen(mTempOutLocation);
-        int xInOurCoordinates = (int) ev.getX() - mTempOutLocation[0];
-        int yInOurCoorindates = (int) ev.getY() - mTempOutLocation[1];
-        return isShown() && mIconLayoutBounds.contains(xInOurCoordinates, yInOurCoorindates);
+        int xInOurCoordinates = (int) ev.getRawX() - mTempOutLocation[0];
+        int yInOurCoordinates = (int) ev.getRawY() - mTempOutLocation[1];
+        return isShown() && getTaskbarIconsActualBounds().contains(xInOurCoordinates,
+                yInOurCoordinates);
+    }
+
+    /**
+     * Returns the current visual taskbar icons bounds (unlike `mIconLayoutBounds` which contains
+     * bounds for transient mode only).
+     */
+    private Rect getTaskbarIconsActualBounds() {
+        View[] iconViews = getIconViews();
+        if (iconViews.length == 0) {
+            return new Rect();
+        }
+
+        int[] firstIconViewLocation = new int[2];
+        int[] lastIconViewLocation = new int[2];
+        iconViews[0].getLocationOnScreen(firstIconViewLocation);
+        iconViews[iconViews.length - 1].getLocationOnScreen(lastIconViewLocation);
+
+        return new Rect(firstIconViewLocation[0], 0, lastIconViewLocation[0] + mIconTouchSize,
+                getHeight());
     }
 
     /**
      * Gets visual bounds of the taskbar view. The visual bounds correspond to the taskbar touch
      * area, rather than layout placement in the parent view.
      */
-    public Rect getIconLayoutVisualBounds() {
+    public Rect getTransientTaskbarIconLayoutBounds() {
         return new Rect(mIconLayoutBounds);
     }
 
     /** Gets taskbar layout bounds in parent view. */
-    public Rect getIconLayoutBounds() {
+    public Rect getTransientTaskbarIconLayoutBoundsInParent() {
         Rect actualBounds = new Rect(mIconLayoutBounds);
         actualBounds.top = getTop();
         actualBounds.bottom = getBottom();

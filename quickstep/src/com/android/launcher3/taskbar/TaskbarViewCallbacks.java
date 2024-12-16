@@ -16,12 +16,16 @@
 
 package com.android.launcher3.taskbar;
 
+import static com.android.launcher3.Flags.taskbarRecentsLayoutTransition;
+import static com.android.launcher3.config.FeatureFlags.enableTaskbarPinning;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_LONG_PRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TASKBAR_ALLAPPS_BUTTON_TAP;
+import static com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_TASKBAR_OVERFLOW;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.view.GestureDetector;
+import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 import android.view.View;
@@ -33,7 +37,6 @@ import com.android.internal.jank.Cuj;
 import com.android.launcher3.taskbar.bubbles.BubbleBarViewController;
 import com.android.launcher3.util.DisplayController;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
-import com.android.wm.shell.Flags;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 
 /**
@@ -91,6 +94,7 @@ public class TaskbarViewCallbacks {
     public View.OnTouchListener getTaskbarDividerRightClickListener() {
         return (v, event) -> {
             if (event.isFromSource(InputDevice.SOURCE_MOUSE)
+                    && event.getAction() == MotionEvent.ACTION_DOWN
                     && event.getButtonState() == MotionEvent.BUTTON_SECONDARY) {
                 mControllers.taskbarPinningController.showPinningView(v, getDividerCenterX());
                 return true;
@@ -106,6 +110,13 @@ public class TaskbarViewCallbacks {
     /** Gets the hover listener for the provided icon view. */
     public View.OnHoverListener getIconOnHoverListener(View icon) {
         return new TaskbarHoverToolTipController(mActivity, mTaskbarView, icon);
+    }
+
+    /** Callback invoked before Taskbar icons are laid out. */
+    void onPreLayoutChildren() {
+        if (enableTaskbarPinning() && taskbarRecentsLayoutTransition()) {
+            mControllers.taskbarViewController.updateTaskbarIconTranslationXForPinning();
+        }
     }
 
     /**
@@ -148,10 +159,9 @@ public class TaskbarViewCallbacks {
                 .orElse(0f);
     }
 
-    /** Returns true if bubble bar controllers present and enabled in persistent taskbar. */
-    public boolean isBubbleBarEnabledInPersistentTaskbar() {
-        return Flags.enableBubbleBarInPersistentTaskBar()
-                && mControllers.bubbleControllers.isPresent();
+    /** Returns true if bubble bar controllers are present. */
+    public boolean isBubbleBarEnabled() {
+        return mControllers.bubbleControllers.isPresent();
     }
 
     /** Returns on click listener for the taskbar overflow view. */
@@ -179,6 +189,9 @@ public class TaskbarViewCallbacks {
         if (mTaskbarView.getTaskbarOverflowView() != null) {
             mTaskbarView.getTaskbarOverflowView().setIsActive(
                     !mTaskbarView.getTaskbarOverflowView().getIsActive());
+            mControllers.taskbarAutohideSuspendController
+                    .updateFlag(FLAG_AUTOHIDE_SUSPEND_TASKBAR_OVERFLOW,
+                            mTaskbarView.getTaskbarOverflowView().getIsActive());
         }
         mControllers.keyboardQuickSwitchController.toggleQuickSwitchViewForTaskbar(
                 mControllers.taskbarViewController.getTaskIdsForPinnedApps(),
@@ -189,6 +202,8 @@ public class TaskbarViewCallbacks {
         if (mTaskbarView.getTaskbarOverflowView() != null) {
             mTaskbarView.getTaskbarOverflowView().setIsActive(false);
         }
+        mControllers.taskbarAutohideSuspendController.updateFlag(
+                FLAG_AUTOHIDE_SUSPEND_TASKBAR_OVERFLOW, false);
     }
 
     private float getDividerCenterX() {
@@ -202,6 +217,10 @@ public class TaskbarViewCallbacks {
     private class TaskbarViewGestureListener extends GestureDetector.SimpleOnGestureListener {
         @Override
         public boolean onDown(@NonNull MotionEvent event) {
+            if (event.isFromSource(InputDevice.SOURCE_MOUSE)
+                    && event.getButtonState() == MotionEvent.BUTTON_SECONDARY) {
+                maybeShowPinningView(event);
+            }
             return true;
         }
 
@@ -211,11 +230,20 @@ public class TaskbarViewCallbacks {
         }
 
         @Override
-        public void onLongPress(MotionEvent event) {
-            if (DisplayController.isPinnedTaskbar(mActivity)) {
-                mControllers.taskbarPinningController.showPinningView(mTaskbarView,
-                        event.getRawX());
+        public void onLongPress(@NonNull MotionEvent event) {
+            if (maybeShowPinningView(event)) {
+                mTaskbarView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
             }
+        }
+
+        /** Returns true if the taskbar pinning popup view was shown for {@code event}. */
+        private boolean maybeShowPinningView(@NonNull MotionEvent event) {
+            if (!DisplayController.isPinnedTaskbar(mActivity) || mTaskbarView.isEventOverAnyItem(
+                    event)) {
+                return false;
+            }
+            mControllers.taskbarPinningController.showPinningView(mTaskbarView, event.getRawX());
+            return true;
         }
     }
 }

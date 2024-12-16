@@ -41,6 +41,7 @@ import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.uioverrides.QuickstepLauncher;
+import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.launcher3.util.StableViewInfo;
 import com.android.launcher3.views.ClipIconView;
 import com.android.launcher3.views.FloatingIconView;
@@ -67,9 +68,10 @@ public class LauncherSwipeHandlerV2 extends AbsSwipeUpHandler<
 
     public LauncherSwipeHandlerV2(Context context, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState, long touchTimeMs,
-            boolean continuingLastGesture, InputConsumerController inputConsumer) {
+            boolean continuingLastGesture, InputConsumerController inputConsumer,
+            MSDLPlayerWrapper msdlPlayerWrapper) {
         super(context, deviceState, taskAnimationManager, gestureState, touchTimeMs,
-                continuingLastGesture, inputConsumer, null);
+                continuingLastGesture, inputConsumer, null, msdlPlayerWrapper);
     }
 
 
@@ -329,7 +331,7 @@ public class LauncherSwipeHandlerV2 extends AbsSwipeUpHandler<
         protected void playScalingRevealAnimation() {
             if (mContainer != null) {
                 new ScalingWorkspaceRevealAnim(mContainer, mSiblingAnimation,
-                        getWindowTargetRect()).start();
+                        getWindowTargetRect(), true /* playAlphaReveal */).start();
             }
         }
 
@@ -379,7 +381,7 @@ public class LauncherSwipeHandlerV2 extends AbsSwipeUpHandler<
             if (mContainer != null) {
                 new ScalingWorkspaceRevealAnim(
                         mContainer, null /* siblingAnimation */,
-                        null /* windowTargetRect */).start();
+                        null /* windowTargetRect */, true /* playAlphaReveal */).start();
             }
         }
     }

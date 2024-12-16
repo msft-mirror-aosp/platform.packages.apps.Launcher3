@@ -37,19 +37,6 @@ import static com.android.quickstep.InputConsumer.TYPE_CURSOR_HOVER;
 import static com.android.quickstep.InputConsumerUtils.newConsumer;
 import static com.android.quickstep.InputConsumerUtils.tryCreateAssistantInputConsumer;
 import static com.android.systemui.shared.system.ActivityManagerWrapper.CLOSE_SYSTEM_WINDOWS_REASON_RECENTS;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_SYSUI_PROXY;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNFOLD_ANIMATION_FORWARDER;
-import static com.android.systemui.shared.system.QuickStepContract.KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_BACK_ANIMATION;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_BUBBLES;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_DESKTOP_MODE;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_DRAG_AND_DROP;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_ONE_HANDED;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_PIP;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_RECENT_TASKS;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_SHELL_TRANSITIONS;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_SPLIT_SCREEN;
-import static com.android.wm.shell.shared.ShellSharedConstants.KEY_EXTRA_SHELL_STARTING_WINDOW;
 
 import android.app.PendingIntent;
 import android.app.Service;
@@ -96,13 +83,14 @@ import com.android.launcher3.testing.shared.ResourceUtils;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.LockedUserState;
+import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.launcher3.util.NavigationMode;
 import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.TraceHelper;
 import com.android.quickstep.OverviewCommandHelper.CommandType;
-import com.android.quickstep.fallback.window.RecentsWindowManager;
+import com.android.quickstep.fallback.window.RecentsWindowFactory;
 import com.android.quickstep.fallback.window.RecentsWindowSwipeHandler;
 import com.android.quickstep.inputconsumers.BubbleBarInputConsumer;
 import com.android.quickstep.inputconsumers.OneHandedModeInputConsumer;
@@ -148,7 +136,6 @@ import java.util.function.Function;
 public class TouchInteractionService extends Service {
 
     private static final String SUBSTRING_PREFIX = "; ";
-    private static final String NEWLINE_PREFIX = "\n\t\t\t-> ";
 
     private static final String TAG = "TouchInteractionService";
 
@@ -173,30 +160,30 @@ public class TouchInteractionService extends Service {
         @BinderThread
         public void onInitialize(Bundle bundle) {
             ISystemUiProxy proxy = ISystemUiProxy.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_SYSUI_PROXY));
-            IPip pip = IPip.Stub.asInterface(bundle.getBinder(KEY_EXTRA_SHELL_PIP));
-            IBubbles bubbles = IBubbles.Stub.asInterface(bundle.getBinder(KEY_EXTRA_SHELL_BUBBLES));
+                    bundle.getBinder(ISystemUiProxy.DESCRIPTOR));
+            IPip pip = IPip.Stub.asInterface(bundle.getBinder(IPip.DESCRIPTOR));
+            IBubbles bubbles = IBubbles.Stub.asInterface(bundle.getBinder(IBubbles.DESCRIPTOR));
             ISplitScreen splitscreen = ISplitScreen.Stub.asInterface(bundle.getBinder(
-                    KEY_EXTRA_SHELL_SPLIT_SCREEN));
+                    ISplitScreen.DESCRIPTOR));
             IOneHanded onehanded = IOneHanded.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_SHELL_ONE_HANDED));
+                    bundle.getBinder(IOneHanded.DESCRIPTOR));
             IShellTransitions shellTransitions = IShellTransitions.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_SHELL_SHELL_TRANSITIONS));
+                    bundle.getBinder(IShellTransitions.DESCRIPTOR));
             IStartingWindow startingWindow = IStartingWindow.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_SHELL_STARTING_WINDOW));
+                    bundle.getBinder(IStartingWindow.DESCRIPTOR));
             ISysuiUnlockAnimationController launcherUnlockAnimationController =
                     ISysuiUnlockAnimationController.Stub.asInterface(
-                            bundle.getBinder(KEY_EXTRA_UNLOCK_ANIMATION_CONTROLLER));
+                            bundle.getBinder(ISysuiUnlockAnimationController.DESCRIPTOR));
             IRecentTasks recentTasks = IRecentTasks.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_SHELL_RECENT_TASKS));
+                    bundle.getBinder(IRecentTasks.DESCRIPTOR));
             IBackAnimation backAnimation = IBackAnimation.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_SHELL_BACK_ANIMATION));
+                    bundle.getBinder(IBackAnimation.DESCRIPTOR));
             IDesktopMode desktopMode = IDesktopMode.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_SHELL_DESKTOP_MODE));
+                    bundle.getBinder(IDesktopMode.DESCRIPTOR));
             IUnfoldAnimation unfoldTransition = IUnfoldAnimation.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_UNFOLD_ANIMATION_FORWARDER));
+                    bundle.getBinder(IUnfoldAnimation.DESCRIPTOR));
             IDragAndDrop dragAndDrop = IDragAndDrop.Stub.asInterface(
-                    bundle.getBinder(KEY_EXTRA_SHELL_DRAG_AND_DROP));
+                    bundle.getBinder(IDragAndDrop.DESCRIPTOR));
             MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis -> {
                 SystemUiProxy.INSTANCE.get(tis).setProxy(proxy, pip,
                         bubbles, splitscreen, onehanded, shellTransitions, startingWindow,
@@ -286,8 +273,7 @@ public class TouchInteractionService extends Service {
         @Override
         public void onAssistantOverrideInvoked(int invocationType) {
             executeForTouchInteractionService(tis -> {
-                if (!ContextualSearchInvoker.newInstance(tis)
-                        .tryStartAssistOverride(invocationType)) {
+                if (!new ContextualSearchInvoker(tis).tryStartAssistOverride(invocationType)) {
                     Log.w(TAG, "Failed to invoke Assist override");
                 }
             });
@@ -524,7 +510,8 @@ public class TouchInteractionService extends Service {
         }
 
         protected void onOverviewTargetChange() {
-            for (Runnable listener : mOnOverviewTargetChangeListeners) {
+            Set<Runnable> listeners = new HashSet<>(mOnOverviewTargetChangeListeners);
+            for (Runnable listener : listeners) {
                 listener.run();
             }
         }
@@ -645,7 +632,7 @@ public class TouchInteractionService extends Service {
     private InputEventReceiver mInputEventReceiver;
 
     private TaskbarManager mTaskbarManager;
-    private RecentsWindowManager mRecentsWindowManager;
+    private RecentsWindowFactory mRecentsWindowFactory;
     private Function<GestureState, AnimatedFloat> mSwipeUpProxyProvider = i -> null;
     private AllAppsActionManager mAllAppsActionManager;
     private InputManager mInputManager;
@@ -683,7 +670,7 @@ public class TouchInteractionService extends Service {
                 new DesktopAppLaunchTransitionManager(this, SystemUiProxy.INSTANCE.get(this));
         mDesktopAppLaunchTransitionManager.registerTransitions();
         if (Flags.enableLauncherOverviewInWindow() || Flags.enableFallbackOverviewInWindow()) {
-            mRecentsWindowManager = new RecentsWindowManager(this);
+            mRecentsWindowFactory = new RecentsWindowFactory(this);
         }
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
 
@@ -736,7 +723,7 @@ public class TouchInteractionService extends Service {
     public void onUserUnlocked() {
         Log.d(TAG, "onUserUnlocked: userId=" + getUserId()
                 + " instance=" + System.identityHashCode(this));
-        mTaskAnimationManager = new TaskAnimationManager(this, mRecentsWindowManager);
+        mTaskAnimationManager = new TaskAnimationManager(this, mRecentsWindowFactory, mDeviceState);
         mOverviewComponentObserver = new OverviewComponentObserver(this, mDeviceState);
         mOverviewCommandHelper = new OverviewCommandHelper(this,
                 mOverviewComponentObserver, mTaskAnimationManager);
@@ -844,8 +831,8 @@ public class TouchInteractionService extends Service {
 
         mTaskbarManager.destroy();
 
-        if (mRecentsWindowManager != null) {
-            mRecentsWindowManager.destroy();
+        if (mRecentsWindowFactory != null) {
+            mRecentsWindowFactory.destroy();
         }
         if (mDesktopAppLaunchTransitionManager != null) {
             mDesktopAppLaunchTransitionManager.unregisterTransitions();
@@ -1288,20 +1275,20 @@ public class TouchInteractionService extends Service {
             GestureState gestureState, long touchTimeMs) {
         return new LauncherSwipeHandlerV2(this, mDeviceState, mTaskAnimationManager,
                 gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
-                mInputConsumer);
+                mInputConsumer, MSDLPlayerWrapper.INSTANCE.get(this));
     }
 
     private AbsSwipeUpHandler createFallbackSwipeHandler(
             GestureState gestureState, long touchTimeMs) {
         return new FallbackSwipeHandler(this, mDeviceState, mTaskAnimationManager,
                 gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
-                mInputConsumer);
+                mInputConsumer, MSDLPlayerWrapper.INSTANCE.get(this));
     }
 
     private AbsSwipeUpHandler createRecentsWindowSwipeHandler(
             GestureState gestureState, long touchTimeMs) {
         return new RecentsWindowSwipeHandler(this, mDeviceState, mTaskAnimationManager,
                 gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
-                mInputConsumer, mRecentsWindowManager);
+                mInputConsumer, mRecentsWindowFactory, MSDLPlayerWrapper.INSTANCE.get(this));
     }
 }

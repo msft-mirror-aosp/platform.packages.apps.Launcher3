@@ -35,6 +35,8 @@ constructor(
     private val flyoutScheduler: FlyoutScheduler = HandlerScheduler(container),
 ) {
 
+    val maximumFlyoutHeight: Int = BubbleBarFlyoutView.getMaximumViewHeight(container.context)
+
     private companion object {
         const val EXPAND_ANIMATION_DURATION_MS = 400L
         const val COLLAPSE_ANIMATION_DURATION_MS = 350L
@@ -102,11 +104,10 @@ constructor(
                 }
         }
         animator.addListener(
-            onStart = { extendTopBoundary() },
             onEnd = {
                 endAction()
                 flyout.setOnClickListener { callbacks.flyoutClicked() }
-            },
+            }
         )
         animator.start()
     }
@@ -114,14 +115,13 @@ constructor(
     fun updateFlyoutFullyExpanded(message: BubbleBarFlyoutMessage, onEnd: () -> Unit) {
         val flyout = flyout ?: return
         hideFlyout(AnimationType.FADE) {
-            callbacks.resetTopBoundary()
             flyout.updateData(message) { showFlyout(AnimationType.FADE, onEnd) }
         }
     }
 
     fun updateFlyoutWhileExpanding(message: BubbleBarFlyoutMessage) {
         val flyout = flyout ?: return
-        flyout.updateData(message) { extendTopBoundary() }
+        flyout.updateData(message) {}
     }
 
     fun updateFlyoutWhileCollapsing(message: BubbleBarFlyoutMessage, onEnd: () -> Unit) {
@@ -129,14 +129,6 @@ constructor(
         animator?.pause()
         animator?.removeAllListeners()
         flyout.updateData(message) { showFlyout(AnimationType.MORPH, onEnd) }
-    }
-
-    private fun extendTopBoundary() {
-        val flyout = flyout ?: return
-        val flyoutTop = flyout.top + flyout.translationY
-        // If the top position of the flyout is negative, then it's bleeding over the
-        // top boundary of its parent view
-        if (flyoutTop < 0) callbacks.extendTopBoundary(space = -flyoutTop.toInt())
     }
 
     fun cancelFlyout(endAction: () -> Unit) {
@@ -184,7 +176,6 @@ constructor(
     private fun cleanupFlyoutView() {
         container.removeView(flyout)
         this@BubbleBarFlyoutController.flyout = null
-        callbacks.resetTopBoundary()
     }
 
     fun hasFlyout() = flyout != null
