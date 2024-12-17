@@ -43,6 +43,7 @@ import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory
 import com.android.launcher3.statemanager.StatefulContainer
 import com.android.launcher3.taskbar.TaskbarUIController
 import com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL
+import com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_SPLIT_SELECT_ORDINAL
 import com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_ORDINAL
 import com.android.launcher3.util.ContextTracker
 import com.android.launcher3.util.DisplayController
@@ -355,17 +356,23 @@ class RecentsWindowManager(context: Context) :
             cleanupRecentsWindow()
         }
         when (state) {
-            HOME ->
+            HOME,
+            BG_LAUNCHER ->
                 AccessibilityManagerCompat.sendStateEventToTest(baseContext, NORMAL_STATE_ORDINAL)
             DEFAULT ->
                 AccessibilityManagerCompat.sendStateEventToTest(baseContext, OVERVIEW_STATE_ORDINAL)
+            OVERVIEW_SPLIT_SELECT ->
+                AccessibilityManagerCompat.sendStateEventToTest(
+                    baseContext,
+                    OVERVIEW_SPLIT_SELECT_ORDINAL,
+                )
         }
     }
 
     private fun getStateName(state: RecentsState?): String {
         return when (state) {
             null -> "NULL"
-            DEFAULT -> "default"
+            DEFAULT -> "DEFAULT"
             MODAL_TASK -> "MODAL_TASK"
             BACKGROUND_APP -> "BACKGROUND_APP"
             HOME -> "HOME"
