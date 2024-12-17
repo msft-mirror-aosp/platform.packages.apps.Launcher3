@@ -1180,7 +1180,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         // Do not stash if hardware keyboard is attached, in 3 button nav and desktop windowing mode
         if (isHardwareKeyboard()
                 && mActivity.isThreeButtonNav()
-                && mControllers.taskbarDesktopModeController.getAreDesktopTasksVisible()) {
+                && mControllers.taskbarDesktopModeController
+                    .getAreDesktopTasksVisibleAndNotInOverview()) {
             return false;
         }
 

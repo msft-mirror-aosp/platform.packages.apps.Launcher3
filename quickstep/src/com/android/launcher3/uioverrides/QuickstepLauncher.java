@@ -1025,7 +1025,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         DesktopVisibilityController desktopVisibilityController = getDesktopVisibilityController();
         if (!ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()
                 && desktopVisibilityController != null
-                && desktopVisibilityController.areDesktopTasksVisible()
+                && desktopVisibilityController.areDesktopTasksVisibleAndNotInOverview()
                 && !desktopVisibilityController.isRecentsGestureInProgress()) {
             // Return early to skip setting activity to appear as resumed
             // TODO: b/333533253 - Remove after flag rollout
@@ -1354,7 +1354,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     public boolean areDesktopTasksVisible() {
         DesktopVisibilityController desktopVisibilityController = getDesktopVisibilityController();
         if (desktopVisibilityController != null) {
-            return desktopVisibilityController.areDesktopTasksVisible();
+            return desktopVisibilityController.areDesktopTasksVisibleAndNotInOverview();
         }
         return false;
     }
