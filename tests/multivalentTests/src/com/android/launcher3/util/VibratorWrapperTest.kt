@@ -17,13 +17,12 @@
 package com.android.launcher3.util
 
 import android.media.AudioAttributes
-import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.VibrationEffect.Composition.PRIMITIVE_LOW_TICK
 import android.os.VibrationEffect.Composition.PRIMITIVE_TICK
 import android.os.Vibrator
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.android.launcher3.util.LauncherModelHelper.SandboxModelContext
 import com.android.launcher3.util.VibratorWrapper.HAPTIC_FEEDBACK_URI
 import com.android.launcher3.util.VibratorWrapper.OVERVIEW_HAPTIC
 import com.android.launcher3.util.VibratorWrapper.VIBRATION_ATTRS
@@ -35,46 +34,40 @@ import org.mockito.ArgumentCaptor
 import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito.any
-import org.mockito.Mockito.reset
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.never
 import org.mockito.kotlin.same
-import org.mockito.kotlin.verifyNoMoreInteractions
 
 @SmallTest
-@RunWith(AndroidJUnit4::class)
+@RunWith(LauncherMultivalentJUnit::class)
 class VibratorWrapperTest {
 
     @Mock private lateinit var settingsCache: SettingsCache
-    @Mock private lateinit var vibrator: Vibrator
+    private lateinit var vibrator: Vibrator
+    private val context: SandboxModelContext = SandboxModelContext()
     @Captor private lateinit var vibrationEffectCaptor: ArgumentCaptor<VibrationEffect>
-
+    @Mock private lateinit var tracker: DaggerSingletonTracker
     private lateinit var underTest: VibratorWrapper
 
     @Before
     fun setup() {
         MockitoAnnotations.initMocks(this)
+        vibrator = context.spyService(Vibrator::class.java)
         `when`(settingsCache.getValue(HAPTIC_FEEDBACK_URI, 0)).thenReturn(true)
         `when`(vibrator.hasVibrator()).thenReturn(true)
         `when`(vibrator.areAllPrimitivesSupported(PRIMITIVE_TICK)).thenReturn(true)
         `when`(vibrator.areAllPrimitivesSupported(PRIMITIVE_LOW_TICK)).thenReturn(true)
         `when`(vibrator.getPrimitiveDurations(PRIMITIVE_LOW_TICK)).thenReturn(intArrayOf(10))
 
-        underTest = VibratorWrapper(vibrator, settingsCache)
+        underTest = VibratorWrapper(context, settingsCache, tracker)
     }
 
     @Test
     fun init_register_onChangeListener() {
+        TestUtil.runOnExecutorSync(Executors.MAIN_EXECUTOR) {}
         verify(settingsCache).register(HAPTIC_FEEDBACK_URI, underTest.mHapticChangeListener)
-    }
-
-    @Test
-    fun close_unregister_onChangeListener() {
-        underTest.close()
-
-        verify(settingsCache).unregister(HAPTIC_FEEDBACK_URI, underTest.mHapticChangeListener)
     }
 
     @Test
@@ -118,58 +111,9 @@ class VibratorWrapperTest {
     }
 
     @Test
-    fun vibrate_for_drag_bump() {
-        underTest.vibrateForDragBump()
-
-        awaitTasksCompleted()
-        verify(vibrator).vibrate(vibrationEffectCaptor.capture(), same(VIBRATION_ATTRS))
-        val expectedEffect =
-            VibrationEffect.startComposition()
-                .addPrimitive(PRIMITIVE_LOW_TICK, VibratorWrapper.DRAG_BUMP_SCALE)
-                .compose()
-        assertThat(vibrationEffectCaptor.value).isEqualTo(expectedEffect)
-    }
-
-    @Test
-    fun vibrate_for_drag_commit() {
-        underTest.vibrateForDragCommit()
-
-        awaitTasksCompleted()
-        verify(vibrator).vibrate(vibrationEffectCaptor.capture(), same(VIBRATION_ATTRS))
-        val expectedEffect =
-            VibrationEffect.startComposition()
-                .addPrimitive(PRIMITIVE_TICK, VibratorWrapper.DRAG_COMMIT_SCALE)
-                .compose()
-        assertThat(vibrationEffectCaptor.value).isEqualTo(expectedEffect)
-    }
-
-    @Test
-    fun vibrate_for_drag_texture() {
-        SystemClock.setCurrentTimeMillis(40000)
-
-        underTest.vibrateForDragTexture()
-
-        awaitTasksCompleted()
-        verify(vibrator).vibrate(vibrationEffectCaptor.capture(), same(VIBRATION_ATTRS))
-        assertThat(vibrationEffectCaptor.value).isEqualTo(VibratorWrapper.getDragEffect())
-    }
-
-    @Test
-    fun vibrate_for_drag_texture_within_time_window_noOp() {
-        SystemClock.setCurrentTimeMillis(40000)
-        underTest.vibrateForDragTexture()
-        awaitTasksCompleted()
-        reset(vibrator)
-
-        underTest.vibrateForDragTexture()
-
-        verifyNoMoreInteractions(vibrator)
-    }
-
-    @Test
     fun haptic_feedback_disabled_no_vibrate() {
         `when`(vibrator.hasVibrator()).thenReturn(false)
-        underTest = VibratorWrapper(vibrator, settingsCache)
+        underTest = VibratorWrapper(context, settingsCache, tracker)
 
         underTest.vibrate(OVERVIEW_HAPTIC)
 

@@ -20,15 +20,14 @@ import android.content.Context
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
-import android.graphics.drawable.ShapeDrawable
-import android.graphics.drawable.shapes.RoundRectShape
 import android.util.AttributeSet
 import android.util.Log
 import android.view.Gravity
-import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewStub
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.updateLayoutParams
+import com.android.launcher3.Flags.enableOverviewIconMenu
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
 import com.android.launcher3.R
 import com.android.launcher3.testing.TestLogging
@@ -39,72 +38,94 @@ import com.android.launcher3.util.TransformingTouchDelegate
 import com.android.launcher3.util.ViewPool
 import com.android.launcher3.util.rects.set
 import com.android.quickstep.BaseContainerInterface
+import com.android.quickstep.DesktopFullscreenDrawParams
+import com.android.quickstep.FullscreenDrawParams
 import com.android.quickstep.TaskOverlayFactory
+import com.android.quickstep.ViewUtils
+import com.android.quickstep.task.thumbnail.TaskThumbnailView
 import com.android.quickstep.util.RecentsOrientedState
 import com.android.systemui.shared.recents.model.Task
 
 /** TaskView that contains all tasks that are part of the desktop. */
 class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
-    TaskView(context, attrs, type = TaskViewType.DESKTOP) {
+    TaskView(
+        context,
+        attrs,
+        type = TaskViewType.DESKTOP,
+        thumbnailFullscreenParams = DesktopFullscreenDrawParams(context),
+    ) {
+    private val contentViewFullscreenParams = FullscreenDrawParams(context)
 
-    private val snapshotDrawParams =
-        object : FullscreenDrawParams(context) {
-            // DesktopTaskView thumbnail's corner radius is independent of fullscreenProgress.
-            override fun computeTaskCornerRadius(context: Context) =
-                computeWindowCornerRadius(context)
-        }
     private val taskThumbnailViewDeprecatedPool =
-        ViewPool<TaskThumbnailViewDeprecated>(
-            context,
-            this,
-            R.layout.task_thumbnail_deprecated,
-            VIEW_POOL_MAX_SIZE,
-            VIEW_POOL_INITIAL_SIZE
-        )
+        if (!enableRefactorTaskThumbnail()) {
+            ViewPool<TaskThumbnailViewDeprecated>(
+                context,
+                this,
+                R.layout.task_thumbnail_deprecated,
+                VIEW_POOL_MAX_SIZE,
+                VIEW_POOL_INITIAL_SIZE,
+            )
+        } else null
+
+    private val taskThumbnailViewPool =
+        if (enableRefactorTaskThumbnail()) {
+            ViewPool<TaskThumbnailView>(
+                context,
+                this,
+                R.layout.task_thumbnail,
+                VIEW_POOL_MAX_SIZE,
+                VIEW_POOL_INITIAL_SIZE,
+            )
+        } else null
+
     private val tempPointF = PointF()
     private val tempRect = Rect()
-    private lateinit var backgroundView: View
     private lateinit var iconView: TaskViewIcon
-    private var childCountAtInflation = 0
+    private lateinit var contentView: DesktopTaskContentView
+    private lateinit var backgroundView: View
 
     override fun onFinishInflate() {
         super.onFinishInflate()
-        backgroundView =
-            findViewById<View>(R.id.background)!!.apply {
-                updateLayoutParams<LayoutParams> {
-                    topMargin = container.deviceProfile.overviewTaskThumbnailTopMarginPx
-                }
-                background =
-                    ShapeDrawable(RoundRectShape(FloatArray(8) { taskCornerRadius }, null, null))
-                        .apply {
-                            setTint(
-                                resources.getColor(
-                                    android.R.color.system_neutral2_300,
-                                    context.theme
-                                )
-                            )
-                        }
-            }
         iconView =
-            getOrInflateIconView(R.id.icon).apply {
+            (findViewById<View>(R.id.icon) as TaskViewIcon).apply {
                 setIcon(
                     this,
                     ResourcesCompat.getDrawable(
                         context.resources,
                         R.drawable.ic_desktop_with_bg,
-                        context.theme
-                    )
+                        context.theme,
+                    ),
                 )
                 setText(resources.getText(R.string.recent_task_desktop))
             }
-        childCountAtInflation = childCount
+        contentView =
+            findViewById<DesktopTaskContentView>(R.id.desktop_content).apply {
+                updateLayoutParams<LayoutParams> {
+                    topMargin = container.deviceProfile.overviewTaskThumbnailTopMarginPx
+                }
+                cornerRadius = contentViewFullscreenParams.currentCornerRadius
+                backgroundView = findViewById(R.id.background)
+                backgroundView.setBackgroundColor(
+                    resources.getColor(android.R.color.system_neutral2_300, context.theme)
+                )
+            }
+    }
+
+    override fun inflateViewStubs() {
+        findViewById<ViewStub>(R.id.icon)
+            ?.apply {
+                layoutResource =
+                    if (enableOverviewIconMenu()) R.layout.icon_app_chip_view
+                    else R.layout.icon_view
+            }
+            ?.inflate()
     }
 
     /** Updates this desktop task to the gives task list defined in `tasks` */
     fun bind(
         tasks: List<Task>,
         orientedState: RecentsOrientedState,
-        taskOverlayFactory: TaskOverlayFactory
+        taskOverlayFactory: TaskOverlayFactory,
     ) {
         if (DEBUG) {
             val sb = StringBuilder()
@@ -113,21 +134,17 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             Log.d(TAG, sb.toString())
         }
         cancelPendingLoadTasks()
+        val backgroundViewIndex = contentView.indexOfChild(backgroundView)
         taskContainers =
             tasks.map { task ->
                 val snapshotView =
                     if (enableRefactorTaskThumbnail()) {
-                        LayoutInflater.from(context).inflate(R.layout.task_thumbnail, this, false)
+                        taskThumbnailViewPool!!.view
                     } else {
-                        taskThumbnailViewDeprecatedPool.view
+                        taskThumbnailViewDeprecatedPool!!.view
                     }
+                contentView.addView(snapshotView, backgroundViewIndex + 1)
 
-                addView(
-                    snapshotView,
-                    // Add snapshotView to the front after initial views e.g. icon and
-                    // background.
-                    childCountAtInflation
-                )
                 TaskContainer(
                     this,
                     task,
@@ -137,20 +154,21 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                     SplitConfigurationOptions.STAGE_POSITION_UNDEFINED,
                     digitalWellBeingToast = null,
                     showWindowsView = null,
-                    taskOverlayFactory
+                    taskOverlayFactory,
                 )
             }
-        taskContainers.forEach { it.bind() }
-        setOrientationState(orientedState)
+        onBind(orientedState)
     }
 
     override fun onRecycle() {
         super.onRecycle()
         visibility = VISIBLE
         taskContainers.forEach {
-            if (!enableRefactorTaskThumbnail()) {
-                removeView(it.thumbnailViewDeprecated)
-                taskThumbnailViewDeprecatedPool.recycle(it.thumbnailViewDeprecated)
+            contentView.removeView(it.snapshotView)
+            if (enableRefactorTaskThumbnail()) {
+                taskThumbnailViewPool!!.recycle(it.thumbnailView)
+            } else {
+                taskThumbnailViewDeprecatedPool!!.recycle(it.thumbnailViewDeprecated)
             }
         }
     }
@@ -159,12 +177,12 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
     override fun updateTaskSize(
         lastComputedTaskSize: Rect,
         lastComputedGridTaskSize: Rect,
-        lastComputedCarouselTaskSize: Rect
+        lastComputedCarouselTaskSize: Rect,
     ) {
         super.updateTaskSize(
             lastComputedTaskSize,
             lastComputedGridTaskSize,
-            lastComputedCarouselTaskSize
+            lastComputedCarouselTaskSize,
         )
         if (taskContainers.isEmpty()) {
             return
@@ -186,7 +204,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             Log.d(
                 TAG,
                 "onMeasure: container=[$containerWidth,$containerHeight]" +
-                    "window=[$windowWidth,$windowHeight] scale=[$scaleWidth,$scaleHeight]"
+                    "window=[$windowWidth,$windowHeight] scale=[$scaleWidth,$scaleHeight]",
             )
         }
 
@@ -209,24 +227,26 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
                 width = (taskSize.width() * scaleWidth).toInt()
                 height = (taskSize.height() * scaleHeight).toInt()
                 leftMargin = (positionInParent.x * scaleWidth).toInt()
-                topMargin =
-                    (positionInParent.y * scaleHeight).toInt() +
-                        container.deviceProfile.overviewTaskThumbnailTopMarginPx
+                topMargin = (positionInParent.y * scaleHeight).toInt()
             }
             if (DEBUG) {
                 with(it.snapshotView.layoutParams as LayoutParams) {
                     Log.d(
                         TAG,
                         "onMeasure: task=${it.task.key} size=[$width,$height]" +
-                            " margin=[$leftMargin,$topMargin]"
+                            " margin=[$leftMargin,$topMargin]",
                     )
                 }
             }
         }
     }
 
-    override fun needsUpdate(dataChange: Int, flag: Int) =
-        if (flag == FLAG_UPDATE_CORNER_RADIUS) false else super.needsUpdate(dataChange, flag)
+    override fun onTaskListVisibilityChanged(visible: Boolean, changes: Int) {
+        super.onTaskListVisibilityChanged(visible, changes)
+        if (needsUpdate(changes, FLAG_UPDATE_CORNER_RADIUS)) {
+            contentViewFullscreenParams.updateCornerRadius(context)
+        }
+    }
 
     override fun onIconLoaded(taskContainer: TaskContainer) {
         // Update contentDescription of snapshotView only, individual task icon is unused.
@@ -241,9 +261,9 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
 
     override fun getThumbnailBounds(bounds: Rect, relativeToDragLayer: Boolean) {
         if (relativeToDragLayer) {
-            container.dragLayer.getDescendantRectRelativeToSelf(backgroundView, bounds)
+            container.dragLayer.getDescendantRectRelativeToSelf(contentView, bounds)
         } else {
-            bounds.set(backgroundView)
+            bounds.set(contentView)
         }
     }
 
@@ -252,7 +272,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         TestLogging.recordEvent(
             TestProtocol.SEQUENCE_MAIN,
             "launchDesktopFromRecents",
-            taskIds.contentToString()
+            taskIds.contentToString(),
         )
         val endCallback = RunnableList()
         val desktopController = recentsView.desktopRecentsController
@@ -262,7 +282,7 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         }
         Log.d(
             TAG,
-            "launchTaskAnimated - launchTaskWithDesktopController: ${taskIds.contentToString()}, withRemoteTransition: $animated"
+            "launchTaskWithDesktopController: ${taskIds.contentToString()}, withRemoteTransition: $animated",
         )
 
         // Callbacks get run from recentsView for case when recents animation already running
@@ -270,14 +290,17 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         return endCallback
     }
 
-    override fun launchTaskAnimated() = launchTaskWithDesktopController(animated = true)
+    override fun launchAsStaticTile() = launchTaskWithDesktopController(animated = true)
 
-    override fun launchTask(callback: (launched: Boolean) -> Unit, isQuickSwitch: Boolean) {
-        launchTaskWithDesktopController(animated = false)?.add { callback(true) } ?: callback(false)
-    }
+    override fun launchWithoutAnimation(
+        isQuickSwitch: Boolean,
+        callback: (launched: Boolean) -> Unit,
+    ) = launchTaskWithDesktopController(animated = false)?.add { callback(true) } ?: callback(false)
 
-    // Desktop tile can't be in split screen
-    override fun confirmSecondSplitSelectApp(): Boolean = false
+    // Return true when Task cannot be launched as fullscreen (i.e. in split select state) to skip
+    // putting DesktopTaskView to split as it's not supported.
+    override fun confirmSecondSplitSelectApp(): Boolean =
+        recentsView?.canLaunchFullscreenTask() != true
 
     // TODO(b/330685808) support overlay for Screenshot action
     override fun setOverlayEnabled(overlayEnabled: Boolean) {}
@@ -286,17 +309,21 @@ class DesktopTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
         backgroundView.alpha = 1 - fullscreenProgress
     }
 
-    override fun updateCurrentFullscreenParams() {
-        super.updateCurrentFullscreenParams()
-        updateFullscreenParams(snapshotDrawParams)
+    override fun updateFullscreenParams() {
+        super.updateFullscreenParams()
+        updateFullscreenParams(contentViewFullscreenParams)
+        contentView.cornerRadius = contentViewFullscreenParams.currentCornerRadius
     }
 
-    override fun getThumbnailFullscreenParams() = snapshotDrawParams
+    override fun addChildrenForAccessibility(outChildren: ArrayList<View>) {
+        super.addChildrenForAccessibility(outChildren)
+        ViewUtils.addAccessibleChildToList(backgroundView, outChildren)
+    }
 
     companion object {
         private const val TAG = "DesktopTaskView"
         private const val DEBUG = false
-        private const val VIEW_POOL_MAX_SIZE = 10
+        private const val VIEW_POOL_MAX_SIZE = 5
 
         // As DesktopTaskView is inflated in background, use initialSize=0 to avoid initPool.
         private const val VIEW_POOL_INITIAL_SIZE = 0

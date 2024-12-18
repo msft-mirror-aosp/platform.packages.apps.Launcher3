@@ -16,6 +16,7 @@
 
 package com.android.launcher3.model;
 
+import static com.android.launcher3.icons.cache.CacheLookupFlag.DEFAULT_LOOKUP_FLAG;
 import static com.android.launcher3.model.data.AppInfo.COMPONENT_KEY_COMPARATOR;
 import static com.android.launcher3.model.data.AppInfo.EMPTY_ARRAY;
 
@@ -40,6 +41,7 @@ import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.pm.PackageInstallInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.ApiWrapper;
+import com.android.launcher3.util.ApplicationInfoWrapper;
 import com.android.launcher3.util.FlagOp;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.SafeCloseable;
@@ -150,7 +152,7 @@ public class AllAppsList {
             return;
         }
         if (loadIcon) {
-            mIconCache.getTitleAndIcon(info, activityInfo, false /* useLowResIcon */);
+            mIconCache.getTitleAndIcon(info, activityInfo, DEFAULT_LOOKUP_FLAG);
             info.sectionName = mIndex.computeSectionName(info.title);
         } else {
             info.title = "";
@@ -169,14 +171,14 @@ public class AllAppsList {
     public AppInfo addPromiseApp(
             Context context, PackageInstallInfo installInfo, boolean loadIcon) {
         // only if not yet installed
-        if (PackageManagerHelper.INSTANCE.get(context)
-                .isAppInstalled(installInfo.packageName, installInfo.user)) {
+        if (new ApplicationInfoWrapper(context, installInfo.packageName, installInfo.user)
+                .isInstalled()) {
             return null;
         }
         AppInfo promiseAppInfo = new AppInfo(installInfo);
 
         if (loadIcon) {
-            mIconCache.getTitleAndIcon(promiseAppInfo, promiseAppInfo.usingLowResIcon());
+            mIconCache.getTitleAndIcon(promiseAppInfo, promiseAppInfo.getMatchingLookupFlag());
             promiseAppInfo.sectionName = mIndex.computeSectionName(promiseAppInfo.title);
         } else {
             promiseAppInfo.title = "";
@@ -223,7 +225,8 @@ public class AllAppsList {
                     if (DEBUG) {
                         Log.w(TAG, "updatePromiseInstallInfo: removing app due to install"
                                 + " failure and appInfo not startable."
-                                + " package=" + appInfo.getTargetPackage());
+                                + " package=" + appInfo.getTargetPackage()
+                                + ", user=" + user);
                     }
                     removeApp(i);
                 }
@@ -319,7 +322,8 @@ public class AllAppsList {
                     if (!findActivity(matches, applicationInfo.componentName)) {
                         if (DEBUG) {
                             Log.w(TAG, "Changing shortcut target due to app component name change."
-                                    + " package=" + packageName);
+                                    + " component=" + applicationInfo.componentName
+                                    + ", user=" + user);
                         }
                         removeApp(i);
                     }
@@ -335,7 +339,7 @@ public class AllAppsList {
                 } else {
                     Intent launchIntent = AppInfo.makeLaunchIntent(info);
 
-                    mIconCache.getTitleAndIcon(applicationInfo, info, false /* useLowResIcon */);
+                    mIconCache.getTitleAndIcon(applicationInfo, info, DEFAULT_LOOKUP_FLAG);
                     applicationInfo.sectionName = mIndex.computeSectionName(applicationInfo.title);
                     applicationInfo.intent = launchIntent;
                     AppInfo.updateRuntimeFlagsForActivityTarget(applicationInfo, info,
@@ -346,8 +350,9 @@ public class AllAppsList {
         } else {
             // Remove all data for this package.
             if (DEBUG) {
-                Log.w(TAG, "updatePromiseInstallInfo: no Activities matched updated package,"
-                        + " removing all apps from package=" + packageName);
+                Log.w(TAG, "updatePackage: no Activities matched updated package,"
+                        + " removing any AppInfo with package=" + packageName
+                        + ", user=" + user);
             }
             for (int i = data.size() - 1; i >= 0; i--) {
                 final AppInfo applicationInfo = data.get(i);

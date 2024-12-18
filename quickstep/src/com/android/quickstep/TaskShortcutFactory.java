@@ -317,7 +317,7 @@ public interface TaskShortcutFactory {
             boolean hideForExistingMultiWindow = container.getDeviceProfile().isMultiWindowMode;
             boolean isLargeTile = deviceProfile.isTablet && taskView.isLargeTile();
             boolean isTaskInExpectedScrollPosition =
-                    recentsView.isTaskInExpectedScrollPosition(recentsView.indexOfChild(taskView));
+                    recentsView.isTaskInExpectedScrollPosition(taskView);
 
             if (notEnoughTasksToSplit || isTaskSplitNotSupported || hideForExistingMultiWindow
                     || (isLargeTile && isTaskInExpectedScrollPosition)) {
@@ -342,7 +342,7 @@ public interface TaskShortcutFactory {
             final RecentsView recentsView = taskView.getRecentsView();
             boolean isLargeTile = deviceProfile.isTablet && taskView.isLargeTile();
             boolean isInExpectedScrollPosition =
-                    recentsView.isTaskInExpectedScrollPosition(recentsView.indexOfChild(taskView));
+                    recentsView.isTaskInExpectedScrollPosition(taskView);
             boolean shouldShowActionsButtonInstead =
                     isLargeTile && isInExpectedScrollPosition;
 
@@ -431,7 +431,7 @@ public interface TaskShortcutFactory {
 
         @Override
         public void onClick(View view) {
-            if (mTaskView.launchTaskAnimated() != null) {
+            if (mTaskView.launchAsStaticTile() != null) {
                 SystemUiProxy.INSTANCE.get(mTarget.asContext()).startScreenPinning(
                         mTaskView.getFirstTask().key.id);
             }

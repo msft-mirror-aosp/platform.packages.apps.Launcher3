@@ -119,7 +119,8 @@ public class PackageUpdatedTask implements ModelUpdateTask {
         final HashMap<String, List<LauncherActivityInfo>> activitiesLists = new HashMap<>();
         if (DEBUG) {
             Log.d(TAG, "Package updated: mOp=" + getOpString()
-                    + " packages=" + Arrays.toString(packages));
+                    + " packages=" + Arrays.toString(packages)
+                    + ", user=" + mUser);
         }
         switch (mOp) {
             case OP_ADD: {
@@ -325,7 +326,8 @@ public class PackageUpdatedTask implements ModelUpdateTask {
                                     itemInfo.setNonResizeable(ApiWrapper.INSTANCE.get(context)
                                             .isNonResizeableActivity(activities.get(0)));
                                 }
-                                iconCache.getTitleAndIcon(itemInfo, itemInfo.usingLowResIcon());
+                                iconCache.getTitleAndIcon(
+                                        itemInfo, itemInfo.getMatchingLookupFlag());
                                 infoUpdated = true;
                             }
                         }

@@ -129,7 +129,10 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         mRecentsView = mLauncher.getOverviewPanel();
         mXRange = mLauncher.getDeviceProfile().widthPx / 2f;
         mYRange = LayoutUtils.getShelfTrackingDistance(
-            mLauncher, mLauncher.getDeviceProfile(), mRecentsView.getPagedOrientationHandler());
+                mLauncher,
+                mLauncher.getDeviceProfile(),
+                mRecentsView.getPagedOrientationHandler(),
+                mRecentsView.getSizeStrategy());
         mMaxYProgress = mLauncher.getDeviceProfile().heightPx / mYRange;
         mMotionPauseDetector = new MotionPauseDetector(mLauncher);
         mMotionPauseMinDisplacement = mLauncher.getResources().getDimension(
@@ -220,7 +223,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         updateNonOverviewAnim(QUICK_SWITCH_FROM_HOME, nonOverviewBuilder);
         mNonOverviewAnim.dispatchOnStart();
 
-        if (mRecentsView.getTaskViewCount() == 0) {
+        if (!mRecentsView.hasTaskViews()) {
             mRecentsView.setOnEmptyMessageUpdatedListener(isEmpty -> {
                 if (!isEmpty && mSwipeDetector.isDraggingState()) {
                     // We have loaded tasks, update the animators to start at the correct scale etc.
@@ -253,7 +256,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         mRecentsView.setFullscreenProgress(fromState.getOverviewFullscreenProgress());
         mLauncher.getActionsView().getVisibilityAlpha().updateValue(
                 (fromState.getVisibleElements(mLauncher) & OVERVIEW_ACTIONS) != 0 ? 1f : 0f);
-        mRecentsView.setTaskIconScaledDown(true);
+        mRecentsView.setTaskIconVisible(false);
 
         float[] scaleAndOffset = toState.getOverviewScaleAndOffset(mLauncher);
         // As we drag right, animate the following properties:
@@ -266,7 +269,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
         // since we need to take potential taskbar into account.
         xAnim.setViewBackgroundColor(mLauncher.getScrimView(),
                 QUICK_SWITCH_FROM_HOME.getWorkspaceScrimColor(mLauncher), LINEAR);
-        if (mRecentsView.getTaskViewCount() == 0) {
+        if (!mRecentsView.hasTaskViews()) {
             xAnim.addFloat(mRecentsView, CONTENT_ALPHA, 0f, 1f, LINEAR);
         }
         mXOverviewAnim = xAnim.createPlaybackController();
@@ -337,7 +340,7 @@ public class NoButtonQuickSwitchTouchController implements TouchController,
                 public void onAnimationEnd(Animator animation) {
                     onAnimationToStateCompleted(OVERVIEW);
                     // Animate the icon after onAnimationToStateCompleted() so it doesn't clobber.
-                    mRecentsView.animateUpTaskIconScale();
+                    mRecentsView.startIconFadeInOnGestureComplete();
                 }
             });
             overviewAnim.start();

@@ -36,6 +36,7 @@ import static com.android.launcher3.shortcuts.ShortcutKey.EXTRA_SHORTCUT_ID;
 
 import android.content.ComponentName;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Process;
@@ -81,8 +82,6 @@ public class ItemInfo {
 
     public static final boolean DEBUG = false;
     public static final int NO_ID = -1;
-    // An id that doesn't match any item, including predicted apps with have an id=NO_ID
-    public static final int NO_MATCHING_ID = Integer.MIN_VALUE;
 
     /** Hidden field Settings.Secure.NAV_BAR_KIDS_MODE */
     private static final Uri NAV_BAR_KIDS_MODE = Settings.Secure.getUriFor("nav_bar_kids_mode");
@@ -354,16 +353,16 @@ public class ItemInfo {
      * Creates {@link LauncherAtom.ItemInfo} with important fields and parent container info.
      */
     @NonNull
-    public LauncherAtom.ItemInfo buildProto() {
-        return buildProto(null);
+    public LauncherAtom.ItemInfo buildProto(Context context) {
+        return buildProto(null, context);
     }
 
     /**
      * Creates {@link LauncherAtom.ItemInfo} with important fields and parent container info.
      */
     @NonNull
-    public LauncherAtom.ItemInfo buildProto(@Nullable final CollectionInfo cInfo) {
-        LauncherAtom.ItemInfo.Builder itemBuilder = getDefaultItemInfoBuilder();
+    public LauncherAtom.ItemInfo buildProto(@Nullable final CollectionInfo cInfo, Context context) {
+        LauncherAtom.ItemInfo.Builder itemBuilder = getDefaultItemInfoBuilder(context);
         Optional<ComponentName> nullableComponent = Optional.ofNullable(getTargetComponent());
         switch (itemType) {
             case ITEM_TYPE_APPLICATION:
@@ -436,10 +435,10 @@ public class ItemInfo {
     }
 
     @NonNull
-    protected LauncherAtom.ItemInfo.Builder getDefaultItemInfoBuilder() {
+    protected LauncherAtom.ItemInfo.Builder getDefaultItemInfoBuilder(Context context) {
         LauncherAtom.ItemInfo.Builder itemBuilder = LauncherAtom.ItemInfo.newBuilder();
-        SettingsCache.INSTANCE.executeIfCreated(cache ->
-                itemBuilder.setIsKidsMode(cache.getValue(NAV_BAR_KIDS_MODE, 0)));
+        itemBuilder.setIsKidsMode(
+                SettingsCache.INSTANCE.get(context).getValue(NAV_BAR_KIDS_MODE, 0));
         UserCache.INSTANCE.executeIfCreated(cache ->
                 itemBuilder.setUserType(getUserType(cache.getUserInfo(user))));
         itemBuilder.setRank(rank);
@@ -543,6 +542,14 @@ public class ItemInfo {
     public void setTitle(@Nullable final CharSequence title,
             @Nullable final ModelWriter modelWriter) {
         this.title = title;
+    }
+
+    /**
+     * Returns a string ID that is stable for a user session, but may not be persisted
+     */
+    @Nullable
+    public Object getStableId() {
+        return getComponentKey();
     }
 
     private int getUserType(UserIconInfo info) {

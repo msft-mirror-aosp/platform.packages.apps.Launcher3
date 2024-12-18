@@ -16,11 +16,16 @@
 package com.android.launcher3.widget.picker;
 
 import static com.android.launcher3.Flags.enableCategorizedWidgetSuggestions;
+import static com.android.launcher3.Flags.enableTieredWidgetsByDefaultInPicker;
 import static com.android.launcher3.Flags.enableUnfoldedTwoPanePicker;
 import static com.android.launcher3.allapps.ActivityAllAppsContainerView.AdapterHolder.SEARCH;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WIDGETSTRAY_EXPAND_PRESS;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WIDGETSTRAY_SEARCHED;
 import static com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL;
 import static com.android.launcher3.views.RecyclerViewFastScroller.FastScrollerLocation.WIDGET_SCROLLER;
+
+import static java.lang.Math.abs;
+import static java.util.Collections.emptyList;
 
 import android.animation.Animator;
 import android.content.Context;
@@ -37,6 +42,7 @@ import android.util.SparseArray;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.WindowInsets;
@@ -68,6 +74,7 @@ import com.android.launcher3.views.StickyHeaderLayout;
 import com.android.launcher3.widget.BaseWidgetSheet;
 import com.android.launcher3.widget.WidgetCell;
 import com.android.launcher3.widget.model.WidgetsListBaseEntry;
+import com.android.launcher3.widget.picker.model.data.WidgetPickerData;
 import com.android.launcher3.widget.picker.search.SearchModeListener;
 import com.android.launcher3.widget.picker.search.WidgetsSearchBar;
 import com.android.launcher3.widget.picker.search.WidgetsSearchBar.WidgetsSearchDataProvider;
@@ -87,7 +94,8 @@ import java.util.stream.IntStream;
  */
 public class WidgetsFullSheet extends BaseWidgetSheet
         implements OnActivePageChangedListener,
-        WidgetsRecyclerView.HeaderViewDimensionsProvider, SearchModeListener {
+        WidgetsRecyclerView.HeaderViewDimensionsProvider, SearchModeListener,
+        WidgetsListAdapter.ExpandButtonClickListener {
 
     private static final long FADE_IN_DURATION = 150;
 
@@ -112,6 +120,10 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             new HashMap<>();
     protected int mRecommendationsCurrentPage = 0;
     protected final SparseArray<AdapterHolder> mAdapters = new SparseArray();
+
+    // Helps with removing focus from searchbar by analyzing motion events.
+    private final SearchClearFocusHelper mSearchClearFocusHelper = new SearchClearFocusHelper();
+    private final float mTouchSlop; // initialized in constructor
 
     private final OnAttachStateChangeListener mBindScrollbarInSearchMode =
             new OnAttachStateChangeListener() {
@@ -145,7 +157,9 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     protected DeviceProfile mDeviceProfile;
 
     protected TextView mNoWidgetsView;
-    protected StickyHeaderLayout mSearchScrollView;
+    protected LinearLayout mSearchScrollView;
+    // Reference to the mSearchScrollView when it is is a sticky header.
+    private @Nullable StickyHeaderLayout mStickyHeaderLayout;
     protected WidgetRecommendationsView mWidgetRecommendationsView;
     protected LinearLayout mWidgetRecommendationsContainer;
     protected View mTabBar;
@@ -157,6 +171,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
 
     public WidgetsFullSheet(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
         mDeviceProfile = mActivityContext.getDeviceProfile();
         mUserCache = UserCache.INSTANCE.get(context);
         mHasWorkProfile = mUserCache.getUserProfiles()
@@ -220,7 +235,11 @@ public class WidgetsFullSheet extends BaseWidgetSheet
 
     protected void setupViews() {
         mSearchScrollView = findViewById(R.id.search_and_recommendations_container);
-        mSearchScrollView.setCurrentRecyclerView(findViewById(R.id.primary_widgets_list_view));
+        if (mSearchScrollView instanceof StickyHeaderLayout) {
+            mStickyHeaderLayout = (StickyHeaderLayout) mSearchScrollView;
+            mStickyHeaderLayout.setCurrentRecyclerView(
+                    findViewById(R.id.primary_widgets_list_view));
+        }
         mNoWidgetsView = findViewById(R.id.no_widgets_text);
         mFastScroller = findViewById(R.id.fast_scroller);
         mFastScroller.setPopupView(findViewById(R.id.fast_scroller_popup));
@@ -251,7 +270,13 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         mSearchBar.initialize(new WidgetsSearchDataProvider() {
             @Override
             public List<WidgetsListBaseEntry> getWidgets() {
-                return getWidgetsToDisplay();
+                if (enableTieredWidgetsByDefaultInPicker()) {
+                    // search all
+                    return mActivityContext.getWidgetPickerDataProvider().get().getAllWidgets();
+                } else {
+                    // Can be removed when inlining enableTieredWidgetsByDefaultInPicker flag
+                    return getWidgetsToDisplay();
+                }
             }
         }, /* searchModeListener= */ this);
     }
@@ -277,14 +302,19 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     }
 
     private void attachScrollbarToRecyclerView(WidgetsRecyclerView recyclerView) {
-        recyclerView.bindFastScrollbar(mFastScroller, WIDGET_SCROLLER);
         if (mCurrentWidgetsRecyclerView != recyclerView) {
+            // Bind scrollbar if changing the recycler view. If widgets list updates, since
+            // scrollbar is already attached to the recycler view, it will automatically adjust as
+            // needed with recycler view's onScrollListener.
+            recyclerView.bindFastScrollbar(mFastScroller, WIDGET_SCROLLER);
             // Only reset the scroll position & expanded apps if the currently shown recycler view
             // has been updated.
             reset();
             resetExpandedHeaders();
             mCurrentWidgetsRecyclerView = recyclerView;
-            mSearchScrollView.setCurrentRecyclerView(recyclerView);
+            if (mStickyHeaderLayout != null) {
+                mStickyHeaderLayout.setCurrentRecyclerView(recyclerView);
+            }
         }
     }
 
@@ -313,7 +343,9 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             mAdapters.get(AdapterHolder.WORK).mWidgetsRecyclerView.scrollToTop();
         }
         mAdapters.get(AdapterHolder.SEARCH).mWidgetsRecyclerView.scrollToTop();
-        mSearchScrollView.reset(/* animate= */ true);
+        if (mStickyHeaderLayout != null) {
+            mStickyHeaderLayout.reset(/* animate= */ true);
+        }
     }
 
     @VisibleForTesting
@@ -472,6 +504,9 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     /**
      * Returns all displayable widgets.
      */
+    // Used by the two pane sheet to show 3-dot menu to toggle between default lists and all lists
+    // when enableTieredWidgetsByDefaultInPicker is OFF. This code path and the 3-dot menu can be
+    // safely deleted when it's alternative "enableTieredWidgetsByDefaultInPicker" flag is inlined.
     protected List<WidgetsListBaseEntry> getWidgetsToDisplay() {
         return mActivityContext.getWidgetPickerDataProvider().get().getAllWidgets();
     }
@@ -481,16 +516,27 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         if (mIsInSearchMode) {
             return;
         }
-        List<WidgetsListBaseEntry> widgets = getWidgetsToDisplay();
+        List<WidgetsListBaseEntry> widgets;
+        List<WidgetsListBaseEntry> defaultWidgets = emptyList();
+
+        if (enableTieredWidgetsByDefaultInPicker()) {
+            WidgetPickerData dataProvider =
+                    mActivityContext.getWidgetPickerDataProvider().get();
+            widgets = dataProvider.getAllWidgets();
+            defaultWidgets = dataProvider.getDefaultWidgets();
+        } else {
+            // This code path can be deleted once enableTieredWidgetsByDefaultInPicker is inlined.
+            widgets = getWidgetsToDisplay();
+        }
 
         AdapterHolder primaryUserAdapterHolder = mAdapters.get(AdapterHolder.PRIMARY);
-        primaryUserAdapterHolder.mWidgetsListAdapter.setWidgets(widgets);
+        primaryUserAdapterHolder.mWidgetsListAdapter.setWidgets(widgets, defaultWidgets);
 
         if (mHasWorkProfile) {
             mViewPager.setVisibility(VISIBLE);
             mTabBar.setVisibility(VISIBLE);
             AdapterHolder workUserAdapterHolder = mAdapters.get(AdapterHolder.WORK);
-            workUserAdapterHolder.mWidgetsListAdapter.setWidgets(widgets);
+            workUserAdapterHolder.mWidgetsListAdapter.setWidgets(widgets, defaultWidgets);
             onActivePageChanged(mViewPager.getCurrentPage());
         } else {
             onActivePageChanged(0);
@@ -505,6 +551,16 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             mIsNoWidgetsViewNeeded = isNoWidgetsViewNeeded;
             post(this::onRecommendedWidgetsBound);
         }
+    }
+
+    @Override
+    public void onWidgetsListExpandButtonClick(View v) {
+        AdapterHolder currentAdapterHolder = mAdapters.get(getCurrentAdapterHolderType());
+        currentAdapterHolder.mWidgetsListAdapter.useExpandedList();
+        onWidgetsBound();
+        currentAdapterHolder.mWidgetsRecyclerView.announceForAccessibility(
+                mActivityContext.getString(R.string.widgets_list_expanded));
+        mActivityContext.getStatsLogManager().logger().log(LAUNCHER_WIDGETSTRAY_EXPAND_PRESS);
     }
 
     @Override
@@ -559,9 +615,12 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             mAdapters.get(AdapterHolder.SEARCH).mWidgetsRecyclerView.setVisibility(GONE);
             mAdapters.get(getCurrentAdapterHolderType()).mWidgetsRecyclerView.setVisibility(
                     VISIBLE);
-            // Visibility of recommended widgets, recycler views and headers are handled in methods
-            // below.
-            post(this::onRecommendedWidgetsBound);
+            if (mRecommendedWidgetsCount > 0) {
+                // Display recommendations immediately, if present, so that other parts of sticky
+                // header (e.g. personal / work tabs) don't flash in interim.
+                mWidgetRecommendationsContainer.setVisibility(VISIBLE);
+            }
+            // Visibility of recycler views and headers are handled in methods below.
             onWidgetsBound();
         }
     }
@@ -662,10 +721,14 @@ public class WidgetsFullSheet extends BaseWidgetSheet
     public boolean onControllerInterceptTouchEvent(MotionEvent ev) {
         if (ev.getAction() == MotionEvent.ACTION_DOWN) {
             mNoIntercept = shouldScroll(ev);
-            if (mSearchBar.isSearchBarFocused()
-                    && !getPopupContainer().isEventOverView(mSearchBarContainer, ev)) {
-                mSearchBar.clearSearchBarFocus();
-            }
+        }
+
+        // Clear focus only if user touched outside of search area and handling focus out ourselves
+        // was necessary (e.g. when it's not predictive back, but other user interaction).
+        if (mSearchBar.isSearchBarFocused()
+                && !getPopupContainer().isEventOverView(mSearchBarContainer, ev)
+                && mSearchClearFocusHelper.shouldClearFocus(ev, mTouchSlop)) {
+            mSearchBar.clearSearchBarFocus();
         }
 
         return super.onControllerInterceptTouchEvent(ev);
@@ -822,7 +885,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                 + marginLayoutParams.topMargin;
     }
 
-    private int getCurrentAdapterHolderType() {
+    protected int getCurrentAdapterHolderType() {
         if (mIsInSearchMode) {
             return SEARCH;
         } else if (mViewPager != null) {
@@ -851,6 +914,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             WidgetsFullSheet sheet = show(BaseActivity.fromContext(getContext()), false);
             sheet.restoreRecommendations(mRecommendedWidgets, mRecommendedWidgetsMap);
             sheet.restoreHierarchyState(widgetsState);
+            sheet.restoreAdapterStates(mAdapters);
             sheet.restorePreviousAdapterHolderType(getCurrentAdapterHolderType());
         } else if (!isTwoPane()) {
             reset();
@@ -864,6 +928,17 @@ public class WidgetsFullSheet extends BaseWidgetSheet
             Map<WidgetRecommendationCategory, List<WidgetItem>> recommendedWidgetsMap) {
         mRecommendedWidgets = recommendedWidgets;
         mRecommendedWidgetsMap = recommendedWidgetsMap;
+    }
+
+    private void restoreAdapterStates(SparseArray<AdapterHolder> adapters) {
+        if (adapters.contains(AdapterHolder.WORK)) {
+            mAdapters.get(AdapterHolder.WORK).mWidgetsListAdapter.restoreState(
+                    adapters.get(AdapterHolder.WORK).mWidgetsListAdapter);
+        }
+        mAdapters.get(AdapterHolder.PRIMARY).mWidgetsListAdapter.restoreState(
+                adapters.get(AdapterHolder.PRIMARY).mWidgetsListAdapter);
+        mAdapters.get(AdapterHolder.SEARCH).mWidgetsListAdapter.restoreState(
+                adapters.get(AdapterHolder.SEARCH).mWidgetsListAdapter);
     }
 
     /**
@@ -1035,6 +1110,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                     this::getEmptySpaceHeight,
                     /* iconClickListener= */ WidgetsFullSheet.this,
                     /* iconLongClickListener= */ WidgetsFullSheet.this,
+                    /* expandButtonClickListener= */ WidgetsFullSheet.this,
                     isTwoPane());
             mWidgetsListAdapter.setHasStableIds(true);
             switch (mAdapterType) {
@@ -1051,7 +1127,7 @@ public class WidgetsFullSheet extends BaseWidgetSheet
         }
 
         private int getEmptySpaceHeight() {
-            return mSearchScrollView.getHeaderHeight();
+            return mStickyHeaderLayout != null ? mStickyHeaderLayout.getHeaderHeight() : 0;
         }
 
         void setup(WidgetsRecyclerView recyclerView) {
@@ -1074,6 +1150,55 @@ public class WidgetsFullSheet extends BaseWidgetSheet
                 mWidgetsRecyclerView.addOnAttachStateChangeListener(mBindScrollbarInSearchMode);
             }
             mWidgetsListAdapter.setMaxHorizontalSpansPxPerRow(mMaxSpanPerRow);
+        }
+    }
+
+    /**
+     * Helper to identify if searchbar's focus can be cleared when user performs an action
+     * outside search.
+     */
+    private static class SearchClearFocusHelper {
+        private float mFirstInteractionX = -1f;
+        private float mFirstInteractionY = -1f;
+
+        /**
+         * For a given [MotionEvent] indicates if we should clear focus from search (and hide IME).
+         */
+        boolean shouldClearFocus(MotionEvent ev, float touchSlop) {
+            int action = ev.getAction();
+            boolean clearFocus = false;
+
+            if (action == MotionEvent.ACTION_DOWN) {
+                mFirstInteractionX = ev.getX();
+                mFirstInteractionY = ev.getY();
+            } else if (action == MotionEvent.ACTION_CANCEL) {
+                // This is when user performed a gesture e.g. predictive back
+                // We don't handle it ourselves and let IME handle the close.
+                mFirstInteractionY = -1;
+                mFirstInteractionX = -1;
+            } else if (action == MotionEvent.ACTION_UP) {
+                // Its clear that user action wasn't predictive back - but press / scroll etc. that
+                // should hide the keyboard.
+                clearFocus = true;
+                mFirstInteractionY = -1;
+                mFirstInteractionX = -1;
+            } else if (action == MotionEvent.ACTION_MOVE) {
+                // Sometimes, on move, we may not receive ACTION_UP, but if the move was within
+                // touch slop and we didn't know if its moved or cancelled, we can clear focus.
+                // Example case: Apps list is small and you do a little scroll on list - in such, we
+                // want to still hide the keyboard.
+                if (mFirstInteractionX != -1 && mFirstInteractionY != -1) {
+                    float distY = abs(mFirstInteractionY - ev.getY());
+                    float distX = abs(mFirstInteractionX - ev.getX());
+                    if (distY >= touchSlop || distX >= touchSlop) {
+                        clearFocus = true;
+                        mFirstInteractionY = -1;
+                        mFirstInteractionX = -1;
+                    }
+                }
+            }
+
+            return clearFocus;
         }
     }
 }

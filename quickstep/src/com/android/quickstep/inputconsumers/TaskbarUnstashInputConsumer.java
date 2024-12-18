@@ -184,7 +184,7 @@ public class TaskbarUnstashInputConsumer extends DelegateInputConsumer {
                             if (!mHasPassedTaskbarNavThreshold && passedTaskbarNavThreshold
                                     && !mGestureState.isInExtendedSlopRegion()) {
                                 mHasPassedTaskbarNavThreshold = true;
-                                mTaskbarActivityContext.onSwipeToUnstashTaskbar();
+                                mTaskbarActivityContext.onSwipeToUnstashTaskbar(true);
                             }
 
                             if (dY < 0) {
@@ -228,10 +228,13 @@ public class TaskbarUnstashInputConsumer extends DelegateInputConsumer {
         }
 
         float velocityYPxPerS = mVelocityTracker.getYVelocity();
+        float dY = Math.abs(mLastPos.y - mDownPos.y);
         if (mCanPlayTaskbarBgAlphaAnimation
                 && mMotionMoveCount >= NUM_MOTION_MOVE_THRESHOLD // Arbitrary value
                 && velocityYPxPerS != 0 // Ignore these
-                && velocityYPxPerS >= mTaskbarSlowVelocityYThreshold) {
+                && velocityYPxPerS >= mTaskbarSlowVelocityYThreshold
+                && dY != 0
+                && dY > mTouchSlop) {
             mTaskbarActivityContext.playTaskbarBackgroundAlphaAnimation();
             mCanPlayTaskbarBgAlphaAnimation = false;
         }
@@ -287,7 +290,7 @@ public class TaskbarUnstashInputConsumer extends DelegateInputConsumer {
             // start a single unstash timeout if hovering bottom edge under the hinted taskbar.
             if (!sUnstashHandler.hasMessagesOrCallbacks()) {
                 sUnstashHandler.postDelayed(() -> {
-                    mTaskbarActivityContext.onSwipeToUnstashTaskbar();
+                    mTaskbarActivityContext.onSwipeToUnstashTaskbar(false);
                     mIsStashedTaskbarHovered = false;
                 }, HOVER_TASKBAR_UNSTASH_TIMEOUT);
             }
@@ -315,7 +318,7 @@ public class TaskbarUnstashInputConsumer extends DelegateInputConsumer {
             startStashedTaskbarHover(/* isHovered = */ true);
         } else if (mBottomEdgeBounds.contains(x, y)) {
             // If hover screen's bottom edge not below the stashed taskbar, unstash it.
-            mTaskbarActivityContext.onSwipeToUnstashTaskbar();
+            mTaskbarActivityContext.onSwipeToUnstashTaskbar(false);
         }
     }
 

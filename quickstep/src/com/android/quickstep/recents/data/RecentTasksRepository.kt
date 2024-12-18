@@ -37,8 +37,14 @@ interface RecentTasksRepository {
     fun getThumbnailById(taskId: Int): Flow<ThumbnailData?>
 
     /**
+     * Gets the [ThumbnailData] associated with a task that has id [taskId]. Flow will settle on
+     * null if the task was not found or is invisible.
+     */
+    fun getCurrentThumbnailById(taskId: Int): ThumbnailData?
+
+    /**
      * Sets the tasks that are visible, indicating that properties relating to visuals need to be
      * populated e.g. icons/thumbnails etc.
      */
-    fun setVisibleTasks(visibleTaskIdList: List<Int>)
+    fun setVisibleTasks(visibleTaskIdList: Set<Int>)
 }

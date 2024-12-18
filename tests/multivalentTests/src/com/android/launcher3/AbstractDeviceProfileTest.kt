@@ -26,8 +26,10 @@ import android.platform.test.rule.IgnoreLimit
 import android.platform.test.rule.LimitDevicesRule
 import android.util.DisplayMetrics
 import android.view.Surface
-import androidx.test.core.app.ApplicationProvider
+import androidx.test.core.app.ApplicationProvider.getApplicationContext
 import androidx.test.platform.app.InstrumentationRegistry
+import com.android.launcher3.dagger.LauncherAppComponent
+import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.testing.shared.ResourceUtils
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext
@@ -38,6 +40,8 @@ import com.android.launcher3.util.rule.setFlags
 import com.android.launcher3.util.window.CachedDisplayInfo
 import com.android.launcher3.util.window.WindowManagerProxy
 import com.google.common.truth.Truth
+import dagger.BindsInstance
+import dagger.Component
 import java.io.BufferedReader
 import java.io.File
 import java.io.PrintWriter
@@ -62,7 +66,7 @@ import org.mockito.kotlin.whenever
 abstract class AbstractDeviceProfileTest {
     protected val testContext: Context = InstrumentationRegistry.getInstrumentation().context
     protected lateinit var context: SandboxContext
-    protected open val runningContext: Context = ApplicationProvider.getApplicationContext()
+    protected open val runningContext: Context = getApplicationContext()
     private val displayController: DisplayController = mock()
     private val windowManagerProxy: WindowManagerProxy = mock()
     private val launcherPrefs: LauncherPrefs = mock()
@@ -79,7 +83,7 @@ abstract class AbstractDeviceProfileTest {
         val statusBarNaturalPx: Int,
         val statusBarRotatedPx: Int,
         val gesturePx: Int,
-        val cutoutPx: Int
+        val cutoutPx: Int,
     )
 
     open val deviceSpecs =
@@ -91,7 +95,7 @@ abstract class AbstractDeviceProfileTest {
                     statusBarNaturalPx = 118,
                     statusBarRotatedPx = 74,
                     gesturePx = 63,
-                    cutoutPx = 118
+                    cutoutPx = 118,
                 ),
             "tablet" to
                 DeviceSpec(
@@ -100,7 +104,7 @@ abstract class AbstractDeviceProfileTest {
                     statusBarNaturalPx = 104,
                     statusBarRotatedPx = 104,
                     gesturePx = 0,
-                    cutoutPx = 0
+                    cutoutPx = 0,
                 ),
             "twopanel-phone" to
                 DeviceSpec(
@@ -109,7 +113,7 @@ abstract class AbstractDeviceProfileTest {
                     statusBarNaturalPx = 133,
                     statusBarRotatedPx = 110,
                     gesturePx = 63,
-                    cutoutPx = 133
+                    cutoutPx = 133,
                 ),
             "twopanel-tablet" to
                 DeviceSpec(
@@ -118,14 +122,15 @@ abstract class AbstractDeviceProfileTest {
                     statusBarNaturalPx = 110,
                     statusBarRotatedPx = 133,
                     gesturePx = 0,
-                    cutoutPx = 0
-                )
+                    cutoutPx = 0,
+                ),
         )
 
     protected fun initializeVarsForPhone(
         deviceSpec: DeviceSpec,
         isGestureMode: Boolean = true,
-        isVerticalBar: Boolean = false
+        isVerticalBar: Boolean = false,
+        isFixedLandscape: Boolean = false,
     ) {
         val (naturalX, naturalY) = deviceSpec.naturalSize
         val windowsBounds = phoneWindowsBounds(deviceSpec, isGestureMode, naturalX, naturalY)
@@ -137,14 +142,15 @@ abstract class AbstractDeviceProfileTest {
             displayInfo,
             rotation = if (isVerticalBar) Surface.ROTATION_90 else Surface.ROTATION_0,
             isGestureMode,
-            densityDpi = deviceSpec.densityDpi
+            densityDpi = deviceSpec.densityDpi,
+            isFixedLandscape = isFixedLandscape,
         )
     }
 
     protected fun initializeVarsForTablet(
         deviceSpec: DeviceSpec,
         isLandscape: Boolean = false,
-        isGestureMode: Boolean = true
+        isGestureMode: Boolean = true,
     ) {
         val (naturalX, naturalY) = deviceSpec.naturalSize
         val windowsBounds = tabletWindowsBounds(deviceSpec, naturalX, naturalY)
@@ -156,7 +162,7 @@ abstract class AbstractDeviceProfileTest {
             displayInfo,
             rotation = if (isLandscape) Surface.ROTATION_0 else Surface.ROTATION_90,
             isGestureMode,
-            densityDpi = deviceSpec.densityDpi
+            densityDpi = deviceSpec.densityDpi,
         )
     }
 
@@ -165,7 +171,7 @@ abstract class AbstractDeviceProfileTest {
         deviceSpecFolded: DeviceSpec,
         isLandscape: Boolean = false,
         isGestureMode: Boolean = true,
-        isFolded: Boolean = false
+        isFolded: Boolean = false,
     ) {
         val (unfoldedNaturalX, unfoldedNaturalY) = deviceSpecUnfolded.naturalSize
         val unfoldedWindowsBounds =
@@ -182,7 +188,7 @@ abstract class AbstractDeviceProfileTest {
         val perDisplayBoundsCache =
             mapOf(
                 unfoldedDisplayInfo to unfoldedWindowsBounds,
-                foldedDisplayInfo to foldedWindowsBounds
+                foldedDisplayInfo to foldedWindowsBounds,
             )
 
         if (isFolded) {
@@ -191,7 +197,7 @@ abstract class AbstractDeviceProfileTest {
                 displayInfo = foldedDisplayInfo,
                 rotation = if (isLandscape) Surface.ROTATION_90 else Surface.ROTATION_0,
                 isGestureMode = isGestureMode,
-                densityDpi = deviceSpecFolded.densityDpi
+                densityDpi = deviceSpecFolded.densityDpi,
             )
         } else {
             initializeCommonVars(
@@ -199,7 +205,7 @@ abstract class AbstractDeviceProfileTest {
                 displayInfo = unfoldedDisplayInfo,
                 rotation = if (isLandscape) Surface.ROTATION_0 else Surface.ROTATION_90,
                 isGestureMode = isGestureMode,
-                densityDpi = deviceSpecUnfolded.densityDpi
+                densityDpi = deviceSpecUnfolded.densityDpi,
             )
         }
     }
@@ -208,7 +214,7 @@ abstract class AbstractDeviceProfileTest {
         deviceSpec: DeviceSpec,
         isGestureMode: Boolean,
         naturalX: Int,
-        naturalY: Int
+        naturalY: Int,
     ): List<WindowBounds> {
         val buttonsNavHeight = Utilities.dpToPx(48f, deviceSpec.densityDpi)
 
@@ -217,14 +223,14 @@ abstract class AbstractDeviceProfileTest {
                 0,
                 max(deviceSpec.statusBarNaturalPx, deviceSpec.cutoutPx),
                 0,
-                if (isGestureMode) deviceSpec.gesturePx else buttonsNavHeight
+                if (isGestureMode) deviceSpec.gesturePx else buttonsNavHeight,
             )
         val rotation90Insets =
             Rect(
                 deviceSpec.cutoutPx,
                 deviceSpec.statusBarRotatedPx,
                 if (isGestureMode) 0 else buttonsNavHeight,
-                if (isGestureMode) deviceSpec.gesturePx else 0
+                if (isGestureMode) deviceSpec.gesturePx else 0,
             )
         val rotation180Insets =
             Rect(
@@ -233,29 +239,29 @@ abstract class AbstractDeviceProfileTest {
                 0,
                 max(
                     if (isGestureMode) deviceSpec.gesturePx else buttonsNavHeight,
-                    deviceSpec.cutoutPx
-                )
+                    deviceSpec.cutoutPx,
+                ),
             )
         val rotation270Insets =
             Rect(
                 if (isGestureMode) 0 else buttonsNavHeight,
                 deviceSpec.statusBarRotatedPx,
                 deviceSpec.cutoutPx,
-                if (isGestureMode) deviceSpec.gesturePx else 0
+                if (isGestureMode) deviceSpec.gesturePx else 0,
             )
 
         return listOf(
             WindowBounds(Rect(0, 0, naturalX, naturalY), rotation0Insets, Surface.ROTATION_0),
             WindowBounds(Rect(0, 0, naturalY, naturalX), rotation90Insets, Surface.ROTATION_90),
             WindowBounds(Rect(0, 0, naturalX, naturalY), rotation180Insets, Surface.ROTATION_180),
-            WindowBounds(Rect(0, 0, naturalY, naturalX), rotation270Insets, Surface.ROTATION_270)
+            WindowBounds(Rect(0, 0, naturalY, naturalX), rotation270Insets, Surface.ROTATION_270),
         )
     }
 
     private fun tabletWindowsBounds(
         deviceSpec: DeviceSpec,
         naturalX: Int,
-        naturalY: Int
+        naturalY: Int,
     ): List<WindowBounds> {
         val naturalInsets = Rect(0, deviceSpec.statusBarNaturalPx, 0, 0)
         val rotatedInsets = Rect(0, deviceSpec.statusBarRotatedPx, 0, 0)
@@ -264,7 +270,7 @@ abstract class AbstractDeviceProfileTest {
             WindowBounds(Rect(0, 0, naturalX, naturalY), naturalInsets, Surface.ROTATION_0),
             WindowBounds(Rect(0, 0, naturalY, naturalX), rotatedInsets, Surface.ROTATION_90),
             WindowBounds(Rect(0, 0, naturalX, naturalY), naturalInsets, Surface.ROTATION_180),
-            WindowBounds(Rect(0, 0, naturalY, naturalX), rotatedInsets, Surface.ROTATION_270)
+            WindowBounds(Rect(0, 0, naturalY, naturalX), rotatedInsets, Surface.ROTATION_270),
         )
     }
 
@@ -273,7 +279,8 @@ abstract class AbstractDeviceProfileTest {
         displayInfo: CachedDisplayInfo,
         rotation: Int,
         isGestureMode: Boolean = true,
-        densityDpi: Int
+        densityDpi: Int,
+        isFixedLandscape: Boolean = false,
     ) {
         setFlagsRule.setFlags(true, Flags.FLAG_ENABLE_TWOLINE_TOGGLE)
         LauncherPrefs.get(testContext).put(LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE, true)
@@ -287,9 +294,9 @@ abstract class AbstractDeviceProfileTest {
             .thenReturn(
                 if (isGestureMode) NavigationMode.NO_BUTTON else NavigationMode.THREE_BUTTONS
             )
-        doReturn(WindowManagerProxy.INSTANCE[runningContext].isTaskbarDrawnInProcess)
+        doReturn(WindowManagerProxy.INSTANCE[getApplicationContext()].isTaskbarDrawnInProcess)
             .whenever(windowManagerProxy)
-            .isTaskbarDrawnInProcess()
+            .isTaskbarDrawnInProcess
 
         val density = densityDpi / DisplayMetrics.DENSITY_DEFAULT.toFloat()
         val config =
@@ -301,12 +308,19 @@ abstract class AbstractDeviceProfileTest {
             }
         val configurationContext = runningContext.createConfigurationContext(config)
         context = SandboxContext(configurationContext)
+        context.initDaggerComponent(
+            DaggerAbsDPTestSandboxComponent.builder().bindWMProxy(windowManagerProxy)
+        )
         context.putObject(DisplayController.INSTANCE, displayController)
-        context.putObject(WindowManagerProxy.INSTANCE, windowManagerProxy)
         context.putObject(LauncherPrefs.INSTANCE, launcherPrefs)
 
         whenever(launcherPrefs.get(LauncherPrefs.TASKBAR_PINNING)).thenReturn(false)
         whenever(launcherPrefs.get(LauncherPrefs.TASKBAR_PINNING_IN_DESKTOP_MODE)).thenReturn(true)
+        whenever(launcherPrefs.get(LauncherPrefs.FIXED_LANDSCAPE_MODE)).thenReturn(isFixedLandscape)
+        whenever(launcherPrefs.get(LauncherPrefs.HOTSEAT_COUNT)).thenReturn(-1)
+        whenever(launcherPrefs.get(LauncherPrefs.DEVICE_TYPE)).thenReturn(-1)
+        whenever(launcherPrefs.get(LauncherPrefs.WORKSPACE_SIZE)).thenReturn("")
+        whenever(launcherPrefs.get(LauncherPrefs.DB_FILE)).thenReturn("")
         val info = spy(DisplayController.Info(context, windowManagerProxy, perDisplayBoundsCache))
         whenever(displayController.info).thenReturn(info)
         whenever(info.isTransientTaskbar).thenReturn(isGestureMode)
@@ -345,5 +359,16 @@ abstract class AbstractDeviceProfileTest {
     protected fun String.xmlToId(): Int {
         val context = InstrumentationRegistry.getInstrumentation().context
         return context.resources.getIdentifier(this, "xml", context.packageName)
+    }
+}
+
+@LauncherAppSingleton
+@Component
+interface AbsDPTestSandboxComponent : LauncherAppComponent {
+    @Component.Builder
+    interface Builder : LauncherAppComponent.Builder {
+        @BindsInstance fun bindWMProxy(proxy: WindowManagerProxy): Builder
+
+        override fun build(): AbsDPTestSandboxComponent
     }
 }

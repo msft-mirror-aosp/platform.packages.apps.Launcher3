@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Helper for [RecentsView] to interact with the [RecentsViewModel]. */
 class RecentsViewModelHelper(private val recentsViewModel: RecentsViewModel) {
@@ -32,7 +33,7 @@ class RecentsViewModelHelper(private val recentsViewModel: RecentsViewModel) {
 
     fun onAttachedToWindow() {
         viewAttachedScope =
-            CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("RecentsView"))
+            CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("RecentsView"))
     }
 
     fun onDetachedFromWindow() {
@@ -49,10 +50,8 @@ class RecentsViewModelHelper(private val recentsViewModel: RecentsViewModel) {
         recentsViewModel.setRunningTaskShowScreenshot(true)
         viewAttachedScope.launch {
             recentsViewModel.waitForRunningTaskShowScreenshotToUpdate()
-            if (updatedThumbnails != null) {
-                recentsViewModel.waitForThumbnailsToUpdate(updatedThumbnails)
-            }
-            ViewUtils.postFrameDrawn(taskView, onFinishRunnable)
+            recentsViewModel.waitForThumbnailsToUpdate(updatedThumbnails)
+            withContext(Dispatchers.Main) { ViewUtils.postFrameDrawn(taskView, onFinishRunnable) }
         }
     }
 }

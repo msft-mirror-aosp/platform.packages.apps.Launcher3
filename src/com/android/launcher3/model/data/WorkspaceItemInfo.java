@@ -142,7 +142,7 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
                 .put(Favorites.OPTIONS, options)
                 .put(Favorites.RESTORED, status);
 
-        if (!usingLowResIcon()) {
+        if (!getMatchingLookupFlag().useLowRes()) {
             writer.putIcon(bitmap, user);
         }
     }
@@ -189,7 +189,13 @@ public class WorkspaceItemInfo extends ItemInfoWithIcon {
         if (TextUtils.isEmpty(label)) {
             label = shortcutInfo.getShortLabel();
         }
-        contentDescription = context.getPackageManager().getUserBadgedLabel(label, user);
+        try {
+            contentDescription = context.getPackageManager().getUserBadgedLabel(label, user);
+        } catch (SecurityException e) {
+            contentDescription = null;
+            Log.e(TAG, "Failed to get content description", e);
+        }
+
         if (shortcutInfo.isEnabled()) {
             runtimeStatusFlags &= ~FLAG_DISABLED_BY_PUBLISHER;
         } else {

@@ -39,6 +39,7 @@ import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.core.util.component1
 import androidx.core.util.component2
+import androidx.core.view.isVisible
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.util.Executors
@@ -58,10 +59,10 @@ constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0,
-    defStyleRes: Int = 0
+    defStyleRes: Int = 0,
 ) : TextView(context, attrs, defStyleAttr, defStyleRes) {
-    private val recentsViewContainer =
-        RecentsViewContainer.containerFromContext<RecentsViewContainer>(context)
+    private val recentsViewContainer: RecentsViewContainer =
+        RecentsViewContainer.containerFromContext(context)
 
     private val launcherApps: LauncherApps? = context.getSystemService(LauncherApps::class.java)
 
@@ -108,18 +109,18 @@ constructor(
     }
 
     private fun setNoLimit() {
+        isVisible = false
         hasLimit = false
-        setContentDescription(appUsageLimitTimeMs = -1, appRemainingTimeMs = -1)
-        visibility = INVISIBLE
         appRemainingTimeMs = -1
+        setContentDescription(appUsageLimitTimeMs = -1, appRemainingTimeMs = -1)
     }
 
     private fun setLimit(appUsageLimitTimeMs: Long, appRemainingTimeMs: Long) {
-        this.appRemainingTimeMs = appRemainingTimeMs
+        isVisible = true
         hasLimit = true
-        text = Utilities.prefixTextWithIcon(context, R.drawable.ic_hourglass_top, getBannerText())
-        visibility = VISIBLE
+        this.appRemainingTimeMs = appRemainingTimeMs
         setContentDescription(appUsageLimitTimeMs, appRemainingTimeMs)
+        text = Utilities.prefixTextWithIcon(context, R.drawable.ic_hourglass_top, getBannerText())
     }
 
     private fun setContentDescription(appUsageLimitTimeMs: Long, appRemainingTimeMs: Long) {
@@ -137,7 +138,7 @@ constructor(
                 usageLimit =
                     launcherApps?.getAppUsageLimit(
                         task.topComponent.packageName,
-                        UserHandle.of(task.key.userId)
+                        UserHandle.of(task.key.userId),
                     )
             } catch (e: Exception) {
                 Log.e(TAG, "Error initializing digital well being toast", e)
@@ -161,7 +162,7 @@ constructor(
         task: Task,
         taskView: TaskView,
         snapshotView: View,
-        @StagePosition stagePosition: Int
+        @StagePosition stagePosition: Int,
     ) {
         this.task = task
         this.taskView = taskView
@@ -172,7 +173,7 @@ constructor(
 
     /** Mark the DWB toast as destroyed and hide it. */
     fun destroy() {
-        visibility = INVISIBLE
+        isVisible = false
         isDestroyed = true
     }
 
@@ -200,7 +201,7 @@ constructor(
 
     private fun getReadableDuration(
         duration: Duration,
-        @StringRes durationLessThanOneMinuteStringId: Int
+        @StringRes durationLessThanOneMinuteStringId: Int,
     ): String {
         val hours = Math.toIntExact(duration.toHours())
         val minutes = Math.toIntExact(duration.minusHours(hours.toLong()).toMinutes())
@@ -210,7 +211,7 @@ constructor(
                 MeasureFormat.getInstance(Locale.getDefault(), MeasureFormat.FormatWidth.NARROW)
                     .formatMeasures(
                         Measure(hours, MeasureUnit.HOUR),
-                        Measure(minutes, MeasureUnit.MINUTE)
+                        Measure(minutes, MeasureUnit.MINUTE),
                     )
             // Apply FormatWidth.WIDE if only the hour part is non-zero (unless forced).
             hours > 0 ->
@@ -238,7 +239,7 @@ constructor(
     @VisibleForTesting
     fun getBannerText(
         remainingTime: Long = appRemainingTimeMs,
-        forContentDesc: Boolean = false
+        forContentDesc: Boolean = false,
     ): String {
         val duration =
             Duration.ofMillis(
@@ -249,7 +250,7 @@ constructor(
         val readableDuration =
             getReadableDuration(
                 duration,
-                R.string.shorter_duration_less_than_one_minute /* forceFormatWidth */
+                R.string.shorter_duration_less_than_one_minute, /* forceFormatWidth */
             )
         val splitBannerConfig = getSplitBannerConfig()
         return when {
@@ -276,7 +277,7 @@ constructor(
             Log.e(
                 TAG,
                 "Failed to open app usage settings for task " + task.topComponent.packageName,
-                e
+                e,
             )
         }
     }
@@ -284,13 +285,13 @@ constructor(
     private fun getContentDescriptionForTask(
         task: Task,
         appUsageLimitTimeMs: Long,
-        appRemainingTimeMs: Long
+        appRemainingTimeMs: Long,
     ): String? =
         if (appUsageLimitTimeMs >= 0 && appRemainingTimeMs >= 0)
             context.getString(
                 R.string.task_contents_description_with_remaining_time,
                 task.titleDescription,
-                getBannerText(appRemainingTimeMs, true /* forContentDesc */)
+                getBannerText(appRemainingTimeMs, true /* forContentDesc */),
             )
         else task.titleDescription
 
@@ -309,7 +310,7 @@ constructor(
                     recentsViewContainer.deviceProfile,
                     splitBounds,
                     taskView.layoutParams.width,
-                    taskView.layoutParams.height
+                    taskView.layoutParams.height,
                 )
             if (stagePosition == STAGE_POSITION_TOP_OR_LEFT) {
                 snapshotWidth = groupedTaskSize.first.x
@@ -326,7 +327,7 @@ constructor(
             recentsViewContainer.deviceProfile,
             snapshotWidth,
             snapshotHeight,
-            this
+            this,
         )
     }
 
@@ -339,7 +340,7 @@ constructor(
                 recentsViewContainer.deviceProfile,
                 taskView.snapshotViews,
                 task.key.id,
-                this
+                this,
             )
         this.translationX = translationX
         this.splitOffsetTranslationY = translationY
@@ -371,7 +372,7 @@ constructor(
             if (taskView.containsMultipleTasks())
                 context.getString(
                     R.string.split_app_usage_settings,
-                    TaskUtils.getTitle(context, task)
+                    TaskUtils.getTitle(context, task),
                 )
             else context.getString(R.string.accessibility_app_usage_settings)
         return AccessibilityNodeInfo.AccessibilityAction(getAccessibilityActionId(), label)
@@ -393,7 +394,7 @@ constructor(
             /** Used for grid task view, only showing icon and time */
             SPLIT_GRID_BANNER_LARGE,
             /** Used for grid task view, only showing icon */
-            SPLIT_GRID_BANNER_SMALL
+            SPLIT_GRID_BANNER_SMALL,
         }
 
         val OPEN_APP_USAGE_SETTINGS_TEMPLATE: Intent = Intent(Settings.ACTION_APP_USAGE_SETTINGS)

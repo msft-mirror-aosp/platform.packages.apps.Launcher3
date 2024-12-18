@@ -42,6 +42,8 @@ import android.window.TransitionInfo
 import android.window.TransitionInfo.Change
 import android.window.WindowContainerToken
 import androidx.annotation.VisibleForTesting
+import androidx.core.util.component1
+import androidx.core.util.component2
 import com.android.app.animation.Interpolators
 import com.android.launcher3.DeviceProfile
 import com.android.launcher3.Flags.enableOverviewIconMenu
@@ -225,10 +227,22 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
                 ObjectAnimator.ofFloat(iconView.splitTranslationY, MULTI_PROPERTY_VALUE, 0f)
             )
         }
+
+        val splitBoundsConfig =
+            (taskContainer.taskView as? GroupedTaskView)?.splitBoundsConfig ?: return
+        val (primarySnapshotViewSize, secondarySnapshotViewSize) =
+            taskContainer.taskView.pagedOrientationHandler.getGroupedTaskViewSizes(
+                deviceProfile,
+                splitBoundsConfig,
+                taskViewWidth,
+                taskViewHeight,
+            )
+        val snapshotViewSize =
+            if (isPrimaryTaskSplitting) secondarySnapshotViewSize else primarySnapshotViewSize
         if (deviceProfile.isLeftRightSplit) {
             // Center view first so scaling happens uniformly, alternatively we can move pivotX to 0
-            val centerThumbnailTranslationX: Float = (taskViewWidth - snapshot.width) / 2f
-            val finalScaleX: Float = taskViewWidth.toFloat() / snapshot.width
+            val centerThumbnailTranslationX: Float = (taskViewWidth - snapshotViewSize.x) / 2f
+            val finalScaleX: Float = taskViewWidth.toFloat() / snapshotViewSize.x
             builder.add(
                 ObjectAnimator.ofFloat(snapshot, View.TRANSLATION_X, centerThumbnailTranslationX)
             )
@@ -262,13 +276,13 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
             //  thumbnail needs to take that into account. We should migrate to only using
             //  translations otherwise this asymmetry causes problems..
             if (isPrimaryTaskSplitting) {
-                centerThumbnailTranslationY = (thumbnailSize - snapshot.height) / 2f
+                centerThumbnailTranslationY = (thumbnailSize - snapshotViewSize.y) / 2f
                 centerThumbnailTranslationY +=
                     deviceProfile.overviewTaskThumbnailTopMarginPx.toFloat()
             } else {
-                centerThumbnailTranslationY = (thumbnailSize - snapshot.height) / 2f
+                centerThumbnailTranslationY = (thumbnailSize - snapshotViewSize.y) / 2f
             }
-            val finalScaleY: Float = thumbnailSize.toFloat() / snapshot.height
+            val finalScaleY: Float = thumbnailSize.toFloat() / snapshotViewSize.y
             builder.add(
                 ObjectAnimator.ofFloat(snapshot, View.TRANSLATION_Y, centerThumbnailTranslationY)
             )
@@ -731,16 +745,19 @@ class SplitAnimationController(val splitSelectStateController: SplitSelectStateC
         val mainRootCandidate = splitRoots.first
         // Will contain changes (1) and (2) in diagram above
         val leafRoots: List<Change> = splitRoots.second
+        // Don't rely on DP.isLeftRightSplit because if launcher is portrait apps could still
+        // launch in landscape if system auto-rotate is enabled and phone is held horizontally
+        val isLeftRightSplit = leafRoots.all { it.endAbsBounds.top == 0 }
 
         // Find the place where our left/top app window meets the divider (used for the
         // launcher side animation)
         val leftTopApp =
             leafRoots.single { change ->
-                (dp.isLeftRightSplit && change.endAbsBounds.left == 0) ||
-                    (!dp.isLeftRightSplit && change.endAbsBounds.top == 0)
+                (isLeftRightSplit && change.endAbsBounds.left == 0) ||
+                    (!isLeftRightSplit && change.endAbsBounds.top == 0)
             }
         val dividerPos =
-            if (dp.isLeftRightSplit) leftTopApp.endAbsBounds.right
+            if (isLeftRightSplit) leftTopApp.endAbsBounds.right
             else leftTopApp.endAbsBounds.bottom
 
         // Create a new floating view in Launcher, positioned above the launching icon
