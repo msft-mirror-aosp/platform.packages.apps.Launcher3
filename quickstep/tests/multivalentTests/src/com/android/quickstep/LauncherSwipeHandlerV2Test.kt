@@ -23,10 +23,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.android.launcher3.Flags.enableLauncherOverviewInWindow
 import com.android.launcher3.R
 import com.android.launcher3.dagger.LauncherAppComponent
+import com.android.launcher3.dagger.LauncherAppModule
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.util.LauncherModelHelper
 import com.android.launcher3.util.MSDLPlayerWrapper
-import com.android.quickstep.dagger.QuickStepModule
 import com.android.quickstep.fallback.window.RecentsWindowFactory
 import com.android.systemui.contextualeducation.GestureType
 import com.android.systemui.shared.system.InputConsumerController
@@ -123,7 +123,7 @@ class LauncherSwipeHandlerV2Test {
 }
 
 @LauncherAppSingleton
-@Component(modules = [QuickStepModule::class])
+@Component(modules = [LauncherAppModule::class])
 interface TestComponent : LauncherAppComponent {
     @Component.Builder
     interface Builder : LauncherAppComponent.Builder {
