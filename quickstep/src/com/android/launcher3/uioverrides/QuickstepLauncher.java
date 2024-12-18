@@ -1432,12 +1432,6 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         return (mTaskbarUIController != null && mTaskbarUIController.hasBubbles());
     }
 
-    @NonNull
-    @Override
-    public TISBindHelper getTISBindHelper() {
-        return mTISBindHelper;
-    }
-
     @Override
     public boolean handleIncorrectSplitTargetSelection() {
         if (!enableSplitContextually() || !mSplitSelectStateController.isSplitSelectActive()) {
