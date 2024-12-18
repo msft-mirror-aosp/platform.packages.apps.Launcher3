@@ -25,11 +25,11 @@ import static com.android.app.animation.Interpolators.ACCELERATE;
 import static com.android.app.animation.Interpolators.ACCELERATE_0_75;
 import static com.android.app.animation.Interpolators.ACCELERATE_DECELERATE;
 import static com.android.app.animation.Interpolators.DECELERATE_2;
+import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.app.animation.Interpolators.EMPHASIZED_DECELERATE;
 import static com.android.app.animation.Interpolators.FAST_OUT_SLOW_IN;
 import static com.android.app.animation.Interpolators.FINAL_FRAME;
 import static com.android.app.animation.Interpolators.LINEAR;
-import static com.android.app.animation.Interpolators.EMPHASIZED;
 import static com.android.app.animation.Interpolators.clampToProgress;
 import static com.android.launcher3.AbstractFloatingView.TYPE_REBIND_SAFE;
 import static com.android.launcher3.AbstractFloatingView.TYPE_TASK_MENU;
@@ -179,6 +179,7 @@ import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.util.TranslateEdgeEffect;
 import com.android.launcher3.util.VibratorWrapper;
 import com.android.launcher3.util.ViewPool;
+import com.android.launcher3.util.coroutines.DispatcherProvider;
 import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.OverviewCommandHelper;
@@ -237,6 +238,8 @@ import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 
 import kotlin.Unit;
 import kotlin.collections.CollectionsKt;
+
+import kotlinx.coroutines.CoroutineScope;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -927,7 +930,11 @@ public abstract class RecentsView<
                     recentsDependencies.inject(RecentTasksRepository.class),
                     recentsDependencies.inject(RecentsViewData.class)
             );
-            mHelper = new RecentsViewModelHelper(mRecentsViewModel);
+            mHelper = new RecentsViewModelHelper(
+                    mRecentsViewModel,
+                    recentsDependencies.inject(CoroutineScope.class),
+                    recentsDependencies.inject(DispatcherProvider.class)
+            );
 
             recentsDependencies.provide(RecentsRotationStateRepository.class,
                     () -> new RecentsRotationStateRepositoryImpl(mOrientationState));
@@ -1263,9 +1270,6 @@ public abstract class RecentsView<
         mTaskOverlayFactory.initListeners();
         if (FeatureFlags.enableSplitContextually()) {
             mSplitSelectStateController.registerSplitListener(mSplitSelectionListener);
-        }
-        if (enableRefactorTaskThumbnail()) {
-            mHelper.onAttachedToWindow();
         }
     }
 
