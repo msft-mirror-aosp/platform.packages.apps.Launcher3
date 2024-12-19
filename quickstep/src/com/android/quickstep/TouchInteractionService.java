@@ -90,7 +90,6 @@ import com.android.launcher3.util.SafeCloseable;
 import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.TraceHelper;
 import com.android.quickstep.OverviewCommandHelper.CommandType;
-import com.android.quickstep.fallback.window.RecentsWindowFactory;
 import com.android.quickstep.fallback.window.RecentsWindowSwipeHandler;
 import com.android.quickstep.inputconsumers.BubbleBarInputConsumer;
 import com.android.quickstep.inputconsumers.OneHandedModeInputConsumer;
@@ -637,7 +636,6 @@ public class TouchInteractionService extends Service {
     private InputEventReceiver mInputEventReceiver;
 
     private TaskbarManager mTaskbarManager;
-    private RecentsWindowFactory mRecentsWindowFactory;
     private Function<GestureState, AnimatedFloat> mSwipeUpProxyProvider = i -> null;
     private AllAppsActionManager mAllAppsActionManager;
     private InputManager mInputManager;
@@ -674,9 +672,6 @@ public class TouchInteractionService extends Service {
         mDesktopAppLaunchTransitionManager =
                 new DesktopAppLaunchTransitionManager(this, SystemUiProxy.INSTANCE.get(this));
         mDesktopAppLaunchTransitionManager.registerTransitions();
-        if (Flags.enableLauncherOverviewInWindow() || Flags.enableFallbackOverviewInWindow()) {
-            mRecentsWindowFactory = new RecentsWindowFactory(this);
-        }
         mInputConsumer = InputConsumerController.getRecentsAnimationInputConsumer();
 
         // Call runOnUserUnlocked() before any other callbacks to ensure everything is initialized.
@@ -728,7 +723,7 @@ public class TouchInteractionService extends Service {
     public void onUserUnlocked() {
         Log.d(TAG, "onUserUnlocked: userId=" + getUserId()
                 + " instance=" + System.identityHashCode(this));
-        mTaskAnimationManager = new TaskAnimationManager(this, mRecentsWindowFactory, mDeviceState);
+        mTaskAnimationManager = new TaskAnimationManager(this, mDeviceState);
         mOverviewComponentObserver = new OverviewComponentObserver(this, mDeviceState);
         mOverviewCommandHelper = new OverviewCommandHelper(this,
                 mOverviewComponentObserver, mTaskAnimationManager);
@@ -835,10 +830,6 @@ public class TouchInteractionService extends Service {
         mTrackpadsConnected.clear();
 
         mTaskbarManager.destroy();
-
-        if (mRecentsWindowFactory != null) {
-            mRecentsWindowFactory.destroy();
-        }
         if (mDesktopAppLaunchTransitionManager != null) {
             mDesktopAppLaunchTransitionManager.unregisterTransitions();
         }
@@ -1294,6 +1285,6 @@ public class TouchInteractionService extends Service {
             GestureState gestureState, long touchTimeMs) {
         return new RecentsWindowSwipeHandler(this, mDeviceState, mTaskAnimationManager,
                 gestureState, touchTimeMs, mTaskAnimationManager.isRecentsAnimationRunning(),
-                mInputConsumer, mRecentsWindowFactory, MSDLPlayerWrapper.INSTANCE.get(this));
+                mInputConsumer, MSDLPlayerWrapper.INSTANCE.get(this));
     }
 }
