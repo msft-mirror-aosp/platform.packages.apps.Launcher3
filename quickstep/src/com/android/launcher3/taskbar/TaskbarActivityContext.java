@@ -189,6 +189,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     private final TaskbarControllers mControllers;
 
     private final WindowManager mWindowManager;
+    private final boolean mIsPrimaryDisplay;
     private DeviceProfile mDeviceProfile;
     private WindowManager.LayoutParams mWindowLayoutParams;
     private WindowManager.LayoutParams mLastUpdatedLayoutParams;
@@ -234,11 +235,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
 
     public TaskbarActivityContext(Context windowContext,
             @Nullable Context navigationBarPanelContext, DeviceProfile launcherDp,
-            TaskbarNavButtonController buttonController, ScopedUnfoldTransitionProgressProvider
-            unfoldTransitionProgressProvider,
-            @NonNull DesktopVisibilityController desktopVisibilityController) {
+            TaskbarNavButtonController buttonController,
+            ScopedUnfoldTransitionProgressProvider unfoldTransitionProgressProvider,
+            @NonNull DesktopVisibilityController desktopVisibilityController,
+            boolean isPrimaryDisplay) {
         super(windowContext);
-
+        mIsPrimaryDisplay = isPrimaryDisplay;
         mNavigationBarPanelContext = navigationBarPanelContext;
         applyDeviceProfile(launcherDp);
         final Resources resources = getResources();
@@ -627,7 +629,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
      */
     private WindowManager.LayoutParams createAllWindowParams() {
         final int windowType =
-                ENABLE_TASKBAR_NAVBAR_UNIFICATION ? TYPE_NAVIGATION_BAR : TYPE_NAVIGATION_BAR_PANEL;
+                (ENABLE_TASKBAR_NAVBAR_UNIFICATION && mIsPrimaryDisplay) ? TYPE_NAVIGATION_BAR
+                        : TYPE_NAVIGATION_BAR_PANEL;
         WindowManager.LayoutParams windowLayoutParams =
                 createDefaultWindowLayoutParams(windowType, TaskbarActivityContext.WINDOW_TITLE);
 
