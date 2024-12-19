@@ -1296,6 +1296,7 @@ public abstract class RecentsView<
         reset();
         if (enableRefactorTaskThumbnail()) {
             mHelper.onDetachedFromWindow();
+            RecentsDependencies.destroy();
         }
     }
 
