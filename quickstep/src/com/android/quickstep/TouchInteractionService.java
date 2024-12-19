@@ -613,6 +613,11 @@ public class TouchInteractionService extends Service {
         public void onToggleOverview() {
             mOverviewCommandHelper.addCommand(CommandType.TOGGLE);
         }
+
+        @Override
+        public void onHideOverview() {
+            mOverviewCommandHelper.addCommand(CommandType.HIDE);
+        }
     };
 
     private ActivityManagerWrapper mAM;

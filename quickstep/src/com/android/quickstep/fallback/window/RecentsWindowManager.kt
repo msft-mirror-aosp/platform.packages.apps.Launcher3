@@ -322,10 +322,6 @@ class RecentsWindowManager(private val displayId: Int, context: Context) :
         return taskbarUIController
     }
 
-    override fun getTISBindHelper(): TISBindHelper {
-        return tisBindHelper
-    }
-
     fun registerInitListener(onInitListener: Predicate<Boolean>) {
         this.onInitListener = onInitListener
     }
