@@ -1530,6 +1530,19 @@ public abstract class RecentsView<
         return clearAllScroll + (mIsRtl ? distance : -distance);
     }
 
+    /**
+     * Launch running task view if it is instance of DesktopTaskView.
+     * @return provides runnable list to attach runnable at end of Desktop Mode launch
+     */
+    @Nullable
+    public RunnableList launchRunningDesktopTaskView() {
+        TaskView taskView = getRunningTaskView();
+        if (taskView instanceof DesktopTaskView) {
+            return taskView.launchWithAnimation();
+        }
+        return null;
+    }
+
     /*
      * Returns if TaskView is within screen bounds defined in [screenStart, screenEnd].
      *

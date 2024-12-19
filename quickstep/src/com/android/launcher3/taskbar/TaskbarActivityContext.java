@@ -1297,7 +1297,18 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             RemoteTransition remoteTransition =
                     (areDesktopTasksVisible() && canUnminimizeDesktopTask(groupTask.task1.key.id))
                             ? createUnminimizeRemoteTransition() : null;
-            handleGroupTaskLaunch(groupTask, remoteTransition, areDesktopTasksVisible());
+            if (areDesktopTasksVisible() && mControllers.uiController.isInOverviewUi()) {
+                RunnableList runnableList = recents.launchRunningDesktopTaskView();
+                // Wrapping it in runnable so we post after DW is ready for the app
+                // launch.
+                if (runnableList != null) {
+                    runnableList.add(() -> UI_HELPER_EXECUTOR.execute(
+                            () -> handleGroupTaskLaunch(groupTask, remoteTransition,
+                                    areDesktopTasksVisible())));
+                }
+            } else {
+                handleGroupTaskLaunch(groupTask, remoteTransition, areDesktopTasksVisible());
+            }
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
         } else if (tag instanceof FolderInfo) {
             // Tapping an expandable folder icon on Taskbar
@@ -1317,9 +1328,29 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         } else if (tag instanceof TaskItemInfo info) {
             RemoteTransition remoteTransition = canUnminimizeDesktopTask(info.getTaskId())
                     ? createUnminimizeRemoteTransition() : null;
-            UI_HELPER_EXECUTOR.execute(() ->
-                    SystemUiProxy.INSTANCE.get(this).showDesktopApp(
-                            info.getTaskId(), remoteTransition));
+
+            TaskView taskView = null;
+            if (recents != null) {
+                taskView = recents.getTaskViewByTaskId(info.getTaskId());
+            }
+
+            if (areDesktopTasksVisible() && taskView != null) {
+                RunnableList runnableList = taskView.launchWithAnimation();
+                if (runnableList != null) {
+                    runnableList.add(() ->
+                            // wrapped it in runnable here since we need the post for DW to be
+                            // ready. if we don't other DW will be gone and only the launched
+                            // task will show.
+                            UI_HELPER_EXECUTOR.execute(() ->
+                                    SystemUiProxy.INSTANCE.get(this).showDesktopApp(
+                                            info.getTaskId(), remoteTransition)));
+                }
+            } else {
+                UI_HELPER_EXECUTOR.execute(() ->
+                        SystemUiProxy.INSTANCE.get(this).showDesktopApp(
+                                info.getTaskId(), remoteTransition));
+            }
+
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(
                     /* stash= */ true);
         } else if (tag instanceof WorkspaceItemInfo) {
@@ -1564,7 +1595,18 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                                                 .launchAppPair((AppPairIcon) launchingIconView,
                                                         -1 /*cuj*/)));
                     } else {
-                        startItemInfoActivity(itemInfos.get(0), foundTask);
+                        if (areDesktopTasksVisible()
+                                && mControllers.uiController.isInOverviewUi()) {
+                            RunnableList runnableList = recents.launchRunningDesktopTaskView();
+                            // Wrapping it in runnable so we post after DW is ready for the app
+                            // launch.
+                            if (runnableList != null) {
+                                runnableList.add(() -> UI_HELPER_EXECUTOR.execute(
+                                        () -> startItemInfoActivity(itemInfos.get(0), foundTask)));
+                            }
+                        } else {
+                            startItemInfoActivity(itemInfos.get(0), foundTask);
+                        }
                     }
                 }
         );
