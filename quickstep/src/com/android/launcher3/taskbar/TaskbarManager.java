@@ -590,9 +590,12 @@ public class TaskbarManager {
         }
     }
 
-    public void setWallpaperVisible(boolean isVisible) {
+    /**
+     * Sets wallpaper visibility for specific display.
+     */
+    public void setWallpaperVisible(int displayId, boolean isVisible) {
         mSharedState.wallpaperVisible = isVisible;
-        TaskbarActivityContext taskbar = getTaskbarForDisplay(getDefaultDisplayId());
+        TaskbarActivityContext taskbar = getTaskbarForDisplay(displayId);
         if (taskbar != null) {
             taskbar.setWallpaperVisible(isVisible);
         }
