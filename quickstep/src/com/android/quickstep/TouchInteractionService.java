@@ -308,10 +308,10 @@ public class TouchInteractionService extends Service {
         @BinderThread
         @Override
         public void updateWallpaperVisibility(int displayId, boolean visible) {
-            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(tis ->
-                    executeForTaskbarManager(
-                            taskbarManager -> taskbarManager.setWallpaperVisible(visible))
-            ));
+            MAIN_EXECUTOR.execute(() -> executeForTouchInteractionService(
+                    tis -> executeForTaskbarManager(
+                            taskbarManager -> taskbarManager.setWallpaperVisible(displayId,
+                                    visible))));
         }
 
         @BinderThread
