@@ -800,7 +800,7 @@ public class TaskbarManager {
     private TaskbarActivityContext createTaskbarActivityContext(DeviceProfile dp, int displayId) {
         TaskbarActivityContext newTaskbar = new TaskbarActivityContext(mWindowContext,
                 mNavigationBarPanelContext, dp, mDefaultNavButtonController,
-                mUnfoldProgressProvider, mDesktopVisibilityController);
+                mUnfoldProgressProvider, mDesktopVisibilityController, isDefaultDisplay(displayId));
 
         addTaskbarToMap(displayId, newTaskbar);
         return newTaskbar;
@@ -846,6 +846,10 @@ public class TaskbarManager {
             }
         };
         addTaskbarRootLayoutToMap(displayId, newTaskbarRootLayout);
+    }
+
+    private boolean isDefaultDisplay(int displayId) {
+        return displayId == getDefaultDisplayId();
     }
 
     /**
