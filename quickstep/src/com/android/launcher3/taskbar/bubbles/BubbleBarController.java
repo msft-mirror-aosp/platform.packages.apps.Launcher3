@@ -318,6 +318,7 @@ public class BubbleBarController extends IBubblesListener.Stub {
             // clear restored state
             mBubbleBarViewController.removeAllBubbles();
             mBubbles.clear();
+            mBubbleBarViewController.showOverflow(update.showOverflow);
         }
 
         BubbleBarBubble bubbleToSelect = null;

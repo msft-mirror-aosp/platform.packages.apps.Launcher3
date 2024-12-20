@@ -1135,6 +1135,7 @@ public class BubbleBarViewController {
 
     /** Removes all existing bubble views */
     public void removeAllBubbles() {
+        mOverflowAdded = false;
         mBarView.removeAllViews();
     }
 
