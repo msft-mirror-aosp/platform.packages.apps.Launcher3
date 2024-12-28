@@ -744,32 +744,36 @@ public class BubbleBarView extends FrameLayout {
             Runnable onEndRunnable) {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams((int) mIconSize, (int) mIconSize,
                 Gravity.LEFT);
-        boolean isOverflowSelected =
-                mSelectedBubbleView != null && mSelectedBubbleView.isOverflow();
         boolean removingOverflow = removedBubble.isOverflow();
         boolean addingOverflow = addedBubble.isOverflow();
-
+        int addedIndex = addingOverflow ? getChildCount() : 0;
         if (!isExpanded()) {
             removeView(removedBubble);
-            int index = addingOverflow ? getChildCount() : 0;
-            addView(addedBubble, index, lp);
+            addView(addedBubble, addedIndex, lp);
             if (onEndRunnable != null) {
                 onEndRunnable.run();
             }
             return;
         }
-        int index = addingOverflow ? getChildCount() : 0;
         addedBubble.setScaleX(0f);
         addedBubble.setScaleY(0f);
-        addView(addedBubble, index, lp);
-
-        if (isOverflowSelected && removingOverflow) {
-            // The added bubble will be selected
-            mSelectedBubbleView = addedBubble;
-        }
-        int indexOfSelectedBubble = indexOfChild(mSelectedBubbleView);
+        addView(addedBubble, addedIndex, lp);
+        int indexOfCurrentSelectedBubble = indexOfChild(mSelectedBubbleView);
         int indexOfBubbleToRemove = indexOfChild(removedBubble);
-
+        int indexOfNewlySelectedBubble = indexOfCurrentSelectedBubble;
+        boolean removingSelectedBubble = mSelectedBubbleView == removedBubble;
+        if (removingSelectedBubble) {
+            if (removingOverflow) {
+                // The added bubble will be selected
+                mSelectedBubbleView = addedBubble;
+                indexOfNewlySelectedBubble = indexOfChild(mSelectedBubbleView);
+            } else {
+                boolean isRemovedNextToOverflow =
+                        indexOfBubbleToRemove == getChildCount() - (hasOverflow() ? 2 : 1);
+                indexOfNewlySelectedBubble =
+                        indexOfCurrentSelectedBubble + (isRemovedNextToOverflow ? -1 : 1);
+            }
+        }
         mBubbleAnimator = new BubbleAnimator(mIconSize, mExpandedBarIconsSpacing,
                 getChildCount(), mBubbleBarLocation.isOnLeft(isLayoutRtl()));
         BubbleAnimator.Listener listener = new BubbleAnimator.Listener() {
@@ -802,8 +806,9 @@ public class BubbleBarView extends FrameLayout {
                 invalidate();
             }
         };
-        mBubbleAnimator.animateNewAndRemoveOld(indexOfSelectedBubble, indexOfBubbleToRemove,
-                listener);
+        //TODO (b/359952121) fix scenario when overflow is being added
+        mBubbleAnimator.animateNewAndRemoveOld(indexOfCurrentSelectedBubble,
+                indexOfNewlySelectedBubble, indexOfBubbleToRemove, addedIndex, listener);
     }
 
     @Override

@@ -70,14 +70,18 @@ class BubbleAnimator(
 
     fun animateNewAndRemoveOld(
         selectedBubbleIndex: Int,
+        newlySelectedBubbleIndex: Int,
         removedBubbleIndex: Int,
+        addedBubbleIndex: Int,
         listener: Listener,
     ) {
         animator = createAnimator(listener)
         state =
             State.AddingAndRemoving(
                 selectedBubbleIndex = selectedBubbleIndex,
+                newlySelectedBubbleIndex = newlySelectedBubbleIndex,
                 removedBubbleIndex = removedBubbleIndex,
+                addedBubbleIndex = addedBubbleIndex,
             )
         animator.start()
     }
@@ -187,17 +191,7 @@ class BubbleAnimator(
             State.Idle -> 0f
             is State.AddingBubble -> getArrowPositionWhenAddingBubble(state)
             is State.RemovingBubble -> getArrowPositionWhenRemovingBubble(state)
-            is State.AddingAndRemoving -> {
-                // we never remove the selected bubble, so the arrow stays pointing to its center
-                val tx =
-                    getBubbleTranslationXWhileAddingBubbleAtLimit(
-                        bubbleIndex = state.selectedBubbleIndex,
-                        removedBubbleIndex = state.removedBubbleIndex,
-                        addedBubbleScale = animator.animatedFraction,
-                        removedBubbleScale = 1 - animator.animatedFraction,
-                    )
-                tx + iconSize / 2f
-            }
+            is State.AddingAndRemoving -> getArrowPositionWhenAddingAndRemovingBubble(state)
         }
     }
 
@@ -210,12 +204,11 @@ class BubbleAnimator(
         ) + iconSize / 2f
         if (state.newlySelectedBubbleIndex != null) {
             val selectedBubbleScale = if (state.newlySelectedBubbleIndex == 0) scale else 1f
-            val finalTx =
-                getBubbleTranslationXWhileScalingBubble(
-                    bubbleIndex = state.newlySelectedBubbleIndex,
-                    scalingBubbleIndex = 0,
-                    bubbleScale = 1f,
-                ) + iconSize * selectedBubbleScale / 2f
+            val finalTx = getBubbleTranslationXWhileScalingBubble(
+                bubbleIndex = state.newlySelectedBubbleIndex,
+                scalingBubbleIndex = 0,
+                bubbleScale = scale
+            ) + iconSize * selectedBubbleScale / 2f
             tx += (finalTx - tx) * animator.animatedFraction
         }
         return tx
@@ -265,6 +258,45 @@ class BubbleAnimator(
                 }
             }
         }
+
+    private fun getArrowPositionWhenAddingAndRemovingBubble(state: State.AddingAndRemoving): Float {
+        // The bubble bar keeps constant width while adding and removing bubble. So we just need to
+        // find selected bubble arrow position on the animation start and newly selected bubble
+        // arrow position on the animation end interpolating the arrow between these positions
+        // during the animation.
+        // The indexes in the state are provided for the bubble bar containing all bubbles. So for
+        // certain circumstances indexes should be adjusted.
+        // When animation is started added bubble has zero scale as well as removed bubble when the
+        // animation is ended, so for both cases we should compute translation as it is one less
+        // bubble.
+        val bubbleCountOnEnd = bubbleCount - 1
+        var selectedIndex = state.selectedBubbleIndex
+        // We only need to adjust the selected index if added bubble was added before the selected.
+        if (selectedIndex > state.addedBubbleIndex) {
+            // If the selectedIndex is higher index than the added bubble index, we need to reduce
+            // selectedIndex by one because the added bubble  has zero scale when animation is
+            // started.
+            selectedIndex--
+        }
+        var newlySelectedIndex = state.newlySelectedBubbleIndex
+        // We only need to adjust newlySelectedIndex if removed bubble was removed before the newly
+        // selected bubble.
+        if (newlySelectedIndex > state.removedBubbleIndex) {
+            // If the newlySelectedIndex is higher index than the removed bubble index, we need to
+            // reduce newlySelectedIndex by one because the removed bubble has zero scale when
+            // animation is ended.
+            newlySelectedIndex--
+        }
+        val iconAndSpacing: Float = iconSize + expandedBarIconSpacing
+        val startTx = getBubblesToTheLeft(selectedIndex, bubbleCountOnEnd) * iconAndSpacing
+        val endTx = getBubblesToTheLeft(newlySelectedIndex, bubbleCountOnEnd) * iconAndSpacing
+        val tx = startTx + (endTx - startTx) * animator.animatedFraction
+        return tx + iconSize / 2f
+    }
+
+    private fun getBubblesToTheLeft(bubbleIndex: Int, bubbleCount: Int): Int =
+        if (onLeft) bubbleCount - bubbleIndex - 1 else bubbleIndex
+
 
     /**
      * Returns the translation X for the bubble at index {@code bubbleIndex} when the bubble bar is
@@ -413,10 +445,17 @@ class BubbleAnimator(
             val removingLastRemainingBubble: Boolean,
         ) : State
 
-        // TODO add index where bubble is being added, and index for newly selected bubble
         /** A new bubble is being added and an old bubble is being removed from the bubble bar. */
-        data class AddingAndRemoving(val selectedBubbleIndex: Int, val removedBubbleIndex: Int) :
-            State
+        data class AddingAndRemoving(
+            /** The index of the selected bubble. */
+            val selectedBubbleIndex: Int,
+            /** The index of the newly selected bubble. */
+            val newlySelectedBubbleIndex: Int,
+            /** The index of the bubble being removed. */
+            val removedBubbleIndex: Int,
+            /** The index of the added bubble. */
+            val addedBubbleIndex: Int,
+        ) : State
     }
 
     /** Callbacks for the animation. */
