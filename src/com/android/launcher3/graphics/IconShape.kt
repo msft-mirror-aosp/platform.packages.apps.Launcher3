@@ -36,9 +36,11 @@ import com.android.launcher3.anim.RoundedRectRevealOutlineProvider
 import com.android.launcher3.dagger.ApplicationContext
 import com.android.launcher3.dagger.LauncherAppComponent
 import com.android.launcher3.dagger.LauncherAppSingleton
+import com.android.launcher3.graphics.ThemeManager.ThemeChangeListener
 import com.android.launcher3.icons.GraphicsUtils
 import com.android.launcher3.icons.IconNormalizer
 import com.android.launcher3.util.DaggerSingletonObject
+import com.android.launcher3.util.DaggerSingletonTracker
 import com.android.launcher3.views.ClipPathView
 import java.io.IOException
 import javax.inject.Inject
@@ -47,7 +49,13 @@ import org.xmlpull.v1.XmlPullParserException
 
 /** Abstract representation of the shape of an icon shape */
 @LauncherAppSingleton
-class IconShape @Inject constructor(@ApplicationContext context: Context) {
+class IconShape
+@Inject
+constructor(
+    @ApplicationContext context: Context,
+    themeManager: ThemeManager,
+    lifeCycle: DaggerSingletonTracker,
+) {
     var shape: ShapeDelegate = Circle()
         private set
 
@@ -56,6 +64,10 @@ class IconShape @Inject constructor(@ApplicationContext context: Context) {
 
     init {
         pickBestShape(context)
+
+        val changeListener = ThemeChangeListener { pickBestShape(context) }
+        themeManager.addChangeListener(changeListener)
+        lifeCycle.addCloseable { themeManager.removeChangeListener(changeListener) }
     }
 
     /** Initializes the shape which is closest to the [AdaptiveIconDrawable] */
