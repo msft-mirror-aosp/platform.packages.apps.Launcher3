@@ -806,7 +806,6 @@ public class BubbleBarView extends FrameLayout {
                 invalidate();
             }
         };
-        //TODO (b/359952121) fix scenario when overflow is being added
         mBubbleAnimator.animateNewAndRemoveOld(indexOfCurrentSelectedBubble,
                 indexOfNewlySelectedBubble, indexOfBubbleToRemove, addedIndex, listener);
     }
