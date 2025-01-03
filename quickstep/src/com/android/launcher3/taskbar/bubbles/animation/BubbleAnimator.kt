@@ -200,18 +200,20 @@ class BubbleAnimator(
 
     private fun getArrowPositionWhenAddingBubble(state: State.AddingBubble): Float {
         val scale = animator.animatedFraction
-        var tx = getBubbleTranslationXWhileScalingBubble(
-            bubbleIndex = state.selectedBubbleIndex,
-            scalingBubbleIndex = 0,
-            bubbleScale = scale
-        ) + iconSize / 2f
+        var tx =
+            getBubbleTranslationXWhileScalingBubble(
+                bubbleIndex = state.selectedBubbleIndex,
+                scalingBubbleIndex = 0,
+                bubbleScale = scale,
+            ) + iconSize / 2f
         if (state.newlySelectedBubbleIndex != null) {
             val selectedBubbleScale = if (state.newlySelectedBubbleIndex == 0) scale else 1f
-            val finalTx = getBubbleTranslationXWhileScalingBubble(
-                bubbleIndex = state.newlySelectedBubbleIndex,
-                scalingBubbleIndex = 0,
-                bubbleScale = scale
-            ) + iconSize * selectedBubbleScale / 2f
+            val finalTx =
+                getBubbleTranslationXWhileScalingBubble(
+                    bubbleIndex = state.newlySelectedBubbleIndex,
+                    scalingBubbleIndex = 0,
+                    bubbleScale = scale,
+                ) + iconSize * selectedBubbleScale / 2f
             tx += (finalTx - tx) * animator.animatedFraction
         }
         return tx
@@ -301,7 +303,6 @@ class BubbleAnimator(
         // when bar is on left the index - 0 corresponds to the right - most bubble and when the
         // bubble bar is on the right - 0 corresponds to the left - most bubble.
         if (onLeft) bubbleCount - bubbleIndex - 1 else bubbleIndex
-
 
     /**
      * Returns the translation X for the bubble at index {@code bubbleIndex} when the bubble bar is

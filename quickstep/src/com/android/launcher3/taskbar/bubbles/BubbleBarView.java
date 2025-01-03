@@ -741,12 +741,10 @@ public class BubbleBarView extends FrameLayout {
 
     /** Add a new bubble and remove an old bubble from the bubble bar. */
     public void addBubbleAndRemoveBubble(BubbleView addedBubble, BubbleView removedBubble,
-            Runnable onEndRunnable) {
+            @Nullable BubbleView bubbleToSelect, Runnable onEndRunnable) {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams((int) mIconSize, (int) mIconSize,
                 Gravity.LEFT);
-        boolean removingOverflow = removedBubble.isOverflow();
-        boolean addingOverflow = addedBubble.isOverflow();
-        int addedIndex = addingOverflow ? getChildCount() : 0;
+        int addedIndex = addedBubble.isOverflow() ? getChildCount() : 0;
         if (!isExpanded()) {
             removeView(removedBubble);
             addView(addedBubble, addedIndex, lp);
@@ -760,19 +758,14 @@ public class BubbleBarView extends FrameLayout {
         addView(addedBubble, addedIndex, lp);
         int indexOfCurrentSelectedBubble = indexOfChild(mSelectedBubbleView);
         int indexOfBubbleToRemove = indexOfChild(removedBubble);
-        int indexOfNewlySelectedBubble = indexOfCurrentSelectedBubble;
-        boolean removingSelectedBubble = mSelectedBubbleView == removedBubble;
-        if (removingSelectedBubble) {
-            if (removingOverflow) {
-                // The added bubble will be selected
-                mSelectedBubbleView = addedBubble;
-                indexOfNewlySelectedBubble = indexOfChild(mSelectedBubbleView);
-            } else {
-                boolean isRemovedNextToOverflow =
-                        indexOfBubbleToRemove == getChildCount() - (hasOverflow() ? 2 : 1);
-                indexOfNewlySelectedBubble =
-                        indexOfCurrentSelectedBubble + (isRemovedNextToOverflow ? -1 : 1);
-            }
+        int indexOfNewlySelectedBubble = bubbleToSelect == null
+                ? indexOfCurrentSelectedBubble : indexOfChild(bubbleToSelect);
+        // Since removed bubble is kept till the end of the animation we should check if there are
+        // more than one bubble. In such a case the bar will remain open without the selected bubble
+        if (mSelectedBubbleView == removedBubble
+                && bubbleToSelect == null
+                && getBubbleChildCount() > 1) {
+            Log.w(TAG, "Remove the currently selected bubble without selecting a new one.");
         }
         mBubbleAnimator = new BubbleAnimator(mIconSize, mExpandedBarIconsSpacing,
                 getChildCount(), mBubbleBarLocation.isOnLeft(isLayoutRtl()));
