@@ -182,6 +182,7 @@ import com.android.launcher3.util.ViewPool;
 import com.android.launcher3.util.coroutines.DispatcherProvider;
 import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.GestureState;
+import com.android.quickstep.HighResLoadingState;
 import com.android.quickstep.OverviewCommandHelper;
 import com.android.quickstep.RecentsAnimationController;
 import com.android.quickstep.RecentsAnimationTargets;
@@ -194,7 +195,6 @@ import com.android.quickstep.RotationTouchHelper;
 import com.android.quickstep.SplitSelectionListener;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.TaskOverlayFactory;
-import com.android.quickstep.TaskThumbnailCache;
 import com.android.quickstep.TaskViewUtils;
 import com.android.quickstep.TopTaskTracker;
 import com.android.quickstep.ViewUtils;
@@ -263,7 +263,7 @@ import java.util.stream.Collectors;
 public abstract class RecentsView<
         CONTAINER_TYPE extends Context & RecentsViewContainer & StatefulContainer<STATE_TYPE>,
         STATE_TYPE extends BaseState<STATE_TYPE>> extends PagedView implements Insettable,
-        TaskThumbnailCache.HighResLoadingState.HighResLoadingStateChangedCallback,
+        HighResLoadingState.HighResLoadingStateChangedCallback,
         TaskVisualsChangeListener {
 
     private static final String TAG = "RecentsView";

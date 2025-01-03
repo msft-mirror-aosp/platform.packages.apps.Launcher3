@@ -207,7 +207,7 @@ class TasksRepository(
                 val cancellableTask =
                     taskIconDataSource.getIconInBackground(task) { icon, contentDescription, title
                         ->
-                        icon.constantState?.let {
+                        icon?.constantState?.let {
                             continuation.resume(
                                 IconData(it.newDrawable().mutate(), contentDescription, title)
                             )
