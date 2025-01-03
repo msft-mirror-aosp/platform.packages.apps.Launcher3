@@ -25,6 +25,7 @@ import android.os.UserHandle
 import android.util.SparseArray
 import androidx.annotation.WorkerThread
 import com.android.launcher3.Flags.enableOverviewIconMenu
+import com.android.launcher3.Flags.enableRefactorTaskThumbnail
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.icons.BaseIconFactory
@@ -63,15 +64,8 @@ class TaskIconCache(
     @get:WorkerThread
     private val iconFactory: BaseIconFactory
         get() =
-            _iconFactory
-                ?: BaseIconFactory(
-                        context,
-                        DisplayController.INSTANCE[context].info.densityDpi,
-                        context.resources.getDimensionPixelSize(
-                            R.dimen.task_icon_cache_default_icon_size
-                        ),
-                    )
-                    .also { _iconFactory = it }
+            if (enableRefactorTaskThumbnail()) createIconFactory()
+            else _iconFactory ?: createIconFactory().also { _iconFactory = it }
 
     var taskVisualsChangeListener: TaskVisualsChangeListener? = null
 
@@ -85,6 +79,22 @@ class TaskIconCache(
         }
     }
 
+    // TODO(b/387496731): Add ensureActive() calls if they show performance benefit
+    override suspend fun getIcon(task: Task): TaskCacheEntry {
+        task.icon?.let {
+            // Nothing to load, the icon is already loaded
+            return TaskCacheEntry(it, task.titleDescription ?: "", task.title)
+        }
+
+        val entry = getCacheEntry(task)
+        task.icon = entry.icon
+        task.titleDescription = entry.contentDescription
+        task.title = entry.title
+
+        dispatchIconUpdate(task.key.id)
+        return entry
+    }
+
     /**
      * Asynchronously fetches the icon and other task data.
      *
@@ -92,14 +102,11 @@ class TaskIconCache(
      * @param callback The callback to receive the task after its data has been populated.
      * @return A cancelable handle to the request
      */
-    override fun getIconInBackground(
-        task: Task,
-        callback: GetTaskIconCallback,
-    ): CancellableTask<*>? {
+    fun getIconInBackground(task: Task, callback: GetTaskIconCallback): CancellableTask<*>? {
         Preconditions.assertUIThread()
-        if (task.icon != null) {
+        task.icon?.let {
             // Nothing to load, the icon is already loaded
-            callback.onTaskIconReceived(task.icon, task.titleDescription ?: "", task.title ?: "")
+            callback.onTaskIconReceived(it, task.titleDescription ?: "", task.title ?: "")
             return null
         }
         val request =
@@ -141,10 +148,17 @@ class TaskIconCache(
     }
 
     @WorkerThread
+    private fun createIconFactory() =
+        BaseIconFactory(
+            context,
+            DisplayController.INSTANCE.get(context).info.densityDpi,
+            context.resources.getDimensionPixelSize(R.dimen.task_icon_cache_default_icon_size),
+        )
+
+    @WorkerThread
     private fun getCacheEntry(task: Task): TaskCacheEntry {
-        var entry = iconCache.getAndInvalidateIfModified(task.key)
-        if (entry != null) {
-            return entry
+        iconCache.getAndInvalidateIfModified(task.key)?.let {
+            return it
         }
 
         val desc = task.taskDescription
@@ -152,11 +166,10 @@ class TaskIconCache(
         var activityInfo: ActivityInfo? = null
 
         // Create new cache entry
-        entry = TaskCacheEntry()
 
         // Load icon
         val icon = getIcon(desc, key.userId)
-        entry.icon =
+        val entryIcon =
             if (icon != null) {
                 getBitmapInfo(
                         BitmapDrawable(context.resources, icon),
@@ -182,21 +195,29 @@ class TaskIconCache(
                 }
             }
 
-        // Skip loading the content description if the activity no longer exists
         activityInfo =
             activityInfo
                 ?: PackageManagerWrapper.getInstance().getActivityInfo(key.component, key.userId)
 
-        if (activityInfo != null) {
-            entry.contentDescription =
-                getBadgedContentDescription(activityInfo, task.key.userId, task.taskDescription)
-            if (enableOverviewIconMenu()) {
-                entry.title = Utilities.trim(activityInfo.loadLabel(context.packageManager))
-            }
-        }
-
-        iconCache.put(task.key, entry)
-        return entry
+        return when {
+            // Skip loading the content description if the activity no longer exists
+            activityInfo == null -> TaskCacheEntry(entryIcon)
+            enableOverviewIconMenu() ->
+                TaskCacheEntry(
+                    entryIcon,
+                    getBadgedContentDescription(
+                        activityInfo,
+                        task.key.userId,
+                        task.taskDescription,
+                    ),
+                    Utilities.trim(activityInfo.loadLabel(context.packageManager)),
+                )
+            else ->
+                TaskCacheEntry(
+                    entryIcon,
+                    getBadgedContentDescription(activityInfo, task.key.userId, task.taskDescription),
+                )
+        }.also { iconCache.put(task.key, it) }
     }
 
     private fun getIcon(desc: ActivityManager.TaskDescription, userId: Int): Bitmap? =
@@ -272,16 +293,16 @@ class TaskIconCache(
         iconCache.evictAll()
     }
 
-    private data class TaskCacheEntry(
-        var icon: Drawable? = null,
-        var contentDescription: String = "",
-        var title: String = "",
+    data class TaskCacheEntry(
+        val icon: Drawable,
+        val contentDescription: String = "",
+        val title: String = "",
     )
 
     /** Callback used when retrieving app icons from cache. */
     fun interface GetTaskIconCallback {
         /** Called when task icon is retrieved. */
-        fun onTaskIconReceived(icon: Drawable?, contentDescription: String, title: String)
+        fun onTaskIconReceived(icon: Drawable, contentDescription: String, title: String)
     }
 
     fun registerTaskVisualsChangeListener(newListener: TaskVisualsChangeListener?) {

@@ -17,6 +17,7 @@ package com.android.quickstep
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
+import androidx.annotation.WorkerThread
 import com.android.launcher3.Flags.enableGridOnlyOverview
 import com.android.launcher3.R
 import com.android.launcher3.util.CancellableTask
@@ -78,14 +79,61 @@ internal constructor(
         cache.updateIfAlreadyInCache(taskId, thumbnail)
     }
 
+    // TODO(b/387496731): Add ensureActive() calls if they show performance benefit
+    /**
+     * Retrieves a thumbnail for the provided `task` on the current thread. This should not be
+     * called from the main thread.
+     */
+    @WorkerThread
+    override suspend fun getThumbnail(task: Task): ThumbnailData? {
+        val lowResolution: Boolean = !highResLoadingState.isEnabled
+        // Check task for thumbnail
+        val taskThumbnail: ThumbnailData? = task.thumbnail
+        if (
+            taskThumbnail?.thumbnail != null && (!taskThumbnail.reducedResolution || lowResolution)
+        ) {
+            return taskThumbnail
+        }
+
+        // Check cache for thumbnail
+        val cachedThumbnail: ThumbnailData? = cache.getAndInvalidateIfModified(task.key)
+        if (
+            cachedThumbnail?.thumbnail != null &&
+                (!cachedThumbnail.reducedResolution || lowResolution)
+        ) {
+            return cachedThumbnail
+        }
+
+        // Get thumbnail from system
+        var thumbnailData =
+            ActivityManagerWrapper.getInstance().getTaskThumbnail(task.key.id, lowResolution)
+        if (thumbnailData.thumbnail == null) {
+            thumbnailData = ActivityManagerWrapper.getInstance().takeTaskThumbnail(task.key.id)
+        }
+
+        // Avoid an async timing issue that a low res entry replaces an existing high
+        // res entry in high res enabled state, so we check before putting it to cache
+        if (
+            enableGridOnlyOverview() &&
+                thumbnailData.reducedResolution &&
+                highResLoadingState.isEnabled
+        ) {
+            val newCachedThumbnail = cache.getAndInvalidateIfModified(task.key)
+            if (newCachedThumbnail.thumbnail != null && !newCachedThumbnail.reducedResolution) {
+                return newCachedThumbnail
+            }
+        }
+        cache.put(task.key, thumbnailData)
+        return thumbnailData
+    }
+
     /**
      * Asynchronously fetches the thumbnail for the given `task`.
      *
      * @param callback The callback to receive the task after its data has been populated.
-     *
      * @return a cancelable handle to the request
      */
-    override fun getThumbnailInBackground(
+    fun getThumbnailInBackground(
         task: Task,
         callback: Consumer<ThumbnailData>,
     ): CancellableTask<ThumbnailData>? {
