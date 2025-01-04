@@ -303,6 +303,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     private final StatsLogManager mStatsLogManager;
 
     private final MSDLPlayerWrapper mMSDLPlayerWrapper;
+    @Nullable
+    private DragController.DragListener mAccessibilityDragListener;
 
     /**
      * Used to inflate the Workspace from XML.
@@ -512,6 +514,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             }
         }
 
+        if (mAccessibilityDragListener != null) {
+            mAccessibilityDragListener.onDragStart(dragObject, options);
+        }
         if (!mLauncher.isInState(EDIT_MODE)) {
             mLauncher.getStateManager().goToState(SPRING_LOADED);
         }
@@ -548,6 +553,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             }
         });
 
+        if (mAccessibilityDragListener != null) {
+            mAccessibilityDragListener.onDragEnd();
+        }
         mDragInfo = null;
         mDragSourceInternal = null;
     }
@@ -1656,7 +1664,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         child.setVisibility(INVISIBLE);
 
         if (options.isAccessibleDrag) {
-            mDragController.addDragListener(
+            mAccessibilityDragListener =
                     new AccessibleDragListenerAdapter(this, WorkspaceAccessibilityHelper::new) {
                         @Override
                         protected void enableAccessibleDrag(boolean enable,
@@ -1669,7 +1677,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                                         IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
                             }
                         }
-                    });
+                    };
         }
 
         beginDragShared(child, this, options);
