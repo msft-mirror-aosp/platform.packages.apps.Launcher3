@@ -18,6 +18,7 @@ package com.android.launcher3.model;
 
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.Utilities.SHOULD_SHOW_FIRST_PAGE_WIDGET;
+import static com.android.launcher3.icons.cache.CacheLookupFlag.DEFAULT_LOOKUP_FLAG;
 
 import android.content.ComponentName;
 import android.content.ContentValues;
@@ -300,7 +301,7 @@ public class LoaderCursor extends CursorWrapper {
 
         // the fallback icon
         if (!loadIcon(info)) {
-            mIconCache.getTitleAndIcon(info, false /* useLowResIcon */);
+            mIconCache.getTitleAndIcon(info, DEFAULT_LOOKUP_FLAG);
         }
 
         if (hasRestoreFlag(WorkspaceItemInfo.FLAG_RESTORED_ICON)) {
@@ -364,7 +365,8 @@ public class LoaderCursor extends CursorWrapper {
         UserIconInfo userIconInfo = userCache.getUserInfo(user);
 
         if (loadIcon) {
-            mIconCache.getTitleAndIcon(info, mActivityInfo, useLowResIcon);
+            mIconCache.getTitleAndIcon(info, mActivityInfo,
+                    DEFAULT_LOOKUP_FLAG.withUseLowRes(useLowResIcon));
             if (mIconCache.isDefaultIcon(info.bitmap, user)) {
                 loadIcon(info);
             }
@@ -498,7 +500,7 @@ public class LoaderCursor extends CursorWrapper {
                 mRestoreEventLogger.logSingleFavoritesItemRestored(itemType);
             }
         } else {
-            markDeleted("Item position overlap", RestoreError.INVALID_LOCATION);
+            markDeleted("Item position overlap", RestoreError.OVERLAPPING_ITEM);
         }
     }
 

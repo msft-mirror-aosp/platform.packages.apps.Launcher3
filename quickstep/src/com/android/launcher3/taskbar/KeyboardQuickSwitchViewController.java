@@ -15,6 +15,7 @@
  */
 package com.android.launcher3.taskbar;
 
+import static com.android.launcher3.desktop.DesktopAppLaunchTransition.AppLaunchType.UNMINIMIZE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 
@@ -25,6 +26,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.animation.AnimationUtils;
+import android.window.OnBackInvokedCallback;
 import android.window.RemoteTransition;
 
 import androidx.annotation.NonNull;
@@ -36,6 +38,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.desktop.DesktopAppLaunchTransition;
+import com.android.launcher3.desktop.DesktopAppLaunchTransition.AppLaunchType;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext;
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayDragLayer;
 import com.android.launcher3.util.DisplayController;
@@ -47,7 +50,6 @@ import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
-import com.android.window.flags.Flags;
 
 import java.io.PrintWriter;
 import java.util.List;
@@ -128,6 +130,23 @@ public class KeyboardQuickSwitchViewController {
                 /* useDesktopTaskView= */ !onDesktop && hasDesktopTask);
     }
 
+    protected void updateQuickSwitchView(
+            @NonNull List<GroupTask> tasks,
+            int numHiddenTasks,
+            int currentFocusIndexOverride,
+            boolean hasDesktopTask,
+            boolean wasDesktopTaskFilteredOut) {
+        mWasDesktopTaskFilteredOut = wasDesktopTaskFilteredOut;
+        mKeyboardQuickSwitchView.applyLoadPlan(
+                mOverlayContext,
+                tasks,
+                numHiddenTasks,
+                /* updateTasks= */ true,
+                currentFocusIndexOverride,
+                mViewCallbacks,
+                /* useDesktopTaskView= */ !mOnDesktop && hasDesktopTask);
+    }
+
     protected void positionView(boolean wasOpenedFromTaskbar, boolean isTransientTaskbar) {
         if (!wasOpenedFromTaskbar) {
             // Keep the default positioning.
@@ -155,6 +174,20 @@ public class KeyboardQuickSwitchViewController {
         mKeyboardQuickSwitchView.setLayoutParams(lp);
     }
 
+    protected void updateLayoutForSurface(boolean updateLayoutFromTaskbar,
+            int currentFocusIndexOverride) {
+        BaseDragLayer.LayoutParams lp =
+                (BaseDragLayer.LayoutParams) mKeyboardQuickSwitchView.getLayoutParams();
+
+        if (updateLayoutFromTaskbar) {
+            lp.width = BaseDragLayer.LayoutParams.WRAP_CONTENT;
+        } else {
+            lp.width = BaseDragLayer.LayoutParams.MATCH_PARENT;
+        }
+
+        mKeyboardQuickSwitchView.animateOpen(currentFocusIndexOverride);
+    }
+
     boolean isCloseAnimationRunning() {
         return mCloseAnimation != null;
     }
@@ -167,6 +200,7 @@ public class KeyboardQuickSwitchViewController {
             // Let currently-running animation finish.
             return;
         }
+        mControllerCallbacks.onCloseStarted();
         if (!animate) {
             InteractionJankMonitorWrapper.begin(
                     mKeyboardQuickSwitchView, Cuj.CUJ_LAUNCHER_KEYBOARD_QUICK_SWITCH_CLOSE);
@@ -247,11 +281,13 @@ public class KeyboardQuickSwitchViewController {
             return -1;
         }
         RemoteTransition remoteTransition = slideInTransition;
-        if (mOnDesktop && task.task1.isMinimized
-                && Flags.enableDesktopAppLaunchAlttabTransitions()) {
+        if (mOnDesktop
+                && mControllers.taskbarActivityContext.canUnminimizeDesktopTask(task.task1.key.id)
+        ) {
             // This app is being unminimized - use our own transition runner.
             remoteTransition = new RemoteTransition(
-                    new DesktopAppLaunchTransition(context, MAIN_EXECUTOR));
+                    new DesktopAppLaunchTransition(context, MAIN_EXECUTOR, UNMINIMIZE),
+                    "DesktopKeyboardQuickSwitchUnminimize");
         }
         mControllers.taskbarActivityContext.handleGroupTaskLaunch(
                 task,
@@ -297,6 +333,7 @@ public class KeyboardQuickSwitchViewController {
     }
 
     class ViewCallbacks {
+        public final OnBackInvokedCallback onBackInvokedCallback = () -> closeQuickSwitchView(true);
 
         boolean onKeyUp(int keyCode, KeyEvent event, boolean isRTL, boolean allowTraversal) {
             if (keyCode != KeyEvent.KEYCODE_TAB

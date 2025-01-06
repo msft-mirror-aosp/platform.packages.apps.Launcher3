@@ -39,10 +39,7 @@ import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.taskbar.bubbles.BubbleBarController;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.SplitConfigurationOptions;
-import com.android.quickstep.OverviewCommandHelper;
-import com.android.quickstep.OverviewCommandHelper.CommandType;
 import com.android.quickstep.util.GroupTask;
-import com.android.quickstep.util.TISBindHelper;
 import com.android.quickstep.views.RecentsView;
 import com.android.quickstep.views.TaskContainer;
 import com.android.quickstep.views.TaskView;
@@ -194,6 +191,16 @@ public class TaskbarUIController implements BubbleBarController.BubbleBarLocatio
     public boolean isHotseatIconOnTopWhenAligned() {
         return true;
     }
+
+    public boolean isAnimatingToHotseat() {
+        return false;
+    }
+
+    /**
+     * Skips to the end of the animation to Hotseat - should only be used if
+     * {@link #isAnimatingToHotseat()} returns true.
+     */
+    public void endAnimationToHotseat() {}
 
     /** Returns {@code true} if Taskbar is currently within overview. */
     protected boolean isInOverviewUi() {
@@ -379,26 +386,13 @@ public class TaskbarUIController implements BubbleBarController.BubbleBarLocatio
     /** Adjusts the hotseat for the bubble bar. */
     public void adjustHotseatForBubbleBar(boolean isBubbleBarVisible) {}
 
-    @Nullable
-    protected TISBindHelper getTISBindHelper() {
-        return null;
-    }
-
     /**
      * Launches the focused task in the Keyboard Quick Switch view through the OverviewCommandHelper
      * <p>
      * Use this helper method when the focused task may be the overview task.
      */
     public void launchKeyboardFocusedTask() {
-        TISBindHelper tisBindHelper = getTISBindHelper();
-        if (tisBindHelper == null) {
-            return;
-        }
-        OverviewCommandHelper overviewCommandHelper = tisBindHelper.getOverviewCommandHelper();
-        if (overviewCommandHelper == null) {
-            return;
-        }
-        overviewCommandHelper.addCommand(CommandType.HIDE);
+        mControllers.navButtonController.hideOverview();
     }
 
     /**

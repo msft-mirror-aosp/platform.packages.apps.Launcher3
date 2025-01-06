@@ -31,6 +31,7 @@ import android.app.ActivityManager.RunningTaskInfo;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Matrix;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Bundle;
@@ -47,9 +48,11 @@ import android.view.RemoteAnimationTarget;
 import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.SurfaceControl.Transaction;
+import android.view.animation.Interpolator;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.Utilities;
@@ -59,6 +62,7 @@ import com.android.launcher3.anim.PendingAnimation;
 import com.android.launcher3.anim.SpringAnimationBuilder;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.util.DisplayController;
+import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.quickstep.AbsSwipeUpHandler;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.RecentsAnimationController;
@@ -97,6 +101,8 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
     private static StaticMessageReceiver sMessageReceiver = null;
 
     private FallbackHomeAnimationFactory mActiveAnimationFactory;
+    private final RecentsDisplayModel mRecentsDisplayModel;
+
     private final boolean mRunningOverHome;
 
     private final Matrix mTmpMatrix = new Matrix();
@@ -107,10 +113,11 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
     public RecentsWindowSwipeHandler(Context context, RecentsAnimationDeviceState deviceState,
             TaskAnimationManager taskAnimationManager, GestureState gestureState, long touchTimeMs,
             boolean continuingLastGesture, InputConsumerController inputConsumer,
-            RecentsWindowManager recentsWindowManager) {
+            MSDLPlayerWrapper msdlPlayerWrapper) {
         super(context, deviceState, taskAnimationManager, gestureState, touchTimeMs,
-                continuingLastGesture, inputConsumer, recentsWindowManager);
+                continuingLastGesture, inputConsumer, msdlPlayerWrapper);
 
+        mRecentsDisplayModel = RecentsDisplayModel.getINSTANCE().get(context);
         mRunningOverHome = mGestureState.getRunningTask() != null
                 && mGestureState.getRunningTask().isHomeTask();
 
@@ -144,12 +151,40 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
         }
     }
 
+    @UiThread
+    @Override
+    protected void animateGestureEnd(
+            float startShift,
+            float endShift,
+            long duration,
+            @NonNull Interpolator interpolator,
+            @NonNull GestureState.GestureEndTarget endTarget,
+            @NonNull PointF velocityPxPerMs) {
+        boolean fromHomeToHome = mRunningOverHome
+                && endTarget == GestureState.GestureEndTarget.HOME;
+        if (fromHomeToHome) {
+            RecentsWindowManager manager =
+                    mRecentsDisplayModel.getRecentsWindowManager(mDeviceState.getDisplayId());
+            if (manager != null) {
+                manager.startHome(/* finishRecentsAnimation= */ false);
+            }
+        }
+        super.animateGestureEnd(
+                startShift,
+                endShift,
+                fromHomeToHome ? 0 : duration,
+                interpolator,
+                endTarget,
+                velocityPxPerMs);
+    }
+
     private void updateHomeActivityTransformDuringSwipeUp(SurfaceProperties builder,
             RemoteAnimationTarget app, TransformParams params) {
         if (mActiveAnimationFactory != null) {
             return;
         }
-        setHomeScaleAndAlpha(builder, app, mCurrentShift.value, 0);
+        setHomeScaleAndAlpha(builder, app, mCurrentShift.value,
+                Utilities.boundToRange(1 - mCurrentShift.value, 0, 1));
     }
 
     private void setHomeScaleAndAlpha(SurfaceProperties builder,
@@ -193,7 +228,11 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
             // the PiP task appearing.
             recentsCallback = () -> {
                 callback.run();
-                mRecentsWindowManager.startHome();
+                RecentsWindowManager manager =
+                        mRecentsDisplayModel.getRecentsWindowManager(mDeviceState.getDisplayId());
+                if (manager != null) {
+                    manager.startHome();
+                }
             };
         } else {
             recentsCallback = callback;

@@ -23,6 +23,7 @@ import static com.android.app.animation.Interpolators.INSTANT;
 import static com.android.app.animation.Interpolators.LINEAR;
 import static com.android.internal.jank.InteractionJankMonitor.Configuration;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
+import static com.android.launcher3.QuickstepTransitionManager.PINNED_TASKBAR_TRANSITION_DURATION;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TRANSIENT_TASKBAR_HIDE;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_TRANSIENT_TASKBAR_SHOW;
@@ -82,8 +83,6 @@ import java.util.function.LongPredicate;
 public class TaskbarStashController implements TaskbarControllers.LoggableTaskbarController {
     private static final String TAG = "TaskbarStashController";
     private static final boolean DEBUG = false;
-
-    private static boolean sEnableSoftwareImeForTests = false;
 
     /**
      * Def. value for @param shouldBubblesFollow in
@@ -398,6 +397,9 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      * Returns how long the stash/unstash animation should play.
      */
     public long getStashDuration() {
+        if (DisplayController.isPinnedTaskbar(mActivity)) {
+            return PINNED_TASKBAR_TRANSITION_DURATION;
+        }
         return DisplayController.isTransientTaskbar(mActivity)
                 ? TRANSIENT_TASKBAR_STASH_DURATION
                 : TASKBAR_STASH_DURATION;
@@ -1168,15 +1170,16 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
 
         // Do not stash if pinned taskbar, hardware keyboard is attached and no IME is docked
-        if (isHardwareKeyboard() && DisplayController.isPinnedTaskbar(mActivity)
+        if (mActivity.isHardwareKeyboard() && DisplayController.isPinnedTaskbar(mActivity)
                 && !mActivity.isImeDocked()) {
             return false;
         }
 
         // Do not stash if hardware keyboard is attached, in 3 button nav and desktop windowing mode
-        if (isHardwareKeyboard()
+        if (mActivity.isHardwareKeyboard()
                 && mActivity.isThreeButtonNav()
-                && mControllers.taskbarDesktopModeController.getAreDesktopTasksVisible()) {
+                && mControllers.taskbarDesktopModeController
+                    .getAreDesktopTasksVisibleAndNotInOverview()) {
             return false;
         }
 
@@ -1186,21 +1189,6 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         }
 
         return mIsImeShowing || mIsImeSwitcherShowing;
-    }
-
-    private boolean isHardwareKeyboard() {
-        return mActivity.isHardwareKeyboard() && !sEnableSoftwareImeForTests;
-    }
-
-    /**
-     * Overrides {@link #isHardwareKeyboard()} to {@code false} for testing, if enabled.
-     * <p>
-     * Virtual devices are sometimes in hardware keyboard mode, leading to an inconsistent
-     * testing environment.
-     */
-    @VisibleForTesting
-    static void enableSoftwareImeForTests(boolean enable) {
-        sEnableSoftwareImeForTests = enable;
     }
 
     /**

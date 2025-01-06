@@ -32,6 +32,7 @@
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"Información de la app de %1$s"</string>
     <string name="split_app_usage_settings" msgid="7214375263347964093">"Configuración del uso de %1$s"</string>
     <string name="new_window_option_taskbar" msgid="6448780542727767211">"Ventana nueva"</string>
+    <string name="manage_windows_option_taskbar" msgid="2294109489960654212">"Administrar ventanas"</string>
     <string name="save_app_pair" msgid="5647523853662686243">"Guardar vinculación"</string>
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"No se admite esta vinculación de apps en este dispositivo"</string>
@@ -67,8 +68,13 @@
     <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"Trabajo"</string>
     <string name="widget_category_conversations" msgid="8894438636213590446">"Conversaciones"</string>
     <string name="widget_category_note_taking" msgid="3469689394504266039">"Tomar notas"</string>
+    <string name="widget_cell_tap_to_show_add_button_label" msgid="4354194214317043581">"Mostrar botón Agregar"</string>
+    <string name="widget_cell_tap_to_hide_add_button_label" msgid="6117805205101555997">"Ocultar botón Agregar"</string>
     <string name="widget_add_button_label" msgid="2761267068711937179">"Agregar"</string>
     <string name="widget_add_button_content_description" msgid="1810530016360039643">"Agregar widget <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>
+    <string name="widgets_list_expand_button_label" msgid="7912016136574932622">"Mostrar todos"</string>
+    <string name="widgets_list_expand_button_content_description" msgid="4600513860973450888">"Mostrar todos los widgets"</string>
+    <string name="widgets_list_expanded" msgid="7374857868788557730">"Mostrando todos los widgets"</string>
     <string name="reconfigurable_widget_education_tip" msgid="6336962690888067057">"Presiona para cambiar la configuración del widget"</string>
     <string name="widget_reconfigure_button_content_description" msgid="8811472721881205250">"Cambiar la configuración del widget"</string>
     <string name="all_apps_search_bar_hint" msgid="1390553134053255246">"Buscar apps"</string>
@@ -76,6 +82,7 @@
     <string name="all_apps_no_search_results" msgid="3200346862396363786">"No hay apps que coincidan con \"<xliff:g id="QUERY">%1$s</xliff:g>\""</string>
     <string name="label_application" msgid="8531721983832654978">"App"</string>
     <string name="all_apps_label" msgid="5015784846527570951">"Todas las apps"</string>
+    <string name="all_apps_list_label" msgid="5106226764073070906">"Lista de apps"</string>
     <string name="notifications_header" msgid="1404149926117359025">"Notificaciones"</string>
     <string name="long_press_shortcut_to_add" msgid="5405328730817637737">"Mantén presionado para mover un acceso directo."</string>
     <string name="long_accessible_way_to_add_shortcut" msgid="2199537273817090740">"Presiona dos veces y mantén presionado para mover un acceso directo o usar acciones personalizadas."</string>
@@ -94,6 +101,7 @@
     <string name="dismiss_prediction_label" msgid="3357562989568808658">"No sugerir app"</string>
     <string name="pin_prediction" msgid="4196423321649756498">"Fijar predicción"</string>
     <string name="bubble" msgid="3072951361014076670">"Burbuja"</string>
+    <string name="pin_to_taskbar" msgid="1281337899690299038">"Fijar a barra"</string>
     <string name="permlab_install_shortcut" msgid="5632423390354674437">"instalar accesos directos"</string>
     <string name="permdesc_install_shortcut" msgid="923466509822011139">"Permite que una aplicación agregue accesos directos sin que el usuario intervenga."</string>
     <string name="permlab_read_settings" msgid="5136500343007704955">"leer parámetros de configuración y accesos directos de la página principal"</string>
@@ -117,6 +125,8 @@
     <string name="folder_renamed" msgid="1794088362165669656">"El nombre de la carpeta se cambió a <xliff:g id="NAME">%1$s</xliff:g>."</string>
     <string name="folder_name_format_exact" msgid="8626242716117004803">"Carpeta: <xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="SIZE">%2$d</xliff:g> elementos"</string>
     <string name="folder_name_format_overflow" msgid="4270108890534995199">"Carpeta: <xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="SIZE">%2$d</xliff:g> o más elementos"</string>
+    <!-- no translation found for unnamed_folder (2420192029474044442) -->
+    <skip />
     <string name="app_pair_name_format" msgid="8134106404716224054">"Vinculación de apps: <xliff:g id="APP1">%1$s</xliff:g> y <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="styles_wallpaper_button_text" msgid="8216961355289236794">"Fondo de pantalla y estilo"</string>
     <string name="edit_home_screen" msgid="8947858375782098427">"Editar pantalla principal"</string>
@@ -124,6 +134,8 @@
     <string name="msg_disabled_by_admin" msgid="6898038085516271325">"El administrador inhabilitó esta función"</string>
     <string name="allow_rotation_title" msgid="7222049633713050106">"Permitir la rotación de la pantalla principal"</string>
     <string name="allow_rotation_desc" msgid="8662546029078692509">"Al girar el teléfono"</string>
+    <string name="landscape_mode_title" msgid="5138814555934843926">"Modo horizontal"</string>
+    <string name="landscape_mode_desc" msgid="7372569859592816793">"Establecer el teléfono en modo horizontal"</string>
     <string name="notification_dots_title" msgid="9062440428204120317">"Puntos de notificación"</string>
     <string name="notification_dots_desc_on" msgid="1679848116452218908">"Activados"</string>
     <string name="notification_dots_desc_off" msgid="1760796511504341095">"Desactivados"</string>
@@ -142,7 +154,8 @@
     <string name="app_installing_title" msgid="5864044122733792085">"Se está instalando <xliff:g id="NAME">%1$s</xliff:g>; <xliff:g id="PROGRESS">%2$s</xliff:g> completado"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"Se completó el <xliff:g id="PROGRESS">%2$s</xliff:g> de la descarga de <xliff:g id="NAME">%1$s</xliff:g>"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"Instalación de <xliff:g id="NAME">%1$s</xliff:g> en espera"</string>
-    <string name="app_archived_title" msgid="7717956158562544081">"<xliff:g id="NAME">%1$s</xliff:g> está archivada. Presiona para descargar y restablecer."</string>
+    <string name="app_archived_title" msgid="4548283110222420708">"<xliff:g id="NAME">%1$s</xliff:g> está archivada."</string>
+    <string name="app_unarchiving_action" msgid="5736107006413929484">"descargar y restablecer"</string>
     <string name="dialog_update_title" msgid="114234265740994042">"Es necesario actualizar la app"</string>
     <string name="dialog_update_message" msgid="4176784553982226114">"No se actualizó la app de este ícono. Puedes actualizarla manualmente para rehabilitar el acceso directo, o bien quitar el ícono."</string>
     <string name="dialog_update" msgid="2178028071796141234">"Actualizar"</string>
@@ -171,7 +184,7 @@
     <string name="action_decrease_width" msgid="1374549771083094654">"Reducir el ancho"</string>
     <string name="action_decrease_height" msgid="282377193880900022">"Reducir la altura"</string>
     <string name="widget_resized" msgid="9130327887929620">"Se cambió la dimensión del widget a <xliff:g id="NUMBER_0">%1$s</xliff:g> de ancho y <xliff:g id="NUMBER_1">%2$s</xliff:g> de alto."</string>
-    <string name="action_deep_shortcut" msgid="2864038805849372848">"Accesos directos"</string>
+    <string name="action_deep_shortcut" msgid="4766835855579976045">"Menú de accesos directos"</string>
     <string name="action_dismiss_notification" msgid="5909461085055959187">"Descartar"</string>
     <string name="accessibility_close" msgid="2277148124685870734">"Cerrar"</string>
     <string name="all_apps_personal_tab" msgid="4190252696685155002">"Personal"</string>
@@ -187,6 +200,7 @@
     <string name="work_apps_paused_edu_accept" msgid="6377476824357318532">"Entendido"</string>
     <string name="work_apps_pause_btn_text" msgid="4669288269140620646">"Detener apps de trabajo"</string>
     <string name="work_apps_enable_btn_text" msgid="1736198302467317371">"Reanudar"</string>
+    <string name="work_scheduler_button_content_description" msgid="917340740986764967">"Programa de las apps de trabajo"</string>
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"Filtro"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"Error: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"Espacio privado"</string>

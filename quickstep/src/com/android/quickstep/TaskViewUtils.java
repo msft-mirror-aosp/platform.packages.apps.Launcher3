@@ -47,12 +47,15 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.graphics.Matrix;
 import android.graphics.Matrix.ScaleToFit;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.util.Pair;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
 import android.view.View;
 import android.window.TransitionInfo;
+import android.window.WindowAnimationState;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -105,7 +108,7 @@ public final class TaskViewUtils {
      * opening remote target (which we don't get until onAnimationStart) will resolve to a TaskView.
      */
     public static TaskView findTaskViewToLaunch(
-            RecentsView recentsView, View v, RemoteAnimationTarget[] targets) {
+            RecentsView<?, ?> recentsView, View v, RemoteAnimationTarget[] targets) {
         if (v instanceof TaskView) {
             TaskView taskView = (TaskView) v;
             return recentsView.isTaskViewVisible(taskView) ? taskView : null;
@@ -118,8 +121,7 @@ public final class TaskViewUtils {
             ComponentName componentName = itemInfo.getTargetComponent();
             int userId = itemInfo.user.getIdentifier();
             if (componentName != null) {
-                for (int i = 0; i < recentsView.getTaskViewCount(); i++) {
-                    TaskView taskView = recentsView.getTaskViewAt(i);
+                for (TaskView taskView : recentsView.getTaskViews()) {
                     if (recentsView.isTaskViewVisible(taskView)) {
                         Task.TaskKey key = taskView.getFirstTask().key;
                         if (componentName.equals(key.getComponent()) && userId == key.userId) {
@@ -559,7 +561,7 @@ public final class TaskViewUtils {
      * Start recents to desktop animation
      */
     public static AnimatorSet composeRecentsDesktopLaunchAnimator(
-            @NonNull DesktopTaskView launchingTaskView,
+            @NonNull TaskView launchingTaskView,
             @NonNull StateManager stateManager, @Nullable DepthController depthController,
             @NonNull TransitionInfo transitionInfo,
             SurfaceControl.Transaction t, @NonNull Runnable finishCallback) {
@@ -783,5 +785,45 @@ public final class TaskViewUtils {
         dockFadeAnimator.setDuration(SPLIT_DIVIDER_ANIM_DURATION);
         animatorHandler.accept(dockFadeAnimator);
         return dockFadeAnimator;
+    }
+
+    /**
+     * Creates an array of {@link RemoteAnimationTarget}s and a matching array of
+     * {@link WindowAnimationState}s from the provided handles.
+     * Important: the ordering of the two arrays is the same, so the state at each index of the
+     * second applies to the target in the same index of the first.
+     *
+     * @param handles The handles wrapping each target.
+     * @param timestamp The start time of the current frame.
+     * @param velocityPxPerMs The current velocity of the target animations.
+     */
+    @NonNull
+    public static Pair<RemoteAnimationTarget[], WindowAnimationState[]> extractTargetsAndStates(
+            @NonNull RemoteTargetHandle[] handles, long timestamp,
+            @NonNull PointF velocityPxPerMs) {
+        RemoteAnimationTarget[] targets = new RemoteAnimationTarget[handles.length];
+        WindowAnimationState[] animationStates = new WindowAnimationState[handles.length];
+
+        for (int i = 0; i < handles.length; i++) {
+            targets[i] = handles[i].getTransformParams().getTargetSet().apps[i];
+
+            TaskViewSimulator taskViewSimulator = handles[i].getTaskViewSimulator();
+            RectF startRect = taskViewSimulator.getCurrentRect();
+            float cornerRadius = taskViewSimulator.getCurrentCornerRadius();
+
+            WindowAnimationState state = new WindowAnimationState();
+            state.timestamp = timestamp;
+            state.bounds = new RectF(
+                    startRect.left, startRect.top, startRect.right, startRect.bottom);
+            state.topLeftRadius = cornerRadius;
+            state.topRightRadius = cornerRadius;
+            state.bottomRightRadius = cornerRadius;
+            state.bottomLeftRadius = cornerRadius;
+            state.velocityPxPerMs = velocityPxPerMs;
+
+            animationStates[i] = state;
+        }
+
+        return new Pair<>(targets, animationStates);
     }
 }

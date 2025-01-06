@@ -36,6 +36,8 @@ import android.widget.FrameLayout;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.ShortcutAndWidgetContainer.TranslationProvider;
+import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.util.HorizontalInsettableView;
 import com.android.launcher3.util.MultiPropertyFactory;
 import com.android.launcher3.util.MultiPropertyFactory.MultiProperty;
@@ -186,33 +188,40 @@ public class Hotseat extends CellLayout implements Insettable {
      */
     public void adjustForBubbleBar(boolean isBubbleBarVisible) {
         DeviceProfile dp = mActivity.getDeviceProfile();
-
+        boolean shouldAdjust = isBubbleBarVisible
+                && dp.shouldAdjustHotseatOrQsbForBubbleBar(getContext());
+        boolean shouldAdjustHotseat = shouldAdjust
+                && dp.shouldAlignBubbleBarWithHotseat();
         ShortcutAndWidgetContainer icons = getShortcutsAndWidgets();
-        AnimatorSet animatorSet = new AnimatorSet();
-
         // update the translation provider for future layout passes of hotseat icons.
-        if (isBubbleBarVisible) {
+        if (shouldAdjustHotseat) {
             icons.setTranslationProvider(
                     cellX -> dp.getHotseatAdjustedTranslation(getContext(), cellX));
         } else {
             icons.setTranslationProvider(null);
         }
-
+        AnimatorSet animatorSet = new AnimatorSet();
         for (int i = 0; i < icons.getChildCount(); i++) {
             View child = icons.getChildAt(i);
-            float tx = isBubbleBarVisible ? dp.getHotseatAdjustedTranslation(getContext(), i) : 0;
-            if (child instanceof Reorderable) {
-                MultiTranslateDelegate mtd = ((Reorderable) child).getTranslateDelegate();
-                animatorSet.play(
-                        mtd.getTranslationX(INDEX_BUBBLE_ADJUSTMENT_ANIM).animateToValue(tx));
-            } else {
-                animatorSet.play(ObjectAnimator.ofFloat(child, VIEW_TRANSLATE_X, tx));
+            if (child.getLayoutParams() instanceof CellLayoutLayoutParams lp) {
+                float tx = shouldAdjustHotseat
+                        ? dp.getHotseatAdjustedTranslation(getContext(), lp.getCellX()) : 0;
+                if (child instanceof Reorderable) {
+                    MultiTranslateDelegate mtd = ((Reorderable) child).getTranslateDelegate();
+                    animatorSet.play(
+                            mtd.getTranslationX(INDEX_BUBBLE_ADJUSTMENT_ANIM).animateToValue(tx));
+                } else {
+                    animatorSet.play(ObjectAnimator.ofFloat(child, VIEW_TRANSLATE_X, tx));
+                }
             }
         }
+        //TODO(b/381109832) refactor & simplify adjustment logic
+        boolean shouldAdjustQsb =
+                shouldAdjustHotseat || (shouldAdjust && dp.shouldAlignBubbleBarWithQSB());
         if (mQsb instanceof HorizontalInsettableView horizontalInsettableQsb) {
             final float currentInsetFraction = horizontalInsettableQsb.getHorizontalInsets();
-            final float targetInsetFraction =
-                    isBubbleBarVisible ? (float) dp.iconSizePx / dp.hotseatQsbWidth : 0;
+            final float targetInsetFraction = shouldAdjustQsb
+                    ? (float) dp.iconSizePx / dp.hotseatQsbWidth : 0;
             ValueAnimator qsbAnimator =
                     ValueAnimator.ofFloat(currentInsetFraction, targetInsetFraction);
             qsbAnimator.addUpdateListener(animation -> {
@@ -222,6 +231,13 @@ public class Hotseat extends CellLayout implements Insettable {
             animatorSet.play(qsbAnimator);
         }
         animatorSet.setDuration(BUBBLE_BAR_ADJUSTMENT_ANIMATION_DURATION_MS).start();
+    }
+
+    @Override
+    protected int getTranslationXForCell(int cellX, int cellY) {
+        TranslationProvider translationProvider = getShortcutsAndWidgets().getTranslationProvider();
+        if (translationProvider == null) return 0;
+        return (int) translationProvider.getTranslationX(cellX);
     }
 
     @Override

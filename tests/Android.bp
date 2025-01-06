@@ -63,7 +63,6 @@ filegroup {
         "src/com/android/launcher3/dragging/TaplDragTest.java",
         "src/com/android/launcher3/dragging/TaplUninstallRemoveTest.java",
         "src/com/android/launcher3/ui/TaplTestsLauncher3Test.java",
-        "src/com/android/launcher3/ui/widget/TaplWidgetPickerTest.java",
         "src/com/android/launcher3/ui/workspace/TaplWorkspaceTest.java",
     ],
 }
@@ -152,19 +151,6 @@ android_test {
     test_suites: ["general-tests"],
 }
 
-// Shared between tests and launcher
-android_library {
-    name: "launcher-testing-shared",
-    srcs: [
-        "multivalentTests/shared/com/android/launcher3/testing/shared/**/*.java",
-        "multivalentTests/shared/com/android/launcher3/testing/shared/**/*.kt",
-    ],
-    resource_dirs: [],
-    manifest: "multivalentTests/shared/AndroidManifest.xml",
-    sdk_version: "current",
-    min_sdk_version: min_launcher3_sdk_version,
-}
-
 filegroup {
     name: "launcher-testing-helpers-robo",
     srcs: [
@@ -173,6 +159,7 @@ filegroup {
         "multivalentTests/src/**/*.java",
         "multivalentTests/src/**/*.kt",
         "src/com/android/launcher3/ui/AbstractLauncherUiTest.java",
+        "src/com/android/launcher3/ui/BaseLauncherTaplTest.java",
         "tapl/com/android/launcher3/tapl/*.java",
         "tapl/com/android/launcher3/tapl/*.kt",
     ],

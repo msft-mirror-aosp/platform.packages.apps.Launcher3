@@ -23,6 +23,7 @@ import static com.android.launcher3.Flags.enableSmartspaceRemovalToggle;
 import static com.android.launcher3.Flags.enableTieredWidgetsByDefaultInPicker;
 import static com.android.launcher3.LauncherPrefs.IS_FIRST_LOAD_AFTER_RESTORE;
 import static com.android.launcher3.LauncherPrefs.SHOULD_SHOW_SMARTSPACE;
+import static com.android.launcher3.LauncherSettings.Favorites.DESKTOP_ICON_FLAG;
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.icons.CacheableShortcutInfo.convertShortcutsToCacheableShortcuts;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_HAS_SHORTCUT_PERMISSION;
@@ -213,13 +214,13 @@ public class LoaderTask implements Runnable {
         ArrayList<ItemInfo> firstScreenItems = new ArrayList<>();
         filterCurrentWorkspaceItems(firstScreens, allItems, firstScreenItems,
                 new ArrayList<>() /* otherScreenItems are ignored */);
-        final int launcherBroadcastInstalledApps = Settings.Secure.getInt(
+        final int disableArchivingLauncherBroadcast = Settings.Secure.getInt(
                 mApp.getContext().getContentResolver(),
-                "launcher_broadcast_installed_apps",
-                /* def= */ 0);
+                "disable_launcher_broadcast_installed_apps",
+                /* default */ 0);
         boolean shouldAttachArchivingExtras = mIsRestoreFromBackup
-                && (launcherBroadcastInstalledApps == 1
-                        || Flags.enableFirstScreenBroadcastArchivingExtras());
+                && disableArchivingLauncherBroadcast == 0
+                && Flags.enableFirstScreenBroadcastArchivingExtras();
         if (shouldAttachArchivingExtras) {
             List<FirstScreenBroadcastModel> broadcastModels =
                     FirstScreenBroadcastHelper.createModelsForFirstScreenBroadcast(
@@ -231,6 +232,7 @@ public class LoaderTask implements Runnable {
             logASplit("Sending first screen broadcast with additional archiving Extras");
             FirstScreenBroadcastHelper.sendBroadcastsForModels(mApp.getContext(), broadcastModels);
         } else {
+            logASplit("Sending first screen broadcast");
             mFirstScreenBroadcast.sendBroadcasts(mApp.getContext(), firstScreenItems);
         }
     }
@@ -246,7 +248,7 @@ public class LoaderTask implements Runnable {
         TraceHelper.INSTANCE.beginSection(TAG);
         LoaderMemoryLogger memoryLogger = new LoaderMemoryLogger();
         mIsRestoreFromBackup =
-                (Boolean) LauncherPrefs.get(mApp.getContext()).get(IS_FIRST_LOAD_AFTER_RESTORE);
+                LauncherPrefs.get(mApp.getContext()).get(IS_FIRST_LOAD_AFTER_RESTORE);
         LauncherRestoreEventLogger restoreEventLogger = null;
         if (enableLauncherBrMetricsFixed()) {
             restoreEventLogger = LauncherRestoreEventLogger.Companion
@@ -261,26 +263,28 @@ public class LoaderTask implements Runnable {
             // sanitizeData should not be invoked if the workspace is loaded from a db different
             // from the main db as defined in the invariant device profile.
             // (e.g. both grid preview and minimal device mode uses a different db)
+            // TODO(b/384731096): Write Unit Test to make sure sanitizeWidgetsShortcutsAndPackages
+            //  actually re-pins shortcuts that are in model but not in ShortcutManager, if possible
+            //  after a simulated restore.
             if (Objects.equals(mApp.getInvariantDeviceProfile().dbFile, mDbName)) {
                 verifyNotStopped();
                 sanitizeFolders(mItemsDeleted);
                 sanitizeAppPairs();
                 sanitizeWidgetsShortcutsAndPackages();
-                logASplit("sanitizeData");
+                logASplit("sanitizeData finished");
             }
 
             verifyNotStopped();
             mLauncherBinder.bindWorkspace(true /* incrementBindId */, /* isBindSync= */ false);
-            logASplit("bindWorkspace");
+            logASplit("bindWorkspace finished");
 
             mModelDelegate.workspaceLoadComplete();
             // Notify the installer packages of packages with active installs on the first screen.
             sendFirstScreenActiveInstallsBroadcast();
-            logASplit("sendFirstScreenBroadcast");
 
             // Take a break
             waitForIdle();
-            logASplit("step 1 complete");
+            logASplit("step 1 loading workspace complete");
             verifyNotStopped();
 
             // second step
@@ -291,11 +295,11 @@ public class LoaderTask implements Runnable {
             } finally {
                 Trace.endSection();
             }
-            logASplit("loadAllApps");
+            logASplit("loadAllApps finished");
 
             verifyNotStopped();
             mLauncherBinder.bindAllApps();
-            logASplit("bindAllApps");
+            logASplit("bindAllApps finished");
 
             verifyNotStopped();
             IconCacheUpdateHandler updateHandler = mIconCache.getUpdateHandler();
@@ -303,28 +307,28 @@ public class LoaderTask implements Runnable {
             updateHandler.updateIcons(allActivityList,
                     LauncherActivityCachingLogic.INSTANCE,
                     mApp.getModel()::onPackageIconsUpdated);
-            logASplit("update icon cache");
+            logASplit("update AllApps icon cache finished");
 
             verifyNotStopped();
-            logASplit("save shortcuts in icon cache");
+            logASplit("saving all shortcuts in icon cache");
             updateHandler.updateIcons(allShortcuts, CacheableShortcutCachingLogic.INSTANCE,
                     mApp.getModel()::onPackageIconsUpdated);
 
             // Take a break
             waitForIdle();
-            logASplit("step 2 complete");
+            logASplit("step 2 loading AllApps complete");
             verifyNotStopped();
 
             // third step
             List<ShortcutInfo> allDeepShortcuts = loadDeepShortcuts();
-            logASplit("loadDeepShortcuts");
+            logASplit("loadDeepShortcuts finished");
 
             verifyNotStopped();
             mLauncherBinder.bindDeepShortcuts();
-            logASplit("bindDeepShortcuts");
+            logASplit("bindDeepShortcuts finished");
 
             verifyNotStopped();
-            logASplit("save deep shortcuts in icon cache");
+            logASplit("saving deep shortcuts in icon cache");
             updateHandler.updateIcons(
                     convertShortcutsToCacheableShortcuts(allDeepShortcuts, allActivityList),
                     CacheableShortcutCachingLogic.INSTANCE,
@@ -332,7 +336,7 @@ public class LoaderTask implements Runnable {
 
             // Take a break
             waitForIdle();
-            logASplit("step 3 complete");
+            logASplit("step 3 loading all shortcuts complete");
             verifyNotStopped();
 
             // fourth step
@@ -345,11 +349,11 @@ public class LoaderTask implements Runnable {
                 widgetsModel.updateWidgetFilters(mWidgetsFilterDataProvider);
             }
             List<CachedObject> allWidgetsList = widgetsModel.update(mApp, /*packageUser=*/null);
-            logASplit("load widgets");
+            logASplit("load widgets finished");
 
             verifyNotStopped();
             mLauncherBinder.bindWidgets();
-            logASplit("bindWidgets");
+            logASplit("bindWidgets finished");
             verifyNotStopped();
             LauncherPrefs prefs = LauncherPrefs.get(mApp.getContext());
 
@@ -357,7 +361,7 @@ public class LoaderTask implements Runnable {
                 mLauncherBinder.bindSmartspaceWidget();
                 // Turn off pref.
                 prefs.putSync(SHOULD_SHOW_SMARTSPACE.to(false));
-                logASplit("bindSmartspaceWidget");
+                logASplit("bindSmartspaceWidget finished");
                 verifyNotStopped();
             } else if (!enableSmartspaceAsAWidget() && WIDGET_ON_FIRST_SCREEN
                     && !prefs.get(LauncherPrefs.SHOULD_SHOW_SMARTSPACE)) {
@@ -365,10 +369,10 @@ public class LoaderTask implements Runnable {
                 prefs.putSync(SHOULD_SHOW_SMARTSPACE.to(true));
             }
 
+            logASplit("saving all widgets in icon cache");
             updateHandler.updateIcons(allWidgetsList,
                     CachedObjectCachingLogic.INSTANCE,
                     mApp.getModel()::onWidgetLabelsUpdated);
-            logASplit("save widgets in icon cache");
 
             // fifth step
             loadFolderNames();
@@ -389,7 +393,7 @@ public class LoaderTask implements Runnable {
             }
         } catch (CancellationException e) {
             // Loader stopped, ignore
-            logASplit("Cancelled");
+            FileLog.w(TAG, "LoaderTask cancelled");
         } catch (Exception e) {
             memoryLogger.printLogs();
             throw e;
@@ -398,6 +402,7 @@ public class LoaderTask implements Runnable {
     }
 
     public synchronized void stopLocked() {
+        FileLog.w(TAG, "stopLocked: Loader stopping");
         mStopped = true;
         this.notify();
     }
@@ -414,7 +419,7 @@ public class LoaderTask implements Runnable {
         } finally {
             Trace.endSection();
         }
-        logASplit("loadWorkspace");
+        logASplit("loadWorkspace finished");
 
         mBgDataModel.isFirstPagePinnedItemEnabled = FeatureFlags.QSB_ON_FIRST_SCREEN
                 && (!enableSmartspaceRemovalToggle() || LauncherPrefs.getPrefs(
@@ -440,7 +445,7 @@ public class LoaderTask implements Runnable {
         } else {
             dbController.tryMigrateDB(restoreEventLogger);
         }
-        Log.d(TAG, "loadWorkspace: loading default favorites");
+        Log.d(TAG, "loadWorkspace: loading default favorites if necessary");
         dbController.loadDefaultFavoritesIfNecessary();
 
         synchronized (mBgDataModel) {
@@ -453,7 +458,7 @@ public class LoaderTask implements Runnable {
                 mInstallingPkgsCached = installingPkgs;
             }
             installingPkgs.forEach(mApp.getIconCache()::updateSessionCache);
-            FileLog.d(TAG, "loadWorkspace: Packages with active install sessions: "
+            FileLog.d(TAG, "loadWorkspace: Packages with active install/update sessions: "
                     + installingPkgs.keySet().stream().map(info -> info.mPackageName).toList());
 
             mFirstScreenBroadcast = new FirstScreenBroadcast(installingPkgs);
@@ -478,8 +483,12 @@ public class LoaderTask implements Runnable {
                         widgetInflater, mPmHelper, iconRequestInfos, unlockedUsers,
                         allDeepShortcuts);
 
-                while (!mStopped && c.moveToNext()) {
-                    itemProcessor.processItem();
+                if (mStopped) {
+                    Log.w(TAG, "loadWorkspaceImpl: Loader stopped, skipping item processing");
+                } else {
+                    while (!mStopped && c.moveToNext()) {
+                        itemProcessor.processItem();
+                    }
                 }
                 tryLoadWorkspaceIconsInBulk(iconRequestInfos);
             } finally {
@@ -594,10 +603,10 @@ public class LoaderTask implements Runnable {
                 info.rank = rank;
 
                 if (info instanceof WorkspaceItemInfo wii
-                        && wii.usingLowResIcon()
+                        && wii.getMatchingLookupFlag().isVisuallyLessThan(DESKTOP_ICON_FLAG)
                         && wii.itemType == Favorites.ITEM_TYPE_APPLICATION
                         && verifiers.stream().anyMatch(it -> it.isItemInPreview(info.rank))) {
-                    mIconCache.getTitleAndIcon(wii, false);
+                    mIconCache.getTitleAndIcon(wii, DESKTOP_ICON_FLAG);
                 } else if (info instanceof AppPairInfo api) {
                     api.fetchHiResIconsIfNeeded(mIconCache);
                 }
@@ -760,7 +769,7 @@ public class LoaderTask implements Runnable {
                     iconRequestInfos.add(new IconRequestInfo<>(
                             promiseAppInfo,
                             /* launcherActivityInfo= */ null,
-                            promiseAppInfo.usingLowResIcon()));
+                            promiseAppInfo.getMatchingLookupFlag().useLowRes()));
                 }
             }
         }

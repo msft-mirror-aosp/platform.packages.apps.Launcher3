@@ -20,8 +20,12 @@ import static android.app.admin.DevicePolicyManager.ACTION_DEVICE_POLICY_RESOURC
 import static android.content.Context.RECEIVER_EXPORTED;
 
 import static com.android.launcher3.Flags.enableSmartspaceRemovalToggle;
+import static com.android.launcher3.InvariantDeviceProfile.GRID_NAME_PREFS_KEY;
+import static com.android.launcher3.LauncherPrefs.DB_FILE;
+import static com.android.launcher3.LauncherPrefs.GRID_NAME;
 import static com.android.launcher3.LauncherPrefs.ICON_STATE;
 import static com.android.launcher3.LauncherPrefs.THEMED_ICONS;
+import static com.android.launcher3.model.DeviceGridState.KEY_DB_FILE;
 import static com.android.launcher3.model.LoaderTask.SMARTSPACE_ON_HOME_SCREEN;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
@@ -30,8 +34,6 @@ import static com.android.launcher3.util.SettingsCache.PRIVATE_SPACE_HIDE_WHEN_L
 
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.pm.LauncherApps;
@@ -47,6 +49,7 @@ import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.icons.IconProvider;
 import com.android.launcher3.icons.LauncherIconProvider;
 import com.android.launcher3.icons.LauncherIcons;
+import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.ModelLauncherCallbacks;
 import com.android.launcher3.model.WidgetsFilterDataProvider;
 import com.android.launcher3.notification.NotificationListener;
@@ -65,11 +68,9 @@ import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
 
-import java.util.Locale;
-import java.util.Objects;
-
 public class LauncherAppState implements SafeCloseable {
 
+    public static final String TAG = "LauncherAppState";
     public static final String ACTION_FORCE_ROLOAD = "force-reload-launcher";
 
     // We do not need any synchronization for this variable as its only written on UI thread.
@@ -122,22 +123,11 @@ public class LauncherAppState implements SafeCloseable {
 
         SimpleBroadcastReceiver modelChangeReceiver =
                 new SimpleBroadcastReceiver(UI_HELPER_EXECUTOR, mModel::onBroadcastIntent);
-        final Locale oldLocale = mContext.getResources().getConfiguration().locale;
         modelChangeReceiver.register(
                 mContext,
-                () -> {
-                    // if local has changed before receiver is registered on bg thread,
-                    // mModel needs to reload.
-                    Locale newLocale = mContext.getResources().getConfiguration().locale;
-                    if (!Objects.equals(oldLocale, newLocale)) {
-                        mModel.forceReload();
-                    }
-                },
-                Intent.ACTION_LOCALE_CHANGED,
                 ACTION_DEVICE_POLICY_RESOURCE_UPDATED);
         if (BuildConfig.IS_STUDIO_BUILD) {
-            mContext.registerReceiver(modelChangeReceiver, new IntentFilter(ACTION_FORCE_ROLOAD),
-                    RECEIVER_EXPORTED);
+            modelChangeReceiver.register(mContext, RECEIVER_EXPORTED, ACTION_FORCE_ROLOAD);
         }
         mOnTerminateCallback.add(() -> modelChangeReceiver.unregisterReceiverSafely(mContext));
 
@@ -293,6 +283,12 @@ public class LauncherAppState implements SafeCloseable {
             if (Themes.KEY_THEMED_ICONS.equals(key)) {
                 mIconProvider.setIconThemeSupported(Themes.isThemedIconEnabled(mContext));
                 verifyIconChanged();
+            } else if (GRID_NAME_PREFS_KEY.equals(key)) {
+                FileLog.d(TAG, "onPrefChanged GRID_NAME changed: "
+                        + LauncherPrefs.get(mContext).get(GRID_NAME));
+            } else if (KEY_DB_FILE.equals(key)) {
+                FileLog.d(TAG, "onPrefChanged DB_FILE changed: "
+                        + LauncherPrefs.get(mContext).get(DB_FILE));
             }
         }
     }

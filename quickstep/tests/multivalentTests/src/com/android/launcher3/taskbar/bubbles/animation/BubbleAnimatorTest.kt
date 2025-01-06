@@ -40,11 +40,11 @@ class BubbleAnimatorTest {
                 iconSize = 40f,
                 expandedBarIconSpacing = 10f,
                 bubbleCount = 5,
-                onLeft = false
+                onLeft = false,
             )
         val listener = TestBubbleAnimatorListener()
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            bubbleAnimator.animateNewBubble(selectedBubbleIndex = 2, listener)
+            bubbleAnimator.animateNewBubble(selectedBubbleIndex = 2, listener = listener)
         }
 
         assertThat(bubbleAnimator.isRunning).isTrue()
@@ -61,7 +61,7 @@ class BubbleAnimatorTest {
                 iconSize = 40f,
                 expandedBarIconSpacing = 10f,
                 bubbleCount = 5,
-                onLeft = false
+                onLeft = false,
             )
         val listener = TestBubbleAnimatorListener()
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -69,7 +69,8 @@ class BubbleAnimatorTest {
                 bubbleIndex = 2,
                 selectedBubbleIndex = 3,
                 removingLastBubble = false,
-                listener
+                removingLastRemainingBubble = false,
+                listener,
             )
         }
 
@@ -87,14 +88,14 @@ class BubbleAnimatorTest {
                 iconSize = 40f,
                 expandedBarIconSpacing = 10f,
                 bubbleCount = 5,
-                onLeft = false
+                onLeft = false,
             )
         val listener = TestBubbleAnimatorListener()
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             bubbleAnimator.animateNewAndRemoveOld(
                 selectedBubbleIndex = 3,
                 removedBubbleIndex = 2,
-                listener
+                listener,
             )
         }
 

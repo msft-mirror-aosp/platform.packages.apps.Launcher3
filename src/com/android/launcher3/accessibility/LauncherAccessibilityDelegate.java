@@ -24,6 +24,7 @@ import android.view.accessibility.AccessibilityEvent;
 
 import androidx.annotation.Nullable;
 
+import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.ButtonDropTarget;
 import com.android.launcher3.CellLayout;
@@ -48,6 +49,7 @@ import com.android.launcher3.model.data.WorkspaceItemFactory;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.popup.ArrowPopup;
 import com.android.launcher3.popup.PopupContainerWithArrow;
+import com.android.launcher3.shortcuts.DeepShortcutView;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.IntArray;
 import com.android.launcher3.util.IntSet;
@@ -104,11 +106,15 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
                 R.string.action_deep_shortcut, KeyEvent.KEYCODE_S));
     }
 
+    private static boolean isNotInShortcutMenu(@Nullable View view) {
+        return view == null || !(view.getParent() instanceof DeepShortcutView);
+    }
+
     @Override
     protected void getSupportedActions(View host, ItemInfo item, List<LauncherAction> out) {
         // If the request came from keyboard, do not add custom shortcuts as that is already
         // exposed as a direct shortcut
-        if (ShortcutUtil.supportsShortcuts(item)) {
+        if (isNotInShortcutMenu(host) && ShortcutUtil.supportsShortcuts(item)) {
             out.add(mActions.get(DEEP_SHORTCUTS));
         }
 
@@ -193,6 +199,8 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
                 host.requestFocus();
                 host.sendAccessibilityEvent(TYPE_VIEW_FOCUSED);
                 host.performAccessibilityAction(ACTION_ACCESSIBILITY_FOCUS, null);
+                AbstractFloatingView.closeOpenViews(mContext, /* animate= */ false,
+                        AbstractFloatingView.TYPE_WIDGET_RESIZE_FRAME);
             });
             return true;
         } else if (action == DEEP_SHORTCUTS) {
@@ -299,7 +307,6 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
                 info.spanX, info.spanY);
         host.requestLayout();
         mContext.getModelWriter().updateItemInDatabase(info);
-        announceConfirmation(mContext.getString(R.string.widget_resized, info.spanX, info.spanY));
         return true;
     }
 
@@ -399,6 +406,11 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
      */
     public boolean addToWorkspace(ItemInfo item, boolean accessibility,
             @Nullable Consumer<Boolean> finishCallback) {
+        // Dismiss widget resize frame if it is showing. The frame marks its cells as unoccupied
+        // while it is showing, so findSpaceOnWorkspace may try to use those cells.
+        AbstractFloatingView.closeOpenViews(mContext, /* animate= */ false,
+                AbstractFloatingView.TYPE_WIDGET_RESIZE_FRAME);
+
         final int[] coordinates = new int[2];
         final int screenId = findSpaceOnWorkspace(item, coordinates);
         if (screenId == -1) {
@@ -415,7 +427,6 @@ public class LauncherAccessibilityDelegate extends BaseAccessibilityDelegate<Lau
                         screenId, coordinates[0], coordinates[1]);
 
                 bindItem(info, accessibility, finishCallback);
-                announceConfirmation(R.string.item_added_to_workspace);
             } else if (item instanceof PendingAddItemInfo) {
                 PendingAddItemInfo info = (PendingAddItemInfo) item;
                 if (info instanceof PendingAddWidgetInfo widgetInfo

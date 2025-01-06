@@ -204,32 +204,20 @@ public class QuickstepTestInformationHandler extends TestInformationHandler {
 
     @Override
     protected WindowInsets getWindowInsets() {
-        RecentsAnimationDeviceState rads = new RecentsAnimationDeviceState(mContext);
-        OverviewComponentObserver observer = new OverviewComponentObserver(mContext, rads);
-        try {
-            RecentsViewContainer container = observer.getContainerInterface().getCreatedContainer();
-
-            return container == null ? null : container.getRootView().getRootWindowInsets();
-        } finally {
-            observer.onDestroy();
-            rads.destroy();
-        }
+        RecentsViewContainer container = getRecentsViewContainer();
+        WindowInsets insets = container == null
+                ? null : container.getRootView().getRootWindowInsets();
+        return insets == null ? super.getWindowInsets() : insets;
     }
 
     private RecentsViewContainer getRecentsViewContainer() {
-        RecentsAnimationDeviceState rads = new RecentsAnimationDeviceState(mContext);
-        OverviewComponentObserver observer = new OverviewComponentObserver(mContext, rads);
-        try {
-            return observer.getContainerInterface().getCreatedContainer();
-        } finally {
-            observer.onDestroy();
-            rads.destroy();
-        }
+        return OverviewComponentObserver.INSTANCE.get(mContext)
+                .getContainerInterface().getCreatedContainer();
     }
 
     @Override
     protected boolean isLauncherInitialized() {
-        return super.isLauncherInitialized() && TouchInteractionService.isInitialized();
+        return super.isLauncherInitialized() && SystemUiProxy.INSTANCE.get(mContext).isActive();
     }
 
     private void enableBlockingTimeout(

@@ -26,8 +26,11 @@ import android.platform.test.rule.IgnoreLimit
 import android.platform.test.rule.LimitDevicesRule
 import android.util.DisplayMetrics
 import android.view.Surface
-import androidx.test.core.app.ApplicationProvider
+import androidx.test.core.app.ApplicationProvider.getApplicationContext
 import androidx.test.platform.app.InstrumentationRegistry
+import com.android.launcher3.dagger.LauncherAppComponent
+import com.android.launcher3.dagger.LauncherAppModule
+import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.testing.shared.ResourceUtils
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.MainThreadInitializedObject.SandboxContext
@@ -38,6 +41,8 @@ import com.android.launcher3.util.rule.setFlags
 import com.android.launcher3.util.window.CachedDisplayInfo
 import com.android.launcher3.util.window.WindowManagerProxy
 import com.google.common.truth.Truth
+import dagger.BindsInstance
+import dagger.Component
 import java.io.BufferedReader
 import java.io.File
 import java.io.PrintWriter
@@ -62,9 +67,9 @@ import org.mockito.kotlin.whenever
 abstract class AbstractDeviceProfileTest {
     protected val testContext: Context = InstrumentationRegistry.getInstrumentation().context
     protected lateinit var context: SandboxContext
-    protected open val runningContext: Context = ApplicationProvider.getApplicationContext()
+    protected open val runningContext: Context = getApplicationContext()
     private val displayController: DisplayController = mock()
-    private val windowManagerProxy: WindowManagerProxy = mock()
+    private val windowManagerProxy: MyWmProxy = mock()
     private val launcherPrefs: LauncherPrefs = mock()
 
     @get:Rule val setFlagsRule = SetFlagsRule(SetFlagsRule.DefaultInitValueType.DEVICE_DEFAULT)
@@ -126,6 +131,7 @@ abstract class AbstractDeviceProfileTest {
         deviceSpec: DeviceSpec,
         isGestureMode: Boolean = true,
         isVerticalBar: Boolean = false,
+        isFixedLandscape: Boolean = false,
     ) {
         val (naturalX, naturalY) = deviceSpec.naturalSize
         val windowsBounds = phoneWindowsBounds(deviceSpec, isGestureMode, naturalX, naturalY)
@@ -138,6 +144,7 @@ abstract class AbstractDeviceProfileTest {
             rotation = if (isVerticalBar) Surface.ROTATION_90 else Surface.ROTATION_0,
             isGestureMode,
             densityDpi = deviceSpec.densityDpi,
+            isFixedLandscape = isFixedLandscape,
         )
     }
 
@@ -274,9 +281,9 @@ abstract class AbstractDeviceProfileTest {
         rotation: Int,
         isGestureMode: Boolean = true,
         densityDpi: Int,
+        isFixedLandscape: Boolean = false,
     ) {
         setFlagsRule.setFlags(true, Flags.FLAG_ENABLE_TWOLINE_TOGGLE)
-        LauncherPrefs.get(testContext).put(LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE, true)
         val windowsBounds = perDisplayBoundsCache[displayInfo]!!
         val realBounds = windowsBounds[rotation]
         whenever(windowManagerProxy.getDisplayInfo(any())).thenReturn(displayInfo)
@@ -287,9 +294,9 @@ abstract class AbstractDeviceProfileTest {
             .thenReturn(
                 if (isGestureMode) NavigationMode.NO_BUTTON else NavigationMode.THREE_BUTTONS
             )
-        doReturn(WindowManagerProxy.INSTANCE[runningContext].isTaskbarDrawnInProcess)
+        doReturn(WindowManagerProxy.INSTANCE[getApplicationContext()].isTaskbarDrawnInProcess)
             .whenever(windowManagerProxy)
-            .isTaskbarDrawnInProcess()
+            .isTaskbarDrawnInProcess
 
         val density = densityDpi / DisplayMetrics.DENSITY_DEFAULT.toFloat()
         val config =
@@ -301,16 +308,21 @@ abstract class AbstractDeviceProfileTest {
             }
         val configurationContext = runningContext.createConfigurationContext(config)
         context = SandboxContext(configurationContext)
+        context.initDaggerComponent(
+            DaggerAbsDPTestSandboxComponent.builder()
+                .bindWMProxy(windowManagerProxy)
+                .bindLauncherPrefs(launcherPrefs)
+        )
         context.putObject(DisplayController.INSTANCE, displayController)
-        context.putObject(WindowManagerProxy.INSTANCE, windowManagerProxy)
-        context.putObject(LauncherPrefs.INSTANCE, launcherPrefs)
 
         whenever(launcherPrefs.get(LauncherPrefs.TASKBAR_PINNING)).thenReturn(false)
         whenever(launcherPrefs.get(LauncherPrefs.TASKBAR_PINNING_IN_DESKTOP_MODE)).thenReturn(true)
+        whenever(launcherPrefs.get(LauncherPrefs.FIXED_LANDSCAPE_MODE)).thenReturn(isFixedLandscape)
         whenever(launcherPrefs.get(LauncherPrefs.HOTSEAT_COUNT)).thenReturn(-1)
         whenever(launcherPrefs.get(LauncherPrefs.DEVICE_TYPE)).thenReturn(-1)
         whenever(launcherPrefs.get(LauncherPrefs.WORKSPACE_SIZE)).thenReturn("")
         whenever(launcherPrefs.get(LauncherPrefs.DB_FILE)).thenReturn("")
+        whenever(launcherPrefs.get(LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE)).thenReturn(true)
         val info = spy(DisplayController.Info(context, windowManagerProxy, perDisplayBoundsCache))
         whenever(displayController.info).thenReturn(info)
         whenever(info.isTransientTaskbar).thenReturn(isGestureMode)
@@ -349,5 +361,23 @@ abstract class AbstractDeviceProfileTest {
     protected fun String.xmlToId(): Int {
         val context = InstrumentationRegistry.getInstrumentation().context
         return context.resources.getIdentifier(this, "xml", context.packageName)
+    }
+}
+
+class MyWmProxy : WindowManagerProxy()
+
+@LauncherAppSingleton
+@Component(modules = [LauncherAppModule::class])
+interface AbsDPTestSandboxComponent : LauncherAppComponent {
+
+    override fun getWmProxy(): MyWmProxy
+
+    @Component.Builder
+    interface Builder : LauncherAppComponent.Builder {
+        @BindsInstance fun bindWMProxy(proxy: MyWmProxy): Builder
+
+        @BindsInstance fun bindLauncherPrefs(prefs: LauncherPrefs): Builder
+
+        override fun build(): AbsDPTestSandboxComponent
     }
 }

@@ -28,8 +28,7 @@ import android.content.Context;
 import android.content.Intent;
 
 import androidx.test.filters.SmallTest;
-
-import com.android.quickstep.fallback.window.RecentsWindowManager;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -40,21 +39,25 @@ import org.mockito.MockitoAnnotations;
 @SmallTest
 public class TaskAnimationManagerTest {
 
-    @Mock
-    private Context mContext;
-
-    @Mock
-    private RecentsWindowManager mRecentsWindowManager;
+    protected final Context mContext =
+            InstrumentationRegistry.getInstrumentation().getTargetContext();
 
     @Mock
     private SystemUiProxy mSystemUiProxy;
 
     private TaskAnimationManager mTaskAnimationManager;
+    protected RecentsAnimationDeviceState mRecentsAnimationDeviceState;
+
+    @Before
+    public void setUpRecentsAnimationDeviceState() {
+        runOnMainSync(() ->
+                mRecentsAnimationDeviceState = new RecentsAnimationDeviceState(mContext, true));
+    }
 
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
-        mTaskAnimationManager = new TaskAnimationManager(mContext, mRecentsWindowManager) {
+        mTaskAnimationManager = new TaskAnimationManager(mContext, mRecentsAnimationDeviceState) {
             @Override
             SystemUiProxy getSystemUiProxy() {
                 return mSystemUiProxy;
@@ -69,13 +72,17 @@ public class TaskAnimationManagerTest {
         final RecentsAnimationCallbacks.RecentsAnimationListener listener =
                 mock(RecentsAnimationCallbacks.RecentsAnimationListener.class);
         doReturn(activityInterface).when(gestureState).getContainerInterface();
-        mTaskAnimationManager.startRecentsAnimation(gestureState, new Intent(), listener);
-
+        runOnMainSync(() ->
+                mTaskAnimationManager.startRecentsAnimation(gestureState, new Intent(), listener));
         final ArgumentCaptor<ActivityOptions> optionsCaptor =
                 ArgumentCaptor.forClass(ActivityOptions.class);
         verify(mSystemUiProxy)
                 .startRecentsActivity(any(), optionsCaptor.capture(), any(), anyBoolean());
         assertEquals(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS,
                 optionsCaptor.getValue().getPendingIntentBackgroundActivityStartMode());
+    }
+
+    protected static void runOnMainSync(Runnable runnable) {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(runnable);
     }
 }

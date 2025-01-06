@@ -46,6 +46,7 @@ import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_PENDING_ACTIVITY_RESULT;
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_PENDING_REQUEST_ARGS;
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_PENDING_REQUEST_CODE;
+import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_RECREATE_TO_UPDATE_THEME;
 import static com.android.launcher3.LauncherConstants.SavedInstanceKeys.RUNTIME_STATE_WIDGET_PANEL;
 import static com.android.launcher3.LauncherConstants.TraceEvents.COLD_STARTUP_TRACE_COOKIE;
 import static com.android.launcher3.LauncherConstants.TraceEvents.COLD_STARTUP_TRACE_METHOD_NAME;
@@ -57,6 +58,7 @@ import static com.android.launcher3.LauncherConstants.TraceEvents.ON_CREATE_EVT;
 import static com.android.launcher3.LauncherConstants.TraceEvents.ON_NEW_INTENT_EVT;
 import static com.android.launcher3.LauncherConstants.TraceEvents.ON_RESUME_EVT;
 import static com.android.launcher3.LauncherConstants.TraceEvents.ON_START_EVT;
+import static com.android.launcher3.LauncherPrefs.FIXED_LANDSCAPE_MODE;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP;
 import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
 import static com.android.launcher3.LauncherState.ALL_APPS;
@@ -70,7 +72,6 @@ import static com.android.launcher3.LauncherState.SPRING_LOADED;
 import static com.android.launcher3.Utilities.postAsyncCallback;
 import static com.android.launcher3.config.FeatureFlags.FOLDABLE_SINGLE_PAGE;
 import static com.android.launcher3.config.FeatureFlags.MULTI_SELECT_EDIT_MODE;
-import static com.android.launcher3.folder.FolderGridOrganizer.createFolderGridOrganizer;
 import static com.android.launcher3.logging.KeyboardStateManager.KeyboardState.HIDE;
 import static com.android.launcher3.logging.KeyboardStateManager.KeyboardState.SHOW;
 import static com.android.launcher3.logging.StatsLogManager.EventEnum;
@@ -204,7 +205,6 @@ import com.android.launcher3.model.ItemInstallQueue;
 import com.android.launcher3.model.ModelWriter;
 import com.android.launcher3.model.StringCache;
 import com.android.launcher3.model.data.AppInfo;
-import com.android.launcher3.model.data.AppPairInfo;
 import com.android.launcher3.model.data.CollectionInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
@@ -233,6 +233,7 @@ import com.android.launcher3.util.IntSet;
 import com.android.launcher3.util.ItemInflater;
 import com.android.launcher3.util.KeyboardShortcutsDelegate;
 import com.android.launcher3.util.LockedUserState;
+import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.launcher3.util.PackageUserKey;
 import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.util.PluginManagerWrapper;
@@ -279,6 +280,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -413,7 +415,6 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     private final List<BackPressHandler> mBackPressedHandlers = new ArrayList<>();
     private boolean mIsColdStartupAfterReboot;
-    private boolean mForceConfigUpdate;
 
     private boolean mIsNaturalScrollingEnabled;
 
@@ -536,6 +537,7 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         mPopupDataProvider = new PopupDataProvider(this::updateNotificationDots);
         mWidgetPickerDataProvider = new WidgetPickerDataProvider();
+        PillColorProvider.getInstance(mWorkspace.getContext()).registerObserver();
 
         boolean internalStateHandled = ACTIVITY_TRACKER.handleCreate(this);
         if (internalStateHandled) {
@@ -758,10 +760,9 @@ public class Launcher extends StatefulActivity<LauncherState>
     protected void onHandleConfigurationChanged() {
         Trace.beginSection("Launcher#onHandleconfigurationChanged");
         try {
-            if (!initDeviceProfile(mDeviceProfile.inv) && !mForceConfigUpdate) {
+            if (!initDeviceProfile(mDeviceProfile.inv)) {
                 return;
             }
-
             dispatchDeviceProfileChanged();
             reapplyUi();
             mDragLayer.recreateControllers();
@@ -772,9 +773,26 @@ public class Launcher extends StatefulActivity<LauncherState>
             mModel.rebindCallbacks();
             updateDisallowBack();
         } finally {
-            mForceConfigUpdate = false;
             Trace.endSection();
         }
+    }
+
+    private void updateFixedLandscape() {
+        if (!com.android.launcher3.Flags.oneGridSpecs()) {
+            return;
+        }
+        // When the flag oneGridSpecs is on we want to disable ALLOW_ROTATION which is replaced
+        // by FIXED_LANDSCAPE_MODE, ALLOW_ROTATION will only be used on Tablets and foldables
+        // afterwards.
+        if (getDeviceProfile().isPhone) {
+            LauncherPrefs.get(this).put(LauncherPrefs.ALLOW_ROTATION, false);
+        } else if (getDeviceProfile().isTablet) {
+            // Tablet do not use fixed landscape mode, make sure it can't be activated by mistake
+            LauncherPrefs.get(this).put(FIXED_LANDSCAPE_MODE, false);
+        }
+        getRotationHelper().setFixedLandscape(
+                Objects.requireNonNull(mDeviceProfile.inv).isFixedLandscape
+        );
     }
 
     public void onAssistantVisibilityChanged(float visibility) {
@@ -805,27 +823,8 @@ public class Launcher extends StatefulActivity<LauncherState>
                     mDeviceProfile.numShownHotseatIcons);
         }
         mModelWriter = mModel.getWriter(true, mCellPosMapper, this);
+        updateFixedLandscape();
         return true;
-    }
-
-    @Override
-    public void invalidateParent(ItemInfo info) {
-        if (info.container >= 0) {
-            View collectionIcon = getWorkspace().getHomescreenIconByItemId(info.container);
-            if (collectionIcon instanceof FolderIcon folderIcon
-                    && collectionIcon.getTag() instanceof FolderInfo) {
-                if (createFolderGridOrganizer(getDeviceProfile())
-                        .setFolderInfo((FolderInfo) folderIcon.getTag())
-                        .isItemInPreview(info.rank)) {
-                    folderIcon.invalidate();
-                }
-            } else if (collectionIcon instanceof AppPairIcon appPairIcon
-                    && collectionIcon.getTag() instanceof AppPairInfo appPairInfo) {
-                if (appPairInfo.getContents().contains(info)) {
-                    appPairIcon.getIconDrawableArea().redraw();
-                }
-            }
-        }
     }
 
     /**
@@ -846,7 +845,6 @@ public class Launcher extends StatefulActivity<LauncherState>
             case REQUEST_CREATE_SHORTCUT:
                 completeAddShortcut(intent, info.container, screenId,
                         cellPos.cellX, cellPos.cellY, info);
-                announceForAccessibility(R.string.item_added_to_workspace);
                 break;
             case REQUEST_CREATE_APPWIDGET:
                 completeAddAppWidget(appWidgetId, info, null, null, false, true, null);
@@ -1335,7 +1333,8 @@ public class Launcher extends StatefulActivity<LauncherState>
 
         NonConfigInstance lastInstance = (NonConfigInstance) getLastNonConfigurationInstance();
         boolean forceRestore = lastInstance != null
-                && (lastInstance.config.diff(mOldConfig) & CONFIG_UI_MODE) != 0;
+                && ((lastInstance.config.diff(mOldConfig) & CONFIG_UI_MODE) != 0
+                || savedState.getBoolean(RUNTIME_STATE_RECREATE_TO_UPDATE_THEME));
         if (forceRestore || !state.shouldDisableRestore()) {
             mStateManager.goToState(state, false /* animated */);
         }
@@ -1546,7 +1545,6 @@ public class Launcher extends StatefulActivity<LauncherState>
         if (!enableAddAppWidgetViaConfigActivityV2() || hostView.getParent() == null) {
             mWorkspace.addInScreen(hostView, launcherInfo);
         }
-        announceForAccessibility(R.string.item_added_to_workspace);
 
         // Show the widget resize frame.
         if (hostView instanceof LauncherAppWidgetHostView) {
@@ -1658,7 +1656,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             if (FeatureFlags.enableSplitContextually()) {
                 handleSplitAnimationGoingToHome(LAUNCHER_SPLIT_SELECTION_EXIT_HOME);
             }
-            mOverlayManager.hideOverlay(isStarted() && !isForceInvisible());
+            mOverlayManager.hideOverlay(isStarted());
             handleGestureContract(intent);
         } else if (Intent.ACTION_ALL_APPS.equals(intent.getAction())) {
             showAllAppsFromIntent(alreadyOnHome);
@@ -1803,6 +1801,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         // changes while launcher is still loading.
         getRootView().getViewTreeObserver().removeOnPreDrawListener(mOnInitialBindListener);
         mOverlayManager.onActivityDestroyed();
+        PillColorProvider.getInstance(mWorkspace.getContext()).unregisterObserver();
     }
 
     public LauncherAccessibilityDelegate getAccessibilityDelegate() {
@@ -2278,7 +2277,8 @@ public class Launcher extends StatefulActivity<LauncherState>
             if (item.container == CONTAINER_DESKTOP) {
                 CellLayout cl = mWorkspace.getScreenWithId(presenterPos.screenId);
                 if (cl != null && cl.isOccupied(presenterPos.cellX, presenterPos.cellY)) {
-                    Object tag = cl.getChildAt(presenterPos.cellX, presenterPos.cellY).getTag();
+                    View occupiedView = cl.getChildAt(presenterPos.cellX, presenterPos.cellY);
+                    Object tag = occupiedView == null ? null : occupiedView.getTag();
                     String desc = "Collision while binding workspace item: " + item
                             + ". Collides with " + tag;
                     if (FeatureFlags.IS_STUDIO_BUILD) {
@@ -2728,6 +2728,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         mModel.dumpState(prefix, fd, writer, args);
         mOverlayManager.dump(prefix, writer);
         ACTIVITY_TRACKER.dump(prefix, writer);
+        MSDLPlayerWrapper.INSTANCE.get(getApplicationContext()).dump(prefix, writer);
     }
 
     /**
@@ -3154,13 +3155,6 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     public CannedAnimationCoordinator getAnimationCoordinator() {
         return mAnimationCoordinator;
-    }
-
-    /**
-     * Set to force config update when set to true next time onHandleConfigurationChanged is called.
-     */
-    public void setForceConfigUpdate(boolean forceConfigUpdate) {
-        mForceConfigUpdate = forceConfigUpdate;
     }
 
     @Override

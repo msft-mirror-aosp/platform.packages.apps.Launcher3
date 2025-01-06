@@ -89,7 +89,6 @@ public class BubbleControllers {
                 );
         bubbleBarController.init(this,
                 bubbleBarLocationListeners,
-                taskbarControllers.navbarButtonsViewController::isImeVisible,
                 taskbarSharedState);
         bubbleStashedHandleViewController.ifPresent(
                 controller -> controller.init(/* bubbleControllers = */ this));
@@ -103,7 +102,8 @@ public class BubbleControllers {
                 new TaskbarViewPropertiesProvider() {
                     @Override
                     public Rect getTaskbarViewBounds() {
-                        return taskbarControllers.taskbarViewController.getIconLayoutBounds();
+                        return taskbarControllers.taskbarViewController
+                                .getTransientTaskbarIconLayoutBoundsInParent();
                     }
 
                     @Override

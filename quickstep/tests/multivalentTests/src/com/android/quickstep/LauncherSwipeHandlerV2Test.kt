@@ -21,8 +21,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.launcher3.R
 import com.android.launcher3.dagger.LauncherAppComponent
+import com.android.launcher3.dagger.LauncherAppModule
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.util.LauncherModelHelper
+import com.android.launcher3.util.MSDLPlayerWrapper
+import com.android.quickstep.fallback.window.RecentsDisplayModel
 import com.android.systemui.contextualeducation.GestureType
 import com.android.systemui.shared.system.InputConsumerController
 import dagger.BindsInstance
@@ -50,6 +53,10 @@ class LauncherSwipeHandlerV2Test {
 
     @Mock private lateinit var systemUiProxy: SystemUiProxy
 
+    @Mock private lateinit var recentsDisplayModel: RecentsDisplayModel
+
+    @Mock private lateinit var msdlPlayerWrapper: MSDLPlayerWrapper
+
     private lateinit var underTest: LauncherSwipeHandlerV2
 
     @get:Rule val mockitoRule = MockitoJUnit.rule()
@@ -63,11 +70,14 @@ class LauncherSwipeHandlerV2Test {
     @Before
     fun setup() {
         sandboxContext.initDaggerComponent(
-            DaggerTestComponent.builder().bindSystemUiProxy(systemUiProxy)
+            DaggerTestComponent.builder()
+                .bindSystemUiProxy(systemUiProxy)
+                .bindRecentsDisplayModel(recentsDisplayModel)
         )
+
         val deviceState = mock(RecentsAnimationDeviceState::class.java)
         whenever(deviceState.rotationTouchHelper).thenReturn(mock(RotationTouchHelper::class.java))
-        gestureState = spy(GestureState(OverviewComponentObserver(sandboxContext, deviceState), 0))
+        gestureState = spy(GestureState(OverviewComponentObserver.INSTANCE.get(sandboxContext), 0))
 
         underTest =
             LauncherSwipeHandlerV2(
@@ -78,6 +88,7 @@ class LauncherSwipeHandlerV2Test {
                 0,
                 false,
                 inputConsumerController,
+                msdlPlayerWrapper,
             )
         underTest.onGestureStarted(/* isLikelyToStartNewTask= */ false)
     }
@@ -105,11 +116,13 @@ class LauncherSwipeHandlerV2Test {
 }
 
 @LauncherAppSingleton
-@Component
+@Component(modules = [LauncherAppModule::class])
 interface TestComponent : LauncherAppComponent {
     @Component.Builder
     interface Builder : LauncherAppComponent.Builder {
         @BindsInstance fun bindSystemUiProxy(proxy: SystemUiProxy): Builder
+
+        @BindsInstance fun bindRecentsDisplayModel(model: RecentsDisplayModel): Builder
 
         override fun build(): TestComponent
     }

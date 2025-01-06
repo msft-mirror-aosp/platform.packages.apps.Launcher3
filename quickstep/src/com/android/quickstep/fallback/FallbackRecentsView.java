@@ -43,9 +43,9 @@ import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitSelectSource;
 import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.FallbackActivityInterface;
-import com.android.quickstep.FallbackWindowInterface;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.RotationTouchHelper;
+import com.android.quickstep.fallback.window.RecentsDisplayModel;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.SplitSelectStateController;
 import com.android.quickstep.util.TaskViewSimulator;
@@ -73,14 +73,15 @@ public class FallbackRecentsView<CONTAINER_TYPE extends Context & RecentsViewCon
     }
 
     public FallbackRecentsView(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr, getContainerInterface());
+        super(context, attrs, defStyleAttr);
         mContainer.getStateManager().addStateListener(this);
     }
 
-    private static BaseContainerInterface<RecentsState, ?> getContainerInterface() {
+    @Override
+    public BaseContainerInterface<RecentsState, ?> getContainerInterface(int displayId) {
         return (Flags.enableFallbackOverviewInWindow() || Flags.enableLauncherOverviewInWindow())
-                ? FallbackWindowInterface.getInstance()
-                : FallbackActivityInterface.INSTANCE;
+                ? RecentsDisplayModel.getINSTANCE().get(mContext)
+                .getFallbackWindowInterface(displayId) : FallbackActivityInterface.INSTANCE;
     }
 
     @Override
@@ -180,7 +181,7 @@ public class FallbackRecentsView<CONTAINER_TYPE extends Context & RecentsViewCon
         Task runningTask = runningTasks[0];
         if (mHomeTask != null && runningTask != null
                 && mHomeTask.key.id == runningTask.key.id
-                && getTaskViewCount() == 0 && mLoadPlanEverApplied) {
+                && !hasTaskViews() && mLoadPlanEverApplied) {
             // Do not add a stub task if we are running over home with empty recents, so that we
             // show the empty recents message instead of showing a stub task and later removing it.
             // Ignore empty task signal if applyLoadPlan has never run.
@@ -263,13 +264,13 @@ public class FallbackRecentsView<CONTAINER_TYPE extends Context & RecentsViewCon
         }
 
         setFreezeViewVisibility(true);
-        if (mContainer.getDesktopVisibilityController() != null) {
-            mContainer.getDesktopVisibilityController().onLauncherStateChanged(toState);
-        }
     }
 
     @Override
     public void onStateTransitionComplete(RecentsState finalState) {
+        if (mContainer.getDesktopVisibilityController() != null) {
+            mContainer.getDesktopVisibilityController().onLauncherStateChanged(finalState);
+        }
         if (!finalState.isRecentsViewVisible()) {
             // Clean-up logic that occurs when recents is no longer in use/visible.
             reset();

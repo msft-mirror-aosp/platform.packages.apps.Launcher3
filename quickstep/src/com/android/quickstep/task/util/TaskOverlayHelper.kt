@@ -18,6 +18,7 @@ package com.android.quickstep.task.util
 
 import android.util.Log
 import android.view.View.OnLayoutChangeListener
+import com.android.launcher3.util.coroutines.DispatcherProvider
 import com.android.quickstep.TaskOverlayFactory
 import com.android.quickstep.recents.di.RecentsDependencies
 import com.android.quickstep.recents.di.get
@@ -33,12 +34,15 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 
 /**
  * Helper for [TaskOverlayFactory.TaskOverlay] to interact with [TaskOverlayViewModel], this helper
  * should merge with [TaskOverlayFactory.TaskOverlay] when it's migrated to MVVM.
  */
 class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOverlay<*>) {
+    private val recentsCoroutineScope: CoroutineScope = RecentsDependencies.get()
+    private val dispatcherProvider: DispatcherProvider = RecentsDependencies.get()
     private lateinit var overlayInitializedScope: CoroutineScope
     private var uiState: TaskOverlayUiState = Disabled
 
@@ -70,6 +74,7 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
                 recentsViewData = RecentsDependencies.get(),
                 getThumbnailPositionUseCase = RecentsDependencies.get(),
                 recentTasksRepository = RecentsDependencies.get(),
+                dispatcherProvider = RecentsDependencies.get(),
             )
         viewModel.overlayState
             .onEach {
@@ -85,19 +90,25 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
     }
 
     private fun initOverlay(enabledState: Enabled) {
-        Log.d(TAG, "initOverlay - taskId: ${task.key.id}, thumbnail: ${enabledState.thumbnail}")
+        if (DEBUG) {
+            Log.d(TAG, "initOverlay - taskId: ${task.key.id}, thumbnail: ${enabledState.thumbnail}")
+        }
         with(getThumbnailPositionState()) {
             overlay.initOverlay(task, enabledState.thumbnail, matrix, isRotated)
         }
     }
 
     private fun reset() {
-        Log.d(TAG, "reset - taskId: ${task.key.id}")
+        if (DEBUG) {
+            Log.d(TAG, "reset - taskId: ${task.key.id}")
+        }
         overlay.reset()
     }
 
     fun destroy() {
-        overlayInitializedScope.cancel()
+        recentsCoroutineScope.launch(dispatcherProvider.background) {
+            overlayInitializedScope.cancel("TaskOverlay being destroyed")
+        }
         uiState = Disabled
         overlay.snapshotView.removeOnLayoutChangeListener(snapshotLayoutChangeListener)
         reset()
@@ -105,5 +116,6 @@ class TaskOverlayHelper(val task: Task, val overlay: TaskOverlayFactory.TaskOver
 
     companion object {
         private const val TAG = "TaskOverlayHelper"
+        private const val DEBUG = false
     }
 }

@@ -20,6 +20,7 @@ import static android.graphics.fonts.FontStyle.FONT_WEIGHT_BOLD;
 import static android.graphics.fonts.FontStyle.FONT_WEIGHT_NORMAL;
 import static android.text.Layout.Alignment.ALIGN_NORMAL;
 
+import static com.android.launcher3.Flags.enableContrastTiles;
 import static com.android.launcher3.Flags.enableCursorHoverStates;
 import static com.android.launcher3.graphics.PreloadIconDrawable.newPendingIcon;
 import static com.android.launcher3.icons.BitmapInfo.FLAG_NO_BADGE;
@@ -39,6 +40,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.icu.text.MessageFormat;
@@ -159,7 +161,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     };
 
     private final MultiTranslateDelegate mTranslateDelegate = new MultiTranslateDelegate(this);
-    private final ActivityContext mActivity;
+    protected final ActivityContext mActivity;
     private FastBitmapDrawable mIcon;
     private DeviceProfile mDeviceProfile;
     private boolean mCenterVertically;
@@ -188,7 +190,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     @ViewDebug.ExportedProperty(category = "launcher")
     private DotInfo mDotInfo;
     private DotRenderer mDotRenderer;
-    private String mCurrentLanguage;
     @ViewDebug.ExportedProperty(category = "launcher", deepExport = true)
     protected DotRenderer.DrawParams mDotParams;
     private Animator mDotScaleAnim;
@@ -300,7 +301,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
         mDotParams = new DotRenderer.DrawParams();
 
-        mCurrentLanguage = context.getResources().getConfiguration().locale.getLanguage();
         setEllipsize(TruncateAt.END);
         setAccessibilityDelegate(mActivity.getAccessibilityDelegate());
         setTextAlpha(1f);
@@ -367,25 +367,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @UiThread
     public void applyFromWorkspaceItem(WorkspaceItemInfo info) {
-        applyFromWorkspaceItem(info, /* animate = */ false, /* staggerIndex = */ 0);
-    }
-
-    @UiThread
-    public void applyFromWorkspaceItem(WorkspaceItemInfo info, boolean animate, int staggerIndex) {
         applyFromWorkspaceItem(info, null);
-    }
-
-    /**
-     * Returns whether the newInfo differs from the current getTag().
-     */
-    public boolean shouldAnimateIconChange(WorkspaceItemInfo newInfo) {
-        WorkspaceItemInfo oldInfo = getTag() instanceof WorkspaceItemInfo
-                ? (WorkspaceItemInfo) getTag()
-                : null;
-        boolean changedIcons = oldInfo != null && oldInfo.getTargetComponent() != null
-                && newInfo.getTargetComponent() != null
-                && !oldInfo.getTargetComponent().equals(newInfo.getTargetComponent());
-        return changedIcons && isShown();
     }
 
     @Override
@@ -490,13 +472,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
      * Only if actual text can be displayed in two line, the {@code true} value will be effective.
      */
     protected boolean shouldUseTwoLine() {
-        return isCurrentLanguageEnglish() && (mDisplay == DISPLAY_ALL_APPS
-                || mDisplay == DISPLAY_PREDICTION_ROW) && (Flags.enableTwolineToggle()
-                && LauncherPrefs.ENABLE_TWOLINE_ALLAPPS_TOGGLE.get(getContext()));
-    }
-
-    protected boolean isCurrentLanguageEnglish() {
-        return mCurrentLanguage.equals(Locale.ENGLISH.getLanguage());
+        return mDeviceProfile.inv.enableTwoLinesInAllApps
+                && (mDisplay == DISPLAY_ALL_APPS || mDisplay == DISPLAY_PREDICTION_ROW);
     }
 
     @UiThread
@@ -722,6 +699,40 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
     }
 
+    /** Draws a background behind the App Title label when required. **/
+    public void drawAppContrastTile(Canvas canvas) {
+        RectF appTitleBounds;
+        Paint.FontMetrics fm = getPaint().getFontMetrics();
+        Rect tmpRect = new Rect();
+        getDrawingRect(tmpRect);
+        CharSequence text = getText();
+
+        int mAppTitleHorizontalPadding = getResources().getDimensionPixelSize(
+                R.dimen.app_title_pill_horizontal_padding);
+        int mRoundRectPadding = getResources().getDimensionPixelSize(
+                R.dimen.app_title_pill_round_rect_padding);
+
+        float titleLength = (getPaint().measureText(text, 0, text.length())
+                + (mAppTitleHorizontalPadding + mRoundRectPadding) * 2);
+        titleLength = Math.min(titleLength, tmpRect.width());
+        appTitleBounds = new RectF((tmpRect.width() - titleLength) / 2.f - getCompoundPaddingLeft(),
+                0, (tmpRect.width() + titleLength) / 2.f + getCompoundPaddingRight(),
+                (int) Math.ceil(fm.bottom - fm.top));
+        appTitleBounds.inset((mAppTitleHorizontalPadding) * 2, 0);
+
+
+        if (mIcon != null) {
+            Rect iconBounds = new Rect();
+            getIconBounds(iconBounds);
+            int textStart = iconBounds.bottom + getCompoundDrawablePadding();
+            appTitleBounds.offset(0, textStart);
+        }
+
+        canvas.drawRoundRect(appTitleBounds, appTitleBounds.height() / 2,
+                appTitleBounds.height() / 2,
+                PillColorProvider.getInstance(getContext()).getAppTitlePillPaint());
+    }
+
     /** Draws a line under the app icon if this is representing a running app in Desktop Mode. */
     protected void drawRunningAppIndicatorIfNecessary(Canvas canvas) {
         if (mRunningAppState == RunningAppState.NOT_RUNNING || mDisplay != DISPLAY_TASKBAR) {
@@ -826,6 +837,16 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             setPadding(getPaddingLeft(), (height - cellHeightPx) / 2, getPaddingRight(),
                     getPaddingBottom());
         }
+        if (shouldDrawAppContrastTile()) {
+            int mAppTitleHorizontalPadding = getResources().getDimensionPixelSize(
+                    R.dimen.app_title_pill_horizontal_padding);
+            int mRoundRectPadding = getResources().getDimensionPixelSize(
+                    R.dimen.app_title_pill_round_rect_padding);
+
+            setPadding(mAppTitleHorizontalPadding + mRoundRectPadding, getPaddingTop(),
+                    mAppTitleHorizontalPadding + mRoundRectPadding,
+                    getPaddingBottom());
+        }
         // Only apply two line for all_apps and device search only if necessary.
         if (shouldUseTwoLine() && (mLastOriginalText != null)) {
             int allowedVerticalSpace = height - getPaddingTop() - getPaddingBottom()
@@ -909,7 +930,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @Override
     public void setTextColor(ColorStateList colors) {
-        mTextColor = colors.getDefaultColor();
+        mTextColor = shouldDrawAppContrastTile() ? PillColorProvider.getInstance(
+                getContext()).getAppTitleTextPaint().getColor()
+                : colors.getDefaultColor();
         mTextColorStateList = colors;
         if (Float.compare(mTextAlpha, 1) == 0) {
             super.setTextColor(colors);
@@ -924,6 +947,15 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         ItemInfo info = tag instanceof ItemInfo ? (ItemInfo) tag : null;
         return info == null || (info.container != LauncherSettings.Favorites.CONTAINER_HOTSEAT
                 && info.container != LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION);
+    }
+
+    /**
+     * Whether or not an App title contrast tile should be drawn for this element.
+     **/
+    public boolean shouldDrawAppContrastTile() {
+        return mDisplay == DISPLAY_WORKSPACE && shouldTextBeVisible()
+                && PillColorProvider.getInstance(getContext()).isMatchaEnabled()
+                && enableContrastTiles() && !TextUtils.isEmpty(getText());
     }
 
     public void setTextVisibility(boolean visible) {
@@ -1276,7 +1308,6 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 applyFromApplicationInfo((AppInfo) info);
             } else if (info instanceof WorkspaceItemInfo) {
                 applyFromWorkspaceItem((WorkspaceItemInfo) info);
-                mActivity.invalidateParent(info);
             } else if (info != null) {
                 applyFromItemInfoWithIcon(info);
             }
@@ -1290,16 +1321,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
      * Verifies that the current icon is high-res otherwise posts a request to load the icon.
      */
     public void verifyHighRes() {
-        if (mIconLoadRequest != null) {
-            mIconLoadRequest.cancel();
-            mIconLoadRequest = null;
-        }
-        if (getTag() instanceof ItemInfoWithIcon && !mHighResUpdateInProgress) {
-            ItemInfoWithIcon info = (ItemInfoWithIcon) getTag();
-            if (info.usingLowResIcon()) {
-                mIconLoadRequest = LauncherAppState.getInstance(getContext()).getIconCache()
-                        .updateIconInBackground(BubbleTextView.this, info);
+        if (getTag() instanceof ItemInfoWithIcon info && !mHighResUpdateInProgress
+                && info.getMatchingLookupFlag().useLowRes()) {
+            if (mIconLoadRequest != null) {
+                mIconLoadRequest.cancel();
             }
+            mIconLoadRequest = LauncherAppState.getInstance(getContext()).getIconCache()
+                    .updateIconInBackground(BubbleTextView.this, info);
         }
     }
 

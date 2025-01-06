@@ -194,7 +194,7 @@ public class TaskbarControllers {
                 voiceInteractionWindowController
         };
 
-        if (taskbarDesktopModeController.getAreDesktopTasksVisible()) {
+        if (taskbarDesktopModeController.getAreDesktopTasksVisibleAndNotInOverview()) {
             mCornerRoundness.value = taskbarDesktopModeController.getTaskbarCornerRoundness(
                     mSharedState.showCornerRadiusInDesktopMode);
         } else {
@@ -221,10 +221,15 @@ public class TaskbarControllers {
         uiController = newUiController;
         uiController.init(this);
         uiController.updateStateForSysuiFlags(mSharedState.sysuiStateFlags);
-        // if bubble controllers are present take bubble bar location, else set it to null
+        // if bubble controllers are present configure the UI controller
         bubbleControllers.ifPresentOrElse(bubbleControllers -> {
             BubbleBarLocation location =
                     bubbleControllers.bubbleBarViewController.getBubbleBarLocation();
+            boolean hiddenForBubbles =
+                    bubbleControllers.bubbleBarViewController.isHiddenForNoBubbles();
+            if (!hiddenForBubbles) {
+                uiController.adjustHotseatForBubbleBar(/* isBubbleBarVisible= */ true);
+            }
             uiController.onBubbleBarLocationUpdated(location);
         }, () -> uiController.onBubbleBarLocationUpdated(null));
         // Notify that the ui controller has changed

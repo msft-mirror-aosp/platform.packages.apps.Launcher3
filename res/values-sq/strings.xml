@@ -32,6 +32,7 @@
     <string name="split_app_info_accessibility" msgid="5475288491241414932">"Informacioni i aplikacionit për %1$s"</string>
     <string name="split_app_usage_settings" msgid="7214375263347964093">"Cilësimet e përdorimit për \"%1$s\""</string>
     <string name="new_window_option_taskbar" msgid="6448780542727767211">"Dritare e re"</string>
+    <string name="manage_windows_option_taskbar" msgid="2294109489960654212">"Menaxho dritaret"</string>
     <string name="save_app_pair" msgid="5647523853662686243">"Ruaj çiftin e aplikacioneve"</string>
     <string name="app_pair_default_title" msgid="4045241727446873529">"<xliff:g id="APP1">%1$s</xliff:g> | <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="app_pair_unlaunchable_at_screen_size" msgid="3446551575502685376">"Ky çift aplikacionesh nuk mbështetet në këtë pajisje"</string>
@@ -67,8 +68,13 @@
     <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"Puna"</string>
     <string name="widget_category_conversations" msgid="8894438636213590446">"Bisedat"</string>
     <string name="widget_category_note_taking" msgid="3469689394504266039">"Mbajtja e shënimeve"</string>
+    <string name="widget_cell_tap_to_show_add_button_label" msgid="4354194214317043581">"Shfaq butonin e shtimit"</string>
+    <string name="widget_cell_tap_to_hide_add_button_label" msgid="6117805205101555997">"Fshih butonin e shtimit"</string>
     <string name="widget_add_button_label" msgid="2761267068711937179">"Shto"</string>
     <string name="widget_add_button_content_description" msgid="1810530016360039643">"Shto miniaplikacionin <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>
+    <string name="widgets_list_expand_button_label" msgid="7912016136574932622">"Shfaq të gjitha"</string>
+    <string name="widgets_list_expand_button_content_description" msgid="4600513860973450888">"Shfaq të gjitha miniaplikacionet"</string>
+    <string name="widgets_list_expanded" msgid="7374857868788557730">"Po shfaqen të gjitha miniaplikacionet"</string>
     <string name="reconfigurable_widget_education_tip" msgid="6336962690888067057">"Trokit për të ndryshuar cilësimet e miniaplikacionit"</string>
     <string name="widget_reconfigure_button_content_description" msgid="8811472721881205250">"Ndrysho cilësimet e miniaplikacionit"</string>
     <string name="all_apps_search_bar_hint" msgid="1390553134053255246">"Kërko për aplikacione"</string>
@@ -76,6 +82,7 @@
     <string name="all_apps_no_search_results" msgid="3200346862396363786">"Nuk u gjet asnjë aplikacion që përputhet me \"<xliff:g id="QUERY">%1$s</xliff:g>\""</string>
     <string name="label_application" msgid="8531721983832654978">"Aplikacioni"</string>
     <string name="all_apps_label" msgid="5015784846527570951">"Të gjitha aplikacionet"</string>
+    <string name="all_apps_list_label" msgid="5106226764073070906">"Lista e aplikacioneve"</string>
     <string name="notifications_header" msgid="1404149926117359025">"Njoftimet"</string>
     <string name="long_press_shortcut_to_add" msgid="5405328730817637737">"Prek dhe mbaj shtypur një shkurtore për ta zhvendosur."</string>
     <string name="long_accessible_way_to_add_shortcut" msgid="2199537273817090740">"Trokit dy herë dhe mbaje shtypur një shkurtore për ta zhvendosur atë ose për të përdorur veprimet e personalizuara."</string>
@@ -94,6 +101,7 @@
     <string name="dismiss_prediction_label" msgid="3357562989568808658">"Mos sugjero aplikacion"</string>
     <string name="pin_prediction" msgid="4196423321649756498">"Gozhdo parashikimin"</string>
     <string name="bubble" msgid="3072951361014076670">"Flluskë"</string>
+    <string name="pin_to_taskbar" msgid="1281337899690299038">"Gozhdoje te shiriti i detyrave"</string>
     <string name="permlab_install_shortcut" msgid="5632423390354674437">"instalimi i shkurtoreve"</string>
     <string name="permdesc_install_shortcut" msgid="923466509822011139">"Lejon një aplikacion të shtojë shkurtore pa ndërhyrjen e përdoruesit."</string>
     <string name="permlab_read_settings" msgid="5136500343007704955">"lexo cilësimet dhe shkurtoret e ekranit bazë"</string>
@@ -117,6 +125,8 @@
     <string name="folder_renamed" msgid="1794088362165669656">"Dosja u riemërtua në <xliff:g id="NAME">%1$s</xliff:g>"</string>
     <string name="folder_name_format_exact" msgid="8626242716117004803">"Dosja: <xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="SIZE">%2$d</xliff:g> artikuj"</string>
     <string name="folder_name_format_overflow" msgid="4270108890534995199">"Dosja: <xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="SIZE">%2$d</xliff:g> ose më shumë artikuj"</string>
+    <!-- no translation found for unnamed_folder (2420192029474044442) -->
+    <skip />
     <string name="app_pair_name_format" msgid="8134106404716224054">"Çifti i aplikacioneve: <xliff:g id="APP1">%1$s</xliff:g> dhe <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="styles_wallpaper_button_text" msgid="8216961355289236794">"Imazhi i sfondit dhe stili"</string>
     <string name="edit_home_screen" msgid="8947858375782098427">"Modifiko ekranin bazë"</string>
@@ -124,6 +134,8 @@
     <string name="msg_disabled_by_admin" msgid="6898038085516271325">"Çaktivizuar nga administratori"</string>
     <string name="allow_rotation_title" msgid="7222049633713050106">"Lejo rrotullimin e ekranit bazë"</string>
     <string name="allow_rotation_desc" msgid="8662546029078692509">"Kur telefoni rrotullohet"</string>
+    <string name="landscape_mode_title" msgid="5138814555934843926">"Modaliteti horizontal"</string>
+    <string name="landscape_mode_desc" msgid="7372569859592816793">"Vendose telefonin në modalitetin horizontal"</string>
     <string name="notification_dots_title" msgid="9062440428204120317">"Pikat e njoftimeve"</string>
     <string name="notification_dots_desc_on" msgid="1679848116452218908">"Aktiv"</string>
     <string name="notification_dots_desc_off" msgid="1760796511504341095">"Joaktiv"</string>
@@ -142,7 +154,8 @@
     <string name="app_installing_title" msgid="5864044122733792085">"<xliff:g id="NAME">%1$s</xliff:g> po instalohet, <xliff:g id="PROGRESS">%2$s</xliff:g> i përfunduar"</string>
     <string name="app_downloading_title" msgid="8336702962104482644">"<xliff:g id="NAME">%1$s</xliff:g> po shkarkohet, <xliff:g id="PROGRESS">%2$s</xliff:g> të përfunduara"</string>
     <string name="app_waiting_download_title" msgid="7053938513995617849">"<xliff:g id="NAME">%1$s</xliff:g> po pret të instalohet"</string>
-    <string name="app_archived_title" msgid="7717956158562544081">"<xliff:g id="NAME">%1$s</xliff:g> është arkivuar. Trokit për ta shkarkuar dhe restauruar."</string>
+    <string name="app_archived_title" msgid="4548283110222420708">"<xliff:g id="NAME">%1$s</xliff:g> është arkivuar."</string>
+    <string name="app_unarchiving_action" msgid="5736107006413929484">"shkarko dhe restauro"</string>
     <string name="dialog_update_title" msgid="114234265740994042">"Kërkohet përditësimi i aplikacionit"</string>
     <string name="dialog_update_message" msgid="4176784553982226114">"Aplikacioni për këtë ikonë nuk është përditësuar. Mund ta përditësosh manualisht për të riaktivizuar këtë shkurtore ose hiq ikonën."</string>
     <string name="dialog_update" msgid="2178028071796141234">"Përditëso"</string>
@@ -171,7 +184,7 @@
     <string name="action_decrease_width" msgid="1374549771083094654">"Zvogëlo gjerësinë"</string>
     <string name="action_decrease_height" msgid="282377193880900022">"Zvogëlo lartësinë"</string>
     <string name="widget_resized" msgid="9130327887929620">"Madhësia e miniaplikacionit u ndryshua me gjerësinë <xliff:g id="NUMBER_0">%1$s</xliff:g> dhe lartësinë <xliff:g id="NUMBER_1">%2$s</xliff:g>"</string>
-    <string name="action_deep_shortcut" msgid="2864038805849372848">"Shkurtoret"</string>
+    <string name="action_deep_shortcut" msgid="4766835855579976045">"Menyja e shkurtoreve"</string>
     <string name="action_dismiss_notification" msgid="5909461085055959187">"Hiqe"</string>
     <string name="accessibility_close" msgid="2277148124685870734">"Mbyll"</string>
     <string name="all_apps_personal_tab" msgid="4190252696685155002">"Personale"</string>
@@ -187,6 +200,7 @@
     <string name="work_apps_paused_edu_accept" msgid="6377476824357318532">"E kuptova"</string>
     <string name="work_apps_pause_btn_text" msgid="4669288269140620646">"Vendos në pauzë aplikacionet e punës"</string>
     <string name="work_apps_enable_btn_text" msgid="1736198302467317371">"Hiq nga pauza"</string>
+    <string name="work_scheduler_button_content_description" msgid="917340740986764967">"Orari për aplikacionet e punës"</string>
     <string name="developer_options_filter_hint" msgid="5896817443635989056">"Filtro"</string>
     <string name="remote_action_failed" msgid="1383965239183576790">"Dështoi: <xliff:g id="WHAT">%1$s</xliff:g>"</string>
     <string name="private_space_label" msgid="2359721649407947001">"Hapësira private"</string>

@@ -70,7 +70,7 @@ constructor(
     private val taskAnimationManager: TaskAnimationManager,
     private val dispatcherProvider: DispatcherProvider = ProductionDispatchers,
 ) {
-    private val coroutineScope = CoroutineScope(SupervisorJob() + dispatcherProvider.default)
+    private val coroutineScope = CoroutineScope(SupervisorJob() + dispatcherProvider.background)
 
     private val commandQueue = ConcurrentLinkedDeque<CommandInfo>()
 
@@ -233,7 +233,7 @@ constructor(
         // When running task view is null we return last large taskView - typically focusView when
         // grid only is not enabled else last desktop task view.
         return if (recentsView.runningTaskView == null) {
-            recentsView.lastLargeTaskView ?: recentsView.getTaskViewAt(0)
+            recentsView.lastLargeTaskView ?: recentsView.getFirstTaskView()
         } else {
             if (
                 enableLargeDesktopWindowingTile() &&
@@ -470,7 +470,7 @@ constructor(
         // Stops requesting focused after first view gets focused.
         recentsView.getTaskViewAt(keyboardTaskFocusIndex).requestFocus() ||
             recentsView.nextTaskView.requestFocus() ||
-            recentsView.getTaskViewAt(0).requestFocus() ||
+            recentsView.getFirstTaskView().requestFocus() ||
             recentsView.requestFocus()
     }
 

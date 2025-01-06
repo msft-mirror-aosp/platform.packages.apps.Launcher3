@@ -66,6 +66,7 @@ class VibratorWrapperTest {
 
     @Test
     fun init_register_onChangeListener() {
+        TestUtil.runOnExecutorSync(Executors.MAIN_EXECUTOR) {}
         verify(settingsCache).register(HAPTIC_FEEDBACK_URI, underTest.mHapticChangeListener)
     }
 

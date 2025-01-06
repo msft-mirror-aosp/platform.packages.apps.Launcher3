@@ -348,10 +348,13 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
         }
 
         /** Called when the snapshot has updated its full screen drawing parameters. */
-        public void setFullscreenParams(TaskView.FullscreenDrawParams fullscreenParams) {}
+        public void setFullscreenParams(FullscreenDrawParams fullscreenParams) {}
 
         /** Sets visibility for the overlay associated elements. */
         public void setVisibility(int visibility) {}
+
+        /** See {@link View#addChildrenForAccessibility(ArrayList)} */
+        public void addChildForAccessibility(ArrayList<View> outChildren) {}
 
         private class ScreenshotSystemShortcut extends SystemShortcut {
 

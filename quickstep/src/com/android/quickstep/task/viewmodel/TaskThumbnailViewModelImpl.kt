@@ -21,6 +21,7 @@ import android.app.ActivityTaskManager.INVALID_TASK_ID
 import android.graphics.Matrix
 import android.util.Log
 import androidx.core.graphics.ColorUtils
+import com.android.launcher3.util.coroutines.DispatcherProvider
 import com.android.quickstep.recents.data.RecentTasksRepository
 import com.android.quickstep.recents.usecase.GetThumbnailPositionUseCase
 import com.android.quickstep.recents.usecase.ThumbnailPositionState
@@ -37,19 +38,18 @@ import kotlin.math.max
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskThumbnailViewModelImpl(
     recentsViewData: RecentsViewData,
-    taskViewData: TaskViewData,
     taskContainerData: TaskContainerData,
+    dispatcherProvider: DispatcherProvider,
     private val tasksRepository: RecentTasksRepository,
     private val getThumbnailPositionUseCase: GetThumbnailPositionUseCase,
     private val splashAlphaUseCase: SplashAlphaUseCase,
@@ -58,22 +58,16 @@ class TaskThumbnailViewModelImpl(
     private val splashProgress = MutableStateFlow(flowOf(0f))
     private var taskId: Int = INVALID_TASK_ID
 
-    override val cornerRadiusProgress =
-        if (taskViewData.isOutlineFormedByThumbnailView) recentsViewData.fullscreenProgress
-        else MutableStateFlow(1f).asStateFlow()
-
-    override val inheritedScale =
-        combine(recentsViewData.scale, taskViewData.scale) { recentsScale, taskScale ->
-            recentsScale * taskScale
-        }
-
     override val dimProgress: Flow<Float> =
         combine(taskContainerData.taskMenuOpenProgress, recentsViewData.tintAmount) {
-            taskMenuOpenProgress,
-            tintAmount ->
-            max(taskMenuOpenProgress * MAX_SCRIM_ALPHA, tintAmount)
-        }
-    override val splashAlpha = splashProgress.flatMapLatest { it }
+                taskMenuOpenProgress,
+                tintAmount ->
+                max(taskMenuOpenProgress * MAX_SCRIM_ALPHA, tintAmount)
+            }
+            .flowOn(dispatcherProvider.background)
+
+    override val splashAlpha =
+        splashProgress.flatMapLatest { it }.flowOn(dispatcherProvider.background)
 
     private val isLiveTile =
         combine(
@@ -105,6 +99,7 @@ class TaskThumbnailViewModelImpl(
                 }
             }
             .distinctUntilChanged()
+            .flowOn(dispatcherProvider.background)
 
     override fun bind(taskId: Int) {
         Log.d(TAG, "bind taskId: $taskId")
@@ -113,17 +108,14 @@ class TaskThumbnailViewModelImpl(
         splashProgress.value = splashAlphaUseCase.execute(taskId)
     }
 
-    override fun getThumbnailPositionState(width: Int, height: Int, isRtl: Boolean): Matrix {
-        return runBlocking {
-            when (
-                val thumbnailPositionState =
-                    getThumbnailPositionUseCase.run(taskId, width, height, isRtl)
-            ) {
-                is ThumbnailPositionState.MatrixScaling -> thumbnailPositionState.matrix
-                is ThumbnailPositionState.MissingThumbnail -> Matrix.IDENTITY_MATRIX
-            }
+    override fun getThumbnailPositionState(width: Int, height: Int, isRtl: Boolean): Matrix =
+        when (
+            val thumbnailPositionState =
+                getThumbnailPositionUseCase.run(taskId, width, height, isRtl)
+        ) {
+            is ThumbnailPositionState.MatrixScaling -> thumbnailPositionState.matrix
+            is ThumbnailPositionState.MissingThumbnail -> Matrix.IDENTITY_MATRIX
         }
-    }
 
     private fun isBackgroundOnly(task: Task): Boolean = task.isLocked || task.thumbnail == null
 

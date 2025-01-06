@@ -21,7 +21,6 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color.TRANSPARENT
 import android.util.AttributeSet
-import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -33,6 +32,7 @@ import com.android.launcher3.Utilities.dpToPx
 import com.android.launcher3.config.FeatureFlags.enableTaskbarPinning
 import com.android.launcher3.taskbar.TaskbarActivityContext
 import com.android.launcher3.taskbar.TaskbarViewCallbacks
+import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.views.ActivityContext
 import com.android.launcher3.views.IconButtonView
@@ -57,7 +57,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         }
 
     init {
-        LayoutInflater.from(context).inflate(R.layout.taskbar_all_apps_button, null, false)
+        contentDescription = context.getString(R.string.all_apps_button_label)
         setUpIcon()
     }
 
@@ -69,7 +69,9 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             )
         backgroundTintList = ColorStateList.valueOf(TRANSPARENT)
         setIconDrawable(drawable)
-        setPadding(dpToPx(activityContext.taskbarSpecsEvaluator.taskbarIconPadding.toFloat()))
+        if (!DisplayController.isTransientTaskbar(context)) {
+            setPadding(dpToPx(activityContext.taskbarSpecsEvaluator.taskbarIconPadding.toFloat()))
+        }
         setForegroundTint(activityContext.getColor(R.color.all_apps_button_color))
     }
 

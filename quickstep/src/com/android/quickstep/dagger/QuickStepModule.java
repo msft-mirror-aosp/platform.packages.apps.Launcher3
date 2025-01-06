@@ -15,10 +15,14 @@
  */
 package com.android.quickstep.dagger;
 
+import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
 import com.android.launcher3.uioverrides.SystemApiWrapper;
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapperImpl;
 import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.PluginManagerWrapper;
+import com.android.launcher3.util.window.WindowManagerProxy;
+import com.android.quickstep.contextualeducation.SystemContextualEduStatsManager;
+import com.android.quickstep.util.SystemWindowManagerProxy;
 
 import dagger.Binds;
 import dagger.Module;
@@ -28,4 +32,7 @@ public abstract class QuickStepModule {
 
     @Binds abstract PluginManagerWrapper bindPluginManagerWrapper(PluginManagerWrapperImpl impl);
     @Binds abstract ApiWrapper bindApiWrapper(SystemApiWrapper systemApiWrapper);
+    @Binds abstract ContextualEduStatsManager bindContextualEduStatsManager(
+            SystemContextualEduStatsManager manager);
+    @Binds abstract WindowManagerProxy bindWindowManagerProxy(SystemWindowManagerProxy proxy);
 }

@@ -19,6 +19,7 @@ package com.android.quickstep.recents.di
 import android.content.Context
 import android.util.Log
 import android.view.View
+import com.android.launcher3.util.coroutines.DispatcherProvider
 import com.android.launcher3.util.coroutines.ProductionDispatchers
 import com.android.quickstep.RecentsModel
 import com.android.quickstep.recents.data.RecentTasksRepository
@@ -35,13 +36,9 @@ import com.android.quickstep.task.viewmodel.TaskContainerData
 import com.android.quickstep.task.viewmodel.TaskOverlayViewModel
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModel
 import com.android.quickstep.task.viewmodel.TaskThumbnailViewModelImpl
-import com.android.quickstep.task.viewmodel.TaskViewData
-import com.android.quickstep.task.viewmodel.TaskViewModel
-import com.android.quickstep.views.TaskViewType
 import com.android.systemui.shared.recents.model.Task
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 internal typealias RecentsScopeId = String
@@ -60,9 +57,13 @@ class RecentsDependencies private constructor(private val appContext: Context) {
     private fun startDefaultScope(appContext: Context) {
         createScope(DEFAULT_SCOPE_ID).apply {
             set(RecentsViewData::class.java.simpleName, RecentsViewData())
+            val dispatcherProvider: DispatcherProvider = ProductionDispatchers
             val recentsCoroutineScope =
-                CoroutineScope(SupervisorJob() + Dispatchers.Main + CoroutineName("RecentsView"))
+                CoroutineScope(
+                    SupervisorJob() + dispatcherProvider.unconfined + CoroutineName("RecentsView")
+                )
             set(CoroutineScope::class.java.simpleName, recentsCoroutineScope)
+            set(DispatcherProvider::class.java.simpleName, dispatcherProvider)
             val recentsModel = RecentsModel.INSTANCE.get(appContext)
             val taskVisualsChangedDelegate =
                 TaskVisualsChangedDelegateImpl(
@@ -171,31 +172,14 @@ class RecentsDependencies private constructor(private val appContext: Context) {
         log("linked scopes: ${getScope(scopeId).scopeIdsLinked}")
         val instance: Any =
             when (modelClass) {
-                RecentTasksRepository::class.java -> {
-                    with(RecentsModel.INSTANCE.get(appContext)) {
-                        TasksRepository(
-                            this,
-                            thumbnailCache,
-                            iconCache,
-                            get(),
-                            get(),
-                            ProductionDispatchers,
-                        )
-                    }
-                }
                 RecentsViewData::class.java -> RecentsViewData()
-                TaskViewModel::class.java -> TaskViewModel(taskViewData = inject(scopeId, extras))
-                TaskViewData::class.java -> {
-                    val taskViewType = extras["TaskViewType"] as TaskViewType
-                    TaskViewData(taskViewType)
-                }
                 TaskContainerData::class.java -> TaskContainerData()
                 TaskThumbnailViewData::class.java -> TaskThumbnailViewData()
                 TaskThumbnailViewModel::class.java ->
                     TaskThumbnailViewModelImpl(
                         recentsViewData = inject(),
-                        taskViewData = inject(scopeId, extras),
                         taskContainerData = inject(scopeId),
+                        dispatcherProvider = inject(),
                         getThumbnailPositionUseCase = inject(),
                         tasksRepository = inject(),
                         splashAlphaUseCase = inject(scopeId),
@@ -207,6 +191,7 @@ class RecentsDependencies private constructor(private val appContext: Context) {
                         recentsViewData = inject(),
                         recentTasksRepository = inject(),
                         getThumbnailPositionUseCase = inject(),
+                        dispatcherProvider = inject(),
                     )
                 }
                 GetThumbnailUseCase::class.java -> GetThumbnailUseCase(taskRepository = inject())
@@ -259,13 +244,17 @@ class RecentsDependencies private constructor(private val appContext: Context) {
         private const val DEFAULT_SCOPE_ID = "RecentsDependencies::GlobalScope"
         private const val TAG = "RecentsDependencies"
         private const val DEBUG = false
+        private var activeRecentsCount = 0
 
         @Volatile private lateinit var instance: RecentsDependencies
 
         fun initialize(view: View): RecentsDependencies = initialize(view.context)
 
         fun initialize(context: Context): RecentsDependencies {
-            synchronized(this) { instance = RecentsDependencies(context.applicationContext) }
+            synchronized(this) {
+                activeRecentsCount++
+                instance = RecentsDependencies(context.applicationContext)
+            }
             return instance
         }
 
@@ -279,9 +268,29 @@ class RecentsDependencies private constructor(private val appContext: Context) {
             return instance
         }
 
+        @JvmStatic
         fun destroy() {
-            instance.scopes.clear()
-            instance.startDefaultScope(instance.appContext)
+            // When Launcher Activity restarts, the old view's RecentsView.onDetachedFromWindow
+            // happens after the new view's creation. This means that destroy can be called after a
+            // new initialisation. This check prevents a newly initialised tree from being
+            // destroyed. Ideally we would have 1 instance of the dependency tree for each
+            // RecentsView.
+            //
+            // This check is sufficient to avoid a leak of the dependency tree after the Activity is
+            // destroyed while also allowing Launcher auto-restarts (production behaviour) to easily
+            // reinitialise the dependency tree.
+            //
+            // TODO(b/353917593): Better lifecycle decisions will be implemented in this bug or when
+            //  replacing with Dagger (b/371370483).
+            activeRecentsCount--
+            if (activeRecentsCount == 0) {
+                instance.scopes.clear()
+            } else {
+                instance.log(
+                    "RecentsDependencies was not destroyed. " +
+                        "There is still an active RecentsView instance."
+                )
+            }
         }
     }
 }

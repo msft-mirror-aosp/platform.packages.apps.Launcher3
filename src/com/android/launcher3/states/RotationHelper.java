@@ -18,6 +18,7 @@ package com.android.launcher3.states;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_NOSENSOR;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE;
 import static android.util.DisplayMetrics.DENSITY_DEVICE_STABLE;
 
 import static com.android.launcher3.LauncherPrefs.ALLOW_ROTATION;
@@ -28,6 +29,7 @@ import static com.android.launcher3.util.window.WindowManagerProxy.MIN_TABLET_WI
 import android.content.Context;
 import android.os.Handler;
 import android.os.Message;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.WorkerThread;
@@ -62,6 +64,8 @@ public class RotationHelper implements LauncherPrefChangeListener,
     public static final int REQUEST_NONE = 0;
     public static final int REQUEST_ROTATE = 1;
     public static final int REQUEST_LOCK = 2;
+
+    private boolean mIsFixedLandscape = false;
 
     @NonNull
     private final BaseActivity mActivity;
@@ -163,6 +167,18 @@ public class RotationHelper implements LauncherPrefChangeListener,
         notifyChange();
     }
 
+    public boolean isFixedLandscape() {
+        return mIsFixedLandscape;
+    }
+
+    /**
+     * If fixedLandscape is true then the Launcher become landscape until set false..
+     */
+    public void setFixedLandscape(boolean fixedLandscape) {
+        mIsFixedLandscape = fixedLandscape;
+        notifyChange();
+    }
+
     // Used by tests only.
     public void forceAllowRotationForTesting(boolean allowRotation) {
         if (mDestroyed) return;
@@ -195,7 +211,9 @@ public class RotationHelper implements LauncherPrefChangeListener,
         }
 
         final int activityFlags;
-        if (mStateHandlerRequest != REQUEST_NONE) {
+        if (mIsFixedLandscape) {
+            activityFlags = SCREEN_ORIENTATION_USER_LANDSCAPE;
+        } else if (mStateHandlerRequest != REQUEST_NONE) {
             activityFlags = mStateHandlerRequest == REQUEST_LOCK ?
                     SCREEN_ORIENTATION_LOCKED : SCREEN_ORIENTATION_UNSPECIFIED;
         } else if (mCurrentTransitionRequest != REQUEST_NONE) {
@@ -213,6 +231,7 @@ public class RotationHelper implements LauncherPrefChangeListener,
         }
         if (activityFlags != mLastActivityFlags) {
             mLastActivityFlags = activityFlags;
+            Log.d("b/380940677", toString());
             mRequestOrientationHandler.sendEmptyMessage(activityFlags);
         }
     }
@@ -240,9 +259,9 @@ public class RotationHelper implements LauncherPrefChangeListener,
         return String.format("[mStateHandlerRequest=%d, mCurrentStateRequest=%d, "
                         + "mLastActivityFlags=%d, mIgnoreAutoRotateSettings=%b, "
                         + "mHomeRotationEnabled=%b, mForceAllowRotationForTesting=%b,"
-                        + " mDestroyed=%b]",
+                        + " mDestroyed=%b, mIsFixedLandscape=%b]",
                 mStateHandlerRequest, mCurrentStateRequest, mLastActivityFlags,
                 mIgnoreAutoRotateSettings, mHomeRotationEnabled, mForceAllowRotationForTesting,
-                mDestroyed);
+                mDestroyed, mIsFixedLandscape);
     }
 }

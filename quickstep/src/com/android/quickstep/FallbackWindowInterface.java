@@ -51,31 +51,11 @@ import java.util.function.Predicate;
  */
 public final class FallbackWindowInterface extends BaseWindowInterface{
 
-    private static FallbackWindowInterface INSTANCE;
-
     private final RecentsWindowManager mRecentsWindowManager;
 
-    /**
-     * This is only null before init() or after destroy()
-     */
-    @Nullable
-    public static FallbackWindowInterface getInstance(){
-        return INSTANCE;
-    }
-
-    public static void init(RecentsWindowManager recentsWindowManager) {
-        if (INSTANCE == null) {
-            INSTANCE = new FallbackWindowInterface(recentsWindowManager);
-        }
-    }
-
-    private FallbackWindowInterface(RecentsWindowManager recentsWindowManager) {
+    public FallbackWindowInterface(RecentsWindowManager recentsWindowManager) {
         super(DEFAULT, BACKGROUND_APP);
         mRecentsWindowManager = recentsWindowManager;
-    }
-
-    public void destroy() {
-        INSTANCE = null;
     }
 
     /** 2 */

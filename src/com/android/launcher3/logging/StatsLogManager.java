@@ -175,6 +175,10 @@ public class StatsLogManager implements ResourceBasedOverride {
         @UiEvent(doc = "User searched for a widget in the widget picker.")
         LAUNCHER_WIDGETSTRAY_SEARCHED(819),
 
+        @UiEvent(doc = "User clicked on view all button to expand the displayed list in the "
+                + "widget picker.")
+        LAUNCHER_WIDGETSTRAY_EXPAND_PRESS(1978),
+
         @UiEvent(doc = "A dragged item is dropped on 'Remove' button in the target bar")
         LAUNCHER_ITEM_DROPPED_ON_REMOVE(465),
 
@@ -296,6 +300,12 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "User swipes or fling in RIGHT direction on the bottom bazel area.")
         LAUNCHER_QUICKSWITCH_RIGHT(572),
+
+        @UiEvent(doc = "User swipes or fling on the bottom bazel area to enter Desktop mode.")
+        LAUNCHER_QUICKSWITCH_ENTER_DESKTOP_MODE(2025),
+
+        @UiEvent(doc = "User swipes or fling on the bottom bazel area to exit Desktop mode.")
+        LAUNCHER_QUICKSWITCH_EXIT_DESKTOP_MODE(2026),
 
         @UiEvent(doc = "User swipes or fling in DOWN direction on the bottom bazel area.")
         LAUNCHER_SWIPEDOWN_NAVBAR(573),
@@ -839,6 +849,13 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "User long press nav handle and a long press runnable was created.")
         LAUNCHER_OMNI_GET_LONG_PRESS_RUNNABLE(1545),
+
+        // One Grid Flags
+        @UiEvent(doc = "User sets the device in Fixed Landscape")
+        FIXED_LANDSCAPE_TOGGLE_ENABLE(2014),
+
+        @UiEvent(doc = "User sets the device in Fixed Landscape")
+        FIXED_LANDSCAPE_TOGGLE_DISABLED(2020),
         // ADD MORE
         ;
 
