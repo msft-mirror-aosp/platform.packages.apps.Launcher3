@@ -37,7 +37,6 @@ import com.android.launcher3.LauncherAnimationRunner
 import com.android.launcher3.LauncherAnimationRunner.RemoteAnimationFactory
 import com.android.launcher3.R
 import com.android.launcher3.compat.AccessibilityManagerCompat
-import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.statemanager.StateManager
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory
 import com.android.launcher3.statemanager.StatefulContainer
@@ -308,10 +307,6 @@ class RecentsWindowManager(context: Context) :
     override fun canStartHomeSafely(): Boolean {
         val overviewCommandHelper = tisBindHelper.overviewCommandHelper
         return overviewCommandHelper == null || overviewCommandHelper.canStartHomeSafely()
-    }
-
-    override fun getDesktopVisibilityController(): DesktopVisibilityController? {
-        return tisBindHelper.desktopVisibilityController
     }
 
     override fun setTaskbarUIController(taskbarUIController: TaskbarUIController?) {
