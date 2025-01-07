@@ -505,6 +505,11 @@ public abstract class SwipeUpAnimationLogic implements
                 }
             }
 
+            if (Float.isNaN(scale)) {
+                Log.e(TAG, "Scale is NaN: starting dimensions=[" + startWidth + ", " + startHeight
+                        + "], current dimensions=[" + currentWidth + ", " + currentHeight + "]");
+            }
+
             mTargetTaskView.setScaleX(scale);
             mTargetTaskView.setScaleY(scale);
             mTargetTaskView.setTranslationX(
