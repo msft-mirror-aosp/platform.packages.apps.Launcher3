@@ -2780,14 +2780,12 @@ public abstract class RecentsView<
     /**
      * Called when a gesture from an app is starting.
      */
-    public void onGestureAnimationStart(
-            Task[] runningTasks, RotationTouchHelper rotationTouchHelper) {
+    public void onGestureAnimationStart(Task[] runningTasks) {
         Log.d(TAG, "onGestureAnimationStart - runningTasks: " + Arrays.toString(runningTasks));
         mActiveGestureRunningTasks = runningTasks;
         // This needs to be called before the other states are set since it can create the task view
         if (mOrientationState.setGestureActive(true)) {
-            setLayoutRotation(rotationTouchHelper.getCurrentActiveRotation(),
-                    rotationTouchHelper.getDisplayRotation());
+            reapplyActiveRotation();
             // Force update to ensure the initial task size is computed even if the orientation has
             // not changed.
             updateSizeAndPadding();
@@ -4673,6 +4671,12 @@ public abstract class RecentsView<
         if (mOrientationState.setRecentsRotation(rotation)) {
             logOrientationChanged();
         }
+    }
+
+    public void reapplyActiveRotation() {
+        RotationTouchHelper rotationTouchHelper = RotationTouchHelper.INSTANCE.get(getContext());
+        setLayoutRotation(rotationTouchHelper.getCurrentActiveRotation(),
+                rotationTouchHelper.getDisplayRotation());
     }
 
     public void setLayoutRotation(int touchRotation, int displayRotation) {

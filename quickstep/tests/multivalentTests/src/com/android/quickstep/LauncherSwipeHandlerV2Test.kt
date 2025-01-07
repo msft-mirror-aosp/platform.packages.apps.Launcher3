@@ -40,7 +40,6 @@ import org.mockito.Mockito.spy
 import org.mockito.junit.MockitoJUnit
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.verify
-import org.mockito.kotlin.whenever
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
@@ -72,15 +71,18 @@ class LauncherSwipeHandlerV2Test {
                 .bindSystemUiProxy(systemUiProxy)
                 .bindRecentsDisplayModel(RecentsDisplayModel(sandboxContext))
         )
-
+        sandboxContext.putObject(
+            RotationTouchHelper.INSTANCE,
+            mock(RotationTouchHelper::class.java),
+        )
         val deviceState = mock(RecentsAnimationDeviceState::class.java)
-        whenever(deviceState.rotationTouchHelper).thenReturn(mock(RotationTouchHelper::class.java))
+        sandboxContext.putObject(RecentsAnimationDeviceState.INSTANCE, deviceState)
+
         gestureState = spy(GestureState(OverviewComponentObserver.INSTANCE.get(sandboxContext), 0))
 
         underTest =
             LauncherSwipeHandlerV2(
                 sandboxContext,
-                deviceState,
                 taskAnimationManager,
                 gestureState,
                 0,
