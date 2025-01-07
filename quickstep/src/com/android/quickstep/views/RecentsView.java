@@ -6814,6 +6814,8 @@ public abstract class RecentsView<
         }
 
         mDesktopRecentsTransitionController.moveToDesktop(taskContainer, transitionSource);
+        // TODO(b/387471509): Invoke successCallback after actual transition completion of
+        //  overview menu to desktop
         successCallback.run();
     }
 
