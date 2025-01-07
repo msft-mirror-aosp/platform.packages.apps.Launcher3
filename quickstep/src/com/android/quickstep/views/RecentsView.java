@@ -1241,8 +1241,15 @@ public abstract class RecentsView<
             mSplitSelectStateController.unregisterSplitListener(mSplitSelectionListener);
         }
         reset();
+    }
+
+    /**
+     * Execute clean-up logic needed when the view is destroyed.
+     */
+    public void destroy() {
+        Log.d(TAG, "destroy");
         if (enableRefactorTaskThumbnail()) {
-            mHelper.onDetachedFromWindow();
+            mHelper.onDestroy();
             RecentsDependencies.destroy();
         }
     }
