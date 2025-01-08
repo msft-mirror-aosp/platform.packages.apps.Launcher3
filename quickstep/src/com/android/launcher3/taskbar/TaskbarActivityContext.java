@@ -85,6 +85,7 @@ import androidx.core.view.WindowInsetsCompat;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
+import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.R;
@@ -1328,7 +1329,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 mControllers.uiController.onTaskbarIconLaunched(api);
                 mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
             }
-        } else if (tag instanceof TaskItemInfo info) {
+        } else if (tag instanceof TaskItemInfo info && !Flags.enableMultiInstanceMenuTaskbar()) {
             RemoteTransition remoteTransition = canUnminimizeDesktopTask(info.getTaskId())
                     ? createUnminimizeRemoteTransition() : null;
 
