@@ -4057,8 +4057,6 @@ public abstract class RecentsView<
                         } else {
                             removeTaskInternal(dismissedTaskView);
                         }
-                        announceForAccessibility(
-                                getResources().getString(R.string.task_view_closed));
                         mContainer.getStatsLogManager().logger()
                                 .withItemInfo(dismissedTaskView.getFirstItemInfo())
                                 .log(LAUNCHER_TASK_DISMISS_SWIPE_UP);
