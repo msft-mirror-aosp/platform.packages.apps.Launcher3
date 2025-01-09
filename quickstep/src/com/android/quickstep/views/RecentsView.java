@@ -925,8 +925,11 @@ public abstract class RecentsView<
         mEmptyMessagePaint.setColor(Themes.getAttrColor(context, android.R.attr.textColorPrimary));
         mEmptyMessagePaint.setTextSize(getResources()
                 .getDimension(R.dimen.recents_empty_message_text_size));
-        mEmptyMessagePaint.setTypeface(Typeface.create(Themes.getDefaultBodyFont(context),
-                Typeface.NORMAL));
+        Typeface typeface = Typeface.create(
+                Typeface.create(Themes.getDefaultBodyFont(context), Typeface.NORMAL),
+                getFontWeight(),
+                false);
+        mEmptyMessagePaint.setTypeface(typeface);
         mEmptyMessagePaint.setAntiAlias(true);
         mEmptyMessagePadding = getResources()
                 .getDimensionPixelSize(R.dimen.recents_empty_message_text_padding);
@@ -6854,6 +6857,14 @@ public abstract class RecentsView<
                                     .build())
                     .log(LAUNCHER_OVERVIEW_ORIENTATION_CHANGED);
         }
+    }
+
+    private int getFontWeight() {
+        int fontWeightAdjustment = getResources().getConfiguration().fontWeightAdjustment;
+        if (fontWeightAdjustment != Configuration.FONT_WEIGHT_ADJUSTMENT_UNDEFINED) {
+            return Typeface.Builder.NORMAL_WEIGHT + fontWeightAdjustment;
+        }
+        return Typeface.Builder.NORMAL_WEIGHT;
     }
 
     public interface TaskLaunchListener {
