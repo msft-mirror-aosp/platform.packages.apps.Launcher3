@@ -74,13 +74,11 @@ class IconShape @Inject constructor(themeManager: ThemeManager, lifeCycle: Dagge
                 setBounds(0, 0, AREA_CALC_SIZE, AREA_CALC_SIZE)
             }
 
-        normalizationScale = IconNormalizer.normalizeAdaptiveIcon(drawable, AREA_CALC_SIZE, null)
+        normalizationScale = IconNormalizer.normalizeAdaptiveIcon(drawable, AREA_CALC_SIZE)
         return pickBestShape(drawable.iconMask, themeManager.iconState.iconMask)
     }
 
     interface ShapeDelegate {
-        fun enableShapeDetection() = false
-
         fun drawShape(canvas: Canvas, offsetX: Float, offsetY: Float, radius: Float, paint: Paint)
 
         fun addToPath(path: Path, offsetX: Float, offsetY: Float, radius: Float)
@@ -107,8 +105,6 @@ class IconShape @Inject constructor(themeManager: ThemeManager, lifeCycle: Dagge
 
         override fun addToPath(path: Path, offsetX: Float, offsetY: Float, radius: Float) =
             path.addCircle(radius + offsetX, radius + offsetY, radius, Path.Direction.CW)
-
-        override fun enableShapeDetection() = true
     }
 
     /** Rounded square with [radiusRatio] as a ratio of its half edge size */
