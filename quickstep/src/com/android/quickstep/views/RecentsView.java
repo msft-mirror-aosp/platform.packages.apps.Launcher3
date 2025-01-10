@@ -5867,8 +5867,7 @@ public abstract class RecentsView<
         if (recentsAnimationTargets.hasDesktopTasks(mContext)) {
             gluer = new RemoteTargetGluer(getContext(), getSizeStrategy(), recentsAnimationTargets,
                     true /* forDesktop */);
-            mRemoteTargetHandles = gluer.assignTargetsForDesktop(
-                    recentsAnimationTargets, /* transitionInfo= */ null);
+            mRemoteTargetHandles = gluer.assignTargetsForDesktop(recentsAnimationTargets);
         } else {
             gluer = new RemoteTargetGluer(getContext(), getSizeStrategy(), recentsAnimationTargets,
                     false);
