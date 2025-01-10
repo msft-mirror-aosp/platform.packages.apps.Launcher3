@@ -551,6 +551,8 @@ public abstract class RecentsView<
     private final ClearAllButton mClearAllButton;
     private final Rect mClearAllButtonDeadZoneRect = new Rect();
     private final Rect mTaskViewDeadZoneRect = new Rect();
+    private final Rect mTopRowDeadZoneRect = new Rect();
+    private final Rect mBottomRowDeadZoneRect = new Rect();
     /**
      * Reflects if Recents is currently in the middle of a gesture, and if so, which tasks are
      * running. If a gesture is not in progress, this will be null.
@@ -1705,8 +1707,11 @@ public abstract class RecentsView<
                                 mClearAllButton.getAlpha() == 1
                                         && mClearAllButtonDeadZoneRect.contains(x, y);
                         final boolean cameFromNavBar = (ev.getEdgeFlags() & EDGE_NAV_BAR) != 0;
+                        int adjustedX = x + getScrollX();
                         if (!clearAllButtonDeadZoneConsumed && !cameFromNavBar
-                                && !mTaskViewDeadZoneRect.contains(x + getScrollX(), y)) {
+                                && !mTaskViewDeadZoneRect.contains(adjustedX, y)
+                                && !mTopRowDeadZoneRect.contains(adjustedX, y)
+                                && !mBottomRowDeadZoneRect.contains(adjustedX, y)) {
                             mTouchDownToStartHome = true;
                         }
                     }
@@ -2084,7 +2089,7 @@ public abstract class RecentsView<
 
     /** Returns true if there are at least one TaskView has been added to the RecentsView. */
     public boolean hasTaskViews() {
-        return CollectionsKt.any(getTaskViews());
+        return mUtils.hasTaskViews();
     }
 
     public int getTaskViewCount() {
@@ -2699,7 +2704,7 @@ public abstract class RecentsView<
     }
 
     @Nullable
-    private TaskView getTaskViewFromTaskViewId(int taskViewId) {
+    TaskView getTaskViewFromTaskViewId(int taskViewId) {
         if (taskViewId == -1) {
             return null;
         }
@@ -4354,7 +4359,7 @@ public abstract class RecentsView<
     /**
      * Returns all the tasks in the top row, without the focused task
      */
-    private IntArray getTopRowIdArray() {
+    IntArray getTopRowIdArray() {
         if (mTopRowIdSet.isEmpty()) {
             return new IntArray(0);
         }
@@ -4371,7 +4376,7 @@ public abstract class RecentsView<
     /**
      * Returns all the tasks in the bottom row, without the focused task
      */
-    private IntArray getBottomRowIdArray() {
+    IntArray getBottomRowIdArray() {
         int bottomRowIdArraySize = getBottomRowTaskCountForTablet();
         if (bottomRowIdArraySize <= 0) {
             return new IntArray(0);
@@ -5508,15 +5513,8 @@ public abstract class RecentsView<
             mClearAllButtonDeadZoneRect.inset(-getPaddingRight() / 2, -verticalMargin);
         }
 
-        // Get the deadzone rect between the task views
-        mTaskViewDeadZoneRect.setEmpty();
-        if (hasTaskViews()) {
-            final View firstTaskView = getFirstTaskView();
-            mUtils.getLastTaskView().getHitRect(mTaskViewDeadZoneRect);
-            mTaskViewDeadZoneRect.union(firstTaskView.getLeft(), firstTaskView.getTop(),
-                    firstTaskView.getRight(),
-                    firstTaskView.getBottom());
-        }
+        mUtils.updateTaskViewDeadZoneRect(mTaskViewDeadZoneRect, mTopRowDeadZoneRect,
+                mBottomRowDeadZoneRect);
     }
 
     private void updateEmptyStateUi(boolean sizeChanged) {
