@@ -81,6 +81,7 @@ import com.android.wm.shell.common.pip.IPip
 import com.android.wm.shell.common.pip.IPipAnimationListener
 import com.android.wm.shell.desktopmode.IDesktopMode
 import com.android.wm.shell.desktopmode.IDesktopTaskListener
+import com.android.wm.shell.desktopmode.IMoveToDesktopCallback
 import com.android.wm.shell.draganddrop.IDragAndDrop
 import com.android.wm.shell.onehanded.IOneHanded
 import com.android.wm.shell.recents.IRecentTasks
@@ -1106,9 +1107,19 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
         taskId: Int,
         transitionSource: DesktopModeTransitionSource?,
         transition: RemoteTransition?,
+        successCallback: Runnable,
     ) =
         executeWithErrorLog({ "Failed call moveToDesktop" }) {
-            desktopMode?.moveToDesktop(taskId, transitionSource, transition)
+            desktopMode?.moveToDesktop(
+                taskId,
+                transitionSource,
+                transition,
+                object : IMoveToDesktopCallback.Stub() {
+                    override fun onTaskMovedToDesktop() {
+                        successCallback.run()
+                    }
+                },
+            )
         }
 
     /** Call shell to remove the desktop that is on given `displayId` */
