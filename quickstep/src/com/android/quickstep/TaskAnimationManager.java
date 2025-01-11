@@ -20,7 +20,6 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static com.android.launcher3.Flags.enableHandleDelayedGestureCallbacks;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.NavigationMode.NO_BUTTON;
 import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
 import static com.android.quickstep.GestureState.STATE_END_TARGET_ANIMATION_FINISHED;
@@ -54,7 +53,6 @@ import com.android.quickstep.util.ActiveGestureProtoLogProxy;
 import com.android.quickstep.util.SystemUiFlagUtils;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
-import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
@@ -110,16 +108,6 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
     }
     SystemUiProxy getSystemUiProxy() {
         return SystemUiProxy.INSTANCE.get(mCtx);
-    }
-
-    /**
-     * Preloads the recents animation.
-     */
-    public void preloadRecentsAnimation(Intent intent) {
-        // Pass null animation handler to indicate this start is for preloading
-        UI_HELPER_EXECUTOR.execute(() -> {
-            ActivityManagerWrapper.getInstance().preloadRecentsActivity(intent);
-        });
     }
 
     boolean shouldIgnoreMotionEvents() {
