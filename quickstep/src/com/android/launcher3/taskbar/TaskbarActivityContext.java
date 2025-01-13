@@ -82,6 +82,7 @@ import androidx.annotation.VisibleForTesting;
 import androidx.core.graphics.Insets;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.android.internal.jank.Cuj;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.BubbleTextView;
 import com.android.launcher3.DeviceProfile;
@@ -913,7 +914,11 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         ActivityOptions options = ActivityOptions.makeRemoteTransition(
                 new RemoteTransition(
                         new DesktopAppLaunchTransition(
-                                /* context= */ this, getMainExecutor(), launchType),
+                                /* context= */ this,
+                                getMainExecutor(),
+                                launchType,
+                                Cuj.CUJ_DESKTOP_MODE_APP_LAUNCH_FROM_ICON
+                        ),
                         "TaskbarDesktopLaunch"));
         return new ActivityOptionsWrapper(options, new RunnableList());
     }
@@ -1316,7 +1321,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         if (tag instanceof GroupTask groupTask) {
             RemoteTransition remoteTransition =
                     (areDesktopTasksVisible() && canUnminimizeDesktopTask(groupTask.task1.key.id))
-                            ? createUnminimizeRemoteTransition() : null;
+                            ? createUnminimizeRemoteTransition(
+                                    Cuj.CUJ_DESKTOP_MODE_APP_LAUNCH_FROM_ICON) : null;
             if (areDesktopTasksVisible() && mControllers.uiController.isInOverviewUi()) {
                 RunnableList runnableList = recents.launchRunningDesktopTaskView();
                 // Wrapping it in runnable so we post after DW is ready for the app
@@ -1347,7 +1353,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             }
         } else if (tag instanceof TaskItemInfo info && !Flags.enableMultiInstanceMenuTaskbar()) {
             RemoteTransition remoteTransition = canUnminimizeDesktopTask(info.getTaskId())
-                    ? createUnminimizeRemoteTransition() : null;
+                    ? createUnminimizeRemoteTransition(Cuj.CUJ_DESKTOP_MODE_APP_LAUNCH_FROM_ICON)
+                    : null;
 
             TaskView taskView = null;
             if (recents != null) {
@@ -1527,9 +1534,14 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                     );
     }
 
-    private RemoteTransition createUnminimizeRemoteTransition() {
+    private RemoteTransition createUnminimizeRemoteTransition(@Cuj.CujType int cujType) {
         return new RemoteTransition(
-                new DesktopAppLaunchTransition(this, getMainExecutor(), AppLaunchType.UNMINIMIZE),
+                new DesktopAppLaunchTransition(
+                        this,
+                        getMainExecutor(),
+                        AppLaunchType.UNMINIMIZE,
+                        cujType
+                ),
                 "TaskbarDesktopUnminimize");
     }
 
