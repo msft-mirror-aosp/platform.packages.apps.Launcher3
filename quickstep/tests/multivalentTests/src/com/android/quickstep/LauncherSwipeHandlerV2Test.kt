@@ -97,7 +97,7 @@ class LauncherSwipeHandlerV2Test {
         verify(systemUiProxy)
             .updateContextualEduStats(
                 /* isTrackpadGesture= */ eq(true),
-                eq(GestureType.HOME.toString()),
+                eq(GestureType.HOME),
             )
     }
 
@@ -107,7 +107,7 @@ class LauncherSwipeHandlerV2Test {
         verify(systemUiProxy)
             .updateContextualEduStats(
                 /* isTrackpadGesture= */ eq(false),
-                eq(GestureType.HOME.toString()),
+                eq(GestureType.HOME),
             )
     }
 }
