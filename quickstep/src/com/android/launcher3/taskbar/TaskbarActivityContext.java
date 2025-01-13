@@ -271,8 +271,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         mWindowManager = c.getSystemService(WindowManager.class);
 
         // Inflate views.
-        final boolean isTransientTaskbar = DisplayController.isTransientTaskbar(this)
-                && !isPhoneMode();
+        boolean isTransientTaskbar = isTransientTaskbar();
         int taskbarLayout = isTransientTaskbar ? R.layout.transient_taskbar : R.layout.taskbar;
         mDragLayer = (TaskbarDragLayer) mLayoutInflater.inflate(taskbarLayout, null, false);
         TaskbarView taskbarView = mDragLayer.findViewById(R.id.taskbar_view);
@@ -383,6 +382,11 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
         setTaskbarWindowFullscreen(mIsFullscreen);
 
         dispatchDeviceProfileChanged();
+    }
+
+    /** Returns whether current taskbar is transient. */
+    public boolean isTransientTaskbar() {
+        return DisplayController.isTransientTaskbar(this) && !isPhoneMode();
     }
 
     /**
