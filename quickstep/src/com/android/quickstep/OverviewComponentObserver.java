@@ -77,7 +77,6 @@ public final class OverviewComponentObserver {
             new SimpleBroadcastReceiver(MAIN_EXECUTOR, this::updateOverviewTargets);
 
     private final Context mContext;
-    private final RecentsDisplayModel mRecentsDisplayModel;
 
     private final Intent mCurrentHomeIntent;
     private final Intent mMyHomeIntent;
@@ -98,10 +97,8 @@ public final class OverviewComponentObserver {
     @Inject
     public OverviewComponentObserver(
             @ApplicationContext Context context,
-            RecentsDisplayModel recentsDisplayModel,
             DaggerSingletonTracker lifecycleTracker) {
         mContext = context;
-        mRecentsDisplayModel = recentsDisplayModel;
         mCurrentHomeIntent = createHomeIntent();
         mMyHomeIntent = new Intent(mCurrentHomeIntent).setPackage(mContext.getPackageName());
         ResolveInfo info = context.getPackageManager().resolveActivity(mMyHomeIntent, 0);
