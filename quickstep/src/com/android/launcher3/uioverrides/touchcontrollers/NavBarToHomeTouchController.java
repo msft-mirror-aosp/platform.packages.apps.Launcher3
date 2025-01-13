@@ -210,10 +210,7 @@ public class NavBarToHomeTouchController implements TouchController,
                     mLauncher.getStateManager().addStateListener(listener);
                     onSwipeInteractionCompleted(mEndState);
                 };
-                new OverviewToHomeAnim(mLauncher, onReachedHome,
-                        FeatureFlags.enableSplitContextually()
-                                ? mCancelSplitRunnable
-                                : null)
+                new OverviewToHomeAnim(mLauncher, onReachedHome, mCancelSplitRunnable)
                         .animateWithVelocity(velocity);
             } else {
                 mLauncher.getStateManager().goToState(mEndState, true,
