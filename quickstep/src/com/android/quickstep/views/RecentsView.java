@@ -4229,6 +4229,12 @@ public abstract class RecentsView<
                 onDismissAnimationEnds();
                 mPendingAnimation = null;
                 mTaskViewsDismissPrimaryTranslations.clear();
+
+                if (!dismissingForSplitSelection && success) {
+                    InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_OVERVIEW_TASK_DISMISS);
+                } else if (!dismissingForSplitSelection) {
+                    InteractionJankMonitorWrapper.cancel(Cuj.CUJ_LAUNCHER_OVERVIEW_TASK_DISMISS);
+                }
             }
         });
     }
@@ -4531,6 +4537,7 @@ public abstract class RecentsView<
     }
 
     public void dismissTask(TaskView taskView, boolean animateTaskView, boolean removeTask) {
+        InteractionJankMonitorWrapper.begin(this, Cuj.CUJ_LAUNCHER_OVERVIEW_TASK_DISMISS);
         PendingAnimation pa = new PendingAnimation(DISMISS_TASK_DURATION);
         createTaskDismissAnimation(pa, taskView, animateTaskView, removeTask, DISMISS_TASK_DURATION,
                 false /* dismissingForSplitSelection*/);
