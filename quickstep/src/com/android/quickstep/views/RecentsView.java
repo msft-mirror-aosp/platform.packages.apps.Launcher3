@@ -520,7 +520,6 @@ public abstract class RecentsView<
 
     @Nullable
     protected RemoteTargetHandle[] mRemoteTargetHandles;
-    protected final Rect mLastComputedCarouselTaskSize = new Rect();
     protected final Rect mLastComputedTaskSize = new Rect();
     protected final Rect mLastComputedGridSize = new Rect();
     protected final Rect mLastComputedGridTaskSize = new Rect();
@@ -2292,11 +2291,6 @@ public abstract class RecentsView<
         mSizeStrategy.calculateGridTaskSize(mContainer, dp, mLastComputedGridTaskSize,
                 getPagedOrientationHandler());
 
-        if (enableGridOnlyOverview()) {
-            mSizeStrategy.calculateCarouselTaskSize(mContainer, dp, mLastComputedCarouselTaskSize,
-                    getPagedOrientationHandler());
-        }
-
         mTaskGridVerticalDiff = mLastComputedGridTaskSize.top - mLastComputedTaskSize.top;
         mTopBottomRowHeightDiff =
                 mLastComputedGridTaskSize.height() + dp.overviewTaskThumbnailTopMarginPx
@@ -2316,17 +2310,9 @@ public abstract class RecentsView<
         }
 
         float accumulatedTranslationX = 0;
-        float translateXToMiddle = 0;
-        if (enableGridOnlyOverview() && mContainer.getDeviceProfile().isTablet) {
-            translateXToMiddle = mIsRtl
-                    ? mLastComputedCarouselTaskSize.right - mLastComputedTaskSize.right
-                    : mLastComputedCarouselTaskSize.left - mLastComputedTaskSize.left;
-        }
         for (TaskView taskView : getTaskViews()) {
-            taskView.updateTaskSize(mLastComputedTaskSize, mLastComputedGridTaskSize,
-                    mLastComputedCarouselTaskSize);
+            taskView.updateTaskSize(mLastComputedTaskSize, mLastComputedGridTaskSize);
             taskView.setNonGridTranslationX(accumulatedTranslationX);
-            taskView.setNonGridPivotTranslationX(translateXToMiddle);
             // Compensate space caused by TaskView scaling.
             float widthDiff =
                     taskView.getLayoutParams().width * (1 - taskView.getNonGridScale());
@@ -2355,7 +2341,8 @@ public abstract class RecentsView<
      */
     public Rect getSelectedTaskBounds() {
         if (mSelectedTask == null) {
-            return mLastComputedTaskSize;
+            return enableGridOnlyOverview() && mContainer.getDeviceProfile().isTablet
+                    ? mLastComputedGridTaskSize : mLastComputedTaskSize;
         }
         return getTaskBounds(mSelectedTask);
     }
@@ -2364,8 +2351,9 @@ public abstract class RecentsView<
         int selectedPage = indexOfChild(taskView);
         int primaryScroll = getPagedOrientationHandler().getPrimaryScroll(this);
         int selectedPageScroll = getScrollForPage(selectedPage);
-        boolean isTopRow = taskView != null && mTopRowIdSet.contains(taskView.getTaskViewId());
-        Rect outRect = new Rect(mLastComputedTaskSize);
+        boolean isTopRow = mTopRowIdSet.contains(taskView.getTaskViewId());
+        Rect outRect = new Rect(
+                taskView.isGridTask() ? mLastComputedGridTaskSize : mLastComputedTaskSize);
         outRect.offset(
                 -(primaryScroll - (selectedPageScroll + getOffsetFromScrollPosition(selectedPage))),
                 (int) (showAsGrid() && enableGridOnlyOverview() && !isTopRow
@@ -2380,10 +2368,6 @@ public abstract class RecentsView<
 
     public Rect getLastComputedGridTaskSize() {
         return mLastComputedGridTaskSize;
-    }
-
-    public Rect getLastComputedCarouselTaskSize() {
-        return mLastComputedCarouselTaskSize;
     }
 
     /** Gets the task size for modal state. */
@@ -2909,8 +2893,6 @@ public abstract class RecentsView<
                 } else {
                     animatorSet.play(ObjectAnimator.ofFloat(this, RECENTS_GRID_PROGRESS, 1));
                     animatorSet.play(tvs.carouselScale.animateToValue(1));
-                    animatorSet.play(tvs.carouselPrimaryTranslation.animateToValue(0));
-                    animatorSet.play(tvs.carouselSecondaryTranslation.animateToValue(0));
                     animatorSet.play(tvs.taskPrimaryTranslation.animateToValue(
                             runningTaskPrimaryGridTranslation));
                     animatorSet.play(tvs.taskSecondaryTranslation.animateToValue(
@@ -4809,14 +4791,7 @@ public abstract class RecentsView<
                 mTempPointF.set(mLastComputedTaskSize.centerX(), mLastComputedTaskSize.bottom);
             }
         } else {
-            // Only update pivot when it is tablet and not in grid yet, so the pivot is correct
-            // for non-current tasks when swiping up to overview
-            if (enableGridOnlyOverview() && mContainer.getDeviceProfile().isTablet
-                    && !mOverviewGridEnabled) {
-                mTempRect.set(mLastComputedCarouselTaskSize);
-            } else {
-                mTempRect.set(mLastComputedTaskSize);
-            }
+            mTempRect.set(mLastComputedTaskSize);
             getPagedViewOrientedState().getFullScreenScaleAndPivot(mTempRect,
                     mContainer.getDeviceProfile(), mTempPointF);
         }
@@ -4927,10 +4902,12 @@ public abstract class RecentsView<
                     && child instanceof DesktopTaskView;
             float totalTranslationX = (skipTranslationOffset ? 0f : translation) + modalTranslation
                     + carouselHiddenOffsetSize;
-            FloatProperty translationPropertyX = child instanceof TaskView
-                    ? ((TaskView) child).getPrimaryTaskOffsetTranslationProperty()
-                    : getPagedOrientationHandler().getPrimaryViewTranslate();
-            translationPropertyX.set(child, totalTranslationX);
+            if (child instanceof TaskView taskView) {
+                taskView.getPrimaryTaskOffsetTranslationProperty().set(taskView, totalTranslationX);
+            } else {
+                getPagedOrientationHandler().getPrimaryViewTranslate().set(child,
+                        totalTranslationX);
+            }
             if (mEnableDrawingLiveTile && i == getRunningTaskIndex()) {
                 runActionOnRemoteHandles(
                         remoteTargetHandle -> remoteTargetHandle.getTaskViewSimulator()
@@ -4938,11 +4915,11 @@ public abstract class RecentsView<
                 redrawLiveTile();
             }
 
-            if (showAsGrid && enableGridOnlyOverview() && child instanceof TaskView) {
-                float totalTranslationY = getVerticalOffsetSize(i, modalOffset);
-                FloatProperty translationPropertyY =
-                        ((TaskView) child).getSecondaryTaskOffsetTranslationProperty();
-                translationPropertyY.set(child, totalTranslationY);
+            if (showAsGrid && enableGridOnlyOverview() && child instanceof TaskView taskView) {
+                float totalTranslationY = getVerticalOffsetSize(taskView, modalOffset);
+                FloatProperty<TaskView> translationPropertyY =
+                        taskView.getSecondaryTaskOffsetTranslationProperty();
+                translationPropertyY.set(taskView, totalTranslationY);
             }
         }
         updateCurveProperties();
@@ -5058,7 +5035,7 @@ public abstract class RecentsView<
      *
      * @param offsetProgress From 0 to 1 where 0 means no offset and 1 means offset offscreen.
      */
-    private float getVerticalOffsetSize(int childIndex, float offsetProgress) {
+    private float getVerticalOffsetSize(TaskView taskView, float offsetProgress) {
         if (offsetProgress == 0 || !(showAsGrid() && enableGridOnlyOverview())
                 || mSelectedTask == null) {
             // Don't bother calculating everything below if we won't offset vertically.
@@ -5066,11 +5043,10 @@ public abstract class RecentsView<
         }
 
         // First, get the position of the task relative to the top row.
-        TaskView child = getTaskViewAt(childIndex);
-        Rect taskPosition = getTaskBounds(child);
+        Rect taskPosition = getTaskBounds(taskView);
 
         boolean isSelectedTaskTopRow = mTopRowIdSet.contains(mSelectedTask.getTaskViewId());
-        boolean isChildTopRow = mTopRowIdSet.contains(child.getTaskViewId());
+        boolean isChildTopRow = mTopRowIdSet.contains(taskView.getTaskViewId());
         // Whether the task should be shifted to the top.
         boolean isTopShift = !isSelectedTaskTopRow && isChildTopRow;
         boolean isBottomShift = isSelectedTaskTopRow && !isChildTopRow;
@@ -5648,19 +5624,10 @@ public abstract class RecentsView<
      * Returns the scale up required on the view, so that it coves the screen completely
      */
     public float getMaxScaleForFullScreen() {
-        if (enableGridOnlyOverview() && mContainer.getDeviceProfile().isTablet
-                && !mOverviewGridEnabled) {
-            if (mLastComputedCarouselTaskSize.isEmpty()) {
-                mSizeStrategy.calculateCarouselTaskSize(mContainer, mContainer.getDeviceProfile(),
-                        mLastComputedCarouselTaskSize, getPagedOrientationHandler());
-            }
-            mTempRect.set(mLastComputedCarouselTaskSize);
-        } else {
-            if (mLastComputedTaskSize.isEmpty()) {
-                getTaskSize(mLastComputedTaskSize);
-            }
-            mTempRect.set(mLastComputedTaskSize);
+        if (mLastComputedTaskSize.isEmpty()) {
+            getTaskSize(mLastComputedTaskSize);
         }
+        mTempRect.set(mLastComputedTaskSize);
         return getPagedViewOrientedState().getFullScreenScaleAndPivot(
                 mTempRect, mContainer.getDeviceProfile(), mTempPointF);
     }

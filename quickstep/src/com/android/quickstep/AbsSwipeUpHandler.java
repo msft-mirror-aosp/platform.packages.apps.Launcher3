@@ -31,7 +31,6 @@ import static com.android.launcher3.BaseActivity.EVENT_STARTED;
 import static com.android.launcher3.BaseActivity.INVISIBLE_BY_STATE_HANDLER;
 import static com.android.launcher3.BaseActivity.STATE_HANDLER_INVISIBILITY_FLAGS;
 import static com.android.launcher3.Flags.enableAdditionalHomeAnimations;
-import static com.android.launcher3.Flags.enableGridOnlyOverview;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.Flags.msdlFeedback;
 import static com.android.launcher3.PagedView.INVALID_PAGE;
@@ -173,6 +172,8 @@ import com.android.wm.shell.shared.startingsurface.SplashScreenExitAnimationUtil
 
 import com.google.android.msdl.data.model.MSDLToken;
 
+import kotlin.Unit;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -181,8 +182,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.Consumer;
-
-import kotlin.Unit;
 
 /**
  * Handles the navigation gestures when Launcher is the default home activity.
@@ -2688,9 +2687,7 @@ public abstract class AbsSwipeUpHandler<
         }
 
         float scrollOffset = Math.abs(mRecentsView.getScrollOffset(mRecentsView.getCurrentPage()));
-        Rect carouselTaskSize = enableGridOnlyOverview()
-                ? mRecentsView.getLastComputedCarouselTaskSize()
-                : mRecentsView.getLastComputedTaskSize();
+        Rect carouselTaskSize = mRecentsView.getLastComputedTaskSize();
         int maxScrollOffset = mRecentsView.getPagedOrientationHandler().getPrimaryValue(
                 carouselTaskSize.width(), carouselTaskSize.height());
         maxScrollOffset += mRecentsView.getPageSpacing();
