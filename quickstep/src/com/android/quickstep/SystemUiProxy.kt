@@ -671,8 +671,10 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
      *
      * @param intent the intent used to create the bubble.
      */
-    fun showAppBubble(intent: Intent?) =
-        executeWithErrorLog({ "Failed call showAppBubble" }) { bubbles?.showAppBubble(intent) }
+    fun showAppBubble(intent: Intent?, user: UserHandle) =
+        executeWithErrorLog({ "Failed call showAppBubble" }) {
+            bubbles?.showAppBubble(intent, user)
+        }
 
     /** Tells SysUI to show the expanded view. */
     fun showExpandedView() =

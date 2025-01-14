@@ -86,6 +86,7 @@ import android.os.Bundle;
 import android.os.IRemoteCallback;
 import android.os.SystemProperties;
 import android.os.Trace;
+import android.os.UserHandle;
 import android.util.AttributeSet;
 import android.view.Display;
 import android.view.HapticFeedbackConstants;
@@ -1438,9 +1439,9 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     }
 
     @Override
-    public void showAppBubble(Intent intent) {
+    public void showAppBubble(Intent intent, UserHandle user) {
         if (intent == null || intent.getPackage() == null) return;
-        SystemUiProxy.INSTANCE.get(this).showAppBubble(intent);
+        SystemUiProxy.INSTANCE.get(this).showAppBubble(intent, user);
     }
 
     /** Sets the location of the bubble bar */
