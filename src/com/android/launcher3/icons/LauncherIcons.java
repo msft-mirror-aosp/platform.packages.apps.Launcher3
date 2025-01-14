@@ -22,7 +22,6 @@ import android.os.UserHandle;
 import androidx.annotation.NonNull;
 
 import com.android.launcher3.InvariantDeviceProfile;
-import com.android.launcher3.graphics.IconShape;
 import com.android.launcher3.graphics.ThemeManager;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.MainThreadInitializedObject;
@@ -56,8 +55,7 @@ public class LauncherIcons extends BaseIconFactory implements AutoCloseable {
 
     protected LauncherIcons(Context context, int fillResIconDpi, int iconBitmapSize,
             ConcurrentLinkedQueue<LauncherIcons> pool) {
-        super(context, fillResIconDpi, iconBitmapSize,
-                IconShape.INSTANCE.get(context).getShape().enableShapeDetection());
+        super(context, fillResIconDpi, iconBitmapSize);
         mThemeController = ThemeManager.INSTANCE.get(context).getThemeController();
         mPool = pool;
     }
