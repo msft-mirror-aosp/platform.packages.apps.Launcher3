@@ -1219,9 +1219,7 @@ public abstract class RecentsView<
                 mIPipAnimationListener);
         mOrientationState.initListeners();
         mTaskOverlayFactory.initListeners();
-        if (FeatureFlags.enableSplitContextually()) {
-            mSplitSelectStateController.registerSplitListener(mSplitSelectionListener);
-        }
+        mSplitSelectStateController.registerSplitListener(mSplitSelectionListener);
     }
 
     @Override
@@ -1241,9 +1239,7 @@ public abstract class RecentsView<
         mIPipAnimationListener.setActivityAndRecentsView(null, null);
         mOrientationState.destroyListeners();
         mTaskOverlayFactory.removeListeners();
-        if (FeatureFlags.enableSplitContextually()) {
-            mSplitSelectStateController.unregisterSplitListener(mSplitSelectionListener);
-        }
+        mSplitSelectStateController.unregisterSplitListener(mSplitSelectionListener);
         reset();
     }
 
@@ -2668,9 +2664,6 @@ public abstract class RecentsView<
         }
         runActionOnRemoteHandles(remoteTargetHandle ->
                 remoteTargetHandle.getTaskViewSimulator().setDrawsBelowRecents(false));
-        if (!FeatureFlags.enableSplitContextually()) {
-            resetFromSplitSelectionState();
-        }
 
         // These are relatively expensive and don't need to be done this frame (RecentsView isn't
         // visible anyway), so defer by a frame to get off the critical path, e.g. app to home.
@@ -3645,11 +3638,7 @@ public abstract class RecentsView<
                 InteractionJankMonitorWrapper.end(Cuj.CUJ_SPLIT_SCREEN_ENTER);
             } else {
                 // If transition to split select was interrupted, clean up to prevent glitches
-                if (FeatureFlags.enableSplitContextually()) {
-                    mSplitSelectStateController.resetState();
-                } else {
-                    resetFromSplitSelectionState();
-                }
+                mSplitSelectStateController.resetState();
                 InteractionJankMonitorWrapper.cancel(Cuj.CUJ_SPLIT_SCREEN_ENTER);
             }
 
@@ -5380,11 +5369,7 @@ public abstract class RecentsView<
             mSplitSelectStateController.launchSplitTasks(
                     aBoolean1 -> {
                         InteractionJankMonitorWrapper.end(Cuj.CUJ_SPLIT_SCREEN_ENTER);
-                        if (FeatureFlags.enableSplitContextually()) {
-                            mSplitSelectStateController.resetState();
-                        } else {
-                            resetFromSplitSelectionState();
-                        }
+                        mSplitSelectStateController.resetState();
                     });
         });
 
@@ -5406,17 +5391,14 @@ public abstract class RecentsView<
 
     @SuppressLint("WrongCall")
     protected void resetFromSplitSelectionState() {
-        if (mSplitSelectSource != null || mSplitHiddenTaskViewIndex != -1 ||
-                FeatureFlags.enableSplitContextually()) {
-            safeRemoveDragLayerView(mSplitSelectStateController.getFirstFloatingTaskView());
-            safeRemoveDragLayerView(mSecondFloatingTaskView);
-            safeRemoveDragLayerView(mSplitSelectStateController.getSplitInstructionsView());
-            safeRemoveDragLayerView(mSplitScrim);
-            mSecondFloatingTaskView = null;
-            mSplitSelectSource = null;
-            mSplitSelectStateController.getSplitAnimationController()
-                    .removeSplitInstructionsView(mContainer);
-        }
+        safeRemoveDragLayerView(mSplitSelectStateController.getFirstFloatingTaskView());
+        safeRemoveDragLayerView(mSecondFloatingTaskView);
+        safeRemoveDragLayerView(mSplitSelectStateController.getSplitInstructionsView());
+        safeRemoveDragLayerView(mSplitScrim);
+        mSecondFloatingTaskView = null;
+        mSplitSelectSource = null;
+        mSplitSelectStateController.getSplitAnimationController()
+                .removeSplitInstructionsView(mContainer);
 
         if (mSecondSplitHiddenView != null) {
             mSecondSplitHiddenView.setThumbnailVisibility(VISIBLE, INVALID_TASK_ID);
@@ -5428,11 +5410,6 @@ public abstract class RecentsView<
         setTaskViewsPrimarySplitTranslation(0);
         setTaskViewsSecondarySplitTranslation(0);
 
-        if (!FeatureFlags.enableSplitContextually()) {
-            // When flag is on, this method gets called from resetState() call below, let's avoid
-            // infinite recursion today
-            mSplitSelectStateController.resetState();
-        }
         if (mSplitHiddenTaskViewIndex == -1) {
             return;
         }
