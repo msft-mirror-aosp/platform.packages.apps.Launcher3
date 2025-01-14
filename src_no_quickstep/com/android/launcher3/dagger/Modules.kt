@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024 The Android Open Source Project
+ * Copyright (C) 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
-package com.android.launcher3.dagger;
+package com.android.launcher3.dagger
 
-import com.android.quickstep.dagger.QuickStepModule;
+import dagger.Module
 
-import dagger.Module;
+private object Modules {}
 
-@Module(includes = QuickStepModule.class)
-public class LauncherAppModule {}
+@Module abstract class WindowManagerProxyModule {}
+
+@Module abstract class ApiWrapperModule {}
+
+@Module abstract class PluginManagerWrapperModule {}

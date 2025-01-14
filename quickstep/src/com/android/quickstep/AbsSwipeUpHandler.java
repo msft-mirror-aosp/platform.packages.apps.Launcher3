@@ -116,7 +116,6 @@ import com.android.launcher3.Utilities;
 import com.android.launcher3.anim.AnimationSuccessListener;
 import com.android.launcher3.anim.AnimatorPlaybackController;
 import com.android.launcher3.compat.AccessibilityManagerCompat;
-import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
 import com.android.launcher3.dragndrop.DragView;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.logging.StatsLogManager.StatsLogger;
@@ -1411,7 +1410,7 @@ public abstract class AbsSwipeUpHandler<
             duration = mContainer != null && mContainer.getDeviceProfile().isTaskbarPresent
                     ? QuickstepTransitionManager.getTaskbarToHomeDuration(isPinnedTaskbar)
                     : StaggeredWorkspaceAnim.DURATION_MS;
-            ContextualEduStatsManager.INSTANCE.get(mContext).updateEduStats(
+            SystemUiProxy.INSTANCE.get(mContext).updateContextualEduStats(
                     mGestureState.isTrackpadGesture(), GestureType.HOME);
         } else if (endTarget == RECENTS) {
             if (mRecentsView != null) {
@@ -1437,7 +1436,7 @@ public abstract class AbsSwipeUpHandler<
                 if (!mGestureState.isHandlingAtomicEvent() || isScrolling) {
                     duration = Math.max(duration, mRecentsView.getScroller().getDuration());
                 }
-                ContextualEduStatsManager.INSTANCE.get(mContext).updateEduStats(
+                SystemUiProxy.INSTANCE.get(mContext).updateContextualEduStats(
                         mGestureState.isTrackpadGesture(), GestureType.OVERVIEW);
             }
         } else if (endTarget == LAST_TASK && mRecentsView != null
