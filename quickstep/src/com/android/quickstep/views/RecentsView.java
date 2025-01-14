@@ -209,7 +209,6 @@ import com.android.quickstep.recents.viewmodel.RecentsViewData;
 import com.android.quickstep.recents.viewmodel.RecentsViewModel;
 import com.android.quickstep.util.ActiveGestureProtoLogProxy;
 import com.android.quickstep.util.AnimUtils;
-import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.util.RecentsAtomicAnimationFactory;
@@ -1972,7 +1971,7 @@ public abstract class RecentsView<
             } else if (taskView instanceof DesktopTaskView) {
                 // Minimized tasks should not be shown in Overview
                 List<Task> nonMinimizedTasks =
-                        ((DesktopTask) groupTask).tasks.stream()
+                        groupTask.getTasks().stream()
                                 .filter(task -> !task.isMinimized)
                                 .toList();
                 ((DesktopTaskView) taskView).bind(nonMinimizedTasks, mOrientationState,
