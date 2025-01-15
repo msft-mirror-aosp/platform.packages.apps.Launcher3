@@ -687,6 +687,20 @@ public class TaskbarManager {
         }
     }
 
+    /**
+     * Signal from SysUI indicating that a non-mirroring display was just connected to the
+     * primary device.
+     */
+    public void onDisplayReady(int displayId) {
+    }
+
+    /**
+     * Signal from SysUI indicating that a previously connected non-mirroring display was just
+     * removed from the primary device.
+     */
+    public void onDisplayRemoved(int displayId) {
+    }
+
     private void removeActivityCallbacksAndListeners() {
         if (mActivity != null) {
             mActivity.removeOnDeviceProfileChangeListener(mDebugActivityDeviceProfileChanged);
