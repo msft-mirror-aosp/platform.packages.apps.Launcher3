@@ -4016,6 +4016,10 @@ public abstract class RecentsView<
             dismissedTaskView.setTranslationZ(0.1f);
         }
         loadVisibleTaskData(TaskView.FLAG_UPDATE_ALL);
+        if (!dismissingForSplitSelection) {
+            anim.addStartListener(() -> InteractionJankMonitorWrapper.begin(this,
+                    Cuj.CUJ_LAUNCHER_OVERVIEW_TASK_DISMISS));
+        }
         mPendingAnimation = anim;
         final TaskView finalNextFocusedTaskView = nextFocusedTaskView;
         final boolean finalCloseGapBetweenClearAll = closeGapBetweenClearAll;
@@ -4540,7 +4544,6 @@ public abstract class RecentsView<
     }
 
     public void dismissTask(TaskView taskView, boolean animateTaskView, boolean removeTask) {
-        InteractionJankMonitorWrapper.begin(this, Cuj.CUJ_LAUNCHER_OVERVIEW_TASK_DISMISS);
         PendingAnimation pa = new PendingAnimation(DISMISS_TASK_DURATION);
         createTaskDismissAnimation(pa, taskView, animateTaskView, removeTask, DISMISS_TASK_DURATION,
                 false /* dismissingForSplitSelection*/);
