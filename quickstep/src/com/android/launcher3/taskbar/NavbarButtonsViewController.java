@@ -41,8 +41,8 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A11Y_BUTTON_LONG_CLICKABLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BACK_DISABLED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_HOME_DISABLED;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_BUTTON_SHOWING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_VISIBLE;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_BUTTON_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NAV_BAR_HIDDEN;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_OVERVIEW_DISABLED;
@@ -331,7 +331,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
 
         // Make sure to remove nav bar buttons translation when any of the following occur:
         // - Notification shade is expanded
-        // - IME is showing (add separate translation for IME)
+        // - IME is visible (add separate translation for IME)
         // - VoiceInteractionWindow (assistant) is showing
         // - Keyboard shortcuts helper is showing
         if (!mContext.isPhoneMode()) {
@@ -507,8 +507,8 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     private void parseSystemUiFlags(@SystemUiStateFlags long sysUiStateFlags) {
         mSysuiStateFlags = sysUiStateFlags;
         boolean isImeSwitcherButtonVisible =
-                (sysUiStateFlags & SYSUI_STATE_IME_SWITCHER_BUTTON_SHOWING) != 0;
-        boolean isImeVisible = (sysUiStateFlags & SYSUI_STATE_IME_SHOWING) != 0;
+                (sysUiStateFlags & SYSUI_STATE_IME_SWITCHER_BUTTON_VISIBLE) != 0;
+        boolean isImeVisible = (sysUiStateFlags & SYSUI_STATE_IME_VISIBLE) != 0;
         boolean a11yVisible = (sysUiStateFlags & SYSUI_STATE_A11Y_BUTTON_CLICKABLE) != 0;
         boolean isHomeDisabled = (sysUiStateFlags & SYSUI_STATE_HOME_DISABLED) != 0;
         boolean isRecentsDisabled = (sysUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0;
