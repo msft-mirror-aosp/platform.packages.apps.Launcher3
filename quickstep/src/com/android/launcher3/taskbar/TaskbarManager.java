@@ -793,7 +793,8 @@ public class TaskbarManager {
     private TaskbarActivityContext createTaskbarActivityContext(DeviceProfile dp, int displayId) {
         TaskbarActivityContext newTaskbar = new TaskbarActivityContext(mWindowContext,
                 mNavigationBarPanelContext, dp, mDefaultNavButtonController,
-                mUnfoldProgressProvider, isDefaultDisplay(displayId));
+                mUnfoldProgressProvider, isDefaultDisplay(displayId),
+                SystemUiProxy.INSTANCE.get(mWindowContext));
 
         addTaskbarToMap(displayId, newTaskbar);
         return newTaskbar;
