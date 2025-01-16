@@ -27,7 +27,6 @@ import com.android.launcher3.model.data.ItemInfo
 import com.android.launcher3.popup.SystemShortcut
 import com.android.launcher3.taskbar.TaskbarAutohideSuspendController.FLAG_AUTOHIDE_SUSPEND_MULTI_INSTANCE_MENU_OPEN
 import com.android.launcher3.taskbar.overlay.TaskbarOverlayContext
-import com.android.launcher3.util.Themes
 import com.android.launcher3.util.TouchController
 import com.android.launcher3.views.ActivityContext
 import com.android.quickstep.RecentsModel
@@ -36,8 +35,6 @@ import com.android.quickstep.util.DesktopTask
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.ThumbnailData
 import com.android.wm.shell.shared.multiinstance.ManageWindowsViewContainer
-import java.util.Collections
-import java.util.function.Predicate
 
 /**
  * A single menu item shortcut to execute displaying open instances of an app. Default interaction
@@ -72,7 +69,7 @@ class ManageWindowsTaskbarShortcut<T>(
             val packageDesktopTasks =
                 (desktopTask?.tasks ?: emptyList()).filter(isTargetPackageTask)
             val nonDesktopPackageTasks =
-                tasks.filter { isTargetPackageTask(it.task1) }.map { it.task1 }
+                tasks.flatMap { it.tasks }.filter { isTargetPackageTask(it) }
 
             // Add tasks from the fetched tasks, deduplicating by task ID
             val packageTasks =
