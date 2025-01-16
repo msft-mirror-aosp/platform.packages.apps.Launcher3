@@ -41,6 +41,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A11Y_BUTTON_LONG_CLICKABLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BACK_DISABLED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_HOME_DISABLED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_ALT_BACK;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_BUTTON_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NAV_BAR_HIDDEN;
@@ -133,19 +134,21 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     private static final int FLAG_IME_SWITCHER_BUTTON_VISIBLE = 1 << 0;
     /** Whether the IME is visible. */
     private static final int FLAG_IME_VISIBLE = 1 << 1;
-    private static final int FLAG_A11Y_VISIBLE = 1 << 2;
-    private static final int FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE = 1 << 3;
-    private static final int FLAG_KEYGUARD_VISIBLE = 1 << 4;
-    private static final int FLAG_KEYGUARD_OCCLUDED = 1 << 5;
-    private static final int FLAG_DISABLE_HOME = 1 << 6;
-    private static final int FLAG_DISABLE_RECENTS = 1 << 7;
-    private static final int FLAG_DISABLE_BACK = 1 << 8;
-    private static final int FLAG_NOTIFICATION_SHADE_EXPANDED = 1 << 9;
-    private static final int FLAG_SCREEN_PINNING_ACTIVE = 1 << 10;
-    private static final int FLAG_VOICE_INTERACTION_WINDOW_SHOWING = 1 << 11;
-    private static final int FLAG_SMALL_SCREEN = 1 << 12;
-    private static final int FLAG_SLIDE_IN_VIEW_VISIBLE = 1 << 13;
-    private static final int FLAG_KEYBOARD_SHORTCUT_HELPER_SHOWING = 1 << 14;
+    /** Whether the back button is adjusted for the IME. */
+    private static final int FLAG_IME_ALT_BACK = 1 << 2;
+    private static final int FLAG_A11Y_VISIBLE = 1 << 3;
+    private static final int FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE = 1 << 4;
+    private static final int FLAG_KEYGUARD_VISIBLE = 1 << 5;
+    private static final int FLAG_KEYGUARD_OCCLUDED = 1 << 6;
+    private static final int FLAG_DISABLE_HOME = 1 << 7;
+    private static final int FLAG_DISABLE_RECENTS = 1 << 8;
+    private static final int FLAG_DISABLE_BACK = 1 << 9;
+    private static final int FLAG_NOTIFICATION_SHADE_EXPANDED = 1 << 10;
+    private static final int FLAG_SCREEN_PINNING_ACTIVE = 1 << 11;
+    private static final int FLAG_VOICE_INTERACTION_WINDOW_SHOWING = 1 << 12;
+    private static final int FLAG_SMALL_SCREEN = 1 << 13;
+    private static final int FLAG_SLIDE_IN_VIEW_VISIBLE = 1 << 14;
+    private static final int FLAG_KEYBOARD_SHORTCUT_HELPER_SHOWING = 1 << 15;
 
     /**
      * Flags where a UI could be over Taskbar surfaces, so the color override should be disabled.
@@ -447,7 +450,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                     flags -> (flags & FLAG_IME_VISIBLE) == 0));
         }
         mPropertyHolders.add(new StatePropertyHolder(mBackButton,
-                flags -> (flags & FLAG_IME_VISIBLE) != 0,
+                flags -> (flags & FLAG_IME_ALT_BACK) != 0,
                 ROTATION_DRAWABLE_PERCENT, 1f, 0f));
         // Translate back button to be at end/start of other buttons for keyguard (only after SUW
         // since it is laid to align with SUW actions while in that state)
@@ -509,6 +512,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         boolean isImeSwitcherButtonVisible =
                 (sysUiStateFlags & SYSUI_STATE_IME_SWITCHER_BUTTON_VISIBLE) != 0;
         boolean isImeVisible = (sysUiStateFlags & SYSUI_STATE_IME_VISIBLE) != 0;
+        boolean useImeAltBack = (sysUiStateFlags & SYSUI_STATE_IME_ALT_BACK) != 0;
         boolean a11yVisible = (sysUiStateFlags & SYSUI_STATE_A11Y_BUTTON_CLICKABLE) != 0;
         boolean isHomeDisabled = (sysUiStateFlags & SYSUI_STATE_HOME_DISABLED) != 0;
         boolean isRecentsDisabled = (sysUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0;
@@ -524,6 +528,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
 
         updateStateForFlag(FLAG_IME_SWITCHER_BUTTON_VISIBLE, isImeSwitcherButtonVisible);
         updateStateForFlag(FLAG_IME_VISIBLE, isImeVisible);
+        updateStateForFlag(FLAG_IME_ALT_BACK, useImeAltBack);
         updateStateForFlag(FLAG_A11Y_VISIBLE, a11yVisible);
         updateStateForFlag(FLAG_DISABLE_HOME, isHomeDisabled);
         updateStateForFlag(FLAG_DISABLE_RECENTS, isRecentsDisabled);
@@ -1228,6 +1233,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         appendFlag(str, flags, FLAG_IME_SWITCHER_BUTTON_VISIBLE,
                 "FLAG_IME_SWITCHER_BUTTON_VISIBLE");
         appendFlag(str, flags, FLAG_IME_VISIBLE, "FLAG_IME_VISIBLE");
+        appendFlag(str, flags, FLAG_IME_ALT_BACK, "FLAG_IME_ALT_BACK");
         appendFlag(str, flags, FLAG_A11Y_VISIBLE, "FLAG_A11Y_VISIBLE");
         appendFlag(str, flags, FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE,
                 "FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE");
