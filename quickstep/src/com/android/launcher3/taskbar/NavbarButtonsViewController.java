@@ -40,8 +40,8 @@ import static com.android.launcher3.util.MultiPropertyFactory.MULTI_PROPERTY_VAL
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A11Y_BUTTON_CLICKABLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_A11Y_BUTTON_LONG_CLICKABLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BACK_DISABLED;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BACK_DISMISS_IME;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_HOME_DISABLED;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_ALT_BACK;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_BUTTON_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NAV_BAR_HIDDEN;
@@ -134,8 +134,14 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     private static final int FLAG_IME_SWITCHER_BUTTON_VISIBLE = 1 << 0;
     /** Whether the IME is visible. */
     private static final int FLAG_IME_VISIBLE = 1 << 1;
-    /** Whether the back button is adjusted for the IME. */
-    private static final int FLAG_IME_ALT_BACK = 1 << 2;
+    /**
+     * The back button is visually adjusted to indicate that it will dismiss the IME when pressed.
+     * This only takes effect while the IME is visible. By default, it is set while the IME is
+     * visible, but may be overridden by the
+     * {@link android.inputmethodservice.InputMethodService.BackDispositionMode backDispositionMode}
+     * set by the IME.
+     */
+    private static final int FLAG_BACK_DISMISS_IME = 1 << 2;
     private static final int FLAG_A11Y_VISIBLE = 1 << 3;
     private static final int FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE = 1 << 4;
     private static final int FLAG_KEYGUARD_VISIBLE = 1 << 5;
@@ -453,7 +459,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                     flags -> (flags & FLAG_IME_VISIBLE) == 0));
         }
         mPropertyHolders.add(new StatePropertyHolder(mBackButton,
-                flags -> (flags & FLAG_IME_ALT_BACK) != 0,
+                flags -> (flags & FLAG_BACK_DISMISS_IME) != 0,
                 ROTATION_DRAWABLE_PERCENT, 1f, 0f));
         // Translate back button to be at end/start of other buttons for keyguard (only after SUW
         // since it is laid to align with SUW actions while in that state)
@@ -515,7 +521,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         boolean isImeSwitcherButtonVisible =
                 (sysUiStateFlags & SYSUI_STATE_IME_SWITCHER_BUTTON_VISIBLE) != 0;
         boolean isImeVisible = (sysUiStateFlags & SYSUI_STATE_IME_VISIBLE) != 0;
-        boolean useImeAltBack = (sysUiStateFlags & SYSUI_STATE_IME_ALT_BACK) != 0;
+        boolean isBackDismissIme = (sysUiStateFlags & SYSUI_STATE_BACK_DISMISS_IME) != 0;
         boolean a11yVisible = (sysUiStateFlags & SYSUI_STATE_A11Y_BUTTON_CLICKABLE) != 0;
         boolean isHomeDisabled = (sysUiStateFlags & SYSUI_STATE_HOME_DISABLED) != 0;
         boolean isRecentsDisabled = (sysUiStateFlags & SYSUI_STATE_OVERVIEW_DISABLED) != 0;
@@ -531,7 +537,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
 
         updateStateForFlag(FLAG_IME_SWITCHER_BUTTON_VISIBLE, isImeSwitcherButtonVisible);
         updateStateForFlag(FLAG_IME_VISIBLE, isImeVisible);
-        updateStateForFlag(FLAG_IME_ALT_BACK, useImeAltBack);
+        updateStateForFlag(FLAG_BACK_DISMISS_IME, isBackDismissIme);
         updateStateForFlag(FLAG_A11Y_VISIBLE, a11yVisible);
         updateStateForFlag(FLAG_DISABLE_HOME, isHomeDisabled);
         updateStateForFlag(FLAG_DISABLE_RECENTS, isRecentsDisabled);
@@ -1236,7 +1242,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         appendFlag(str, flags, FLAG_IME_SWITCHER_BUTTON_VISIBLE,
                 "FLAG_IME_SWITCHER_BUTTON_VISIBLE");
         appendFlag(str, flags, FLAG_IME_VISIBLE, "FLAG_IME_VISIBLE");
-        appendFlag(str, flags, FLAG_IME_ALT_BACK, "FLAG_IME_ALT_BACK");
+        appendFlag(str, flags, FLAG_BACK_DISMISS_IME, "FLAG_BACK_DISMISS_IME");
         appendFlag(str, flags, FLAG_A11Y_VISIBLE, "FLAG_A11Y_VISIBLE");
         appendFlag(str, flags, FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE,
                 "FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE");
