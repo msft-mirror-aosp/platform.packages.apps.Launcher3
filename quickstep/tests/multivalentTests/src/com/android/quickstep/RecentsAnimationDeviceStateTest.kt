@@ -1,7 +1,7 @@
 package com.android.quickstep
 
 import android.content.Context
-import android.testing.AndroidTestingRunner
+import androidx.test.annotation.UiThreadTest
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.filters.SmallTest
 import com.android.launcher3.util.DisplayController.CHANGE_DENSITY
@@ -10,6 +10,7 @@ import com.android.launcher3.util.DisplayController.CHANGE_ROTATION
 import com.android.launcher3.util.DisplayController.Info
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR
+import com.android.launcher3.util.LauncherMultivalentJUnit
 import com.android.launcher3.util.NavigationMode
 import com.android.quickstep.util.GestureExclusionManager
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_ALLOW_GESTURE_IGNORING_BAR_VISIBILITY
@@ -33,12 +34,13 @@ import org.mockito.Mockito.reset
 import org.mockito.Mockito.verify
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.verifyZeroInteractions
+import org.mockito.kotlin.verifyNoMoreInteractions
 import org.mockito.kotlin.whenever
 
 /** Unit test for [RecentsAnimationDeviceState]. */
 @SmallTest
-@RunWith(AndroidTestingRunner::class)
+@UiThreadTest
+@RunWith(LauncherMultivalentJUnit::class)
 class RecentsAnimationDeviceStateTest {
 
     @Mock private lateinit var exclusionManager: GestureExclusionManager
@@ -74,7 +76,7 @@ class RecentsAnimationDeviceStateTest {
 
         underTest.registerExclusionListener()
 
-        verifyZeroInteractions(exclusionManager)
+        verifyNoMoreInteractions(exclusionManager)
     }
 
     @Test
@@ -95,7 +97,7 @@ class RecentsAnimationDeviceStateTest {
 
         underTest.unregisterExclusionListener()
 
-        verifyZeroInteractions(exclusionManager)
+        verifyNoMoreInteractions(exclusionManager)
     }
 
     @Test
@@ -126,7 +128,7 @@ class RecentsAnimationDeviceStateTest {
 
         underTest.onDisplayInfoChanged(context, info, CHANGE_DENSITY)
 
-        verifyZeroInteractions(exclusionManager)
+        verifyNoMoreInteractions(exclusionManager)
     }
 
     @Test
