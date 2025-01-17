@@ -1239,6 +1239,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mIcon = icon;
         if (mIcon != null) {
             mIcon.setVisible(getWindowVisibility() == VISIBLE && isShown(), false);
+            mIcon.setHoverScaleEnabledForDisplay(mDisplay != DISPLAY_TASKBAR);
         }
     }
 
