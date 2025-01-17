@@ -368,7 +368,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 new KeyboardQuickSwitchController(),
                 new TaskbarPinningController(this),
                 bubbleControllersOptional,
-                new TaskbarDesktopModeController(DesktopVisibilityController.INSTANCE.get(this)));
+                new TaskbarDesktopModeController(this,
+                        DesktopVisibilityController.INSTANCE.get(this)));
 
         mLauncherPrefs = LauncherPrefs.get(this);
     }

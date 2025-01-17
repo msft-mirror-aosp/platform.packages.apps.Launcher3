@@ -147,7 +147,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     @Test
     fun canShowRunningAndRecentAppsIsFalseAfterInit_getTasksOnlyCalledInInit() {
         // getTasks() should have been called once from init().
-        verify(mockRecentsModel, times(1)).getTasks(any<Consumer<List<GroupTask>>>())
+        verify(mockRecentsModel, times(1)).getTasks(any<Consumer<List<GroupTask>>>(), any())
         recentAppsController.canShowRunningApps = false
         recentAppsController.canShowRecentApps = false
         prepareHotseatAndRunningAndRecentApps(
@@ -156,7 +156,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
             recentTaskPackages = listOf(RECENT_PACKAGE_1, RECENT_PACKAGE_2),
         )
         // Verify that getTasks() was not called again after the init().
-        verify(mockRecentsModel, times(1)).getTasks(any<Consumer<List<GroupTask>>>())
+        verify(mockRecentsModel, times(1)).getTasks(any<Consumer<List<GroupTask>>>(), any())
     }
 
     @Test
@@ -881,7 +881,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
                 taskListChangeId
             }
             .whenever(mockRecentsModel)
-            .getTasks(any<Consumer<List<GroupTask>>>())
+            .getTasks(any<Consumer<List<GroupTask>>>(), any())
         recentTasksChangedListener?.onRecentTasksChanged()
     }
 
@@ -945,7 +945,7 @@ class TaskbarRecentAppsControllerTest : TaskbarBaseTestCase() {
     }
 
     private fun setInDesktopMode(inDesktopMode: Boolean) {
-        whenever(taskbarControllers.taskbarDesktopModeController.areDesktopTasksVisible)
+        whenever(taskbarControllers.taskbarDesktopModeController.shouldShowDesktopTasksInTaskbar())
             .thenReturn(inDesktopMode)
     }
 
