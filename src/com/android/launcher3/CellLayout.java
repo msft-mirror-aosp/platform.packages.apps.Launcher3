@@ -16,6 +16,7 @@
 
 package com.android.launcher3;
 
+import static com.android.launcher3.LauncherState.NORMAL;
 import static com.android.launcher3.dragndrop.DraggableView.DRAGGABLE_ICON;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 import static com.android.launcher3.util.MultiTranslateDelegate.INDEX_REORDER_PREVIEW_OFFSET;
@@ -47,6 +48,7 @@ import android.view.View;
 import android.view.ViewDebug;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -69,6 +71,7 @@ import com.android.launcher3.dragndrop.DraggableView;
 import com.android.launcher3.folder.PreviewBackground;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.LauncherAppWidgetInfo;
+import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.util.CellAndSpan;
 import com.android.launcher3.util.GridOccupancy;
 import com.android.launcher3.util.MSDLPlayerWrapper;
@@ -780,6 +783,22 @@ public class CellLayout extends ViewGroup {
                 Log.d(TAG, "Adding view to ShortcutsAndWidgetsContainer: " + child);
             }
             mShortcutsAndWidgets.addView(child, index, lp);
+
+            // Whenever an app is added, if Accessibility service is enabled, focus on that app.
+            if (mActivity instanceof Launcher) {
+                Launcher.cast(mActivity).getStateManager().addStateListener(
+                        new StateManager.StateListener<LauncherState>() {
+                            @Override
+                            public void onStateTransitionComplete(LauncherState finalState) {
+                                if (finalState == NORMAL) {
+                                    child.performAccessibilityAction(
+                                            AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null);
+                                    Launcher.cast(mActivity).getStateManager()
+                                            .removeStateListener(this);
+                                }
+                            }
+                        });
+            }
 
             if (markCells) markCellsAsOccupiedForView(child);
 
