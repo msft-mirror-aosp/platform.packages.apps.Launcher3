@@ -166,6 +166,7 @@ import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags;
 import com.android.systemui.unfold.updates.RotationChangeProvider;
 import com.android.systemui.unfold.util.ScopedUnfoldTransitionProgressProvider;
+import com.android.wm.shell.shared.desktopmode.DesktopTaskToFrontReason;
 
 import java.io.PrintWriter;
 import java.util.Collections;
@@ -1330,10 +1331,12 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 if (runnableList != null) {
                     runnableList.add(() -> UI_HELPER_EXECUTOR.execute(
                             () -> handleGroupTaskLaunch(groupTask, remoteTransition,
-                                    areDesktopTasksVisible())));
+                                    areDesktopTasksVisible(),
+                                    DesktopTaskToFrontReason.TASKBAR_TAP)));
                 }
             } else {
-                handleGroupTaskLaunch(groupTask, remoteTransition, areDesktopTasksVisible());
+                handleGroupTaskLaunch(groupTask, remoteTransition, areDesktopTasksVisible(),
+                        DesktopTaskToFrontReason.TASKBAR_TAP);
             }
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(true);
         } else if (tag instanceof FolderInfo) {
@@ -1370,12 +1373,14 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                             // task will show.
                             UI_HELPER_EXECUTOR.execute(() ->
                                     SystemUiProxy.INSTANCE.get(this).showDesktopApp(
-                                            info.getTaskId(), remoteTransition)));
+                                            info.getTaskId(), remoteTransition,
+                                            DesktopTaskToFrontReason.TASKBAR_TAP)));
                 }
             } else {
                 UI_HELPER_EXECUTOR.execute(() ->
                         SystemUiProxy.INSTANCE.get(this).showDesktopApp(
-                                info.getTaskId(), remoteTransition));
+                                info.getTaskId(), remoteTransition,
+                                DesktopTaskToFrontReason.TASKBAR_TAP));
             }
 
             mControllers.taskbarStashController.updateAndAnimateTransientTaskbar(
@@ -1468,8 +1473,9 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
     public void handleGroupTaskLaunch(
             GroupTask task,
             @Nullable RemoteTransition remoteTransition,
-            boolean onDesktop) {
-        handleGroupTaskLaunch(task, remoteTransition, onDesktop,
+            boolean onDesktop,
+            DesktopTaskToFrontReason toFrontReason) {
+        handleGroupTaskLaunch(task, remoteTransition, onDesktop, toFrontReason,
                 /* onStartCallback= */ null, /* onFinishCallback= */ null);
     }
 
@@ -1488,6 +1494,7 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
             GroupTask task,
             @Nullable RemoteTransition remoteTransition,
             boolean onDesktop,
+            DesktopTaskToFrontReason toFrontReason,
             @Nullable Runnable onStartCallback,
             @Nullable Runnable onFinishCallback) {
         if (task instanceof DesktopTask) {
@@ -1502,8 +1509,8 @@ public class TaskbarActivityContext extends BaseTaskbarContext {
                 if (onStartCallback != null) {
                     onStartCallback.run();
                 }
-                SystemUiProxy.INSTANCE.get(this).showDesktopApp(
-                        task.task1.key.id, useRemoteTransition ? remoteTransition : null);
+                SystemUiProxy.INSTANCE.get(this).showDesktopApp(task.task1.key.id,
+                        useRemoteTransition ? remoteTransition : null, toFrontReason);
                 if (onFinishCallback != null) {
                     onFinishCallback.run();
                 }

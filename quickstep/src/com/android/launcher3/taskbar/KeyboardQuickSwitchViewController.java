@@ -49,6 +49,7 @@ import com.android.systemui.shared.recents.model.Task;
 import com.android.systemui.shared.recents.model.ThumbnailData;
 import com.android.systemui.shared.system.InteractionJankMonitorWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
+import com.android.wm.shell.shared.desktopmode.DesktopTaskToFrontReason;
 
 import java.io.PrintWriter;
 import java.util.List;
@@ -297,6 +298,7 @@ public class KeyboardQuickSwitchViewController {
                 task,
                 remoteTransition,
                 mOnDesktop,
+                DesktopTaskToFrontReason.ALT_TAB,
                 onStartCallback,
                 onFinishCallback);
         return -1;
