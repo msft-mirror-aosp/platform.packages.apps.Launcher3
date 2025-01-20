@@ -20,8 +20,10 @@ import android.graphics.Rect
 import android.view.View
 import androidx.core.view.children
 import com.android.launcher3.Flags.enableLargeDesktopWindowingTile
+import com.android.launcher3.Flags.enableSeparateExternalDisplayTasks
 import com.android.launcher3.util.IntArray
 import com.android.quickstep.util.GroupTask
+import com.android.quickstep.util.isExternalDisplay
 import com.android.quickstep.views.RecentsView.RUNNING_TASK_ATTACH_ALPHA
 import com.android.systemui.shared.recents.model.ThumbnailData
 import java.util.function.BiConsumer
@@ -50,6 +52,12 @@ class RecentsViewUtils(private val recentsView: RecentsView<*, *>) {
     fun sortDesktopTasksToFront(tasks: List<GroupTask>): List<GroupTask> {
         val (desktopTasks, otherTasks) = tasks.partition { it.taskViewType == TaskViewType.DESKTOP }
         return otherTasks + desktopTasks
+    }
+
+    fun sortExternalDisplayTasksToFront(tasks: List<GroupTask>): List<GroupTask> {
+        val (externalDisplayTasks, otherTasks) =
+            tasks.partition { it.tasks.firstOrNull().isExternalDisplay }
+        return otherTasks + externalDisplayTasks
     }
 
     class TaskViewsIterable(val recentsView: RecentsView<*, *>) : Iterable<TaskView> {
@@ -96,8 +104,46 @@ class RecentsViewUtils(private val recentsView: RecentsView<*, *>) {
     fun getExpectedCurrentTask(runningTaskView: TaskView?, focusedTaskView: TaskView?): TaskView? =
         runningTaskView
             ?: focusedTaskView
-            ?: taskViews.firstOrNull { it !is DesktopTaskView }
+            ?: taskViews.firstOrNull {
+                it !is DesktopTaskView &&
+                    !(enableSeparateExternalDisplayTasks() && it.isExternalDisplay)
+            }
             ?: taskViews.lastOrNull()
+
+    private fun getDeviceProfile() = (recentsView.mContainer as RecentsViewContainer).deviceProfile
+
+    fun getRunningTaskExpectedIndex(runningTaskView: TaskView): Int {
+        val firstTaskViewIndex = recentsView.indexOfChild(getFirstTaskView())
+        return if (getDeviceProfile().isTablet) {
+            var index = firstTaskViewIndex
+            if (enableLargeDesktopWindowingTile() && runningTaskView !is DesktopTaskView) {
+                // For fullsreen tasks, skip over Desktop tasks in its section
+                index +=
+                    if (enableSeparateExternalDisplayTasks()) {
+                        if (runningTaskView.isExternalDisplay) {
+                            taskViews.count { it is DesktopTaskView && it.isExternalDisplay }
+                        } else {
+                            taskViews.count { it is DesktopTaskView && !it.isExternalDisplay }
+                        }
+                    } else {
+                        getDesktopTaskViewCount()
+                    }
+            }
+            if (enableSeparateExternalDisplayTasks() && !runningTaskView.isExternalDisplay) {
+                // For main display section, skip over external display tasks
+                index += taskViews.count { it.isExternalDisplay }
+            }
+            index
+        } else {
+            val currentIndex: Int = recentsView.indexOfChild(runningTaskView)
+            return if (currentIndex != -1) {
+                currentIndex // Keep the position if running task already in layout.
+            } else {
+                // New running task are added to the front to begin with.
+                firstTaskViewIndex
+            }
+        }
+    }
 
     /** Returns the first TaskView if it exists, or null otherwise. */
     fun getFirstTaskView(): TaskView? = taskViews.firstOrNull()
@@ -204,7 +250,7 @@ class RecentsViewUtils(private val recentsView: RecentsView<*, *>) {
         outTopRowRect: Rect,
         outBottomRowRect: Rect,
     ) {
-        if (!(recentsView.mContainer as RecentsViewContainer).deviceProfile.isTablet) {
+        if (!getDeviceProfile().isTablet) {
             getRowRect(getFirstTaskView(), getLastTaskView(), outTaskViewRowRect)
             return
         }
