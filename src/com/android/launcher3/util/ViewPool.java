@@ -17,6 +17,7 @@ package com.android.launcher3.util;
 
 import android.content.Context;
 import android.os.Handler;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,6 +34,7 @@ import com.android.launcher3.util.ViewPool.Reusable;
  * During initialization, views are inflated on the background thread.
  */
 public class ViewPool<T extends View & Reusable> {
+    private static final String TAG = ViewPool.class.getSimpleName();
 
     private final Object[] mPool;
 
@@ -77,6 +79,7 @@ public class ViewPool<T extends View & Reusable> {
                 T view = inflateNewView(inflater);
                 handler.post(() -> addToPool(view));
             }
+            Log.d(TAG, "initPool complete");
         }, "ViewPool-init").start();
     }
 
