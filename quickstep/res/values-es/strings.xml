@@ -143,7 +143,7 @@
     <string name="taskbar_overflow_a11y_title" msgid="7960342079198820179">"Barra de tareas ampliada"</string>
     <string name="move_drop_target_top_or_left" msgid="2988702185049595807">"Mover arriba/a la izquierda"</string>
     <string name="move_drop_target_bottom_or_right" msgid="5431393418797620162">"Mover abajo/a la derecha"</string>
-    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{aplicación más}other{aplicaciones más}}"</string>
+    <string name="quick_switch_overflow" msgid="3679780650881041632">"{count,plural, =1{app más}other{apps más}}"</string>
     <string name="quick_switch_desktop" msgid="8393802056024499749">"Ordenador"</string>
     <string name="quick_switch_split_task" msgid="5598194724255333896">"<xliff:g id="APP_NAME_1">%1$s</xliff:g> y <xliff:g id="APP_NAME_2">%2$s</xliff:g>"</string>
     <string name="bubble_bar_bubble_fallback_description" msgid="7811684548953452009">"Burbuja"</string>
