@@ -3224,7 +3224,7 @@ public abstract class RecentsView<
         Map<TaskView, Float> gridTranslations = new HashMap<>();
 
         TaskView lastLargeTaskView = mUtils.getLastLargeTaskView();
-        int focusedTaskShift = 0;
+        int focusedTaskViewShift = 0;
         int largeTaskWidthAndSpacing = 0;
         int snappedTaskRowWidth = 0;
         int snappedPage = isKeyboardTaskFocusPending() ? mKeyboardTaskFocusIndex : getNextPage();
@@ -3269,7 +3269,7 @@ public abstract class RecentsView<
                     topRowWidth += taskWidthAndSpacing;
                     bottomRowWidth += taskWidthAndSpacing;
                 }
-                gridTranslation += focusedTaskShift;
+                gridTranslation += focusedTaskViewShift;
                 gridTranslation += mIsRtl ? taskWidthAndSpacing : -taskWidthAndSpacing;
 
                 // Center view vertically in case it's from different orientation.
@@ -3288,9 +3288,12 @@ public abstract class RecentsView<
                     gridTranslation +=
                             mIsRtl ? largeTaskWidthAndSpacing : -largeTaskWidthAndSpacing;
                 } else {
-                    // For task before the focused task, accumulate the width and spacing to
-                    // calculate the distance focused task need to shift.
-                    focusedTaskShift += mIsRtl ? taskWidthAndSpacing : -taskWidthAndSpacing;
+                    // For TaskViews before the new focused TaskView, accumulate the width and
+                    // spacing to calculate the distance the new focused TaskView needs to shift.
+                    // This could happen for example after multiple times of dismissing the
+                    // focused TaskView, the triggered rebalance might set a non-first TaskView
+                    // inside `mChildren` as the new focused TaskView.
+                    focusedTaskViewShift += mIsRtl ? taskWidthAndSpacing : -taskWidthAndSpacing;
                 }
                 int taskViewId = taskView.getTaskViewId();
 
@@ -3361,7 +3364,7 @@ public abstract class RecentsView<
         if (snappedTaskView != null) {
             snappedTaskNonGridScrollAdjustment = snappedTaskView.getScrollAdjustment(
                     /*gridEnabled=*/false);
-            snappedTaskGridTranslationX = gridTranslations.get(snappedTaskView);
+            snappedTaskGridTranslationX = gridTranslations.getOrDefault(snappedTaskView, 0f);
         }
 
         // Use the accumulated translation of the row containing the last task.
@@ -3442,14 +3445,22 @@ public abstract class RecentsView<
 
         for (TaskView taskView : getTaskViews()) {
             taskView.setGridTranslationX(
-                    gridTranslations.get(taskView) - snappedTaskGridTranslationX
+                    gridTranslations.getOrDefault(taskView, 0f) - snappedTaskGridTranslationX
                             + snappedTaskNonGridScrollAdjustment);
         }
 
         if (mAddDesktopButton != null) {
-            mAddDesktopButton.setTranslationX(
-                    gridTranslations.get(getFirstTaskView()) - snappedTaskGridTranslationX
-                            + snappedTaskNonGridScrollAdjustment);
+            TaskView firstTaskView = getFirstTaskView();
+            float translationX = 0f;
+            if (firstTaskView != null) {
+                translationX += firstTaskView.getGridTranslationX();
+            }
+            if (focusedTaskViewShift != 0) {
+                // If the focused task is inserted between `firstTaskView` and
+                // `mAddDesktopButton`, shift `mAddDesktopButton` to accommodate.
+                translationX += largeTaskWidthAndSpacing;
+            }
+            mAddDesktopButton.setTranslationX(translationX);
         }
 
         final TaskView runningTask = getRunningTaskView();
