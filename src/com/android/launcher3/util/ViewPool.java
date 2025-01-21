@@ -44,6 +44,9 @@ public class ViewPool<T extends View & Reusable> {
 
     private int mCurrentSize = 0;
 
+    @Nullable
+    private Thread mViewPoolInitThread;
+
     public ViewPool(Context context, @Nullable ViewGroup parent,
             int layoutId, int maxSize, int initialSize) {
         this(LayoutInflater.from(context).cloneInContext(context),
@@ -74,13 +77,15 @@ public class ViewPool<T extends View & Reusable> {
 
         // Inflate views on a non looper thread. This allows us to catch errors like calling
         // "new Handler()" in constructor easily.
-        new Thread(() -> {
+        mViewPoolInitThread = new Thread(() -> {
             for (int i = 0; i < initialSize; i++) {
                 T view = inflateNewView(inflater);
                 handler.post(() -> addToPool(view));
             }
             Log.d(TAG, "initPool complete");
-        }, "ViewPool-init").start();
+            mViewPoolInitThread = null;
+        }, "ViewPool-init");
+        mViewPoolInitThread.start();
     }
 
     @UiThread
@@ -115,6 +120,12 @@ public class ViewPool<T extends View & Reusable> {
     @AnyThread
     private T inflateNewView(LayoutInflater inflater) {
         return (T) inflater.inflate(mLayoutId, mParent, false);
+    }
+
+    public void killOngoingInitializations() throws InterruptedException {
+        if (mViewPoolInitThread != null) {
+            mViewPoolInitThread.join();
+        }
     }
 
     /**

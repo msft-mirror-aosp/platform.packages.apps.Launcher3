@@ -1255,6 +1255,13 @@ public abstract class RecentsView<
     public void destroy() {
         Log.d(TAG, "destroy");
         if (enableRefactorTaskThumbnail()) {
+            try {
+                mTaskViewPool.killOngoingInitializations();
+                mGroupedTaskViewPool.killOngoingInitializations();
+                mDesktopTaskViewPool.killOngoingInitializations();
+            } catch (InterruptedException e) {
+                Log.e(TAG, "Ongoing initializations could not be killed", e);
+            }
             mHelper.onDestroy();
             RecentsDependencies.destroy();
         }
