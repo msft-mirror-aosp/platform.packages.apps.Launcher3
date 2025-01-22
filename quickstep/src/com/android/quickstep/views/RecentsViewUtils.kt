@@ -67,6 +67,9 @@ class RecentsViewUtils(private val recentsView: RecentsView<*, *>) {
     /** Counts [TaskView]s that are [DesktopTaskView] instances. */
     fun getDesktopTaskViewCount(): Int = taskViews.count { it is DesktopTaskView }
 
+    /** Counts [TaskView]s that are not [DesktopTaskView] instances. */
+    fun getNonDesktopTaskViewCount(): Int = taskViews.count { it !is DesktopTaskView }
+
     /** Returns a list of all large TaskView Ids from [TaskView]s */
     fun getLargeTaskViewIds(): List<Int> = taskViews.filter { it.isLargeTile }.map { it.taskViewId }
 
