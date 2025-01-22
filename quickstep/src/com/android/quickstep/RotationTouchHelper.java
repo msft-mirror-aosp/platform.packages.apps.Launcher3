@@ -33,16 +33,13 @@ import android.content.res.Resources;
 import android.view.MotionEvent;
 import android.view.OrientationEventListener;
 
-import com.android.launcher3.dagger.ApplicationContext;
-import com.android.launcher3.dagger.LauncherAppComponent;
-import com.android.launcher3.dagger.LauncherAppSingleton;
 import com.android.launcher3.testing.shared.TestProtocol;
-import com.android.launcher3.util.DaggerSingletonObject;
-import com.android.launcher3.util.DaggerSingletonTracker;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.DisplayInfoChangeListener;
 import com.android.launcher3.util.DisplayController.Info;
+import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.NavigationMode;
+import com.android.launcher3.util.SafeCloseable;
 import com.android.quickstep.util.RecentsOrientedState;
 import com.android.systemui.shared.Flags;
 import com.android.systemui.shared.system.QuickStepContract;
@@ -51,20 +48,16 @@ import com.android.systemui.shared.system.TaskStackChangeListeners;
 
 import java.io.PrintWriter;
 
-import javax.inject.Inject;
-
 /**
  * Helper class for transforming touch events
  */
-@LauncherAppSingleton
-public class RotationTouchHelper implements DisplayInfoChangeListener {
+public class RotationTouchHelper implements DisplayInfoChangeListener, SafeCloseable {
 
-    public static final DaggerSingletonObject<RotationTouchHelper> INSTANCE =
-            new DaggerSingletonObject<>(LauncherAppComponent::getRotationTouchHelper);
+    public static final MainThreadInitializedObject<RotationTouchHelper> INSTANCE =
+            new MainThreadInitializedObject<>(RotationTouchHelper::new);
 
     private final OrientationTouchTransformer mOrientationTouchTransformer;
     private final DisplayController mDisplayController;
-    private final SystemUiProxy mSystemUiProxy;
     private final int mDisplayId;
     private int mDisplayRotation;
 
@@ -134,17 +127,12 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
     private boolean mTaskListFrozen;
     private final Context mContext;
 
-    @Inject
-    RotationTouchHelper(@ApplicationContext Context context,
-            DisplayController displayController,
-            SystemUiProxy systemUiProxy,
-            DaggerSingletonTracker lifeCycle) {
+    private RotationTouchHelper(Context context) {
         mContext = context;
-        mDisplayController = displayController;
-        mSystemUiProxy = systemUiProxy;
+        mDisplayController = DisplayController.INSTANCE.get(mContext);
+        Resources resources = mContext.getResources();
         mDisplayId = DEFAULT_DISPLAY;
 
-        Resources resources = mContext.getResources();
         mOrientationTouchTransformer = new OrientationTouchTransformer(resources, mMode,
                 () -> QuickStepContract.getWindowCornerRadius(mContext));
 
@@ -172,13 +160,14 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
                 }
             }
         };
+    }
 
-        lifeCycle.addCloseable(() -> {
-            mDisplayController.removeChangeListener(this);
-            mOrientationListener.disable();
-            TaskStackChangeListeners.getInstance()
-                    .unregisterTaskStackListener(mFrozenTaskListener);
-        });
+    @Override
+    public void close() {
+        mDisplayController.removeChangeListener(this);
+        mOrientationListener.disable();
+        TaskStackChangeListeners.getInstance()
+                .unregisterTaskStackListener(mFrozenTaskListener);
     }
 
     public boolean isTaskListFrozen() {
@@ -351,7 +340,8 @@ public class RotationTouchHelper implements DisplayInfoChangeListener {
     }
 
     private void notifySysuiOfCurrentRotation(int rotation) {
-        UI_HELPER_EXECUTOR.execute(() -> mSystemUiProxy.notifyPrioritizedRotation(rotation));
+        UI_HELPER_EXECUTOR.execute(() -> SystemUiProxy.INSTANCE.get(mContext)
+                .notifyPrioritizedRotation(rotation));
     }
 
     /**

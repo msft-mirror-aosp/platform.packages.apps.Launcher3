@@ -48,7 +48,6 @@ import org.junit.runners.model.Statement
 class SandboxApplication private constructor(private val base: SandboxApplicationWrapper) :
     SandboxModelContext(base), TestRule {
 
-    @JvmOverloads
     constructor(
         base: Context = ApplicationProvider.getApplicationContext()
     ) : this(SandboxApplicationWrapper(base))

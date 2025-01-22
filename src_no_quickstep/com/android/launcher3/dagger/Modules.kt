@@ -25,8 +25,3 @@ private object Modules {}
 @Module abstract class ApiWrapperModule {}
 
 @Module abstract class PluginManagerWrapperModule {}
-
-@Module object StaticObjectModule {}
-
-// Module containing bindings for the final derivative app
-@Module abstract class AppModule {}
