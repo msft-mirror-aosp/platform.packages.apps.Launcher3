@@ -345,13 +345,13 @@ public class TaskbarManager {
 
     private void destroyTaskbarForDisplay(int displayId) {
         TaskbarActivityContext taskbar = getTaskbarForDisplay(displayId);
-        debugWhyTaskbarNotDestroyed(
-                "destroyTaskbarForDisplay: " + taskbar + " displayId=" + displayId);
+        debugWhyTaskbarNotDestroyed("destroyTaskbarForDisplay: " + taskbar, displayId);
         if (taskbar != null) {
             taskbar.onDestroy();
             // remove all defaults that we store
             removeTaskbarFromMap(displayId);
         }
+        // make this display-specific
         DeviceProfile dp = mUserUnlocked ?
                 LauncherAppState.getIDP(mWindowContext).getDeviceProfile(mWindowContext) : null;
         if (dp == null || !isTaskbarEnabled(dp)) {
@@ -506,6 +506,7 @@ public class TaskbarManager {
     private void recreateTaskbarForDisplay(int displayId) {
         Trace.beginSection("recreateTaskbar");
         try {
+            // TODO: make this code display specific
             DeviceProfile dp = mUserUnlocked ?
                     LauncherAppState.getIDP(mWindowContext).getDeviceProfile(mWindowContext) : null;
 
@@ -744,12 +745,18 @@ public class TaskbarManager {
 
     public void dumpLogs(String prefix, PrintWriter pw) {
         pw.println(prefix + "TaskbarManager:");
-        TaskbarActivityContext taskbar = getTaskbarForDisplay(getDefaultDisplayId());
-        if (taskbar == null) {
-            pw.println(prefix + "\tTaskbarActivityContext: null");
-        } else {
-            taskbar.dumpLogs(prefix + "\t", pw);
+        // iterate through taskbars and do the dump for each
+        for (int i = 0; i < mTaskbars.size(); i++) {
+            int displayId = mTaskbars.keyAt(i);
+            TaskbarActivityContext taskbar = mTaskbars.get(i);
+            pw.println(prefix + "\tTaskbar at display " + displayId + ":");
+            if (taskbar == null) {
+                pw.println(prefix + "\t\tTaskbarActivityContext: null");
+            } else {
+                taskbar.dumpLogs(prefix + "\t\t", pw);
+            }
         }
+
     }
 
     private void addTaskbarRootViewToWindow(int displayId) {
@@ -900,11 +907,17 @@ public class TaskbarManager {
 
     /** Temp logs for b/254119092. */
     public void debugWhyTaskbarNotDestroyed(String debugReason) {
+        debugWhyTaskbarNotDestroyed(debugReason, getDefaultDisplayId());
+    }
+
+    /** Temp logs for b/254119092. */
+    public void debugWhyTaskbarNotDestroyed(String debugReason, int displayId) {
         StringJoiner log = new StringJoiner("\n");
-        log.add(debugReason);
+        log.add(debugReason  + " displayId=" + displayId);
 
         boolean activityTaskbarPresent = mActivity != null
                 && mActivity.getDeviceProfile().isTaskbarPresent;
+        // TODO: make this display specific
         boolean contextTaskbarPresent = mUserUnlocked && LauncherAppState.getIDP(mWindowContext)
                 .getDeviceProfile(mWindowContext).isTaskbarPresent;
         if (activityTaskbarPresent == contextTaskbarPresent) {
