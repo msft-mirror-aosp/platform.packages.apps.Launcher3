@@ -20,17 +20,10 @@ import android.content.Intent
 import android.os.Process
 import android.os.UserManager
 import androidx.annotation.VisibleForTesting
-import com.android.launcher3.dagger.ApplicationContext
-import com.android.launcher3.dagger.LauncherAppComponent
-import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR
-import javax.inject.Inject
 
-@LauncherAppSingleton
-class LockedUserState
-@Inject
-constructor(@ApplicationContext private val context: Context, lifeCycle: DaggerSingletonTracker) {
+class LockedUserState(private val mContext: Context) : SafeCloseable {
     val isUserUnlockedAtLauncherStartup: Boolean
     var isUserUnlocked = false
         private set(value) {
@@ -43,7 +36,7 @@ constructor(@ApplicationContext private val context: Context, lifeCycle: DaggerS
     private val mUserUnlockedActions: RunnableList = RunnableList()
 
     @VisibleForTesting
-    val userUnlockedReceiver =
+    val mUserUnlockedReceiver =
         SimpleBroadcastReceiver(UI_HELPER_EXECUTOR) {
             if (Intent.ACTION_USER_UNLOCKED == it.action) {
                 isUserUnlocked = true
@@ -60,8 +53,8 @@ constructor(@ApplicationContext private val context: Context, lifeCycle: DaggerS
         isUserUnlocked = checkIsUserUnlocked()
         isUserUnlockedAtLauncherStartup = isUserUnlocked
         if (!isUserUnlocked) {
-            userUnlockedReceiver.register(
-                context,
+            mUserUnlockedReceiver.register(
+                mContext,
                 {
                     // If user is unlocked while registering broadcast receiver, we should update
                     // [isUserUnlocked], which will call [notifyUserUnlocked] in setter
@@ -69,18 +62,22 @@ constructor(@ApplicationContext private val context: Context, lifeCycle: DaggerS
                         MAIN_EXECUTOR.execute { isUserUnlocked = true }
                     }
                 },
-                Intent.ACTION_USER_UNLOCKED,
+                Intent.ACTION_USER_UNLOCKED
             )
         }
-        lifeCycle.addCloseable { userUnlockedReceiver.unregisterReceiverSafely(context) }
     }
 
     private fun checkIsUserUnlocked() =
-        context.getSystemService(UserManager::class.java)!!.isUserUnlocked(Process.myUserHandle())
+        mContext.getSystemService(UserManager::class.java)!!.isUserUnlocked(Process.myUserHandle())
 
     private fun notifyUserUnlocked() {
         mUserUnlockedActions.executeAllAndDestroy()
-        userUnlockedReceiver.unregisterReceiverSafely(context)
+        mUserUnlockedReceiver.unregisterReceiverSafely(mContext)
+    }
+
+    /** Stops the receiver from listening for ACTION_USER_UNLOCK broadcasts. */
+    override fun close() {
+        mUserUnlockedReceiver.unregisterReceiverSafely(mContext)
     }
 
     /**
@@ -91,7 +88,9 @@ constructor(@ApplicationContext private val context: Context, lifeCycle: DaggerS
         mUserUnlockedActions.add(action)
     }
 
-    /** Removes a previously queued `Runnable` to be run when the user is unlocked. */
+    /**
+     * Removes a previously queued `Runnable` to be run when the user is unlocked.
+     */
     fun removeOnUserUnlockedRunnable(action: Runnable) {
         mUserUnlockedActions.remove(action)
     }
@@ -99,7 +98,7 @@ constructor(@ApplicationContext private val context: Context, lifeCycle: DaggerS
     companion object {
         @VisibleForTesting
         @JvmField
-        val INSTANCE = DaggerSingletonObject(LauncherAppComponent::getLockedUserState)
+        val INSTANCE = MainThreadInitializedObject { LockedUserState(it) }
 
         @JvmStatic fun get(context: Context): LockedUserState = INSTANCE.get(context)
     }

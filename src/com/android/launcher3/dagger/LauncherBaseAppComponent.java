@@ -27,7 +27,6 @@ import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.DaggerSingletonTracker;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DynamicResource;
-import com.android.launcher3.util.LockedUserState;
 import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PluginManagerWrapper;
@@ -69,7 +68,6 @@ public interface LauncherBaseAppComponent {
     ThemeManager getThemeManager();
     DisplayController getDisplayController();
     WallpaperColorHints getWallpaperColorHints();
-    LockedUserState getLockedUserState();
 
     /** Builder for LauncherBaseAppComponent. */
     interface Builder {
