@@ -68,10 +68,8 @@
     <string name="widgets_full_sheet_work_tab" msgid="3767150027110633765">"Lavoro"</string>
     <string name="widget_category_conversations" msgid="8894438636213590446">"Conversazioni"</string>
     <string name="widget_category_note_taking" msgid="3469689394504266039">"Aggiunta di note"</string>
-    <!-- no translation found for widget_cell_tap_to_show_add_button_label (4354194214317043581) -->
-    <skip />
-    <!-- no translation found for widget_cell_tap_to_hide_add_button_label (6117805205101555997) -->
-    <skip />
+    <string name="widget_cell_tap_to_show_add_button_label" msgid="4354194214317043581">"Mostra pulsante Aggiungi"</string>
+    <string name="widget_cell_tap_to_hide_add_button_label" msgid="6117805205101555997">"Nascondi pulsante Aggiungi"</string>
     <string name="widget_add_button_label" msgid="2761267068711937179">"Aggiungi"</string>
     <string name="widget_add_button_content_description" msgid="1810530016360039643">"Aggiungi widget <xliff:g id="WIDGET_NAME">%1$s</xliff:g>"</string>
     <string name="widgets_list_expand_button_label" msgid="7912016136574932622">"Mostra tutto"</string>
@@ -127,7 +125,7 @@
     <string name="folder_name_format_overflow" msgid="4270108890534995199">"Cartella: <xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="SIZE">%2$d</xliff:g> o più elementi"</string>
     <string name="app_pair_name_format" msgid="8134106404716224054">"Coppia di app: <xliff:g id="APP1">%1$s</xliff:g> and <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="styles_wallpaper_button_text" msgid="8216961355289236794">"Sfondo e stile"</string>
-    <string name="edit_home_screen" msgid="8947858375782098427">"Modifica la schermata Home"</string>
+    <string name="edit_home_screen" msgid="8947858375782098427">"Modifica schermata Home"</string>
     <string name="settings_button_text" msgid="8873672322605444408">"Impostazioni schermata Home"</string>
     <string name="msg_disabled_by_admin" msgid="6898038085516271325">"Disattivata dall\'amministratore"</string>
     <string name="allow_rotation_title" msgid="7222049633713050106">"Consenti rotazione della schermata Home"</string>
