@@ -2693,15 +2693,16 @@ public abstract class RecentsView<
     }
 
     private void onReset() {
-        if (enableRefactorTaskThumbnail()) {
-            mRecentsViewModel.onReset();
-            removeAllViews();
-        }
         unloadVisibleTaskData(TaskView.FLAG_UPDATE_ALL);
         setCurrentPage(0);
         LayoutUtils.setViewEnabled(mActionsView, true);
         if (mOrientationState.setGestureActive(false)) {
             updateOrientationHandler(/* forceRecreateDragLayerControllers = */ false);
+        }
+        if (enableRefactorTaskThumbnail()) {
+            mRecentsViewModel.onReset();
+            // TODO(b/391842220) Remove TaskViews rather than calling specific logic to cancel scope
+            getTaskViews().forEach(TaskView::destroyScopes);
         }
     }
 
