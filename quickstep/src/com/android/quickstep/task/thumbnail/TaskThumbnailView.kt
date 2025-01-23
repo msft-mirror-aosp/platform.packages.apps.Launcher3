@@ -108,21 +108,6 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
         viewData = RecentsDependencies.get(this)
         updateViewDataValues()
         viewModel = RecentsDependencies.get(this)
-        viewModel.uiState
-            .dropWhile { it == Uninitialized }
-            .flowOn(dispatcherProvider.background)
-            .onEach { viewModelUiState ->
-                Log.d(TAG, "viewModelUiState changed from: $uiState to: $viewModelUiState")
-                uiState = viewModelUiState
-                resetViews()
-                when (viewModelUiState) {
-                    is Uninitialized -> {}
-                    is LiveTile -> drawLiveWindow(viewModelUiState)
-                    is SnapshotSplash -> drawSnapshotSplash(viewModelUiState)
-                    is BackgroundOnly -> drawBackground(viewModelUiState.backgroundColor)
-                }
-            }
-            .launchIn(viewAttachedScope)
         viewModel.dimProgress
             .dropWhile { it == 0f }
             .flowOn(dispatcherProvider.background)
@@ -163,6 +148,19 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
         super.onLayout(changed, left, top, right, bottom)
         if (changed) {
             updateViewDataValues()
+        }
+    }
+
+    fun setState(state: TaskThumbnailUiState) {
+        Log.d(TAG, "viewModelUiState changed from: $uiState to: $state")
+        if (uiState == state) return
+        uiState = state
+        resetViews()
+        when (state) {
+            is Uninitialized -> {}
+            is LiveTile -> drawLiveWindow(state)
+            is SnapshotSplash -> drawSnapshotSplash(state)
+            is BackgroundOnly -> drawBackground(state.backgroundColor)
         }
     }
 
@@ -238,10 +236,6 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
         thumbnailView.imageMatrix = viewModel.getThumbnailPositionState(width, height, isLayoutRtl)
     }
 
-    private companion object {
-        const val TAG = "TaskThumbnailView"
-    }
-
     private fun maybeCreateHeader() {
         if (enableDesktopExplodedView() && taskThumbnailViewHeader == null) {
             taskThumbnailViewHeader =
@@ -250,5 +244,9 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
                     as TaskThumbnailViewHeader
             addView(taskThumbnailViewHeader)
         }
+    }
+
+    private companion object {
+        const val TAG = "TaskThumbnailView"
     }
 }
