@@ -75,30 +75,43 @@ class TaskbarRecentAppsController(context: Context, private val recentsModel: Re
         private set
 
     /**
+     * The task-state of an app, i.e. whether the app has a task and what state
+     * that task is in.
+     *
+     * @property taskId The ID of the task if one exists (i.e. if the state is
+     * RUNNING or MINIMIZED), null otherwise (NOT_RUNNING).
+     */
+    data class TaskState(val runningAppState: RunningAppState, val taskId: Int? = null)
+
+    /**
      * Returns the state of the most active Desktop task represented by the given [ItemInfo].
      *
      * If there are several tasks represented by the same [ItemInfo] we return the most active one,
      * i.e. we return [DesktopAppState.RUNNING] over [DesktopAppState.MINIMIZED], and
      * [DesktopAppState.MINIMIZED] over [DesktopAppState.NOT_RUNNING].
      */
-    fun getDesktopItemState(itemInfo: ItemInfo?): RunningAppState {
-        val packageName = itemInfo?.getTargetPackage() ?: return RunningAppState.NOT_RUNNING
-        return getDesktopAppState(packageName, itemInfo.user.identifier)
+    fun getDesktopItemState(itemInfo: ItemInfo?): TaskState {
+        val packageName =
+            itemInfo?.getTargetPackage() ?: return TaskState(RunningAppState.NOT_RUNNING)
+        return getDesktopTaskState(packageName, itemInfo.user.identifier)
     }
 
-    private fun getDesktopAppState(packageName: String, userId: Int): RunningAppState {
-        val tasks = desktopTask?.tasks ?: return RunningAppState.NOT_RUNNING
+    private fun getDesktopTaskState(packageName: String, userId: Int): TaskState {
+        val tasks = desktopTask?.tasks ?: return TaskState(RunningAppState.NOT_RUNNING)
         val appTasks =
             tasks.filter { task ->
                 packageName == task.key.packageName && task.key.userId == userId
             }
-        if (appTasks.find { getRunningAppState(it.key.id) == RunningAppState.RUNNING } != null) {
-            return RunningAppState.RUNNING
+        val runningTask = appTasks.find { getRunningAppState(it.key.id) == RunningAppState.RUNNING }
+        if (runningTask != null) {
+            return TaskState(RunningAppState.RUNNING, runningTask.key.id)
         }
-        if (appTasks.find { getRunningAppState(it.key.id) == RunningAppState.MINIMIZED } != null) {
-            return RunningAppState.MINIMIZED
+        val minimizedTask =
+            appTasks.find { getRunningAppState(it.key.id) == RunningAppState.MINIMIZED }
+        if (minimizedTask != null) {
+            return TaskState(RunningAppState.MINIMIZED, taskId = minimizedTask.key.id)
         }
-        return RunningAppState.NOT_RUNNING
+        return TaskState(RunningAppState.NOT_RUNNING)
     }
 
     /** Get the [RunningAppState] for the given task. */
