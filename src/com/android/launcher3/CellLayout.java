@@ -529,9 +529,11 @@ public class CellLayout extends ViewGroup {
 
         for (int i = 0; i < mDelegatedCellDrawings.size(); i++) {
             DelegatedCellDrawing cellDrawing = mDelegatedCellDrawings.get(i);
-            cellToPoint(cellDrawing.mDelegateCellX, cellDrawing.mDelegateCellY, mTempLocation);
             canvas.save();
-            canvas.translate(mTempLocation[0], mTempLocation[1]);
+            if (cellDrawing.mDelegateCellX >= 0 && cellDrawing.mDelegateCellY >= 0) {
+                cellToPoint(cellDrawing.mDelegateCellX, cellDrawing.mDelegateCellY, mTempLocation);
+                canvas.translate(mTempLocation[0], mTempLocation[1]);
+            }
             cellDrawing.drawUnderItem(canvas);
             canvas.restore();
         }
@@ -660,9 +662,11 @@ public class CellLayout extends ViewGroup {
 
         for (int i = 0; i < mDelegatedCellDrawings.size(); i++) {
             DelegatedCellDrawing bg = mDelegatedCellDrawings.get(i);
-            cellToPoint(bg.mDelegateCellX, bg.mDelegateCellY, mTempLocation);
             canvas.save();
-            canvas.translate(mTempLocation[0], mTempLocation[1]);
+            if (bg.mDelegateCellX >= 0 && bg.mDelegateCellY >= 0) {
+                cellToPoint(bg.mDelegateCellX, bg.mDelegateCellY, mTempLocation);
+                canvas.translate(mTempLocation[0], mTempLocation[1]);
+            }
             bg.drawOverItem(canvas);
             canvas.restore();
         }
