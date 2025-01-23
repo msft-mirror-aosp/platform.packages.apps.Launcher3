@@ -47,7 +47,7 @@ import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.model.BgDataModel;
 import com.android.launcher3.shapes.IconShapeModel;
-import com.android.launcher3.shapes.IconShapesProvider;
+import com.android.launcher3.shapes.ShapesProvider;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.RunnableList;
@@ -144,7 +144,7 @@ public class GridCustomizationsProvider extends ContentProvider {
                             KEY_SHAPE_KEY, KEY_SHAPE_TITLE, KEY_PATH, KEY_IS_DEFAULT});
                     String currentShapePath =
                             ThemeManager.INSTANCE.get(context).getIconState().getIconMask();
-                    for (IconShapeModel shape : IconShapesProvider.INSTANCE.getShapes().values()) {
+                    for (IconShapeModel shape : ShapesProvider.INSTANCE.getIconShapes().values()) {
                         cursor.newRow()
                                 .add(KEY_SHAPE_KEY, shape.getKey())
                                 .add(KEY_SHAPE_TITLE, shape.getTitle())
