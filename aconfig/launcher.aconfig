@@ -574,3 +574,13 @@ flag {
     purpose: PURPOSE_BUGFIX
   }
 }
+
+flag {
+  name: "restore_archived_app_icons_from_db"
+  namespace: "launcher"
+  description: "Restores pre-archived icons from db when available, mimicing promise icons"
+  bug: "391913214"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
