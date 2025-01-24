@@ -89,6 +89,8 @@ import java.util.StringJoiner;
 public class TaskbarManager {
     private static final String TAG = "TaskbarManager";
     private static final boolean DEBUG = false;
+    // TODO(b/382378283) remove all logs with this tag
+    public static final String NULL_TASKBAR_ROOT_LAYOUT_TAG = "b/382378283";
 
     /**
      * All the configurations which do not initiate taskbar recreation.
@@ -151,6 +153,20 @@ public class TaskbarManager {
     private class RecreationListener implements DisplayController.DisplayInfoChangeListener {
         @Override
         public void onDisplayInfoChanged(Context context, DisplayController.Info info, int flags) {
+
+            if ((flags & CHANGE_DENSITY) != 0) {
+                Log.d(NULL_TASKBAR_ROOT_LAYOUT_TAG, "Display density changed");
+            }
+            if ((flags & CHANGE_NAVIGATION_MODE) != 0) {
+                Log.d(NULL_TASKBAR_ROOT_LAYOUT_TAG, "Navigation mode changed");
+            }
+            if ((flags & CHANGE_DESKTOP_MODE) != 0) {
+                Log.d(NULL_TASKBAR_ROOT_LAYOUT_TAG, "Desktop mode changed");
+            }
+            if ((flags & CHANGE_TASKBAR_PINNING) != 0) {
+                Log.d(NULL_TASKBAR_ROOT_LAYOUT_TAG, "Taskbar pinning changed");
+            }
+
             if ((flags & (CHANGE_DENSITY | CHANGE_NAVIGATION_MODE | CHANGE_DESKTOP_MODE
                     | CHANGE_TASKBAR_PINNING)) != 0) {
                 recreateTaskbar();
@@ -547,9 +563,14 @@ public class TaskbarManager {
             if (enableTaskbarNoRecreate()) {
                 addTaskbarRootViewToWindow(displayId);
                 FrameLayout taskbarRootLayout = getTaskbarRootLayoutForDisplay(displayId);
-                taskbarRootLayout.removeAllViews();
-                taskbarRootLayout.addView(taskbar.getDragLayer());
-                taskbar.notifyUpdateLayoutParams();
+                if (taskbarRootLayout != null) {
+                    taskbarRootLayout.removeAllViews();
+                    taskbarRootLayout.addView(taskbar.getDragLayer());
+                    taskbar.notifyUpdateLayoutParams();
+                } else {
+                    Log.e(NULL_TASKBAR_ROOT_LAYOUT_TAG,
+                            "taskbarRootLayout is null for displayId=" + displayId);
+                }
             }
         } finally {
             Trace.endSection();
@@ -755,6 +776,8 @@ public class TaskbarManager {
     private void addTaskbarRootViewToWindow(int displayId) {
         TaskbarActivityContext taskbar = getTaskbarForDisplay(displayId);
         if (!enableTaskbarNoRecreate() || taskbar == null) {
+            Log.d(NULL_TASKBAR_ROOT_LAYOUT_TAG,
+                    "addTaskbarRootViewToWindow - taskbar null | displayId=" + displayId);
             return;
         }
 
@@ -762,6 +785,10 @@ public class TaskbarManager {
             mWindowManager.addView(getTaskbarRootLayoutForDisplay(displayId),
                     taskbar.getWindowLayoutParams());
             mAddedRootLayouts.put(displayId, true);
+        } else {
+            Log.d(NULL_TASKBAR_ROOT_LAYOUT_TAG,
+                    "addTaskbarRootViewToWindow - root layout already added | displayId="
+                            + displayId);
         }
     }
 
@@ -854,6 +881,7 @@ public class TaskbarManager {
             }
         };
         addTaskbarRootLayoutToMap(displayId, newTaskbarRootLayout);
+        Log.d(NULL_TASKBAR_ROOT_LAYOUT_TAG, "created new root layout - displayId=" + displayId);
     }
 
     private boolean isDefaultDisplay(int displayId) {
@@ -867,7 +895,14 @@ public class TaskbarManager {
      * @return The taskbar root layout {@link FrameLayout} for a given display or {@code null}.
      */
     private FrameLayout getTaskbarRootLayoutForDisplay(int displayId) {
-        return mRootLayouts.get(displayId);
+        FrameLayout frameLayout = mRootLayouts.get(displayId);
+        if (frameLayout != null) {
+            return frameLayout;
+        } else {
+            Log.d(NULL_TASKBAR_ROOT_LAYOUT_TAG,
+                    "getTaskbarRootLayoutForDisplay == null | displayId=" + displayId);
+            return null;
+        }
     }
 
     /**
@@ -880,6 +915,8 @@ public class TaskbarManager {
         if (!mRootLayouts.contains(displayId) && rootLayout != null) {
             mRootLayouts.put(displayId, rootLayout);
         }
+
+        Log.d(NULL_TASKBAR_ROOT_LAYOUT_TAG, "mRootLayouts.size()=" + mRootLayouts.size());
     }
 
     /**
@@ -892,6 +929,8 @@ public class TaskbarManager {
             mAddedRootLayouts.delete(displayId);
             mRootLayouts.delete(displayId);
         }
+
+        Log.d(NULL_TASKBAR_ROOT_LAYOUT_TAG, "mRootLayouts.size()=" + mRootLayouts.size());
     }
 
     private int getDefaultDisplayId() {
