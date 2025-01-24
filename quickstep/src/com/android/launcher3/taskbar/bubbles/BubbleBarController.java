@@ -34,6 +34,7 @@ import android.os.Bundle;
 import android.os.SystemProperties;
 import android.util.ArrayMap;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.android.launcher3.taskbar.TaskbarSharedState;
 import com.android.launcher3.taskbar.bubbles.stashing.BubbleStashController;
@@ -587,6 +588,18 @@ public class BubbleBarController extends IBubblesListener.Stub {
                     mBubbleBarViewController.animateBubbleBarLocation(bubbleBarLocation);
                     mBubbleBarLocationListener.onBubbleBarLocationAnimated(bubbleBarLocation);
                 });
+    }
+
+    @Override
+    public void onDragItemOverBubbleBarDragZone(BubbleBarLocation location) {
+        //TODO(b/388894910): add meaningful implementation
+        MAIN_EXECUTOR.execute(() ->
+                Toast.makeText(mContext, "onDragItemOver " + location, Toast.LENGTH_SHORT).show());
+    }
+
+    @Override
+    public void onItemDraggedOutsideBubbleBarDropZone() {
+
     }
 
     /** Notifies WMShell to show the expanded view. */
