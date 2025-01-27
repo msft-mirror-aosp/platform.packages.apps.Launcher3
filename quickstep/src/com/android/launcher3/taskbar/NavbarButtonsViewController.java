@@ -277,13 +277,14 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
     }
 
     protected void setupController() {
-        boolean isThreeButtonNav = mContext.isThreeButtonNav();
+        final boolean isThreeButtonNav = mContext.isThreeButtonNav();
+        final boolean isPhoneMode = mContext.isPhoneMode();
         DeviceProfile deviceProfile = mContext.getDeviceProfile();
         Resources resources = mContext.getResources();
 
         int setupSize = mControllers.taskbarActivityContext.getSetupWindowSize();
-        Point p = DimensionUtils.getTaskbarPhoneDimensions(deviceProfile, resources,
-                mContext.isPhoneMode(), mContext.isGestureNav());
+        Point p = DimensionUtils.getTaskbarPhoneDimensions(deviceProfile, resources, isPhoneMode,
+                mContext.isGestureNav());
         ViewGroup.LayoutParams navButtonsViewLayoutParams = mNavButtonsView.getLayoutParams();
         navButtonsViewLayoutParams.width = p.x;
         if (!mContext.isUserSetupComplete()) {
@@ -304,8 +305,10 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             mImeSwitcherButton = addButton(switcherResId, BUTTON_IME_SWITCH,
                     isThreeButtonNav ? mStartContextualContainer : mEndContextualContainer,
                     mControllers.navButtonController, R.id.ime_switcher);
+            // A11y and IME Switcher buttons overlap on phone mode, show only a11y if both visible.
             mPropertyHolders.add(new StatePropertyHolder(mImeSwitcherButton,
-                    flags -> ((flags & FLAG_IME_SWITCHER_BUTTON_VISIBLE) != 0)));
+                    flags -> (flags & FLAG_IME_SWITCHER_BUTTON_VISIBLE) != 0
+                            && !(isPhoneMode && (flags & FLAG_A11Y_VISIBLE) != 0)));
         }
 
         mPropertyHolders.add(new StatePropertyHolder(
@@ -319,7 +322,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                         .get(ALPHA_INDEX_SMALL_SCREEN),
                 flags -> (flags & FLAG_SMALL_SCREEN) == 0));
 
-        if (!mContext.isPhoneMode()) {
+        if (!isPhoneMode) {
             mPropertyHolders.add(new StatePropertyHolder(mControllers.taskbarDragLayerController
                     .getKeyguardBgTaskbar(), flags -> (flags & FLAG_KEYGUARD_VISIBLE) == 0));
         }
@@ -337,7 +340,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
         // - IME is visible (add separate translation for IME)
         // - VoiceInteractionWindow (assistant) is showing
         // - Keyboard shortcuts helper is showing
-        if (!mContext.isPhoneMode()) {
+        if (!isPhoneMode) {
             int flagsToRemoveTranslation = FLAG_NOTIFICATION_SHADE_EXPANDED | FLAG_IME_VISIBLE
                     | FLAG_VOICE_INTERACTION_WINDOW_SHOWING | FLAG_KEYBOARD_SHORTCUT_HELPER_SHOWING;
             mPropertyHolders.add(new StatePropertyHolder(mNavButtonInAppDisplayProgressForSysui,
@@ -365,9 +368,9 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
             initButtons(mNavButtonContainer, mEndContextualContainer,
                     mControllers.navButtonController);
             updateButtonLayoutSpacing();
-            updateStateForFlag(FLAG_SMALL_SCREEN, mContext.isPhoneMode());
+            updateStateForFlag(FLAG_SMALL_SCREEN, isPhoneMode);
 
-            if (!mContext.isPhoneMode()) {
+            if (!isPhoneMode) {
                 mPropertyHolders.add(new StatePropertyHolder(
                         mControllers.taskbarDragLayerController.getNavbarBackgroundAlpha(),
                         flags -> (flags & FLAG_ONLY_BACK_FOR_BOUNCER_VISIBLE) != 0));
@@ -394,7 +397,7 @@ public class NavbarButtonsViewController implements TaskbarControllers.LoggableT
                 R.bool.floating_rotation_button_position_left);
         mControllers.rotationButtonController.setRotationButton(mFloatingRotationButton,
                 mRotationButtonListener);
-        if (mContext.isPhoneMode()) {
+        if (isPhoneMode) {
             mTaskbarTransitions.init();
         }
 
