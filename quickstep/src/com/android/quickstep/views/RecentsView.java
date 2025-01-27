@@ -907,6 +907,7 @@ public abstract class RecentsView<
         if (DesktopModeStatus.enableMultipleDesktops(mContext)) {
             mAddDesktopButton = (AddDesktopButton) LayoutInflater.from(context).inflate(
                     R.layout.overview_add_desktop_button, this, false);
+            mAddDesktopButton.setOnClickListener(this::createDesk);
         }
 
         mTaskViewPool = new ViewPool<>(context, this, R.layout.task, 20 /* max size */,
@@ -4603,6 +4604,12 @@ public abstract class RecentsView<
         if (taskView != null) {
             dismissTask(taskView, true /*animateTaskView*/, true /*removeTask*/);
         }
+    }
+
+    private void createDesk(View view) {
+        SystemUiProxy.INSTANCE
+                .get(getContext())
+                .createDesktop(mContainer.getDisplay().getDisplayId());
     }
 
     @Override
