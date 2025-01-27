@@ -170,6 +170,7 @@ public class CellLayout extends ViewGroup {
 
     private boolean mDragging = false;
     public boolean mHasOnLayoutBeenCalled = false;
+    private boolean mPlayDragHaptics = false;
 
     private final TimeInterpolator mEaseOutInterpolator;
     protected final ShortcutAndWidgetContainer mShortcutsAndWidgets;
@@ -1160,7 +1161,8 @@ public class CellLayout extends ViewGroup {
             DropTarget.DragObject dragObject) {
         if (mDragCell[0] != cellX || mDragCell[1] != cellY || mDragCellSpan[0] != spanX
                 || mDragCellSpan[1] != spanY) {
-            if (Flags.msdlFeedback()) {
+            determineIfDragHapticsPlay();
+            if (mPlayDragHaptics && Flags.msdlFeedback()) {
                 mMSDLPlayerWrapper.playToken(MSDLToken.DRAG_INDICATOR_DISCRETE);
             }
             mDragCell[0] = cellX;
@@ -1185,6 +1187,14 @@ public class CellLayout extends ViewGroup {
                 dragObject.stateAnnouncer.announce(getItemMoveDescription(cellX, cellY));
             }
 
+        }
+    }
+
+    private void determineIfDragHapticsPlay() {
+        if (mDragCell[0] != -1 || mDragCell[1] != -1
+                || mDragCellSpan[0] != -1 || mDragCellSpan[1] != -1) {
+            // The nearest cell is known and we can play haptics
+            mPlayDragHaptics = true;
         }
     }
 
@@ -1789,6 +1799,7 @@ public class CellLayout extends ViewGroup {
      * @param child The child that is being dropped
      */
     void onDropChild(View child) {
+        mPlayDragHaptics = false;
         if (child != null) {
             CellLayoutLayoutParams
                     lp = (CellLayoutLayoutParams) child.getLayoutParams();
