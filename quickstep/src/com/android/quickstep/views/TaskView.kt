@@ -99,6 +99,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 /** A task in the Recents view. */
@@ -741,10 +743,17 @@ constructor(
             // onRecycle. So it should be initialized at this point. TaskView Lifecycle:
             // `bind` -> `onBind` ->  onAttachedToWindow() -> onDetachFromWindow -> onRecycle
             coroutineJobs +=
+                viewModel!!.tintAmount.onEach(::updateTintAmount).launchIn(coroutineScope)
+
+            coroutineJobs +=
                 coroutineScope.launch {
                     viewModel!!.state.collectLatest(::updateTaskContainerState)
                 }
         }
+    }
+
+    private fun updateTintAmount(amount: Float) {
+        taskContainers.forEach { it.updateTintAmount(amount) }
     }
 
     private fun updateTaskContainerState(state: TaskTileUiState) {
