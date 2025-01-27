@@ -17,7 +17,6 @@
 package com.android.quickstep.recents.data
 
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.ShapeDrawable
 import android.util.Log
 import com.android.launcher3.util.coroutines.DispatcherProvider
 import com.android.quickstep.recents.data.TaskVisualsChangedDelegate.TaskIconChangedCallback
@@ -202,13 +201,11 @@ class TasksRepository(
     private suspend fun getIconFromDataSource(task: Task) =
         withContext(dispatcherProvider.background) {
             val iconCacheEntry = taskIconDataSource.getIcon(task)
-            val icon = iconCacheEntry.icon.constantState?.newDrawable()?.mutate() ?: EMPTY_DRAWABLE
-            IconData(icon, iconCacheEntry.contentDescription, iconCacheEntry.title)
+            IconData(iconCacheEntry.icon, iconCacheEntry.contentDescription, iconCacheEntry.title)
         }
 
     companion object {
         private const val TAG = "TasksRepository"
-        private val EMPTY_DRAWABLE = ShapeDrawable()
     }
 
     /** Helper class to support StateFlow emissions when using a Map with a MutableStateFlow. */

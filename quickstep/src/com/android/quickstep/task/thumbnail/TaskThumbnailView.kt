@@ -20,6 +20,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.Rect
+import android.graphics.drawable.ShapeDrawable
 import android.util.AttributeSet
 import android.util.Log
 import android.view.LayoutInflater
@@ -217,7 +218,8 @@ class TaskThumbnailView : FrameLayout, ViewPool.Reusable {
         drawSnapshot(snapshotSplash.snapshot)
 
         splashBackground.setBackgroundColor(snapshotSplash.snapshot.backgroundColor)
-        splashIcon.setImageDrawable(snapshotSplash.splash)
+        val icon = snapshotSplash.splash?.constantState?.newDrawable()?.mutate() ?: ShapeDrawable()
+        splashIcon.setImageDrawable(icon)
     }
 
     private fun drawSnapshot(snapshot: Snapshot) {
