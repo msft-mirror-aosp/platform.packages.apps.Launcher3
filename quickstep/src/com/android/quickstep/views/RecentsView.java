@@ -5277,17 +5277,16 @@ public abstract class RecentsView<
         boolean isInitiatingTaskViewSplitPair =
                 mSplitSelectStateController.isDismissingFromSplitPair();
         if (isInitiatingSplitFromTaskView && isInitiatingTaskViewSplitPair
-                && mSplitHiddenTaskView instanceof GroupedTaskView) {
+                && mSplitHiddenTaskView instanceof GroupedTaskView groupedTaskView) {
             // Splitting from Overview for split pair task
             createInitialSplitSelectAnimation(builder);
 
             // Animate pair thumbnail into full thumbnail
-            // TODO(b/391918297): Use `leftTopTaskContainer` that will be introduced inside
-            //  `appPairsController`.
-            boolean primaryTaskSelected = mSplitHiddenTaskView.getTaskIds()[0]
+            boolean primaryTaskSelected = groupedTaskView.getLeftTopTaskContainer().getTask().key.id
                     == mSplitSelectStateController.getInitialTaskId();
-            TaskContainer taskContainer = mSplitHiddenTaskView
-                    .getTaskContainers().get(primaryTaskSelected ? 1 : 0);
+            TaskContainer taskContainer =
+                    primaryTaskSelected ? groupedTaskView.getRightBottomTaskContainer()
+                            : groupedTaskView.getLeftTopTaskContainer();
             mSplitSelectStateController.getSplitAnimationController()
                     .addInitialSplitFromPair(taskContainer, builder,
                             mContainer.getDeviceProfile(),
