@@ -50,6 +50,7 @@ import com.android.launcher3.Flags.enableHoverOfChildElementsInTaskview
 import com.android.launcher3.Flags.enableLargeDesktopWindowingTile
 import com.android.launcher3.Flags.enableOverviewIconMenu
 import com.android.launcher3.Flags.enableRefactorTaskThumbnail
+import com.android.launcher3.Flags.enableSeparateExternalDisplayTasks
 import com.android.launcher3.R
 import com.android.launcher3.Utilities
 import com.android.launcher3.anim.AnimatedFloat
@@ -90,6 +91,8 @@ import com.android.quickstep.util.BorderAnimator.Companion.createSimpleBorderAni
 import com.android.quickstep.util.RecentsOrientedState
 import com.android.quickstep.util.TaskCornerRadius
 import com.android.quickstep.util.TaskRemovedDuringLaunchListener
+import com.android.quickstep.util.displayId
+import com.android.quickstep.util.isExternalDisplay
 import com.android.quickstep.views.RecentsView.UNBOUND_TASK_VIEW_ID
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.ThumbnailData
@@ -140,10 +143,17 @@ constructor(
     val isRunningTask: Boolean
         get() = this === recentsView?.runningTaskView
 
+    val displayId: Int
+        get() = taskContainers.firstOrNull()?.task.displayId
+
+    val isExternalDisplay: Boolean
+        get() = displayId.isExternalDisplay
+
     val isLargeTile: Boolean
         get() =
             this == recentsView?.focusedTaskView ||
-                (enableLargeDesktopWindowingTile() && type == TaskViewType.DESKTOP)
+                (enableLargeDesktopWindowingTile() && type == TaskViewType.DESKTOP) ||
+                (enableSeparateExternalDisplayTasks() && isExternalDisplay)
 
     val recentsView: RecentsView<*, *>?
         get() = parent as? RecentsView<*, *>
@@ -1193,7 +1203,7 @@ constructor(
         )
         val opts =
             container.getActivityLaunchOptions(this, null).apply {
-                options.launchDisplayId = display?.displayId ?: Display.DEFAULT_DISPLAY
+                options.launchDisplayId = displayId
             }
         if (
             ActivityManagerWrapper.getInstance()
