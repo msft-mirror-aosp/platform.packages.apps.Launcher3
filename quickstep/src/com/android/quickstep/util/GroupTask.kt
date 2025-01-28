@@ -50,9 +50,16 @@ constructor(
     /**
      * Returns true if a task in this group has a package name that matches the given `packageName`.
      */
-    fun containsPackage(packageName: String) = tasks.any { it.key.packageName == packageName }
+    fun containsPackage(packageName: String?) = tasks.any { it.key.packageName == packageName }
 
-    open fun hasMultipleTasks() = task2 != null
+    /**
+     * Returns true if a task in this group has a package name that matches the given `packageName`,
+     * and its user ID matches the given `userId`.
+     */
+    fun containsPackage(packageName: String?, userId: Int) =
+        tasks.any { it.key.packageName == packageName && it.key.userId == userId }
+
+    fun isEmpty() = tasks.isEmpty()
 
     /** Returns whether this task supports multiple tasks or not. */
     open fun supportsMultipleTasks() = taskViewType == TaskViewType.GROUPED
@@ -78,6 +85,10 @@ constructor(
 /** A [Task] container that must contain exactly one task in the recent tasks list. */
 class SingleTask(task: Task) :
     GroupTask(task, task2 = null, mSplitBounds = null, TaskViewType.SINGLE) {
+
+    val task: Task
+        get() = task1
+
     override fun copy() = SingleTask(task1)
 
     override fun toString() = "type=$taskViewType task=$task1"
@@ -95,6 +106,12 @@ class SingleTask(task: Task) :
  */
 class SplitTask(task1: Task, task2: Task, splitBounds: SplitConfigurationOptions.SplitBounds) :
     GroupTask(task1, task2, splitBounds, TaskViewType.GROUPED) {
+
+    val topLeftTask: Task
+        get() = if (mSplitBounds!!.leftTopTaskId == task1.key.id) task1!! else task2!!
+
+    val bottomRightTask: Task
+        get() = if (topLeftTask == task1) task2!! else task1!!
 
     override fun copy() = SplitTask(task1, task2!!, mSplitBounds!!)
 

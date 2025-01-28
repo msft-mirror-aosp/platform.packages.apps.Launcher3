@@ -212,9 +212,11 @@ import com.android.quickstep.util.GroupTask;
 import com.android.quickstep.util.LayoutUtils;
 import com.android.quickstep.util.RecentsAtomicAnimationFactory;
 import com.android.quickstep.util.RecentsOrientedState;
+import com.android.quickstep.util.SingleTask;
 import com.android.quickstep.util.SplitAnimationController.Companion.SplitAnimInitProps;
 import com.android.quickstep.util.SplitAnimationTimings;
 import com.android.quickstep.util.SplitSelectStateController;
+import com.android.quickstep.util.SplitTask;
 import com.android.quickstep.util.SurfaceTransaction;
 import com.android.quickstep.util.SurfaceTransactionApplier;
 import com.android.quickstep.util.TaskGridNavHelper;
@@ -1968,7 +1970,7 @@ public abstract class RecentsView<
             GroupTask groupTask = taskGroups.get(i);
             boolean containsStagedTask = stagedTaskIdToBeRemoved != INVALID_TASK_ID
                     && groupTask.containsTask(stagedTaskIdToBeRemoved);
-            boolean shouldSkipGroupTask = containsStagedTask && !groupTask.hasMultipleTasks();
+            boolean shouldSkipGroupTask = containsStagedTask && groupTask instanceof SingleTask;
 
             if ((isSplitSelectionActive() && groupTask.taskViewType == TaskViewType.DESKTOP)
                     || shouldSkipGroupTask) {
@@ -1982,25 +1984,27 @@ public abstract class RecentsView<
             // to be a temporary container for the remaining task.
             TaskView taskView = getTaskViewFromPool(
                     containsStagedTask ? TaskViewType.SINGLE : groupTask.taskViewType);
-            if (taskView instanceof GroupedTaskView) {
-                boolean firstTaskIsLeftTopTask =
-                        groupTask.mSplitBounds.leftTopTaskId == groupTask.task1.key.id;
-                Task leftTopTask = firstTaskIsLeftTopTask ? groupTask.task1 : groupTask.task2;
-                Task rightBottomTask = firstTaskIsLeftTopTask ? groupTask.task2 : groupTask.task1;
-                ((GroupedTaskView) taskView).bind(leftTopTask, rightBottomTask, mOrientationState,
-                        mTaskOverlayFactory, groupTask.mSplitBounds);
-            } else if (taskView instanceof DesktopTaskView) {
+            if (taskView instanceof GroupedTaskView groupedTaskView) {
+                var splitTask = (SplitTask) groupTask;
+                groupedTaskView.bind(splitTask.getTopLeftTask(),
+                        splitTask.getBottomRightTask(), mOrientationState,
+                        mTaskOverlayFactory, splitTask.mSplitBounds);
+            } else if (taskView instanceof DesktopTaskView desktopTaskView) {
                 // Minimized tasks should not be shown in Overview
                 List<Task> nonMinimizedTasks =
                         groupTask.getTasks().stream()
                                 .filter(task -> !task.isMinimized)
                                 .toList();
-                ((DesktopTaskView) taskView).bind(nonMinimizedTasks, mOrientationState,
+                desktopTaskView.bind(nonMinimizedTasks, mOrientationState,
                         mTaskOverlayFactory);
-            } else {
-                Task task = groupTask.task1.key.id == stagedTaskIdToBeRemoved ? groupTask.task2
-                        : groupTask.task1;
+            } else if (groupTask instanceof SplitTask splitTask) {
+                Task task = splitTask.getTopLeftTask().key.id == stagedTaskIdToBeRemoved
+                        ? splitTask.getBottomRightTask()
+                        : splitTask.getTopLeftTask();
                 taskView.bind(task, mOrientationState, mTaskOverlayFactory);
+            } else {
+                taskView.bind(((SingleTask) groupTask).getTask(), mOrientationState,
+                        mTaskOverlayFactory);
             }
             addView(taskView);
 

@@ -27,8 +27,6 @@ class DesktopTask(override val tasks: List<Task>) :
 
     override fun containsTask(taskId: Int) = tasks.any { it.key.id == taskId }
 
-    override fun hasMultipleTasks() = tasks.size > 1
-
     override fun supportsMultipleTasks() = true
 
     override fun copy() = DesktopTask(tasks)
