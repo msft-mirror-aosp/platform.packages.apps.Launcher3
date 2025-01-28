@@ -1988,7 +1988,7 @@ public abstract class RecentsView<
                 var splitTask = (SplitTask) groupTask;
                 groupedTaskView.bind(splitTask.getTopLeftTask(),
                         splitTask.getBottomRightTask(), mOrientationState,
-                        mTaskOverlayFactory, splitTask.mSplitBounds);
+                        mTaskOverlayFactory, splitTask.getSplitBounds());
             } else if (taskView instanceof DesktopTaskView desktopTaskView) {
                 // Minimized tasks should not be shown in Overview
                 List<Task> nonMinimizedTasks =

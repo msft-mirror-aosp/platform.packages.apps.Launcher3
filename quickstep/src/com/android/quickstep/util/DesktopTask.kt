@@ -23,7 +23,7 @@ import com.android.systemui.shared.recents.model.Task
  * tasks list.
  */
 class DesktopTask(override val tasks: List<Task>) :
-    GroupTask(tasks[0], null, null, TaskViewType.DESKTOP) {
+    GroupTask(tasks[0], task2 = null, TaskViewType.DESKTOP) {
 
     override fun containsTask(taskId: Int) = tasks.any { it.key.id == taskId }
 
