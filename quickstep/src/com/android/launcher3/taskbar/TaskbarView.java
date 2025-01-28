@@ -26,8 +26,6 @@ import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER;
 import static com.android.launcher3.config.FeatureFlags.enableTaskbarPinning;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 
-import static java.util.function.Predicate.not;
-
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Canvas;
@@ -420,7 +418,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
                 .filter(Objects::nonNull)
                 .toArray(ItemInfo[]::new);
         // TODO(b/343289567 and b/316004172): support app pairs and desktop mode.
-        recentTasks = recentTasks.stream().filter(not(GroupTask::supportsMultipleTasks)).toList();
+        recentTasks = recentTasks.stream().filter(it -> it instanceof SingleTask).toList();
 
         if (taskbarRecentsLayoutTransition()) {
             updateItemsWithLayoutTransition(hotseatItemInfos, recentTasks);
@@ -671,7 +669,7 @@ public class TaskbarView extends FrameLayout implements FolderIcon.FolderIconPar
             // Replace any Recent views with the appropriate type if it's not already that type.
             final int expectedLayoutResId;
             boolean isCollection = false;
-            if (task.supportsMultipleTasks()) {
+            if (!(task instanceof SingleTask)) {
                 if (task.taskViewType == TaskViewType.DESKTOP) {
                     // TODO(b/316004172): use Desktop tile layout.
                     expectedLayoutResId = -1;
