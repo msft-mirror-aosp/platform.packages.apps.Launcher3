@@ -40,6 +40,7 @@ import android.app.TaskInfo;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Rect;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 
@@ -167,6 +168,7 @@ public class RecentTasksListTest {
     }
 
     @Test
+    @DisableFlags(FLAG_ENABLE_SEPARATE_EXTERNAL_DISPLAY_TASKS)
     public void loadTasksInBackground_freeformTask_createsDesktopTask() throws Exception  {
         List<TaskInfo> tasks = Arrays.asList(
                 createRecentTaskInfo(1 /* taskId */, DEFAULT_DISPLAY),
