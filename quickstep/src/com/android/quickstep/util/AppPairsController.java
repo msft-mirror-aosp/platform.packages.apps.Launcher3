@@ -134,6 +134,8 @@ public class AppPairsController {
 
         GroupedTaskView gtv = (GroupedTaskView) taskView;
         List<TaskContainer> containers = gtv.getTaskContainers();
+        // TODO(b/391918297): Replace `taskContainers[x]` with `leftTopTaskContainer` and
+        //  `rightBottomTaskContainer`.
         ComponentKey taskKey1 = TaskUtils.getLaunchComponentKeyForTask(
                 containers.get(0).getTask().key);
         ComponentKey taskKey2 = TaskUtils.getLaunchComponentKeyForTask(
@@ -183,9 +185,8 @@ public class AppPairsController {
             return;
         }
 
-        List<TaskContainer> containers = gtv.getTaskContainers();
         List<TaskViewItemInfo> recentsInfos =
-                containers.stream().map(TaskContainer::getItemInfo).toList();
+                gtv.getTaskContainers().stream().map(TaskContainer::getItemInfo).toList();
         List<WorkspaceItemInfo> apps =
                 recentsInfos.stream().map(this::resolveAppPairWorkspaceInfo).toList();
 

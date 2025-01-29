@@ -191,9 +191,7 @@ class GroupedTaskView @JvmOverloads constructor(context: Context, attrs: Attribu
             val bottomRightTaskPercent = 1 - topLeftTaskPercent
             taskContainers[0]
                 .iconView
-                .setFlexSplitAlpha(
-                    if (topLeftTaskPercent < MINIMUM_RATIO_TO_SHOW_ICON) 0f else 1f
-                )
+                .setFlexSplitAlpha(if (topLeftTaskPercent < MINIMUM_RATIO_TO_SHOW_ICON) 0f else 1f)
             taskContainers[1]
                 .iconView
                 .setFlexSplitAlpha(
