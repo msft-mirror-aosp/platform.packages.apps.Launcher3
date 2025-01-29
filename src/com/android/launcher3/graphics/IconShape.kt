@@ -114,7 +114,6 @@ constructor(private val themeManager: ThemeManager, lifeCycle: DaggerSingletonTr
         ): ValueAnimator where T : View, T : ClipPathView
     }
 
-    @VisibleForTesting
     class Circle : RoundedSquare(1f) {
 
         override fun drawShape(
