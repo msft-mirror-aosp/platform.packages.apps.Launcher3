@@ -126,7 +126,6 @@ constructor(
         ): ValueAnimator where T : View, T : ClipPathView
     }
 
-    @VisibleForTesting
     class Circle : RoundedSquare(1f) {
 
         override fun drawShape(
