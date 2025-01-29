@@ -955,7 +955,7 @@ public abstract class AbsSwipeUpHandler<
 
     @Override
     public void onRecentsAnimationStart(RecentsAnimationController controller,
-            RecentsAnimationTargets targets, TransitionInfo transitionInfo) {
+            RecentsAnimationTargets targets, @Nullable TransitionInfo transitionInfo) {
         super.onRecentsAnimationStart(controller, targets, transitionInfo);
         if (targets.hasDesktopTasks(mContext)) {
             mRemoteTargetHandles = mTargetGluer.assignTargetsForDesktop(targets, transitionInfo);
