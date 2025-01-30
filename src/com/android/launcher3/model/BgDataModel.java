@@ -49,6 +49,7 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.CollectionInfo;
 import com.android.launcher3.model.data.ItemInfo;
+import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.shortcuts.ShortcutKey;
@@ -69,6 +70,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -417,9 +419,9 @@ public class BgDataModel {
          * Binds updated incremental download progress
          */
         default void bindIncrementalDownloadProgressUpdated(AppInfo app) { }
-
-        /** Called when a runtime property of the ItemInfo is updated due to some system event */
-        default void bindItemsUpdated(Set<ItemInfo> updates) { }
+        default void bindWorkspaceItemsChanged(List<WorkspaceItemInfo> updated) { }
+        default void bindWidgetsRestored(ArrayList<LauncherAppWidgetInfo> widgets) { }
+        default void bindRestoreItemsChange(HashSet<ItemInfo> updates) { }
         default void bindWorkspaceComponentsRemoved(Predicate<ItemInfo> matcher) { }
 
         /**

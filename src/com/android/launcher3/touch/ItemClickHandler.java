@@ -228,9 +228,10 @@ public class ItemClickHandler {
     private static void onClickPendingAppItem(View v, Launcher launcher, String packageName,
             boolean downloadStarted) {
         ItemInfo item = (ItemInfo) v.getTag();
-        CompletableFuture<SessionInfo> siFuture = CompletableFuture.supplyAsync(() ->
-                InstallSessionHelper.INSTANCE.get(launcher)
-                        .getActiveSessionInfo(item.user, packageName),
+        CompletableFuture<SessionInfo> siFuture;
+        siFuture = CompletableFuture.supplyAsync(() ->
+                        InstallSessionHelper.INSTANCE.get(launcher)
+                                .getActiveSessionInfo(item.user, packageName),
                 UI_HELPER_EXECUTOR);
         Consumer<SessionInfo> marketLaunchAction = sessionInfo -> {
             if (sessionInfo != null) {
@@ -244,8 +245,8 @@ public class ItemClickHandler {
                 }
             }
             // Fallback to using custom market intent.
-            Intent intent = ApiWrapper.INSTANCE.get(launcher).getMarketSearchIntent(
-                    packageName, item.user);
+            Intent intent = ApiWrapper.INSTANCE.get(launcher).getAppMarketActivityIntent(
+                    packageName, Process.myUserHandle());
             launcher.startActivitySafely(v, intent, item);
         };
 
@@ -357,7 +358,9 @@ public class ItemClickHandler {
         // Check for abandoned promise
         if ((v instanceof BubbleTextView) && shortcut.hasPromiseIconUi()
                 && (!Flags.enableSupportForArchiving() || !shortcut.isArchived())) {
-            String packageName = shortcut.getTargetPackage();
+            String packageName = shortcut.getIntent().getComponent() != null
+                    ? shortcut.getIntent().getComponent().getPackageName()
+                    : shortcut.getIntent().getPackage();
             if (!TextUtils.isEmpty(packageName)) {
                 onClickPendingAppItem(
                         v,

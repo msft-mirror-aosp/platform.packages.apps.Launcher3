@@ -22,6 +22,7 @@ import com.android.launcher3.LauncherModel.CallbackTask
 import com.android.launcher3.celllayout.CellPosMapper
 import com.android.launcher3.model.BgDataModel.FixedContainerItems
 import com.android.launcher3.model.data.ItemInfo
+import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.util.PackageUserKey
 import com.android.launcher3.widget.model.WidgetsListBaseEntriesBuilder
 import java.util.Objects
@@ -50,17 +51,18 @@ class ModelTaskController(
      */
     fun getModelWriter() = model.getWriter(false /* verifyChanges */, CellPosMapper.DEFAULT, null)
 
-    fun bindUpdatedWorkspaceItems(allUpdates: Collection<ItemInfo>) {
+    fun bindUpdatedWorkspaceItems(allUpdates: List<WorkspaceItemInfo>) {
         // Bind workspace items
-        val workspaceUpdates = allUpdates.filter { it.id != ItemInfo.NO_ID }.toSet()
+        val workspaceUpdates =
+            allUpdates.stream().filter { info -> info.id != ItemInfo.NO_ID }.toList()
         if (workspaceUpdates.isNotEmpty()) {
-            scheduleCallbackTask { it.bindItemsUpdated(workspaceUpdates) }
+            scheduleCallbackTask { it.bindWorkspaceItemsChanged(workspaceUpdates) }
         }
 
         // Bind extra items if any
         allUpdates
             .stream()
-            .mapToInt { it.container }
+            .mapToInt { info: WorkspaceItemInfo -> info.container }
             .distinct()
             .mapToObj { dataModel.extraItems.get(it) }
             .filter { Objects.nonNull(it) }
