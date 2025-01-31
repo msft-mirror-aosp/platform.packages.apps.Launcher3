@@ -275,7 +275,7 @@ public class KeyboardQuickSwitchView extends ConstraintLayout {
                     task2,
                     updateTasks ? mViewCallbacks::updateThumbnailInBackground : null,
                     updateTasks ? mViewCallbacks::updateIconInBackground : null,
-                    groupTask.mSplitBounds);
+                    groupTask instanceof SplitTask splitTask ? splitTask.getSplitBounds() : null);
 
             previousTaskView = currentTaskView;
         }

@@ -15,7 +15,6 @@
  */
 package com.android.quickstep.util
 
-import androidx.annotation.VisibleForTesting
 import com.android.launcher3.util.SplitConfigurationOptions
 import com.android.quickstep.views.TaskViewType
 import com.android.systemui.shared.recents.model.Task
@@ -25,27 +24,8 @@ import java.util.Objects
  * An abstract class for creating [Task] containers that can be [SingleTask]s, [SplitTask]s, or
  * [DesktopTask]s in the recent tasks list.
  */
-abstract class GroupTask
-@VisibleForTesting(otherwise = VisibleForTesting.PROTECTED)
-constructor(
-    @Deprecated("Prefer using `getTasks()` instead") @JvmField val task1: Task,
-    @Deprecated("Prefer using `getTasks()` instead") @JvmField val task2: Task?,
-    @JvmField val mSplitBounds: SplitConfigurationOptions.SplitBounds?,
-    @JvmField val taskViewType: TaskViewType,
-) {
-    protected constructor(
-        task1: Task,
-        task2: Task?,
-        splitBounds: SplitConfigurationOptions.SplitBounds?,
-    ) : this(
-        task1,
-        task2,
-        splitBounds,
-        if (task2 != null) TaskViewType.GROUPED else TaskViewType.SINGLE,
-    )
-
-    open fun containsTask(taskId: Int) =
-        task1.key.id == taskId || (task2 != null && task2.key.id == taskId)
+abstract class GroupTask(val tasks: List<Task>, @JvmField val taskViewType: TaskViewType) {
+    fun containsTask(taskId: Int) = tasks.any { it.key.id == taskId }
 
     /**
      * Returns true if a task in this group has a package name that matches the given `packageName`.
@@ -61,17 +41,8 @@ constructor(
 
     fun isEmpty() = tasks.isEmpty()
 
-    /** Returns whether this task supports multiple tasks or not. */
-    open fun supportsMultipleTasks() = taskViewType == TaskViewType.GROUPED
-
-    /** Returns a List of all the Tasks in this GroupTask */
-    open val tasks: List<Task>
-        get() = listOfNotNull(task1, task2)
-
     /** Creates a copy of this instance */
     abstract fun copy(): GroupTask
-
-    override fun toString() = "type=$taskViewType task1=$task1 task2=$task2"
 
     override fun equals(o: Any?): Boolean {
         if (this === o) return true
@@ -83,15 +54,14 @@ constructor(
 }
 
 /** A [Task] container that must contain exactly one task in the recent tasks list. */
-class SingleTask(task: Task) :
-    GroupTask(task, task2 = null, mSplitBounds = null, TaskViewType.SINGLE) {
+class SingleTask(task: Task) : GroupTask(listOf(task), TaskViewType.SINGLE) {
 
     val task: Task
-        get() = task1
+        get() = tasks[0]
 
-    override fun copy() = SingleTask(task1)
+    override fun copy() = SingleTask(task)
 
-    override fun toString() = "type=$taskViewType task=$task1"
+    override fun toString() = "type=$taskViewType task=$task"
 
     override fun equals(o: Any?): Boolean {
         if (this === o) return true
@@ -104,25 +74,26 @@ class SingleTask(task: Task) :
  * A [Task] container that must contain exactly two tasks and split bounds to represent an app-pair
  * in the recent tasks list.
  */
-class SplitTask(task1: Task, task2: Task, splitBounds: SplitConfigurationOptions.SplitBounds) :
-    GroupTask(task1, task2, splitBounds, TaskViewType.GROUPED) {
+class SplitTask(task1: Task, task2: Task, val splitBounds: SplitConfigurationOptions.SplitBounds) :
+    GroupTask(listOf(task1, task2), TaskViewType.GROUPED) {
 
     val topLeftTask: Task
-        get() = if (mSplitBounds!!.leftTopTaskId == task1.key.id) task1!! else task2!!
+        get() = if (splitBounds.leftTopTaskId == tasks[0].key.id) tasks[0] else tasks[1]
 
     val bottomRightTask: Task
-        get() = if (topLeftTask == task1) task2!! else task1!!
+        get() = if (topLeftTask == tasks[0]) tasks[1] else tasks[0]
 
-    override fun copy() = SplitTask(task1, task2!!, mSplitBounds!!)
+    override fun copy() = SplitTask(tasks[0], tasks[1], splitBounds)
 
-    override fun toString() = "type=$taskViewType task1=$task1 task2=$task2"
+    override fun toString() =
+        "type=$taskViewType topLeftTask=$topLeftTask bottomRightTask=$bottomRightTask"
 
     override fun equals(o: Any?): Boolean {
         if (this === o) return true
         if (o !is SplitTask) return false
-        if (mSplitBounds!! != o.mSplitBounds!!) return false
+        if (splitBounds != o.splitBounds) return false
         return super.equals(o)
     }
 
-    override fun hashCode() = Objects.hash(super.hashCode(), mSplitBounds)
+    override fun hashCode() = Objects.hash(super.hashCode(), splitBounds)
 }
