@@ -120,7 +120,8 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
             TaskShortcutFactory.WELLBEING,
             TaskShortcutFactory.SAVE_APP_PAIR,
             TaskShortcutFactory.SCREENSHOT,
-            TaskShortcutFactory.MODAL
+            TaskShortcutFactory.MODAL,
+            TaskShortcutFactory.CLOSE,
     };
 
     /**

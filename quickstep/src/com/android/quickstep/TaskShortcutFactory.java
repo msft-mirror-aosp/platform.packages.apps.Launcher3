@@ -21,6 +21,7 @@ import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.view.Surface.ROTATION_0;
 
 import static com.android.launcher3.Flags.enableRefactorTaskThumbnail;
+import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_CLOSE_APP_TAP;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_FREE_FORM_TAP;
 import static com.android.launcher3.util.SplitConfigurationOptions.STAGE_POSITION_BOTTOM_OR_RIGHT;
 
@@ -297,6 +298,29 @@ public interface TaskShortcutFactory {
         }
     }
 
+    class CloseSystemShortcut extends SystemShortcut {
+        private final TaskContainer mTaskContainer;
+
+        public CloseSystemShortcut(int iconResId, int textResId, RecentsViewContainer container,
+                TaskContainer taskContainer) {
+            super(iconResId, textResId, container, taskContainer.getTaskView().getFirstItemInfo(),
+                    taskContainer.getTaskView());
+            mTaskContainer = taskContainer;
+        }
+
+        @Override
+        public void onClick(View view) {
+            TaskView taskView = mTaskContainer.getTaskView();
+            RecentsView<?, ?> recentsView = taskView.getRecentsView();
+            if (recentsView != null) {
+                dismissTaskMenuView();
+                recentsView.dismissTask(taskView, true, true);
+                mTarget.getStatsLogManager().logger().withItemInfo(mTaskContainer.getItemInfo())
+                        .log(LAUNCHER_SYSTEM_SHORTCUT_CLOSE_APP_TAP);
+            }
+        }
+    }
+
     /**
      * Does NOT add split options in the following scenarios:
      * * 1. Taskbar is not present AND aren't at least 2 tasks in overview to show split options for
@@ -515,6 +539,26 @@ public interface TaskShortcutFactory {
                     taskContainer.getOverlay().getModalStateSystemShortcut(
                             taskContainer.getItemInfo(), taskContainer.getTaskView());
             return createSingletonShortcutList(modalStateSystemShortcut);
+        }
+    };
+
+    TaskShortcutFactory CLOSE = new TaskShortcutFactory() {
+        @Override
+        public List<SystemShortcut> getShortcuts(RecentsViewContainer container,
+                TaskContainer taskContainer) {
+            return Collections.singletonList(new CloseSystemShortcut(
+                    R.drawable.ic_close_option,
+                    R.string.recent_task_option_close, container, taskContainer));
+        }
+
+        @Override
+        public boolean showForGroupedTask() {
+            return true;
+        }
+
+        @Override
+        public boolean showForDesktopTask() {
+            return true;
         }
     };
 }

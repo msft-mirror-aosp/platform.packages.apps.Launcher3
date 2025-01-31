@@ -36,7 +36,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewStub
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.annotation.IntDef
@@ -669,13 +668,6 @@ constructor(
             val shouldPopulateAccessibilityMenu =
                 modalness == 0f && recentsView?.isSplitSelectionActive == false
             if (shouldPopulateAccessibilityMenu) {
-                addAction(
-                    AccessibilityAction(
-                        R.id.action_close,
-                        context.getText(R.string.accessibility_close),
-                    )
-                )
-
                 taskContainers.forEach {
                     TraceHelper.allowIpcs("TV.a11yInfo") {
                         TaskOverlayFactory.getEnabledShortcuts(this@TaskView, it).forEach { shortcut
@@ -706,11 +698,6 @@ constructor(
 
     override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean {
         // TODO(b/343708271): Add support for multiple tasks per action.
-        if (action == R.id.action_close) {
-            recentsView?.dismissTask(this, true /*animateTaskView*/, true /*removeTask*/)
-            return true
-        }
-
         taskContainers.forEach {
             if (it.digitalWellBeingToast?.handleAccessibilityAction(action) == true) {
                 return true
