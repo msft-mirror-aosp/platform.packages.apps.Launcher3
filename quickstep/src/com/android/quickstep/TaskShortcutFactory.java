@@ -48,6 +48,7 @@ import com.android.launcher3.model.WellbeingModel;
 import com.android.launcher3.popup.SystemShortcut;
 import com.android.launcher3.popup.SystemShortcut.AppInfo;
 import com.android.launcher3.util.InstantAppResolver;
+import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.launcher3.util.SplitConfigurationOptions.SplitPositionOption;
 import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.orientation.RecentsPagedOrientationHandler;
@@ -128,20 +129,28 @@ public interface TaskShortcutFactory {
     };
 
     class SplitSelectSystemShortcut extends SystemShortcut {
-        private final TaskView mTaskView;
+        private final TaskContainer mTaskContainer;
         private final SplitPositionOption mSplitPositionOption;
 
-        public SplitSelectSystemShortcut(RecentsViewContainer container, TaskView taskView,
+        public SplitSelectSystemShortcut(RecentsViewContainer container,
+                TaskContainer taskContainer, TaskView taskView,
                 SplitPositionOption option) {
             super(option.iconResId, option.textResId, container, taskView.getFirstItemInfo(),
                     taskView);
-            mTaskView = taskView;
+            mTaskContainer = taskContainer;
             mSplitPositionOption = option;
         }
 
         @Override
         public void onClick(View view) {
-            mTaskView.initiateSplitSelect(mSplitPositionOption);
+            RecentsView recentsView = mTaskContainer.getTaskView().getRecentsView();
+            if (recentsView != null) {
+                recentsView.initiateSplitSelect(
+                        mTaskContainer,
+                        mSplitPositionOption.stagePosition,
+                        SplitConfigurationOptions.getLogEventForPosition(
+                                mSplitPositionOption.stagePosition));
+            }
         }
     }
 
@@ -151,7 +160,6 @@ public interface TaskShortcutFactory {
      */
     class SaveAppPairSystemShortcut extends SystemShortcut<RecentsViewContainer> {
         private final GroupedTaskView mTaskView;
-
 
         public SaveAppPairSystemShortcut(RecentsViewContainer container, GroupedTaskView taskView,
             int iconResId) {
@@ -202,14 +210,14 @@ public interface TaskShortcutFactory {
         }
 
         private void startActivity() {
-            final Task.TaskKey taskKey = mTaskView.getFirstTask().key;
-            final int taskId = taskKey.id;
             final ActivityOptions options = makeLaunchOptions(mTarget);
-            if (options != null) {
-                options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+            if (options == null) {
+                return;
             }
-            if (options != null
-                    && ActivityManagerWrapper.getInstance().startActivityFromRecents(taskId,
+            final Task.TaskKey taskKey = mTaskContainer.getTask().key;
+            final int taskId = taskKey.id;
+            options.setSplashScreenStyle(SplashScreen.SPLASH_SCREEN_STYLE_ICON);
+            if (ActivityManagerWrapper.getInstance().startActivityFromRecents(taskId,
                     options)) {
                 final Runnable animStartedListener = () -> {
                     // Hide the task view and wait for the window to be resized
@@ -252,8 +260,8 @@ public interface TaskShortcutFactory {
                 overridePendingAppTransitionMultiThumbFuture(
                         future, animStartedListener, mHandler, true /* scaleUp */,
                         taskKey.displayId);
-                mTarget.getStatsLogManager().logger().withItemInfo(mTaskView.getFirstItemInfo())
-                        .log(mLauncherEvent);
+                mTarget.getStatsLogManager().logger().withItemInfo(mTaskContainer.getItemInfo())
+                            .log(mLauncherEvent);
             }
         }
 
@@ -327,7 +335,8 @@ public interface TaskShortcutFactory {
             return orientationHandler.getSplitPositionOptions(deviceProfile)
                     .stream()
                     .map((Function<SplitPositionOption, SystemShortcut>) option ->
-                            new SplitSelectSystemShortcut(container, taskView, option))
+                            new SplitSelectSystemShortcut(container, taskContainer, taskView,
+                                    option))
                     .collect(Collectors.toList());
         }
     };
@@ -420,24 +429,24 @@ public interface TaskShortcutFactory {
 
         private static final String TAG = "PinSystemShortcut";
 
-        private final TaskView mTaskView;
+        private final TaskContainer mTaskContainer;
 
         public PinSystemShortcut(RecentsViewContainer target,
                 TaskContainer taskContainer) {
             super(R.drawable.ic_pin, R.string.recent_task_option_pin, target,
                     taskContainer.getItemInfo(), taskContainer.getTaskView());
-            mTaskView = taskContainer.getTaskView();
+            mTaskContainer = taskContainer;
         }
 
         @Override
         public void onClick(View view) {
-            if (mTaskView.launchAsStaticTile() != null) {
+            if (mTaskContainer.getTaskView().launchAsStaticTile() != null) {
                 SystemUiProxy.INSTANCE.get(mTarget.asContext()).startScreenPinning(
-                        mTaskView.getFirstTask().key.id);
+                        mTaskContainer.getTask().key.id);
             }
             dismissTaskMenuView();
-            mTarget.getStatsLogManager().logger().withItemInfo(mTaskView.getFirstItemInfo())
-                    .log(LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_PIN_TAP);
+            mTarget.getStatsLogManager().logger().withItemInfo(mTaskContainer.getItemInfo())
+                        .log(LauncherEvent.LAUNCHER_SYSTEM_SHORTCUT_PIN_TAP);
         }
     }
 

@@ -233,7 +233,7 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
             RecentsView overviewPanel = mTaskContainer.getTaskView().getRecentsView();
             // Task has already been dismissed
             if (overviewPanel == null) return;
-            overviewPanel.initiateSplitSelect(mTaskContainer.getTaskView());
+            overviewPanel.initiateSplitSelect(mTaskContainer);
         }
 
         protected void saveAppPair() {
@@ -369,7 +369,7 @@ public class TaskOverlayFactory implements ResourceBasedOverride {
 
             @Override
             public void onClick(View view) {
-                saveScreenshot(mTaskContainer.getTaskView().getFirstTask());
+                saveScreenshot(mTaskContainer.getTask());
                 dismissTaskMenuView();
             }
         }

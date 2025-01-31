@@ -652,13 +652,13 @@ public abstract class RecentsView<
                 return;
             }
 
-            TaskView taskView = getTaskViewByTaskId(taskId);
-            if (taskView == null) {
-                Log.d(TAG, "onTaskRemoved: " + taskId + ", no associated TaskView");
+            TaskContainer taskContainer = mUtils.getTaskContainerById(taskId);
+            if (taskContainer == null) {
+                Log.d(TAG, "onTaskRemoved: " + taskId + ", no associated Task");
                 return;
             }
             Log.d(TAG, "onTaskRemoved: " + taskId);
-            Task.TaskKey taskKey = taskView.getFirstTask().key;
+            Task.TaskKey taskKey = taskContainer.getTask().key;
             UI_HELPER_EXECUTOR.execute(new CancellableTask<>(
                     () -> PackageManagerWrapper.getInstance()
                             .getActivityInfo(taskKey.getComponent(), taskKey.userId) == null,
@@ -847,7 +847,7 @@ public abstract class RecentsView<
 
     private final RecentsViewModel mRecentsViewModel;
     private final RecentsViewModelHelper mHelper;
-    private final RecentsViewUtils mUtils = new RecentsViewUtils(this);
+    protected final RecentsViewUtils mUtils = new RecentsViewUtils(this);
 
     private final Matrix mTmpMatrix = new Matrix();
 
@@ -1117,7 +1117,7 @@ public abstract class RecentsView<
                 TaskView taskView = getTaskViewByTaskId(taskId);
                 if (taskView != null) {
                     for (TaskContainer container : taskView.getTaskContainers()) {
-                        if (container == null || taskId != container.getTask().key.id) {
+                        if (taskId != container.getTask().key.id) {
                             continue;
                         }
                         container.getThumbnailViewDeprecated().setThumbnail(container.getTask(),
@@ -1132,9 +1132,10 @@ public abstract class RecentsView<
     @Override
     public void onTaskIconChanged(@NonNull String pkg, @NonNull UserHandle user) {
         for (TaskView taskView : getTaskViews()) {
-            Task task = taskView.getFirstTask();
-            if (pkg.equals(task.key.getPackageName()) && task.key.userId == user.getIdentifier()) {
-                task.icon = null;
+            Task firstTask = taskView.getFirstTask();
+            if (firstTask != null && pkg.equals(firstTask.key.getPackageName())
+                    && firstTask.key.userId == user.getIdentifier()) {
+                firstTask.icon = null;
                 if (taskView.getTaskContainers().stream().anyMatch(
                         container -> container.getIconView().getDrawable() != null)) {
                     taskView.onTaskListVisibilityChanged(true /* visible */);
@@ -4084,6 +4085,7 @@ public abstract class RecentsView<
                         } else {
                             removeTaskInternal(dismissedTaskView);
                         }
+                        // TODO(b/391918297): Logging when the TaskView does not have tasks as well.
                         mContainer.getStatsLogManager().logger()
                                 .withItemInfo(dismissedTaskView.getFirstItemInfo())
                                 .log(LAUNCHER_TASK_DISMISS_SWIPE_UP);
@@ -5171,18 +5173,20 @@ public abstract class RecentsView<
      * Primarily used by overview actions to initiate split from focused task, logs the source
      * of split invocation as such.
      */
-    public void initiateSplitSelect(TaskView taskView) {
+    public void initiateSplitSelect(TaskContainer taskContainer) {
         int defaultSplitPosition = getPagedOrientationHandler()
                 .getDefaultSplitPosition(mContainer.getDeviceProfile());
-        initiateSplitSelect(taskView, defaultSplitPosition, LAUNCHER_OVERVIEW_ACTIONS_SPLIT);
+        initiateSplitSelect(taskContainer, defaultSplitPosition, LAUNCHER_OVERVIEW_ACTIONS_SPLIT);
     }
 
     /** TODO(b/266477929): Consolidate this call w/ the one below */
-    public void initiateSplitSelect(TaskView taskView, @StagePosition int stagePosition,
+    public void initiateSplitSelect(TaskContainer taskContainer,
+            @StagePosition int stagePosition,
             StatsLogManager.EventEnum splitEvent) {
+        TaskView taskView = taskContainer.getTaskView();
         mSplitHiddenTaskView = taskView;
         mSplitSelectStateController.setInitialTaskSelect(null /*intent*/, stagePosition,
-                taskView.getFirstItemInfo(), splitEvent, taskView.getFirstTask().key.id);
+                taskContainer.getItemInfo(), splitEvent, taskContainer.getTask().key.id);
         mSplitSelectStateController.setAnimateCurrentTaskDismissal(
                 true /*animateCurrentTaskDismissal*/);
         mSplitHiddenTaskViewIndex = indexOfChild(taskView);
@@ -5273,15 +5277,16 @@ public abstract class RecentsView<
         boolean isInitiatingTaskViewSplitPair =
                 mSplitSelectStateController.isDismissingFromSplitPair();
         if (isInitiatingSplitFromTaskView && isInitiatingTaskViewSplitPair
-                && mSplitHiddenTaskView instanceof GroupedTaskView) {
+                && mSplitHiddenTaskView instanceof GroupedTaskView groupedTaskView) {
             // Splitting from Overview for split pair task
             createInitialSplitSelectAnimation(builder);
 
             // Animate pair thumbnail into full thumbnail
-            boolean primaryTaskSelected = mSplitHiddenTaskView.getTaskIds()[0]
+            boolean primaryTaskSelected = groupedTaskView.getLeftTopTaskContainer().getTask().key.id
                     == mSplitSelectStateController.getInitialTaskId();
-            TaskContainer taskContainer = mSplitHiddenTaskView
-                    .getTaskContainers().get(primaryTaskSelected ? 1 : 0);
+            TaskContainer taskContainer =
+                    primaryTaskSelected ? groupedTaskView.getRightBottomTaskContainer()
+                            : groupedTaskView.getLeftTopTaskContainer();
             mSplitSelectStateController.getSplitAnimationController()
                     .addInitialSplitFromPair(taskContainer, builder,
                             mContainer.getDeviceProfile(),
@@ -5767,8 +5772,12 @@ public abstract class RecentsView<
                 } else {
                     taskView.launchWithoutAnimation(this::onTaskLaunchAnimationEnd);
                 }
-                mContainer.getStatsLogManager().logger().withItemInfo(taskView.getFirstItemInfo())
-                        .log(LAUNCHER_TASK_LAUNCH_SWIPE_DOWN);
+                // TODO(b/391918297): Logging when there is no associated task.
+                ItemInfo firstItemInfo = taskView.getFirstItemInfo();
+                if (firstItemInfo != null) {
+                    mContainer.getStatsLogManager().logger().withItemInfo(firstItemInfo)
+                            .log(LAUNCHER_TASK_LAUNCH_SWIPE_DOWN);
+                }
             } else {
                 onTaskLaunchAnimationEnd(false);
             }
