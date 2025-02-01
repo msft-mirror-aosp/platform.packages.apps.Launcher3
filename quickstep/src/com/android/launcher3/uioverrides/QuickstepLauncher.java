@@ -459,7 +459,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
 
     protected void onItemClicked(View view) {
         if (!mSplitToWorkspaceController.handleSecondAppSelectionForSplit(view)) {
-            QuickstepLauncher.super.getItemOnClickListener().onClick(view);
+            super.getItemOnClickListener().onClick(view);
         }
     }
 
@@ -731,6 +731,9 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         final boolean ret = super.initDeviceProfile(idp);
         mDeviceProfile.isPredictiveBackSwipe =
                 getApplicationInfo().isOnBackInvokedCallbackEnabled();
+        if (ret) {
+            SystemUiProxy.INSTANCE.get(this).setLauncherAppIconSize(mDeviceProfile.iconSizePx);
+        }
         return ret;
     }
 
@@ -1237,6 +1240,7 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         }
     }
 
+    @NonNull
     @Override
     public ActivityOptionsWrapper getActivityLaunchOptions(View v, @Nullable ItemInfo item) {
         ActivityOptionsWrapper activityOptions = mAppTransitionManager.getActivityLaunchOptions(
@@ -1364,12 +1368,6 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
     public boolean areDesktopTasksVisible() {
         return DesktopVisibilityController.INSTANCE.get(this)
                 .areDesktopTasksVisibleAndNotInOverview();
-    }
-
-    @Override
-    protected void onDeviceProfileInitiated() {
-        super.onDeviceProfileInitiated();
-        SystemUiProxy.INSTANCE.get(this).setLauncherAppIconSize(mDeviceProfile.iconSizePx);
     }
 
     @Override
@@ -1507,5 +1505,10 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
 
     public void setCanShowAllAppsEducationView(boolean canShowAllAppsEducationView) {
         mCanShowAllAppsEducationView = canShowAllAppsEducationView;
+    }
+
+    @Override
+    public void returnToHomescreen() {
+        getStateManager().goToState(LauncherState.NORMAL);
     }
 }

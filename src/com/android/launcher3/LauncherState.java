@@ -345,7 +345,7 @@ public abstract class LauncherState implements BaseState<LauncherState> {
     public final  <DEVICE_PROFILE_CONTEXT extends Context & ActivityContext>
             float getDepth(DEVICE_PROFILE_CONTEXT context) {
         return getDepth(context,
-                BaseDraggingActivity.fromContext(context).getDeviceProfile().isMultiWindowMode);
+                ActivityContext.lookupContext(context).getDeviceProfile().isMultiWindowMode);
     }
 
     /**
