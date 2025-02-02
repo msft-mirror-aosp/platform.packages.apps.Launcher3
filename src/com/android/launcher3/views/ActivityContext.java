@@ -528,6 +528,11 @@ public interface ActivityContext {
         return false;
     }
 
+    /** Returns the current ActivityContext as context */
+    default Context asContext() {
+        return (Context) this;
+    }
+
     /**
      * Returns the ActivityContext associated with the given Context, or throws an exception if
      * the Context is not associated with any ActivityContext.

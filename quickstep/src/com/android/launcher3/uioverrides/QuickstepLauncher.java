@@ -1165,9 +1165,9 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
                     .getHotseatTranslationXForNavBar(this, isBubblesOnLeft);
         }
         if (isBubbleBarEnabled()
-                && mDeviceProfile.shouldAdjustHotseatForBubbleBar(getContext(), hasBubbles())) {
+                && mDeviceProfile.shouldAdjustHotseatForBubbleBar(asContext(), hasBubbles())) {
             translationX += (int) mDeviceProfile
-                    .getHotseatAdjustedTranslation(getContext(), itemInfo.cellX);
+                    .getHotseatAdjustedTranslation(asContext(), itemInfo.cellX);
         }
         return translationX;
     }

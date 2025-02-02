@@ -63,14 +63,6 @@ public interface RecentsViewContainer extends ActivityContext {
     <T extends View> T getOverviewPanel();
 
     /**
-     * Dispatches a generic motion event to the view hierarchy.
-     * Returns the current RecentsViewContainer as context
-     */
-    default Context asContext() {
-        return (Context) this;
-    }
-
-    /**
      * @see Window.Callback#dispatchGenericMotionEvent(MotionEvent)
      */
     boolean dispatchGenericMotionEvent(MotionEvent ev);
