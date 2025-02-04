@@ -24,7 +24,6 @@ import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SH
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.Utilities.SHOULD_SHOW_FIRST_PAGE_WIDGET;
 import static com.android.launcher3.icons.cache.CacheLookupFlag.DEFAULT_LOOKUP_FLAG;
-import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ARCHIVED;
 
 import android.content.ComponentName;
 import android.content.ContentValues;
@@ -308,7 +307,7 @@ public class LoaderCursor extends CursorWrapper {
      * Make an WorkspaceItemInfo object for a restored application or shortcut item that points
      * to a package that is not yet installed on the system.
      */
-    public WorkspaceItemInfo getRestoredItemInfo(Intent intent, boolean isArchived) {
+    public WorkspaceItemInfo getRestoredItemInfo(Intent intent) {
         final WorkspaceItemInfo info = new WorkspaceItemInfo();
         info.user = user;
         info.intent = intent;
@@ -318,7 +317,7 @@ public class LoaderCursor extends CursorWrapper {
             mIconCache.getTitleAndIcon(info, DEFAULT_LOOKUP_FLAG);
         }
 
-        if (hasRestoreFlag(WorkspaceItemInfo.FLAG_RESTORED_ICON) || isArchived) {
+        if (hasRestoreFlag(WorkspaceItemInfo.FLAG_RESTORED_ICON)) {
             String title = getTitle();
             if (!TextUtils.isEmpty(title)) {
                 info.title = Utilities.trim(title);
@@ -334,7 +333,6 @@ public class LoaderCursor extends CursorWrapper {
         info.contentDescription = mIconCache.getUserBadgedLabel(info.title, info.user);
         info.itemType = itemType;
         info.status = restoreFlag;
-        if (isArchived) info.runtimeStatusFlags |= FLAG_ARCHIVED;
         return info;
     }
 
