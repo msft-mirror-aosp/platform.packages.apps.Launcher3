@@ -149,8 +149,9 @@ import com.android.launcher3.uioverrides.touchcontrollers.NoButtonQuickSwitchTou
 import com.android.launcher3.uioverrides.touchcontrollers.PortraitStatesTouchController;
 import com.android.launcher3.uioverrides.touchcontrollers.QuickSwitchTouchController;
 import com.android.launcher3.uioverrides.touchcontrollers.StatusBarTouchController;
+import com.android.launcher3.uioverrides.touchcontrollers.TaskViewDismissTouchController;
+import com.android.launcher3.uioverrides.touchcontrollers.TaskViewLaunchTouchController;
 import com.android.launcher3.uioverrides.touchcontrollers.TaskViewRecentsTouchContext;
-import com.android.launcher3.uioverrides.touchcontrollers.TaskViewTouchController;
 import com.android.launcher3.uioverrides.touchcontrollers.TaskViewTouchControllerDeprecated;
 import com.android.launcher3.uioverrides.touchcontrollers.TransposedQuickSwitchTouchController;
 import com.android.launcher3.uioverrides.touchcontrollers.TwoButtonNavbarTouchController;
@@ -687,7 +688,8 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         }
 
         if (enableExpressiveDismissTaskMotion()) {
-            list.add(new TaskViewTouchController<>(this, mTaskViewRecentsTouchContext));
+            list.add(new TaskViewLaunchTouchController<>(this, mTaskViewRecentsTouchContext));
+            list.add(new TaskViewDismissTouchController<>(this, mTaskViewRecentsTouchContext));
         } else {
             list.add(new TaskViewTouchControllerDeprecated<>(this, mTaskViewRecentsTouchContext));
         }
