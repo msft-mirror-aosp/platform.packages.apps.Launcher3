@@ -20,7 +20,6 @@ import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 
 import static com.android.launcher3.LauncherState.FLAG_NON_INTERACTIVE;
 
-import android.content.Context;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
@@ -197,11 +196,6 @@ public abstract class StatefulActivity<STATE_TYPE extends BaseState<STATE_TYPE>>
 
         mOldConfig.setTo(newConfig);
         mOldRotation = rotation;
-    }
-
-    @Override
-    public Context getContext() {
-        return this;
     }
 
     /**
