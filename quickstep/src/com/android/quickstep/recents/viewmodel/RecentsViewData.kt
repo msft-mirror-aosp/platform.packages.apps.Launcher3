@@ -27,9 +27,6 @@ class RecentsViewData {
     // The settled set of visible taskIds that is updated after RecentsView scroll settles.
     val settledFullyVisibleTaskIds = MutableStateFlow(emptySet<Int>())
 
-    // Color tint on foreground scrim
-    val tintAmount = MutableStateFlow(0f)
-
     val thumbnailSplashProgress = MutableStateFlow(0f)
 
     // A list of taskIds that are associated with a RecentsAnimationController. */

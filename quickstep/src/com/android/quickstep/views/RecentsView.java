@@ -241,8 +241,8 @@ import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource;
 
 import kotlin.Unit;
 import kotlin.collections.CollectionsKt;
-
 import kotlin.jvm.functions.Function0;
+
 import kotlinx.coroutines.CoroutineScope;
 
 import java.util.ArrayList;
@@ -6566,10 +6566,6 @@ public abstract class RecentsView<
     /** Tint the RecentsView and TaskViews in to simulate a scrim. */
     private void setColorTint(float tintAmount) {
         mColorTint = tintAmount;
-
-        if (enableRefactorTaskThumbnail()) {
-            mRecentsViewModel.setTintAmount(tintAmount);
-        }
 
         for (TaskView taskView : getTaskViews()) {
             taskView.setColorTint(mColorTint, mTintingColor);
