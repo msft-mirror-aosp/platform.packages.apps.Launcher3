@@ -15,7 +15,6 @@
  */
 package com.android.launcher3.model;
 
-import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_ENABLED;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_WORK_PROFILE_QUIET_MODE_ENABLED;
@@ -40,6 +39,7 @@ import androidx.annotation.NonNull;
 import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherModel.ModelUpdateTask;
+import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.LauncherSettings.Favorites;
 import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.IconCache;
@@ -238,22 +238,19 @@ public class PackageUpdatedTask implements ModelUpdateTask {
                         if (itemInfo.isPromise() && isNewApkAvailable) {
                             boolean isTargetValid = !cn.getClassName().equals(
                                     IconCache.EMPTY_CLASS_NAME);
-                            if (itemInfo.itemType == ITEM_TYPE_DEEP_SHORTCUT) {
+                            if (itemInfo.itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
                                 List<ShortcutInfo> shortcut =
                                         new ShortcutRequest(context, mUser)
                                                 .forPackage(cn.getPackageName(),
                                                         itemInfo.getDeepShortcutId())
                                                 .query(ShortcutRequest.PINNED);
-                                if (shortcut.isEmpty()
-                                        && !(Flags.restoreArchivedShortcuts()
-                                            && !itemInfo.isArchived())
-                                ) {
+                                if (shortcut.isEmpty()) {
                                     isTargetValid = false;
                                     if (DEBUG) {
                                         Log.d(TAG, "Pinned Shortcut not found for updated"
                                                 + " package=" + itemInfo.getTargetPackage());
                                     }
-                                } else if (!shortcut.isEmpty()) {
+                                } else {
                                     if (DEBUG) {
                                         Log.d(TAG, "Found pinned shortcut for updated"
                                                 + " package=" + itemInfo.getTargetPackage()
@@ -272,7 +269,7 @@ public class PackageUpdatedTask implements ModelUpdateTask {
                                     || itemInfo.isArchived())) {
                                 if (updateWorkspaceItemIntent(context, itemInfo, packageName)) {
                                     infoUpdated = true;
-                                } else if (shouldRemoveRestoredShortcut(itemInfo)) {
+                                } else if (itemInfo.hasPromiseIconUi()) {
                                     removedShortcuts.add(itemInfo.id);
                                     if (DEBUG) {
                                         FileLog.w(TAG, "Removing restored shortcut promise icon"
@@ -439,7 +436,7 @@ public class PackageUpdatedTask implements ModelUpdateTask {
      */
     private boolean updateWorkspaceItemIntent(Context context,
             WorkspaceItemInfo si, String packageName) {
-        if (si.itemType == ITEM_TYPE_DEEP_SHORTCUT) {
+        if (si.itemType == LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT) {
             // Do not update intent for deep shortcuts as they contain additional information
             // about the shortcut.
             return false;
@@ -453,15 +450,6 @@ public class PackageUpdatedTask implements ModelUpdateTask {
             return true;
         }
         return false;
-    }
-
-    private boolean shouldRemoveRestoredShortcut(WorkspaceItemInfo itemInfo) {
-        if (itemInfo.hasPromiseIconUi() && !Flags.restoreArchivedShortcuts()) {
-            return true;
-        }
-        return Flags.restoreArchivedShortcuts()
-                && !itemInfo.isArchived()
-                && itemInfo.itemType == ITEM_TYPE_DEEP_SHORTCUT;
     }
 
     private String getOpString() {
