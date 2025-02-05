@@ -2189,9 +2189,6 @@ public abstract class RecentsView<
 
     public void setFullscreenProgress(float fullscreenProgress) {
         mFullscreenProgress = fullscreenProgress;
-        if (enableRefactorTaskThumbnail()) {
-            mRecentsViewModel.updateFullscreenProgress(mFullscreenProgress);
-        }
         for (TaskView taskView : getTaskViews()) {
             taskView.setFullscreenProgress(mFullscreenProgress);
         }
