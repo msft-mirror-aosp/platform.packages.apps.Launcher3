@@ -37,7 +37,7 @@ import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_D
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DISABLE_GESTURE_PIP_ANIMATING;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DISABLE_GESTURE_SPLIT_INVOCATION;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_HOME_DISABLED;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_MAGNIFICATION_OVERLAP;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NAV_BAR_HIDDEN;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_EXPANDED;
@@ -64,6 +64,11 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import com.android.launcher3.dagger.ApplicationContext;
+import com.android.launcher3.dagger.LauncherAppComponent;
+import com.android.launcher3.dagger.LauncherAppSingleton;
+import com.android.launcher3.util.DaggerSingletonObject;
+import com.android.launcher3.util.DaggerSingletonTracker;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DisplayController.DisplayInfoChangeListener;
 import com.android.launcher3.util.DisplayController.Info;
@@ -83,20 +88,23 @@ import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
 
 import java.io.PrintWriter;
-import java.util.ArrayList;
+
+import javax.inject.Inject;
 
 /**
  * Manages the state of the system during a swipe up gesture.
  */
+@LauncherAppSingleton
 public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, ExclusionListener {
-
-    private static final String TAG = "RecentsAnimationDeviceState";
 
     static final String SUPPORT_ONE_HANDED_MODE = "ro.support_one_handed_mode";
 
     // TODO: Move to quickstep contract
     private static final float QUICKSTEP_TOUCH_SLOP_RATIO_TWO_BUTTON = 3f;
     private static final float QUICKSTEP_TOUCH_SLOP_RATIO_GESTURAL = 1.414f;
+
+    public static DaggerSingletonObject<RecentsAnimationDeviceState> INSTANCE =
+            new DaggerSingletonObject<>(LauncherAppComponent::getRecentsAnimationDeviceState);
 
     private final Context mContext;
     private final DisplayController mDisplayController;
@@ -109,8 +117,6 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
     // Cache for better performance since it doesn't change at runtime.
     private final boolean mCanImeRenderGesturalNavButtons =
             InputMethodService.canImeRenderGesturalNavButtons();
-
-    private final ArrayList<Runnable> mOnDestroyActions = new ArrayList<>();
 
     private @SystemUiStateFlags long mSystemUiStateFlags = QuickStepContract.SYSUI_STATE_AWAKE;
     private NavigationMode mMode = THREE_BUTTONS;
@@ -130,55 +136,38 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
     private @NonNull Region mExclusionRegion = GestureExclusionManager.EMPTY_REGION;
     private boolean mExclusionListenerRegistered;
 
-    public RecentsAnimationDeviceState(Context context) {
-        this(context, false, GestureExclusionManager.INSTANCE);
-    }
-
-    public RecentsAnimationDeviceState(Context context, boolean isInstanceForTouches) {
-        this(context, isInstanceForTouches, GestureExclusionManager.INSTANCE);
-    }
-
     @VisibleForTesting
-    RecentsAnimationDeviceState(Context context, GestureExclusionManager exclusionManager) {
-        this(context, false, exclusionManager);
-    }
-
-    /**
-     * @param isInstanceForTouches {@code true} if this is the persistent instance being used for
-     *                                   gesture touch handling
-     */
+    @Inject
     RecentsAnimationDeviceState(
-            Context context, boolean isInstanceForTouches,
-            GestureExclusionManager exclusionManager) {
+            @ApplicationContext Context context,
+            GestureExclusionManager exclusionManager,
+            DisplayController displayController,
+            ContextualSearchStateManager contextualSearchStateManager,
+            RotationTouchHelper rotationTouchHelper,
+            SettingsCache settingsCache,
+            DaggerSingletonTracker lifeCycle) {
         mContext = context;
-        mDisplayController = DisplayController.INSTANCE.get(context);
+        mDisplayController = displayController;
         mExclusionManager = exclusionManager;
-        mContextualSearchStateManager = ContextualSearchStateManager.INSTANCE.get(context);
+        mContextualSearchStateManager = contextualSearchStateManager;
+        mRotationTouchHelper = rotationTouchHelper;
         mIsOneHandedModeSupported = SystemProperties.getBoolean(SUPPORT_ONE_HANDED_MODE, false);
-        mRotationTouchHelper = RotationTouchHelper.INSTANCE.get(context);
-        if (isInstanceForTouches) {
-            // rotationTouchHelper doesn't get initialized after being destroyed, so only destroy
-            // if primary TouchInteractionService instance needs to be destroyed.
-            mRotationTouchHelper.init();
-            runOnDestroy(mRotationTouchHelper::destroy);
-        }
 
         // Register for exclusion updates
-        runOnDestroy(() -> unregisterExclusionListener());
+        lifeCycle.addCloseable(this::unregisterExclusionListener);
 
         // Register for display changes changes
         mDisplayController.addChangeListener(this);
         onDisplayInfoChanged(context, mDisplayController.getInfo(), CHANGE_ALL);
-        runOnDestroy(() -> mDisplayController.removeChangeListener(this));
+        lifeCycle.addCloseable(() -> mDisplayController.removeChangeListener(this));
 
-        SettingsCache settingsCache = SettingsCache.INSTANCE.get(mContext);
         if (mIsOneHandedModeSupported) {
             Uri oneHandedUri = Settings.Secure.getUriFor(ONE_HANDED_ENABLED);
             SettingsCache.OnChangeListener onChangeListener =
                     enabled -> mIsOneHandedModeEnabled = enabled;
             settingsCache.register(oneHandedUri, onChangeListener);
             mIsOneHandedModeEnabled = settingsCache.getValue(oneHandedUri);
-            runOnDestroy(() -> settingsCache.unregister(oneHandedUri, onChangeListener));
+            lifeCycle.addCloseable(() -> settingsCache.unregister(oneHandedUri, onChangeListener));
         } else {
             mIsOneHandedModeEnabled = false;
         }
@@ -189,14 +178,16 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
                 enabled -> mIsSwipeToNotificationEnabled = enabled;
         settingsCache.register(swipeBottomNotificationUri, onChangeListener);
         mIsSwipeToNotificationEnabled = settingsCache.getValue(swipeBottomNotificationUri);
-        runOnDestroy(() -> settingsCache.unregister(swipeBottomNotificationUri, onChangeListener));
+        lifeCycle.addCloseable(
+                () -> settingsCache.unregister(swipeBottomNotificationUri, onChangeListener));
 
         Uri setupCompleteUri = Settings.Secure.getUriFor(Settings.Secure.USER_SETUP_COMPLETE);
         mIsUserSetupComplete = settingsCache.getValue(setupCompleteUri, 0);
         if (!mIsUserSetupComplete) {
             SettingsCache.OnChangeListener userSetupChangeListener = e -> mIsUserSetupComplete = e;
             settingsCache.register(setupCompleteUri, userSetupChangeListener);
-            runOnDestroy(() -> settingsCache.unregister(setupCompleteUri, userSetupChangeListener));
+            lifeCycle.addCloseable(
+                    () -> settingsCache.unregister(setupCompleteUri, userSetupChangeListener));
         }
 
         try {
@@ -217,28 +208,19 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
             }
         };
         TaskStackChangeListeners.getInstance().registerTaskStackListener(mPipListener);
-        runOnDestroy(() ->
+        lifeCycle.addCloseable(() ->
                 TaskStackChangeListeners.getInstance().unregisterTaskStackListener(mPipListener));
-    }
-
-    private void runOnDestroy(Runnable action) {
-        mOnDestroyActions.add(action);
-    }
-
-    /**
-     * Cleans up all the registered listeners and receivers.
-     */
-    public void destroy() {
-        for (Runnable r : mOnDestroyActions) {
-            r.run();
-        }
     }
 
     /**
      * Adds a listener for the nav mode change, guaranteed to be called after the device state's
      * mode has changed.
+     *
+     * @return Added {@link DisplayInfoChangeListener} so that caller is
+     * responsible for removing the listener from {@link DisplayController} to avoid memory leak.
      */
-    public void addNavigationModeChangedCallback(Runnable callback) {
+    public DisplayController.DisplayInfoChangeListener addNavigationModeChangedCallback(
+            Runnable callback) {
         DisplayController.DisplayInfoChangeListener listener = (context, info, flags) -> {
             if ((flags & CHANGE_NAVIGATION_MODE) != 0) {
                 callback.run();
@@ -246,7 +228,16 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
         };
         mDisplayController.addChangeListener(listener);
         callback.run();
-        runOnDestroy(() -> mDisplayController.removeChangeListener(listener));
+        return listener;
+    }
+
+    /**
+     * Remove the {DisplayController.DisplayInfoChangeListener} added from
+     * {@link #addNavigationModeChangedCallback} when {@link TouchInteractionService} is destroyed.
+     */
+    public void removeDisplayInfoChangeListener(
+            DisplayController.DisplayInfoChangeListener listener) {
+        mDisplayController.removeChangeListener(listener);
     }
 
     @Override
@@ -603,14 +594,10 @@ public class RecentsAnimationDeviceState implements DisplayInfoChangeListener, E
         return mPipIsActive;
     }
 
-    public RotationTouchHelper getRotationTouchHelper() {
-        return mRotationTouchHelper;
-    }
-
     /** Returns whether IME is rendering nav buttons, and IME is currently showing. */
     public boolean isImeRenderingNavButtons() {
         return mCanImeRenderGesturalNavButtons && mMode == NO_BUTTON
-                && ((mSystemUiStateFlags & SYSUI_STATE_IME_SHOWING) != 0);
+                && ((mSystemUiStateFlags & SYSUI_STATE_IME_VISIBLE) != 0);
     }
 
     /**

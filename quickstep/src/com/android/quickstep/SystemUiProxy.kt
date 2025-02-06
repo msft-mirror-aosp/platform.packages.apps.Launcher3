@@ -19,11 +19,9 @@ import android.app.ActivityManager
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions
 import android.app.PendingIntent
-import android.app.PictureInPictureParams
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ActivityInfo
 import android.content.pm.ShortcutInfo
 import android.graphics.Point
 import android.graphics.Rect
@@ -45,6 +43,7 @@ import android.window.IOnBackInvokedCallback
 import android.window.RemoteTransition
 import android.window.TaskSnapshot
 import android.window.TransitionFilter
+import android.window.TransitionInfo
 import androidx.annotation.MainThread
 import androidx.annotation.VisibleForTesting
 import androidx.annotation.WorkerThread
@@ -62,6 +61,7 @@ import com.android.launcher3.util.SplitConfigurationOptions.StagePosition
 import com.android.quickstep.util.ActiveGestureProtoLogProxy
 import com.android.quickstep.util.ContextualSearchInvoker
 import com.android.quickstep.util.unfold.ProxyUnfoldTransitionProvider
+import com.android.systemui.contextualeducation.GestureType
 import com.android.systemui.shared.recents.ISystemUiProxy
 import com.android.systemui.shared.recents.model.ThumbnailData.Companion.wrap
 import com.android.systemui.shared.system.QuickStepContract
@@ -81,6 +81,7 @@ import com.android.wm.shell.common.pip.IPip
 import com.android.wm.shell.common.pip.IPipAnimationListener
 import com.android.wm.shell.desktopmode.IDesktopMode
 import com.android.wm.shell.desktopmode.IDesktopTaskListener
+import com.android.wm.shell.desktopmode.IMoveToDesktopCallback
 import com.android.wm.shell.draganddrop.IDragAndDrop
 import com.android.wm.shell.onehanded.IOneHanded
 import com.android.wm.shell.recents.IRecentTasks
@@ -93,6 +94,7 @@ import com.android.wm.shell.shared.bubbles.BubbleBarLocation
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation.UpdateSource
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource
+import com.android.wm.shell.shared.desktopmode.DesktopTaskToFrontReason
 import com.android.wm.shell.shared.split.SplitBounds
 import com.android.wm.shell.shared.split.SplitScreenConstants.PersistentSnapPosition
 import com.android.wm.shell.splitscreen.ISplitScreen
@@ -124,7 +126,7 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
     private val systemUiProxyDeathRecipient =
         IBinder.DeathRecipient { Executors.MAIN_EXECUTOR.execute { clearProxy() } }
 
-    // Save the listeners passed into the proxy since OverviewProxyService may not have been bound
+    // Save the listeners passed into the proxy since LauncherProxyService may not have been bound
     // yet, and we'll need to set/register these listeners with SysUI when they do.  Note that it is
     // up to the caller to clear the listeners to prevent leaks as these can be held indefinitely
     // in case SysUI needs to rebind.
@@ -168,7 +170,7 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
      * different process). It is bare-bones, so it's expected that the component and options will be
      * provided via fill-in intent.
      */
-    private val recentsPendingIntent =
+    private val recentsPendingIntent by lazy {
         PendingIntent.getActivity(
             context,
             0,
@@ -182,6 +184,7 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
                 )
                 .toBundle(),
         )
+    }
 
     val unfoldTransitionProvider: ProxyUnfoldTransitionProvider? =
         if ((Flags.enableUnfoldStateAnimation() && ResourceUnfoldTransitionConfig().isEnabled))
@@ -215,9 +218,9 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
             systemUiProxy?.onImeSwitcherLongPress()
         }
 
-    fun updateContextualEduStats(isTrackpadGesture: Boolean, gestureType: String) =
+    fun updateContextualEduStats(isTrackpadGesture: Boolean, gestureType: GestureType) =
         executeWithErrorLog({ "Failed call updateContextualEduStats" }) {
-            systemUiProxy?.updateContextualEduStats(isTrackpadGesture, gestureType)
+            systemUiProxy?.updateContextualEduStats(isTrackpadGesture, gestureType.name)
         }
 
     fun setHomeRotationEnabled(enabled: Boolean) =
@@ -497,20 +500,12 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
 
     /** @return Destination bounds of auto-pip animation, `null` if the animation is not ready. */
     fun startSwipePipToHome(
-        componentName: ComponentName?,
-        activityInfo: ActivityInfo?,
-        pictureInPictureParams: PictureInPictureParams?,
+        taskInfo: RunningTaskInfo,
         launcherRotation: Int,
         hotseatKeepClearArea: Rect?,
     ): Rect? {
         executeWithErrorLog({ "Failed call startSwipePipToHome" }) {
-            return pip?.startSwipePipToHome(
-                componentName,
-                activityInfo,
-                pictureInPictureParams,
-                launcherRotation,
-                hotseatKeepClearArea,
-            )
+            return pip?.startSwipePipToHome(taskInfo, launcherRotation, hotseatKeepClearArea)
         }
         return null
     }
@@ -671,8 +666,10 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
      *
      * @param intent the intent used to create the bubble.
      */
-    fun showAppBubble(intent: Intent?) =
-        executeWithErrorLog({ "Failed call showAppBubble" }) { bubbles?.showAppBubble(intent) }
+    fun showAppBubble(intent: Intent?, user: UserHandle) =
+        executeWithErrorLog({ "Failed call showAppBubble" }) {
+            bubbles?.showAppBubble(intent, user)
+        }
 
     /** Tells SysUI to show the expanded view. */
     fun showExpandedView() =
@@ -834,6 +831,15 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
     ) =
         executeWithErrorLog({ "Failed call startIntent" }) {
             splitScreen?.startIntent(intent, userId, fillInIntent, position, options, instanceId)
+        }
+
+    /**
+     * Call the desktop mode interface to start a TRANSIT_OPEN transition when launching an intent
+     * from the taskbar so that it can be handled in desktop mode.
+     */
+    fun startLaunchIntentTransition(intent: Intent, options: Bundle, displayId: Int) =
+        executeWithErrorLog({ "Failed call startLaunchIntentTransition" }) {
+            desktopMode?.startLaunchIntentTransition(intent, options, displayId)
         }
 
     //
@@ -1067,6 +1073,19 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
     //
     // Desktop Mode
     //
+    /** Calls shell to create a new desk (if possible) on the display whose ID is `displayId`. */
+    fun createDesktop(displayId: Int) =
+        executeWithErrorLog({ "Failed call createDesk" }) { desktopMode?.createDesk(displayId) }
+
+    /**
+     * Calls shell to activate the desk whose ID is `deskId` on whatever display it exists on. This
+     * will bring all tasks on this desk to the front.
+     */
+    fun activateDesktop(deskId: Int, transition: RemoteTransition?) =
+        executeWithErrorLog({ "Failed call activateDesk" }) {
+            desktopMode?.activateDesk(deskId, transition)
+        }
+
     /** Call shell to show all apps active on the desktop */
     fun showDesktopApps(displayId: Int, transition: RemoteTransition?) =
         executeWithErrorLog({ "Failed call showDesktopApps" }) {
@@ -1074,18 +1093,14 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
         }
 
     /** If task with the given id is on the desktop, bring it to front */
-    fun showDesktopApp(taskId: Int, transition: RemoteTransition?) =
+    fun showDesktopApp(
+        taskId: Int,
+        transition: RemoteTransition?,
+        toFrontReason: DesktopTaskToFrontReason,
+    ) =
         executeWithErrorLog({ "Failed call showDesktopApp" }) {
-            desktopMode?.showDesktopApp(taskId, transition)
+            desktopMode?.showDesktopApp(taskId, transition, toFrontReason)
         }
-
-    /** Call shell to get number of visible freeform tasks */
-    fun getVisibleDesktopTaskCount(displayId: Int): Int {
-        executeWithErrorLog({ "Failed call getVisibleDesktopTaskCount" }) {
-            return desktopMode?.getVisibleTaskCount(displayId) ?: 0
-        }
-        return 0
-    }
 
     /** Set a listener on shell to get updates about desktop task state */
     fun setDesktopTaskListener(listener: IDesktopTaskListener?) {
@@ -1106,9 +1121,19 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
         taskId: Int,
         transitionSource: DesktopModeTransitionSource?,
         transition: RemoteTransition?,
+        successCallback: Runnable,
     ) =
         executeWithErrorLog({ "Failed call moveToDesktop" }) {
-            desktopMode?.moveToDesktop(taskId, transitionSource, transition)
+            desktopMode?.moveToDesktop(
+                taskId,
+                transitionSource,
+                transition,
+                object : IMoveToDesktopCallback.Stub() {
+                    override fun onTaskMovedToDesktop() {
+                        successCallback.run()
+                    }
+                },
+            )
         }
 
     /** Call shell to remove the desktop that is on given `displayId` */
@@ -1174,6 +1199,7 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
             homeContentInsets: Rect?,
             minimizedHomeBounds: Rect?,
             extras: Bundle?,
+            transitionInfo: TransitionInfo?,
         ) =
             listener.onAnimationStart(
                 RecentsAnimationControllerCompat(controller),
@@ -1186,6 +1212,7 @@ class SystemUiProxy @Inject constructor(@ApplicationContext private val context:
                     // https://developer.android.com/guide/components/aidl#Bundles
                     classLoader = SplitBounds::class.java.classLoader
                 },
+                transitionInfo,
             )
 
         override fun onAnimationCanceled(taskIds: IntArray?, taskSnapshots: Array<TaskSnapshot>?) =

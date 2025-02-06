@@ -15,12 +15,12 @@
  */
 package com.android.launcher3.testing;
 
+import static com.android.launcher3.Flags.enableFallbackOverviewInWindow;
 import static com.android.launcher3.Flags.enableGridOnlyOverview;
+import static com.android.launcher3.Flags.enableLauncherOverviewInWindow;
 import static com.android.launcher3.allapps.AllAppsStore.DEFER_UPDATES_TEST;
 import static com.android.launcher3.config.FeatureFlags.ENABLE_TASKBAR_NAVBAR_UNIFICATION;
 import static com.android.launcher3.config.FeatureFlags.FOLDABLE_SINGLE_PAGE;
-import static com.android.launcher3.config.FeatureFlags.enableAppPairs;
-import static com.android.launcher3.config.FeatureFlags.enableSplitContextually;
 import static com.android.launcher3.testing.shared.TestProtocol.TEST_INFO_RESPONSE_FIELD;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
@@ -243,8 +243,8 @@ public class TestInformationHandler implements ResourceBasedOverride {
             }
 
             case TestProtocol.REQUEST_GET_SPLIT_SELECTION_ACTIVE:
-                response.putBoolean(TEST_INFO_RESPONSE_FIELD, enableSplitContextually()
-                        && Launcher.ACTIVITY_TRACKER.getCreatedContext().isSplitSelectionActive());
+                response.putBoolean(TEST_INFO_RESPONSE_FIELD,
+                        Launcher.ACTIVITY_TRACKER.getCreatedContext().isSplitSelectionActive());
                 return response;
 
             case TestProtocol.REQUEST_ENABLE_ROTATION:
@@ -325,8 +325,9 @@ public class TestInformationHandler implements ResourceBasedOverride {
                 return response;
             }
 
-            case TestProtocol.REQUEST_FLAG_ENABLE_APP_PAIRS: {
-                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD, enableAppPairs());
+            case TestProtocol.REQUEST_IS_RECENTS_WINDOW_ENABLED: {
+                response.putBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD,
+                        enableLauncherOverviewInWindow() || enableFallbackOverviewInWindow());
                 return response;
             }
 

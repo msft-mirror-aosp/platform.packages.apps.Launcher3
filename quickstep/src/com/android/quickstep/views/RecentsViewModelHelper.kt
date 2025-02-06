@@ -32,8 +32,8 @@ class RecentsViewModelHelper(
     private val recentsCoroutineScope: CoroutineScope,
     private val dispatcherProvider: DispatcherProvider,
 ) {
-    fun onDetachedFromWindow() {
-        recentsCoroutineScope.cancel("RecentsView detaching from window")
+    fun onDestroy() {
+        recentsCoroutineScope.cancel("RecentsView is being destroyed")
     }
 
     fun switchToScreenshot(
@@ -44,10 +44,12 @@ class RecentsViewModelHelper(
         // Update recentsViewModel and apply the thumbnailOverride ASAP, before waiting inside
         // viewAttachedScope.
         recentsViewModel.setRunningTaskShowScreenshot(true)
-        recentsCoroutineScope.launch(dispatcherProvider.main) {
+        recentsCoroutineScope.launch(dispatcherProvider.background) {
             recentsViewModel.waitForRunningTaskShowScreenshotToUpdate()
             recentsViewModel.waitForThumbnailsToUpdate(updatedThumbnails)
-            withContext(Dispatchers.Main) { ViewUtils.postFrameDrawn(taskView, onFinishRunnable) }
+            withContext(Dispatchers.Main.immediate) {
+                ViewUtils.postFrameDrawn(taskView, onFinishRunnable)
+            }
         }
     }
 }

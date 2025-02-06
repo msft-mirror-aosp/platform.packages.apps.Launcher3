@@ -15,10 +15,12 @@
  */
 package com.android.launcher3.graphics;
 
-import static com.android.launcher3.LauncherPrefs.THEMED_ICONS;
+
+import static com.android.launcher3.graphics.ThemeManager.PREF_ICON_SHAPE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
-import static com.android.launcher3.util.Themes.isThemedIconEnabled;
+
+import static java.util.Objects.requireNonNullElse;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
@@ -44,18 +46,18 @@ import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherModel;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.model.BgDataModel;
-import com.android.launcher3.shapes.AppShape;
-import com.android.launcher3.shapes.AppShapesProvider;
+import com.android.launcher3.shapes.IconShapeModel;
+import com.android.launcher3.shapes.ShapesProvider;
 import com.android.launcher3.util.Executors;
 import com.android.launcher3.util.Preconditions;
 import com.android.launcher3.util.RunnableList;
 import com.android.systemui.shared.Flags;
 
+import java.lang.ref.WeakReference;
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -85,10 +87,13 @@ public class GridCustomizationsProvider extends ContentProvider {
 
     private static final String TAG = "GridCustomizationsProvider";
 
+    // KEY_NAME is the name of the grid used internally while the KEY_GRID_TITLE is the translated
+    // string title of the grid.
     private static final String KEY_NAME = "name";
     private static final String KEY_GRID_TITLE = "grid_title";
     private static final String KEY_ROWS = "rows";
     private static final String KEY_COLS = "cols";
+    private static final String KEY_GRID_ICON_ID = "grid_icon_id";
     private static final String KEY_PREVIEW_COUNT = "preview_count";
     // is_default means if a certain option is currently set to the system
     private static final String KEY_IS_DEFAULT = "is_default";
@@ -121,7 +126,7 @@ public class GridCustomizationsProvider extends ContentProvider {
 
     // Set of all active previews used to track duplicate memory allocations
     private final Set<PreviewLifecycleObserver> mActivePreviews =
-            Collections.newSetFromMap(new WeakHashMap<>());
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     @Override
     public boolean onCreate() {
@@ -139,19 +144,28 @@ public class GridCustomizationsProvider extends ContentProvider {
 
         switch (path) {
             case KEY_SHAPE_OPTIONS: {
-                if (Flags.newCustomizationPickerUi() && Flags.enableLauncherIconShapes()) {
+                if (Flags.newCustomizationPickerUi()) {
                     MatrixCursor cursor = new MatrixCursor(new String[]{
                             KEY_SHAPE_KEY, KEY_SHAPE_TITLE, KEY_PATH, KEY_IS_DEFAULT});
-                    List<AppShape> shapes =  AppShapesProvider.INSTANCE.getShapes();
-                    for (int i = 0; i < shapes.size(); i++) {
-                        AppShape shape = shapes.get(i);
+                    String currentShapePath =
+                            ThemeManager.INSTANCE.get(context).getIconState().getIconMask();
+                    Optional<IconShapeModel> selectedShape = ShapesProvider.INSTANCE.getIconShapes()
+                            .values()
+                            .stream()
+                            .filter(shape -> shape.getPathString().equals(currentShapePath))
+                            .findFirst();
+                    // Handle default for when current shape doesn't match new shapes.
+                    if (selectedShape.isEmpty()) {
+                        selectedShape = Optional.ofNullable(ShapesProvider.INSTANCE.getIconShapes()
+                                .get("circle"));
+                    }
+
+                    for (IconShapeModel shape : ShapesProvider.INSTANCE.getIconShapes().values()) {
                         cursor.newRow()
                                 .add(KEY_SHAPE_KEY, shape.getKey())
                                 .add(KEY_SHAPE_TITLE, shape.getTitle())
-                                .add(KEY_PATH, shape.getPath())
-                                // TODO (b/348664593): We should fetch the currently-set shape
-                                //  option from the preferences.
-                                .add(KEY_IS_DEFAULT, i == 0);
+                                .add(KEY_PATH, shape.getPathString())
+                                .add(KEY_IS_DEFAULT, shape.equals(selectedShape.get()));
                     }
                     return cursor;
                 } else  {
@@ -161,24 +175,26 @@ public class GridCustomizationsProvider extends ContentProvider {
             case KEY_LIST_OPTIONS: {
                 MatrixCursor cursor = new MatrixCursor(new String[]{
                         KEY_NAME, KEY_GRID_TITLE, KEY_ROWS, KEY_COLS, KEY_PREVIEW_COUNT,
-                        KEY_IS_DEFAULT});
+                        KEY_IS_DEFAULT, KEY_GRID_ICON_ID});
                 InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(getContext());
                 for (GridOption gridOption : idp.parseAllGridOptions(getContext())) {
                     cursor.newRow()
                             .add(KEY_NAME, gridOption.name)
-                            .add(KEY_GRID_TITLE, gridOption.title)
+                            .add(KEY_GRID_TITLE, gridOption.gridTitle)
                             .add(KEY_ROWS, gridOption.numRows)
                             .add(KEY_COLS, gridOption.numColumns)
                             .add(KEY_PREVIEW_COUNT, 1)
                             .add(KEY_IS_DEFAULT, idp.numColumns == gridOption.numColumns
-                                    && idp.numRows == gridOption.numRows);
+                                    && idp.numRows == gridOption.numRows)
+                            .add(KEY_GRID_ICON_ID, gridOption.gridIconId);
                 }
                 return cursor;
             }
             case GET_ICON_THEMED:
             case ICON_THEMED: {
                 MatrixCursor cursor = new MatrixCursor(new String[]{BOOLEAN_VALUE});
-                cursor.newRow().add(BOOLEAN_VALUE, isThemedIconEnabled(getContext()) ? 1 : 0);
+                cursor.newRow().add(BOOLEAN_VALUE,
+                        ThemeManager.INSTANCE.get(getContext()).isMonoThemeEnabled() ? 1 : 0);
                 return cursor;
             }
             default:
@@ -211,12 +227,8 @@ public class GridCustomizationsProvider extends ContentProvider {
         switch (path) {
             case KEY_DEFAULT_GRID: {
                 if (Flags.newCustomizationPickerUi()) {
-                    String shapeKey = values.getAsString(KEY_SHAPE_KEY);
-                    Optional<AppShape> optionalShape = AppShapesProvider.INSTANCE.getShapes()
-                            .stream().filter(shape -> shape.getKey().equals(shapeKey)).findFirst();
-                    String pathToSet = optionalShape.map(AppShape::getPath).orElse(null);
-                    // TODO (b/348664593): Apply shapeName to the system. This needs to be a
-                    //  synchronous call.
+                    LauncherPrefs.INSTANCE.get(context).put(PREF_ICON_SHAPE,
+                            requireNonNullElse(values.getAsString(KEY_SHAPE_KEY), ""));
                 }
                 String gridName = values.getAsString(KEY_NAME);
                 InvariantDeviceProfile idp = InvariantDeviceProfile.INSTANCE.get(context);
@@ -247,8 +259,8 @@ public class GridCustomizationsProvider extends ContentProvider {
             }
             case ICON_THEMED:
             case SET_ICON_THEMED: {
-                LauncherPrefs.get(context)
-                        .put(THEMED_ICONS, values.getAsBoolean(BOOLEAN_VALUE));
+                ThemeManager.INSTANCE.get(context)
+                        .setMonoThemeEnabled(values.getAsBoolean(BOOLEAN_VALUE));
                 context.getContentResolver().notifyChange(uri, null);
                 return 1;
             }
@@ -317,8 +329,15 @@ public class GridCustomizationsProvider extends ContentProvider {
             Bundle result = new Bundle();
             result.putParcelable(KEY_SURFACE_PACKAGE, renderer.getSurfacePackage());
 
-            Messenger messenger =
-                    new Messenger(new Handler(UI_HELPER_EXECUTOR.getLooper(), observer));
+            mActivePreviews.add(observer);
+            lifeCycleTracker.add(() -> mActivePreviews.remove(observer));
+
+            // Wrap the callback in a weak reference. This ensures that the callback is not kept
+            // alive due to the Messenger's IBinder
+            Messenger messenger = new Messenger(new Handler(
+                    UI_HELPER_EXECUTOR.getLooper(),
+                    new WeakCallbackWrapper(observer)));
+
             Message msg = Message.obtain();
             msg.replyTo = messenger;
             result.putParcelable(KEY_CALLBACK, msg);
@@ -355,14 +374,10 @@ public class GridCustomizationsProvider extends ContentProvider {
                     renderer.hideBottomRow(message.getData().getBoolean(KEY_HIDE_BOTTOM_ROW));
                     break;
                 case MESSAGE_ID_UPDATE_SHAPE:
-                    if (Flags.newCustomizationPickerUi() && Flags.enableLauncherIconShapes()) {
+                    if (Flags.newCustomizationPickerUi()
+                            && com.android.launcher3.Flags.enableLauncherIconShapes()) {
                         String shapeKey = message.getData().getString(KEY_SHAPE_KEY);
-                        Optional<AppShape> optionalShape = AppShapesProvider.INSTANCE.getShapes()
-                                .stream()
-                                .filter(shape -> shape.getKey().equals(shapeKey))
-                                .findFirst();
-                        String pathToSet = optionalShape.map(AppShape::getPath).orElse(null);
-                        // TODO (b/348664593): Update launcher preview with the given shape
+                        renderer.updateShape(shapeKey);
                     }
                     break;
                 case MESSAGE_ID_UPDATE_GRID:
@@ -398,6 +413,36 @@ public class GridCustomizationsProvider extends ContentProvider {
             return plo != null
                     && plo.renderer.getHostToken().equals(renderer.getHostToken())
                     && plo.renderer.getDisplayId() == renderer.getDisplayId();
+        }
+    }
+
+    /**
+     * A WeakReference wrapper around Handler.Callback to avoid passing hard-reference over IPC
+     * when using a Messenger
+     */
+    private static class WeakCallbackWrapper implements Handler.Callback {
+
+        private final WeakReference<Handler.Callback> mActual;
+        private final Message mCleanupMessage;
+
+        WeakCallbackWrapper(Handler.Callback actual) {
+            mActual = new WeakReference<>(actual);
+            mCleanupMessage = new Message();
+        }
+
+        @Override
+        public boolean handleMessage(Message message) {
+            Handler.Callback actual = mActual.get();
+            return actual != null && actual.handleMessage(message);
+        }
+
+        @Override
+        protected void finalize() throws Throwable {
+            super.finalize();
+            Handler.Callback actual = mActual.get();
+            if (actual != null) {
+                actual.handleMessage(mCleanupMessage);
+            }
         }
     }
 }

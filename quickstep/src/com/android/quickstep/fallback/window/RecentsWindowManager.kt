@@ -37,13 +37,15 @@ import com.android.launcher3.LauncherAnimationRunner
 import com.android.launcher3.LauncherAnimationRunner.RemoteAnimationFactory
 import com.android.launcher3.R
 import com.android.launcher3.compat.AccessibilityManagerCompat
-import com.android.launcher3.statehandlers.DesktopVisibilityController
 import com.android.launcher3.statemanager.StateManager
 import com.android.launcher3.statemanager.StateManager.AtomicAnimationFactory
 import com.android.launcher3.statemanager.StatefulContainer
 import com.android.launcher3.taskbar.TaskbarUIController
+import com.android.launcher3.testing.TestLogging
 import com.android.launcher3.testing.shared.TestProtocol.NORMAL_STATE_ORDINAL
+import com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_SPLIT_SELECT_ORDINAL
 import com.android.launcher3.testing.shared.TestProtocol.OVERVIEW_STATE_ORDINAL
+import com.android.launcher3.testing.shared.TestProtocol.SEQUENCE_MAIN
 import com.android.launcher3.util.ContextTracker
 import com.android.launcher3.util.DisplayController
 import com.android.launcher3.util.RunnableList
@@ -88,8 +90,10 @@ import java.util.function.Predicate
  * To add new protologs, see [RecentsWindowProtoLogProxy]. To enable logging to logcat, see
  * [QuickstepProtoLogGroup.Constants.DEBUG_RECENTS_WINDOW]
  */
-class RecentsWindowManager(context: Context) :
-    RecentsWindowContext(context), RecentsViewContainer, StatefulContainer<RecentsState> {
+class RecentsWindowManager(context: Context, wallpaperColorHints: Int) :
+    RecentsWindowContext(context, wallpaperColorHints),
+    RecentsViewContainer,
+    StatefulContainer<RecentsState> {
 
     companion object {
         private const val HOME_APPEAR_DURATION: Long = 250
@@ -163,6 +167,7 @@ class RecentsWindowManager(context: Context) :
         TaskStackChangeListeners.getInstance().unregisterTaskStackListener(taskStackChangeListener)
         callbacks?.removeListener(recentsAnimationListener)
         recentsWindowTracker.onContextDestroyed(this)
+        recentsView?.destroy()
     }
 
     override fun startHome() {
@@ -234,6 +239,7 @@ class RecentsWindowManager(context: Context) :
     private val onBackInvokedCallback: () -> Unit = {
         // If we are in live tile mode, launch the live task, otherwise return home
         recentsView?.runningTaskView?.launchWithAnimation() ?: startHome()
+        TestLogging.recordEvent(SEQUENCE_MAIN, "onBackInvoked")
     }
 
     private fun cleanupRecentsWindow() {
@@ -310,10 +316,6 @@ class RecentsWindowManager(context: Context) :
         return overviewCommandHelper == null || overviewCommandHelper.canStartHomeSafely()
     }
 
-    override fun getDesktopVisibilityController(): DesktopVisibilityController? {
-        return tisBindHelper.desktopVisibilityController
-    }
-
     override fun setTaskbarUIController(taskbarUIController: TaskbarUIController?) {
         this.taskbarUIController = taskbarUIController
     }
@@ -355,17 +357,23 @@ class RecentsWindowManager(context: Context) :
             cleanupRecentsWindow()
         }
         when (state) {
-            HOME ->
+            HOME,
+            BG_LAUNCHER ->
                 AccessibilityManagerCompat.sendStateEventToTest(baseContext, NORMAL_STATE_ORDINAL)
             DEFAULT ->
                 AccessibilityManagerCompat.sendStateEventToTest(baseContext, OVERVIEW_STATE_ORDINAL)
+            OVERVIEW_SPLIT_SELECT ->
+                AccessibilityManagerCompat.sendStateEventToTest(
+                    baseContext,
+                    OVERVIEW_SPLIT_SELECT_ORDINAL,
+                )
         }
     }
 
     private fun getStateName(state: RecentsState?): String {
         return when (state) {
             null -> "NULL"
-            DEFAULT -> "default"
+            DEFAULT -> "DEFAULT"
             MODAL_TASK -> "MODAL_TASK"
             BACKGROUND_APP -> "BACKGROUND_APP"
             HOME -> "HOME"
@@ -380,10 +388,6 @@ class RecentsWindowManager(context: Context) :
             systemUiController = SystemUiController(rootView)
         }
         return systemUiController
-    }
-
-    override fun getContext(): Context {
-        return this
     }
 
     override fun getScrimView(): ScrimView? {

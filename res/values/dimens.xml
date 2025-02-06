@@ -191,7 +191,7 @@
 
     <!-- Widget tray -->
     <dimen name="widget_cell_vertical_padding">8dp</dimen>
-    <dimen name="widget_cell_horizontal_padding">8dp</dimen>
+    <dimen name="widget_cell_horizontal_padding">4dp</dimen>
     <dimen name="widget_cell_title_font_size">14sp</dimen>
     <integer name="widget_cell_title_font_weight">500</integer>
     <dimen name="widget_cell_title_line_height">20sp</dimen>
@@ -488,8 +488,6 @@
     <dimen name="overview_grid_side_margin">0dp</dimen>
     <dimen name="overview_grid_row_spacing">0dp</dimen>
     <dimen name="overview_page_spacing">0dp</dimen>
-    <dimen name="overview_top_margin_grid_only">0dp</dimen>
-    <dimen name="overview_bottom_margin_grid_only">0dp</dimen>
 
     <dimen name="split_placeholder_size">72dp</dimen>
     <dimen name="split_placeholder_inset">16dp</dimen>

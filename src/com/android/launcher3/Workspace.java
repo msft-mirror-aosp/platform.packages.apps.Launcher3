@@ -53,8 +53,6 @@ import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
-import android.os.Handler;
-import android.os.Message;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -70,6 +68,7 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.core.view.ViewCompat;
 
 import com.android.app.animation.Interpolators;
 import com.android.launcher3.accessibility.AccessibleDragListenerAdapter;
@@ -108,6 +107,7 @@ import com.android.launcher3.model.data.WorkspaceItemInfo;
 import com.android.launcher3.pageindicators.PageIndicator;
 import com.android.launcher3.statemanager.StateManager;
 import com.android.launcher3.statemanager.StateManager.StateHandler;
+import com.android.launcher3.statemanager.StateManager.StateListener;
 import com.android.launcher3.states.StateAnimationConfig;
 import com.android.launcher3.touch.WorkspaceTouchListener;
 import com.android.launcher3.util.EdgeEffectCompat;
@@ -123,13 +123,9 @@ import com.android.launcher3.util.RunnableList;
 import com.android.launcher3.util.Thunk;
 import com.android.launcher3.util.WallpaperOffsetInterpolator;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
-import com.android.launcher3.widget.LauncherWidgetHolder;
-import com.android.launcher3.widget.LauncherWidgetHolder.ProviderChangedListener;
 import com.android.launcher3.widget.NavigableAppWidgetHostView;
 import com.android.launcher3.widget.PendingAddShortcutInfo;
 import com.android.launcher3.widget.PendingAddWidgetInfo;
-import com.android.launcher3.widget.PendingAppWidgetHostView;
-import com.android.launcher3.widget.WidgetManagerHelper;
 import com.android.launcher3.widget.util.WidgetSizes;
 import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlayCallbacks;
 import com.android.systemui.plugins.shared.LauncherOverlayManager.LauncherOverlayTouchProxy;
@@ -303,6 +299,8 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     private final StatsLogManager mStatsLogManager;
 
     private final MSDLPlayerWrapper mMSDLPlayerWrapper;
+    @Nullable
+    private DragController.DragListener mAccessibilityDragListener;
 
     /**
      * Used to inflate the Workspace from XML.
@@ -512,6 +510,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             }
         }
 
+        if (mAccessibilityDragListener != null) {
+            mAccessibilityDragListener.onDragStart(dragObject, options);
+        }
         if (!mLauncher.isInState(EDIT_MODE)) {
             mLauncher.getStateManager().goToState(SPRING_LOADED);
         }
@@ -548,6 +549,9 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             }
         });
 
+        if (mAccessibilityDragListener != null) {
+            mAccessibilityDragListener.onDragEnd();
+        }
         mDragInfo = null;
         mDragSourceInternal = null;
     }
@@ -653,9 +657,6 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         if (!enableSmartspaceRemovalToggle()) {
             bindAndInitFirstWorkspaceScreen();
         }
-
-        // Remove any deferred refresh callbacks
-        mLauncher.mHandler.removeCallbacksAndMessages(DeferredWidgetRefresh.class);
 
         // Re-enable the layout transitions
         enableLayoutTransitions();
@@ -1656,7 +1657,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         child.setVisibility(INVISIBLE);
 
         if (options.isAccessibleDrag) {
-            mDragController.addDragListener(
+            mAccessibilityDragListener =
                     new AccessibleDragListenerAdapter(this, WorkspaceAccessibilityHelper::new) {
                         @Override
                         protected void enableAccessibleDrag(boolean enable,
@@ -1669,7 +1670,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
                                         IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
                             }
                         }
-                    });
+                    };
         }
 
         beginDragShared(child, this, options);
@@ -1761,7 +1762,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         }
 
         final DragView dv;
-        if (contentView instanceof View) {
+        if (contentView != null) {
             dv = mDragController.startDrag(
                     contentView,
                     draggableView,
@@ -2232,6 +2233,23 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
             }
             mStatsLogManager.logger().withItemInfo(d.dragInfo).withInstanceId(d.logInstanceId)
                     .log(LauncherEvent.LAUNCHER_ITEM_DROP_COMPLETED);
+
+            if (mAccessibilityDragListener != null) {
+                // This code needs to be called after StateManager.cancelAnimation. Before changing
+                // the order of operations in this method related to the StateListener below, please
+                // test that accessibility moves retain focus after accessibility dropping an item.
+                // Accessibility focus must be requested after launcher is back to a normal state
+                mLauncher.getStateManager().addStateListener(new StateListener<LauncherState>() {
+                    @Override
+                    public void onStateTransitionComplete(LauncherState finalState) {
+                        if (finalState == NORMAL) {
+                            cell.performAccessibilityAction(
+                                    AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null);
+                            mLauncher.getStateManager().removeStateListener(this);
+                        }
+                    }
+                });
+            }
         }
 
         if (d.stateAnnouncer != null && !droppedOnOriginalCell) {
@@ -3438,43 +3456,6 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         removeItemsByMatcher(matcher);
     }
 
-    public void widgetsRestored(final ArrayList<LauncherAppWidgetInfo> changedInfo) {
-        if (!changedInfo.isEmpty()) {
-            DeferredWidgetRefresh widgetRefresh = new DeferredWidgetRefresh(changedInfo,
-                    mLauncher.getAppWidgetHolder());
-
-            LauncherAppWidgetInfo item = changedInfo.get(0);
-            final AppWidgetProviderInfo widgetInfo;
-            WidgetManagerHelper widgetHelper = new WidgetManagerHelper(getContext());
-            if (item.hasRestoreFlag(LauncherAppWidgetInfo.FLAG_ID_NOT_VALID)) {
-                widgetInfo = widgetHelper.findProvider(item.providerName, item.user);
-            } else {
-                widgetInfo = widgetHelper.getLauncherAppWidgetInfo(item.appWidgetId,
-                        item.getTargetComponent());
-            }
-
-            if (widgetInfo != null) {
-                // Re-inflate the widgets which have changed status
-                widgetRefresh.run();
-            } else {
-                // widgetRefresh will automatically run when the packages are updated.
-                // For now just update the progress bars
-                mapOverItems(new ItemOperator() {
-                    @Override
-                    public boolean evaluate(ItemInfo info, View view) {
-                        if (view instanceof PendingAppWidgetHostView
-                                && changedInfo.contains(info)) {
-                            ((LauncherAppWidgetInfo) info).installProgress = 100;
-                            ((PendingAppWidgetHostView) view).applyState();
-                        }
-                        // process all the shortcuts
-                        return false;
-                    }
-                });
-            }
-        }
-    }
-
     public boolean isOverlayShown() {
         return mOverlayShown;
     }
@@ -3519,8 +3500,15 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
 
     @Override
     protected boolean canAnnouncePageDescription() {
-        // b/383247157: Disable disruptive home screen page announcement
-        return false;
+        return Float.compare(mOverlayProgress, 0f) == 0;
+    }
+
+    @Override
+    protected void announcePageForAccessibility() {
+        // Talkback focuses on AccessibilityActionView by default, so we need to modify the state
+        // description there in order for the change in page scroll to be announced.
+        ViewCompat.setStateDescription(mLauncher.getAccessibilityActionView(),
+                getCurrentPageDescription());
     }
 
     @Override
@@ -3538,7 +3526,7 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         int nScreens = getChildCount();
         int extraScreenId = mScreenOrder.indexOf(EXTRA_EMPTY_SCREEN_ID);
         if (extraScreenId >= 0 && nScreens > 1) {
-            if (page == extraScreenId) {
+            if (page == extraScreenId || (isTwoPanelEnabled() && page == extraScreenId + 1)) {
                 return getContext().getString(R.string.workspace_new_page);
             }
             nScreens--;
@@ -3550,6 +3538,11 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         int panelCount = getPanelCount();
         int currentPage = (page / panelCount) + 1;
         int totalPages = nScreens / panelCount + nScreens % panelCount;
+
+        // When dragging, a blank screen is added. This increases the total page count, but we still
+        // want to describe the original page count where icons are currently pinned
+        if (extraScreenId > 0) totalPages--;
+
         return getContext().getString(R.string.workspace_scroll_format, currentPage, totalPages);
     }
 
@@ -3567,62 +3560,6 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
     @Override
     public CellPosMapper getCellPosMapper() {
         return mLauncher.getCellPosMapper();
-    }
-
-    /**
-     * Used as a workaround to ensure that the AppWidgetService receives the
-     * PACKAGE_ADDED broadcast before updating widgets.
-     */
-    private class DeferredWidgetRefresh implements Runnable, ProviderChangedListener {
-        private final ArrayList<LauncherAppWidgetInfo> mInfos;
-        private final LauncherWidgetHolder mWidgetHolder;
-        private final Handler mHandler;
-
-        private boolean mRefreshPending;
-
-        DeferredWidgetRefresh(ArrayList<LauncherAppWidgetInfo> infos,
-                              LauncherWidgetHolder holder) {
-            mInfos = infos;
-            mWidgetHolder = holder;
-            mHandler = mLauncher.mHandler;
-            mRefreshPending = true;
-
-            mWidgetHolder.addProviderChangeListener(this);
-            // Force refresh after 10 seconds, if we don't get the provider changed event.
-            // This could happen when the provider is no longer available in the app.
-            Message msg = Message.obtain(mHandler, this);
-            msg.obj = DeferredWidgetRefresh.class;
-            mHandler.sendMessageDelayed(msg, 10000);
-        }
-
-        @Override
-        public void run() {
-            mWidgetHolder.removeProviderChangeListener(this);
-            mHandler.removeCallbacks(this);
-
-            if (!mRefreshPending) {
-                return;
-            }
-
-            mRefreshPending = false;
-
-            ArrayList<PendingAppWidgetHostView> views = new ArrayList<>(mInfos.size());
-            mapOverItems((info, view) -> {
-                if (view instanceof PendingAppWidgetHostView && mInfos.contains(info)) {
-                    views.add((PendingAppWidgetHostView) view);
-                }
-                // process all children
-                return false;
-            });
-            for (PendingAppWidgetHostView view : views) {
-                view.reInflate();
-            }
-        }
-
-        @Override
-        public void notifyWidgetProvidersChanged() {
-            run();
-        }
     }
 
     private class StateTransitionListener extends AnimatorListenerAdapter

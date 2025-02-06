@@ -32,7 +32,6 @@ import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherAppState
 import com.android.launcher3.LauncherSettings.Favorites
 import com.android.launcher3.backuprestore.LauncherRestoreEventLogger.RestoreError
-import com.android.launcher3.config.FeatureFlags
 import com.android.launcher3.icons.CacheableShortcutInfo
 import com.android.launcher3.icons.cache.CacheLookupFlag.Companion.DEFAULT_LOOKUP_FLAG
 import com.android.launcher3.logging.FileLog
@@ -287,7 +286,7 @@ class WorkspaceItemProcessor(
                     // If the pinned deep shortcut is no longer published,
                     // use the last saved icon instead of the default.
                     val csi = CacheableShortcutInfo(pinnedShortcut, appInfoWrapper)
-                    iconCache.getShortcutIcon(info, csi, c::loadIcon)
+                    iconCache.getShortcutIcon(info, csi, c::loadIconFromDb)
                     if (appInfoWrapper.isSuspended()) {
                         info.runtimeStatusFlags =
                             info.runtimeStatusFlags or ItemInfoWithIcon.FLAG_DISABLED_SUSPENDED
@@ -405,24 +404,14 @@ class WorkspaceItemProcessor(
      * stored in the BgDataModel.
      */
     private fun processFolderOrAppPair() {
-        var collection = bgDataModel.findOrMakeFolder(c.id)
+        var collection = c.findOrMakeFolder(c.id, bgDataModel)
         // If we generated a placeholder Folder before this point, it may need to be replaced with
         // an app pair.
         if (c.itemType == Favorites.ITEM_TYPE_APP_PAIR && collection is FolderInfo) {
-            if (!FeatureFlags.enableAppPairs()) {
-                // If app pairs are not enabled, stop loading.
-                Log.e(TAG, "app pairs flag is off, did not load app pair")
-                return
-            }
-
-            val folderInfo: FolderInfo = collection
             val newAppPair = AppPairInfo()
             // Move the placeholder's contents over to the new app pair.
-            folderInfo.getContents().forEach(newAppPair::add)
+            collection.getContents().forEach(newAppPair::add)
             collection = newAppPair
-            // Remove the placeholder and add the app pair into the data model.
-            bgDataModel.collections.remove(c.id)
-            bgDataModel.collections.put(c.id, collection)
         }
 
         c.applyCommonProperties(collection)
@@ -576,7 +565,7 @@ class WorkspaceItemProcessor(
                 logWidgetInfo(app.invariantDeviceProfile, lapi)
             }
         }
-        c.checkAndAddItem(appWidgetInfo, bgDataModel)
+        c.checkAndAddItem(appWidgetInfo, bgDataModel, memoryLogger)
     }
 
     companion object {

@@ -31,15 +31,15 @@ import static com.android.launcher3.logger.LauncherAtom.ContainerInfo.ContainerC
 import static com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers.ContainerCase.DEVICE_SEARCH_RESULT_CONTAINER;
 import static com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_WORKSPACE_SNAPSHOT;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_0;
-import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_90;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_180;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_270;
+import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DISPLAY_ROTATION__ROTATION_90;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DST_STATE__ALLAPPS;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DST_STATE__BACKGROUND;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DST_STATE__HOME;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__DST_STATE__OVERVIEW;
-import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__RECENTS_ORIENTATION_HANDLER__PORTRAIT;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__RECENTS_ORIENTATION_HANDLER__LANDSCAPE;
+import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__RECENTS_ORIENTATION_HANDLER__PORTRAIT;
 import static com.android.systemui.shared.system.SysUiStatsLog.LAUNCHER_UICHANGED__RECENTS_ORIENTATION_HANDLER__SEASCAPE;
 
 import android.content.Context;
@@ -69,6 +69,7 @@ import com.android.launcher3.logger.LauncherAtomExtensions.DeviceSearchResultCon
 import com.android.launcher3.logger.LauncherAtomExtensions.ExtendedContainers;
 import com.android.launcher3.logging.InstanceId;
 import com.android.launcher3.logging.StatsLogManager;
+import com.android.launcher3.model.data.CollectionInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.Executors;
@@ -386,7 +387,8 @@ public class StatsLogCompatManager extends StatsLogManager {
                 // and then write to StatsLog.
                 app.getModel().enqueueModelUpdateTask((taskController, dataModel, apps) ->
                         write(event, applyOverwrites(mItemInfo.buildProto(
-                                dataModel.collections.get(mItemInfo.container), mContext))));
+                                (CollectionInfo) dataModel.itemsIdMap.get(mItemInfo.container),
+                                mContext))));
             })) {
                 // Write log on the model thread so that logs do not go out of order
                 // (for eg: drop comes after drag)
@@ -422,6 +424,22 @@ public class StatsLogCompatManager extends StatsLogManager {
                     break;
                 case LAUNCHER_PRIVATE_SPACE_UNLOCK_ANIMATION_END:
                     InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_PRIVATE_SPACE_UNLOCK);
+                    break;
+                case LAUNCHER_WORK_UTILITY_VIEW_EXPAND_ANIMATION_BEGIN:
+                    InteractionJankMonitorWrapper.begin(
+                            view,
+                            Cuj.CUJ_LAUNCHER_WORK_UTILITY_VIEW_EXPAND);
+                    break;
+                case LAUNCHER_WORK_UTILITY_VIEW_EXPAND_ANIMATION_END:
+                    InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_WORK_UTILITY_VIEW_EXPAND);
+                    break;
+                case LAUNCHER_WORK_UTILITY_VIEW_SHRINK_ANIMATION_BEGIN:
+                    InteractionJankMonitorWrapper.begin(
+                            view,
+                            Cuj.CUJ_LAUNCHER_WORK_UTILITY_VIEW_SHRINK);
+                    break;
+                case LAUNCHER_WORK_UTILITY_VIEW_SHRINK_ANIMATION_END:
+                    InteractionJankMonitorWrapper.end(Cuj.CUJ_LAUNCHER_WORK_UTILITY_VIEW_SHRINK);
                     break;
                 default:
                     break;

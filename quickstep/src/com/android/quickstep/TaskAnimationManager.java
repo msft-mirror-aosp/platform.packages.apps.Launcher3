@@ -20,7 +20,6 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static com.android.launcher3.Flags.enableHandleDelayedGestureCallbacks;
 import static com.android.launcher3.Flags.enableScalingRevealHomeAnimation;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
-import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.launcher3.util.NavigationMode.NO_BUTTON;
 import static com.android.quickstep.GestureState.GestureEndTarget.RECENTS;
 import static com.android.quickstep.GestureState.STATE_END_TARGET_ANIMATION_FINISHED;
@@ -36,6 +35,7 @@ import android.content.Intent;
 import android.os.SystemProperties;
 import android.util.Log;
 import android.view.RemoteAnimationTarget;
+import android.window.TransitionInfo;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -53,7 +53,6 @@ import com.android.quickstep.util.ActiveGestureProtoLogProxy;
 import com.android.quickstep.util.SystemUiFlagUtils;
 import com.android.quickstep.views.RecentsView;
 import com.android.systemui.shared.recents.model.ThumbnailData;
-import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
@@ -69,6 +68,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
     private RecentsAnimationController mController;
     private RecentsAnimationCallbacks mCallbacks;
     private RecentsAnimationTargets mTargets;
+    private TransitionInfo mTransitionInfo;
     private RecentsAnimationDeviceState mDeviceState;
 
     // Temporary until we can hook into gesture state events
@@ -108,16 +108,6 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
     }
     SystemUiProxy getSystemUiProxy() {
         return SystemUiProxy.INSTANCE.get(mCtx);
-    }
-
-    /**
-     * Preloads the recents animation.
-     */
-    public void preloadRecentsAnimation(Intent intent) {
-        // Pass null animation handler to indicate this start is for preloading
-        UI_HELPER_EXECUTOR.execute(() -> {
-            ActivityManagerWrapper.getInstance().preloadRecentsActivity(intent);
-        });
     }
 
     boolean shouldIgnoreMotionEvents() {
@@ -166,7 +156,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         mCallbacks.addListener(new RecentsAnimationCallbacks.RecentsAnimationListener() {
             @Override
             public void onRecentsAnimationStart(RecentsAnimationController controller,
-                    RecentsAnimationTargets targets) {
+                    RecentsAnimationTargets targets, @Nullable TransitionInfo transitionInfo) {
                 if (enableHandleDelayedGestureCallbacks() && mRecentsAnimationStartPending) {
                     ActiveGestureProtoLogProxy.logStartRecentsAnimationCallback(
                             "onRecentsAnimationStart");
@@ -180,6 +170,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
                 }
                 mController = controller;
                 mTargets = targets;
+                mTransitionInfo = transitionInfo;
                 // TODO(b/236226779): We can probably get away w/ setting mLastAppearedTaskTargets
                 //  to all appeared targets directly vs just looking at running ones
                 int[] runningTaskIds = mLastGestureState.getRunningTaskIds(targets.apps.length > 1);
@@ -448,7 +439,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
     public void notifyRecentsAnimationState(
             RecentsAnimationCallbacks.RecentsAnimationListener listener) {
         if (isRecentsAnimationRunning()) {
-            listener.onRecentsAnimationStart(mController, mTargets);
+            listener.onRecentsAnimationStart(mController, mTargets, mTransitionInfo);
         }
         // TODO: Do we actually need to report canceled/finished?
     }
@@ -488,6 +479,7 @@ public class TaskAnimationManager implements RecentsAnimationCallbacks.RecentsAn
         mController = null;
         mCallbacks = null;
         mTargets = null;
+        mTransitionInfo = null;
         mLastGestureState = null;
         mLastAppearedTaskTargets = null;
     }

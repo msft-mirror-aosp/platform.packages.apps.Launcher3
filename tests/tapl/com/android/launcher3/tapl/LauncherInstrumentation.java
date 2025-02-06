@@ -211,6 +211,8 @@ public final class LauncherInstrumentation {
     private TrackpadGestureType mTrackpadGestureType = TrackpadGestureType.NONE;
     private int mPointerCount = 0;
 
+    private boolean mWaitingForMotionUpEvent;
+
     private static Pattern getKeyEventPattern(String action, String keyCode) {
         return Pattern.compile("Key event: KeyEvent.*action=" + action + ".*keyCode=" + keyCode);
     }
@@ -752,7 +754,29 @@ public final class LauncherInstrumentation {
         }
     }
 
+    private void cleanUpInputStream() {
+        if (!mWaitingForMotionUpEvent) {
+            return;
+        }
+        long downTime = SystemClock.uptimeMillis();
+        MotionEvent cleanUpEvent = getMotionEvent(
+                downTime,
+                downTime,
+                MotionEvent.ACTION_UP,
+                0,
+                0,
+                InputDevice.SOURCE_TOUCHSCREEN,
+                Configurator.getInstance().getToolType());
+        log("Test failed while a ACTION_UP event was still pending. "
+                + "Cleaning up the input stream by sending an ACTION_UP event forcefully: "
+                + "event= " + cleanUpEvent);
+
+        injectEventUnchecked(cleanUpEvent);
+        mWaitingForMotionUpEvent = false;
+    }
+
     void fail(String message) {
+        cleanUpInputStream();
         checkForAnomaly();
         if (mOnFailure != null) mOnFailure.run();
         Assert.fail(formatSystemHealthMessage(formatErrorWithEvents(
@@ -954,7 +978,7 @@ public final class LauncherInstrumentation {
                     waitUntilLauncherObjectGone(APPS_RES_ID);
                     waitUntilLauncherObjectGone(WORKSPACE_RES_ID);
                     waitUntilLauncherObjectGone(WIDGETS_RES_ID);
-                    if (isTablet() && !is3PLauncher()) {
+                    if (isTablet() && !is3PLauncher() && !isRecentsWindowEnabled()) {
                         waitForSystemLauncherObject(TASKBAR_RES_ID);
                     } else {
                         waitUntilSystemLauncherObjectGone(TASKBAR_RES_ID);
@@ -1006,6 +1030,11 @@ public final class LauncherInstrumentation {
                     return null;
             }
         }
+    }
+
+    boolean isRecentsWindowEnabled() {
+        return getTestInfo(TestProtocol.REQUEST_IS_RECENTS_WINDOW_ENABLED)
+                .getBoolean(TestProtocol.TEST_INFO_RESPONSE_FIELD);
     }
 
     public void waitForModelQueueCleared() {
@@ -2010,11 +2039,6 @@ public final class LauncherInstrumentation {
                 TestProtocol.TEST_INFO_RESPONSE_FIELD);
     }
 
-    boolean isAppPairsEnabled() {
-        return getTestInfo(TestProtocol.REQUEST_FLAG_ENABLE_APP_PAIRS).getBoolean(
-                TestProtocol.TEST_INFO_RESPONSE_FIELD);
-    }
-
     public void sendPointer(long downTime, long currentTime, int action, Point point,
             GestureScope gestureScope) {
         sendPointer(downTime, currentTime, action, point, gestureScope,
@@ -2022,8 +2046,38 @@ public final class LauncherInstrumentation {
     }
 
     private void injectEvent(InputEvent event) {
-        assertTrue("injectInputEvent failed: event=" + event,
-                mInstrumentation.getUiAutomation().injectInputEvent(event, true, false));
+        if (event instanceof MotionEvent motionEvent) {
+            switch (motionEvent.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    assertTrue("Attempting to inject a second ACTION_DOWN event before a "
+                                    + "ACTION_UP event: " + event,
+                            !mWaitingForMotionUpEvent);
+                    mWaitingForMotionUpEvent = true;
+                    break;
+                case MotionEvent.ACTION_CANCEL:
+                case MotionEvent.ACTION_UP:
+                    assertTrue("Attempting to inject an unexpected ACTION_UP event: " + event,
+                            mWaitingForMotionUpEvent);
+                    mWaitingForMotionUpEvent = false;
+
+                    break;
+                default:
+                    // Nothing to do
+                    break;
+            }
+        }
+        assertTrue("injectInputEvent failed: event=" + event, injectEventUnchecked(event));
+    }
+
+    private boolean injectEventUnchecked(InputEvent event) {
+        boolean result = mInstrumentation.getUiAutomation().injectInputEvent(event, true, false);
+
+        // Only MotionEvents need to be recycled.
+        if (event instanceof MotionEvent motionEvent) {
+            motionEvent.recycle();
+        }
+
+        return result;
     }
 
     public void sendPointer(long downTime, long currentTime, int action, Point point,
@@ -2077,12 +2131,13 @@ public final class LauncherInstrumentation {
                 downTime, currentTime, action, point.x, point.y, pointerCount,
                 mTrackpadGestureType)
                 : getMotionEvent(downTime, currentTime, action, point.x, point.y, source, toolType);
+        int button = isRightClick ? MotionEvent.BUTTON_SECONDARY : MotionEvent.BUTTON_PRIMARY;
+        if (action == MotionEvent.ACTION_BUTTON_PRESS) {
+            event.setButtonState(event.getButtonState() | button);
+        }
         if (action == MotionEvent.ACTION_BUTTON_PRESS
                 || action == MotionEvent.ACTION_BUTTON_RELEASE) {
-            event.setActionButton(MotionEvent.BUTTON_PRIMARY);
-        }
-        if (isRightClick) {
-            event.setButtonState(event.getButtonState() | MotionEvent.BUTTON_SECONDARY);
+            event.setActionButton(button);
         }
         injectEvent(event);
     }
@@ -2193,11 +2248,17 @@ public final class LauncherInstrumentation {
         sendPointer(downTime, downTime, MotionEvent.ACTION_DOWN, targetCenter,
                 GestureScope.DONT_EXPECT_PILFER, InputDevice.SOURCE_TOUCHSCREEN,
                 /* isRightClick= */ true, MotionEvent.TOOL_TYPE_STYLUS);
+        sendPointer(downTime, downTime, MotionEvent.ACTION_BUTTON_PRESS, targetCenter,
+                GestureScope.DONT_EXPECT_PILFER, InputDevice.SOURCE_TOUCHSCREEN,
+                /* isRightClick= */ true, MotionEvent.TOOL_TYPE_STYLUS);
         try {
             expectEvent(TestProtocol.SEQUENCE_MAIN, longClickEvent);
             final UiObject2 result = waitForLauncherObject(resName);
             return result;
         } finally {
+            sendPointer(downTime, downTime, MotionEvent.ACTION_BUTTON_RELEASE, targetCenter,
+                    GestureScope.DONT_EXPECT_PILFER, InputDevice.SOURCE_TOUCHSCREEN,
+                    /* isRightClick= */ true, MotionEvent.TOOL_TYPE_STYLUS);
             sendPointer(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, targetCenter,
                     GestureScope.DONT_EXPECT_PILFER, InputDevice.SOURCE_TOUCHSCREEN,
                     /* isRightClick= */ true, MotionEvent.TOOL_TYPE_STYLUS);
@@ -2212,11 +2273,17 @@ public final class LauncherInstrumentation {
         sendPointer(downTime, downTime, MotionEvent.ACTION_DOWN, targetCenter,
                 GestureScope.DONT_EXPECT_PILFER, InputDevice.SOURCE_MOUSE,
                 /* isRightClick= */ true);
+        sendPointer(downTime, downTime, MotionEvent.ACTION_BUTTON_PRESS, targetCenter,
+                GestureScope.DONT_EXPECT_PILFER, InputDevice.SOURCE_MOUSE,
+                /* isRightClick= */ true);
         try {
             expectEvent(TestProtocol.SEQUENCE_MAIN, rightClickEvent);
             final UiObject2 result = waitForLauncherObject(resName);
             return result;
         } finally {
+            sendPointer(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_BUTTON_RELEASE,
+                    targetCenter, GestureScope.DONT_EXPECT_PILFER, InputDevice.SOURCE_MOUSE,
+                    /* isRightClick= */ true);
             sendPointer(downTime, SystemClock.uptimeMillis(), ACTION_UP, targetCenter,
                     GestureScope.DONT_EXPECT_PILFER, InputDevice.SOURCE_MOUSE,
                     /* isRightClick= */ true);

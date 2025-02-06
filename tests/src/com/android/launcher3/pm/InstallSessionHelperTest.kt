@@ -52,7 +52,7 @@ class InstallSessionHelperTest {
     private val sandboxContext = spy(launcherModelHelper.sandboxContext)
     private val packageManager = sandboxContext.packageManager
     private val expectedAppPackage = "expectedAppPackage"
-    private val expectedInstallerPackage = "expectedInstallerPackage"
+    private val expectedInstallerPackage = sandboxContext.packageName
     private val mockPackageInstaller: PackageInstaller = mock()
 
     private lateinit var installSessionHelper: InstallSessionHelper
@@ -61,7 +61,6 @@ class InstallSessionHelperTest {
     @Before
     fun setup() {
         whenever(packageManager.packageInstaller).thenReturn(mockPackageInstaller)
-        whenever(sandboxContext.packageName).thenReturn(expectedInstallerPackage)
         launcherApps = sandboxContext.spyService(LauncherApps::class.java)
         installSessionHelper = InstallSessionHelper(sandboxContext)
     }

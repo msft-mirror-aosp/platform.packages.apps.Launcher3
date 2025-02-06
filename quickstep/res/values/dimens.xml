@@ -34,9 +34,6 @@
     <!--  Overview Task Views  -->
     <!--  The thumbnail uses up to this much of the total screen height/width in Overview -->
     <item name="overview_max_scale" format="float" type="dimen">0.7</item>
-    <!--  The thumbnail should not go smaller than this much of the total screen height/width in
-             tablet app to Overview carousel -->
-    <item name="overview_carousel_min_scale" format="float" type="dimen">0.46</item>
     <!--  A touch target for icons, sometimes slightly larger than the icons themselves  -->
     <dimen name="task_thumbnail_icon_size">48dp</dimen>
     <!--  The icon size for the focused task, placed in center of touch target  -->
@@ -84,6 +81,12 @@
     <!--  The size of the icon menu's icon touch target  -->
     <dimen name="task_thumbnail_icon_menu_drawable_touch_size">44dp</dimen>
     <dimen name="task_thumbnail_icon_menu_elevation">4dp</dimen>
+    <!--  The size of the task thumbnail header  -->
+    <dimen name="task_thumbnail_header_height">30dp</dimen>
+    <dimen name="task_thumbnail_header_margin_edge">18dp</dimen>
+    <dimen name="task_thumbnail_header_margin_between_views">9dp</dimen>
+    <dimen name="task_thumbnail_header_icon_size">18dp</dimen>
+    <dimen name="task_thumbnail_header_round_corner_radius">16dp</dimen>
 
     <dimen name="task_icon_cache_default_icon_size">72dp</dimen>
     <item name="overview_modal_max_scale" format="float" type="dimen">1.1</item>
@@ -102,6 +105,9 @@
     <dimen name="recents_clear_all_deadzone_vertical_margin">70dp</dimen>
     <dimen name="recents_clear_all_outline_radius">24dp</dimen>
     <dimen name="recents_clear_all_outline_padding">2dp</dimen>
+
+    <!-- Recents add desktop button -->
+    <dimen name="add_desktop_button_size">56dp</dimen>
 
     <!-- The speed in dp/s at which the user needs to be scrolling in recents such that we start
              loading full resolution screenshots. -->
@@ -465,6 +471,7 @@
     <dimen name="bubblebar_icon_spacing_persistent_taskbar">@dimen/bubblebar_icon_spacing</dimen>
     <dimen name="bubblebar_expanded_icon_spacing">12dp</dimen>
     <dimen name="bubblebar_icon_elevation">1dp</dimen>
+    <dimen name="bubblebar_transient_taskbar_min_distance">12dp</dimen>
 
     <!-- Bubble bar dismiss view -->
     <dimen name="bubblebar_dismiss_target_size">@dimen/floating_dismiss_background_size</dimen>
@@ -522,9 +529,4 @@
 
     <!-- Digital Wellbeing -->
     <dimen name="digital_wellbeing_toast_height">48dp</dimen>
-
-    <!-- Splitscreen -->
-    <!-- Max width of the split instructions view -->
-    <dimen name="split_instructions_view_max_width">220dp</dimen>
-
 </resources>

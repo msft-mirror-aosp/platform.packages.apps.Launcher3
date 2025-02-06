@@ -22,10 +22,12 @@ import static android.view.WindowManager.LayoutParams.TYPE_DOCK_DIVIDER;
 
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 
+import android.annotation.Nullable;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.util.ArraySet;
 import android.view.RemoteAnimationTarget;
+import android.window.TransitionInfo;
 
 import androidx.annotation.BinderThread;
 import androidx.annotation.NonNull;
@@ -93,7 +95,7 @@ public class RecentsAnimationCallbacks implements
             RemoteAnimationTarget[] appTargets, Rect homeContentInsets,
             Rect minimizedHomeBounds, Bundle extras) {
         onAnimationStart(controller, appTargets, new RemoteAnimationTarget[0],
-                homeContentInsets, minimizedHomeBounds, extras);
+                homeContentInsets, minimizedHomeBounds, extras, /* transitionInfo= */ null);
     }
 
     // Called only in R+ platform
@@ -101,7 +103,8 @@ public class RecentsAnimationCallbacks implements
     public final void onAnimationStart(RecentsAnimationControllerCompat animationController,
             RemoteAnimationTarget[] appTargets,
             RemoteAnimationTarget[] wallpaperTargets,
-            Rect homeContentInsets, Rect minimizedHomeBounds, Bundle extras) {
+            Rect homeContentInsets, Rect minimizedHomeBounds, Bundle extras,
+            @Nullable TransitionInfo transitionInfo) {
         long appCount = Arrays.stream(appTargets)
                 .filter(app -> app.mode == MODE_CLOSING)
                 .count();
@@ -141,7 +144,7 @@ public class RecentsAnimationCallbacks implements
             Utilities.postAsyncCallback(MAIN_EXECUTOR.getHandler(), () -> {
                 ActiveGestureProtoLogProxy.logOnRecentsAnimationStart(targets.apps.length);
                 for (RecentsAnimationListener listener : getListeners()) {
-                    listener.onRecentsAnimationStart(mController, targets);
+                    listener.onRecentsAnimationStart(mController, targets, transitionInfo);
                 }
             });
         }
@@ -205,7 +208,7 @@ public class RecentsAnimationCallbacks implements
      */
     public interface RecentsAnimationListener {
         default void onRecentsAnimationStart(RecentsAnimationController controller,
-                RecentsAnimationTargets targets) {}
+                RecentsAnimationTargets targets, @Nullable TransitionInfo transitionInfo) {}
 
         /**
          * Callback from the system when the recents animation is canceled. {@param thumbnailData}

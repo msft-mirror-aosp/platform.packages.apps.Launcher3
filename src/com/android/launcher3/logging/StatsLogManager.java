@@ -225,8 +225,11 @@ public class StatsLogManager implements ResourceBasedOverride {
         @UiEvent(doc = "User tapped on desktop icon on a task menu.")
         LAUNCHER_SYSTEM_SHORTCUT_DESKTOP_TAP(1706),
 
-        @UiEvent(doc = "Use tapped on external display icon on a task menu,")
+        @UiEvent(doc = "User tapped on external display icon on a task menu,")
         LAUNCHER_SYSTEM_SHORTCUT_EXTERNAL_DISPLAY_TAP(1957),
+
+        @UiEvent(doc = "User tapped on close app on a task menu,")
+        LAUNCHER_SYSTEM_SHORTCUT_CLOSE_APP_TAP(2081),
 
         @UiEvent(doc = "User tapped on pause app system shortcut.")
         LAUNCHER_SYSTEM_SHORTCUT_PAUSE_TAP(521),
@@ -856,6 +859,18 @@ public class StatsLogManager implements ResourceBasedOverride {
 
         @UiEvent(doc = "User sets the device in Fixed Landscape")
         FIXED_LANDSCAPE_TOGGLE_DISABLED(2020),
+
+        @UiEvent(doc = "Work utility view expand animation started")
+        LAUNCHER_WORK_UTILITY_VIEW_EXPAND_ANIMATION_BEGIN(2075),
+
+        @UiEvent(doc = "Work utility view expand animation ended")
+        LAUNCHER_WORK_UTILITY_VIEW_EXPAND_ANIMATION_END(2076),
+
+        @UiEvent(doc = "Work utility view shrink animation started")
+        LAUNCHER_WORK_UTILITY_VIEW_SHRINK_ANIMATION_BEGIN(2077),
+
+        @UiEvent(doc = "Work utility view shrink animation ended")
+        LAUNCHER_WORK_UTILITY_VIEW_SHRINK_ANIMATION_END(2078),
         // ADD MORE
         ;
 

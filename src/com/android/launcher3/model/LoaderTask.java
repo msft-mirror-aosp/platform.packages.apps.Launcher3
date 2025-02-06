@@ -26,12 +26,14 @@ import static com.android.launcher3.LauncherPrefs.SHOULD_SHOW_SMARTSPACE;
 import static com.android.launcher3.LauncherSettings.Favorites.DESKTOP_ICON_FLAG;
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.icons.CacheableShortcutInfo.convertShortcutsToCacheableShortcuts;
+import static com.android.launcher3.icons.cache.CacheLookupFlag.DEFAULT_LOOKUP_FLAG;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_HAS_SHORTCUT_PERMISSION;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_PRIVATE_PROFILE_QUIET_MODE_ENABLED;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_CHANGE_PERMISSION;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_ENABLED;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_WORK_PROFILE_QUIET_MODE_ENABLED;
-import static com.android.launcher3.model.ModelUtils.filterCurrentWorkspaceItems;
+import static com.android.launcher3.model.ModelUtils.WIDGET_FILTER;
+import static com.android.launcher3.model.ModelUtils.currentScreenContentFilter;
 import static com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 import static com.android.launcher3.util.PackageManagerHelper.hasShortcutsPermission;
@@ -82,7 +84,6 @@ import com.android.launcher3.icons.cache.LauncherActivityCachingLogic;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.model.data.AppPairInfo;
-import com.android.launcher3.model.data.CollectionInfo;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.IconRequestInfo;
 import com.android.launcher3.model.data.ItemInfo;
@@ -106,11 +107,13 @@ import com.android.launcher3.util.TraceHelper;
 import com.android.launcher3.widget.WidgetInflater;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 
@@ -153,6 +156,8 @@ public class LoaderTask implements Runnable {
     protected final Map<ComponentKey, AppWidgetProviderInfo> mWidgetProvidersMap = new ArrayMap<>();
     private Map<ShortcutKey, ShortcutInfo> mShortcutKeyToPinnedShortcuts;
     private HashMap<PackageUserKey, SessionInfo> mInstallingPkgsCached;
+
+    private List<IconRequestInfo<WorkspaceItemInfo>> mWorkspaceIconRequestInfos = new ArrayList<>();
 
     private boolean mStopped;
 
@@ -210,10 +215,10 @@ public class LoaderTask implements Runnable {
         final int firstScreen = allScreens.get(0);
         IntSet firstScreens = IntSet.wrap(firstScreen);
 
-        ArrayList<ItemInfo> allItems = mBgDataModel.getAllWorkspaceItems();
-        ArrayList<ItemInfo> firstScreenItems = new ArrayList<>();
-        filterCurrentWorkspaceItems(firstScreens, allItems, firstScreenItems,
-                new ArrayList<>() /* otherScreenItems are ignored */);
+        List<ItemInfo> firstScreenItems =
+                mBgDataModel.itemsIdMap.stream()
+                        .filter(currentScreenContentFilter(firstScreens))
+                        .toList();
         final int disableArchivingLauncherBroadcast = Settings.Secure.getInt(
                 mApp.getContext().getContentResolver(),
                 "disable_launcher_broadcast_installed_apps",
@@ -227,7 +232,7 @@ public class LoaderTask implements Runnable {
                             mPmHelper,
                             firstScreenItems,
                             mInstallingPkgsCached,
-                            mBgDataModel.appWidgets
+                            mBgDataModel.itemsIdMap.stream().filter(WIDGET_FILTER).toList()
                     );
             logASplit("Sending first screen broadcast with additional archiving Extras");
             FirstScreenBroadcastHelper.sendBroadcastsForModels(mApp.getContext(), broadcastModels);
@@ -410,7 +415,7 @@ public class LoaderTask implements Runnable {
     protected void loadWorkspace(
             List<CacheableShortcutInfo> allDeepShortcuts,
             String selection,
-            LoaderMemoryLogger memoryLogger,
+            @Nullable LoaderMemoryLogger memoryLogger,
             @Nullable LauncherRestoreEventLogger restoreEventLogger
     ) {
         Trace.beginSection("LoadWorkspace");
@@ -438,12 +443,12 @@ public class LoaderTask implements Runnable {
         ModelDbController dbController = mApp.getModel().getModelDbController();
         if (Flags.gridMigrationRefactor()) {
             try {
-                dbController.attemptMigrateDb(restoreEventLogger);
+                dbController.attemptMigrateDb(restoreEventLogger, mModelDelegate);
             } catch (Exception e) {
                 FileLog.e(TAG, "Failed to migrate grid", e);
             }
         } else {
-            dbController.tryMigrateDB(restoreEventLogger);
+            dbController.tryMigrateDB(restoreEventLogger, mModelDelegate);
         }
         Log.d(TAG, "loadWorkspace: loading default favorites if necessary");
         dbController.loadDefaultFavoritesIfNecessary();
@@ -474,13 +479,12 @@ public class LoaderTask implements Runnable {
                 final LongSparseArray<Boolean> unlockedUsers = new LongSparseArray<>();
                 queryPinnedShortcutsForUnlockedUsers(context, unlockedUsers);
 
-                List<IconRequestInfo<WorkspaceItemInfo>> iconRequestInfos = new ArrayList<>();
-
+                mWorkspaceIconRequestInfos = new ArrayList<>();
                 WorkspaceItemProcessor itemProcessor = new WorkspaceItemProcessor(c, memoryLogger,
                         mUserCache, mUserManagerState, mLauncherApps, mPendingPackages,
                         mShortcutKeyToPinnedShortcuts, mApp, mBgDataModel,
                         mWidgetProvidersMap, installingPkgs, isSdCardReady,
-                        widgetInflater, mPmHelper, iconRequestInfos, unlockedUsers,
+                        widgetInflater, mPmHelper, mWorkspaceIconRequestInfos, unlockedUsers,
                         allDeepShortcuts);
 
                 if (mStopped) {
@@ -490,7 +494,7 @@ public class LoaderTask implements Runnable {
                         itemProcessor.processItem();
                     }
                 }
-                tryLoadWorkspaceIconsInBulk(iconRequestInfos);
+                tryLoadWorkspaceIconsInBulk(mWorkspaceIconRequestInfos);
             } finally {
                 IOUtils.closeSilently(c);
             }
@@ -523,14 +527,13 @@ public class LoaderTask implements Runnable {
      * requests high-res icons for the items that are part of an app pair.
      */
     private void processAppPairItems() {
-        for (CollectionInfo collection : mBgDataModel.collections) {
-            if (!(collection instanceof AppPairInfo appPair)) {
-                continue;
-            }
-
-            appPair.getContents().sort(Folder.ITEM_POS_COMPARATOR);
-            appPair.fetchHiResIconsIfNeeded(mIconCache);
-        }
+        mBgDataModel.itemsIdMap.stream()
+                .filter(item -> item instanceof AppPairInfo)
+                .forEach(item -> {
+                    AppPairInfo appPair = (AppPairInfo) item;
+                    appPair.getContents().sort(Folder.ITEM_POS_COMPARATOR);
+                    appPair.fetchHiResIconsIfNeeded(mIconCache);
+                });
     }
 
     /**
@@ -586,8 +589,8 @@ public class LoaderTask implements Runnable {
         // Sort the folder items, update ranks, and make sure all preview items are high res.
         List<FolderGridOrganizer> verifiers = mApp.getInvariantDeviceProfile().supportedProfiles
                 .stream().map(FolderGridOrganizer::createFolderGridOrganizer).toList();
-        for (CollectionInfo collection : mBgDataModel.collections) {
-            if (!(collection instanceof FolderInfo folder)) {
+        for (ItemInfo itemInfo : mBgDataModel.itemsIdMap) {
+            if (!(itemInfo instanceof FolderInfo folder)) {
                 continue;
             }
 
@@ -622,7 +625,9 @@ public class LoaderTask implements Runnable {
             for (IconRequestInfo<WorkspaceItemInfo> iconRequestInfo : iconRequestInfos) {
                 WorkspaceItemInfo wai = iconRequestInfo.itemInfo;
                 if (mIconCache.isDefaultIcon(wai.bitmap, wai.user)) {
-                    iconRequestInfo.loadWorkspaceIcon(mApp.getContext());
+                    logASplit("tryLoadWorkspaceIconsInBulk: default icon found for "
+                            + wai.getTargetComponent() + ", will attempt to load from iconBlob");
+                    iconRequestInfo.loadIconFromDbBlob(mApp.getContext());
                 }
             }
         } finally {
@@ -657,8 +662,6 @@ public class LoaderTask implements Runnable {
             IntArray deletedFolderIds = mApp.getModel().getModelDbController().deleteEmptyFolders();
             synchronized (mBgDataModel) {
                 for (int folderId : deletedFolderIds) {
-                    mBgDataModel.workspaceItems.remove(mBgDataModel.collections.get(folderId));
-                    mBgDataModel.collections.remove(folderId);
                     mBgDataModel.itemsIdMap.remove(folderId);
                 }
             }
@@ -676,8 +679,6 @@ public class LoaderTask implements Runnable {
 
         synchronized (mBgDataModel) {
             for (int id : deleted) {
-                mBgDataModel.workspaceItems.remove(mBgDataModel.collections.get(id));
-                mBgDataModel.collections.remove(id);
                 mBgDataModel.itemsIdMap.remove(id);
             }
         }
@@ -707,7 +708,7 @@ public class LoaderTask implements Runnable {
         // Clear the list of apps
         mBgAllAppsList.clear();
 
-        List<IconRequestInfo<AppInfo>> iconRequestInfos = new ArrayList<>();
+        List<IconRequestInfo<AppInfo>> allAppsItemRequestInfos = new ArrayList<>();
         boolean isWorkProfileQuiet = false;
         boolean isPrivateProfileQuiet = false;
         for (UserHandle user : profiles) {
@@ -747,14 +748,13 @@ public class LoaderTask implements Runnable {
                     }
                 }
 
-                iconRequestInfos.add(new IconRequestInfo<>(
-                        appInfo, app, /* useLowResIcon= */ false));
-                mBgAllAppsList.add(
-                        appInfo, app, false);
+                IconRequestInfo<AppInfo> iconRequestInfo = getAppInfoIconRequestInfo(
+                        appInfo, app, mWorkspaceIconRequestInfos);
+                allAppsItemRequestInfos.add(iconRequestInfo);
+                mBgAllAppsList.add(appInfo, app, false);
             }
             allActivityList.addAll(apps);
         }
-
 
         if (FeatureFlags.PROMISE_APPS_IN_ALL_APPS.get()) {
             // get all active sessions and add them to the all apps list
@@ -766,7 +766,7 @@ public class LoaderTask implements Runnable {
                         false);
 
                 if (promiseAppInfo != null) {
-                    iconRequestInfos.add(new IconRequestInfo<>(
+                    allAppsItemRequestInfos.add(new IconRequestInfo<>(
                             promiseAppInfo,
                             /* launcherActivityInfo= */ null,
                             promiseAppInfo.getMatchingLookupFlag().useLowRes()));
@@ -775,9 +775,22 @@ public class LoaderTask implements Runnable {
         }
 
         Trace.beginSection("LoadAllAppsIconsInBulk");
+
         try {
-            mIconCache.getTitlesAndIconsInBulk(iconRequestInfos);
-            iconRequestInfos.forEach(iconRequestInfo ->
+            mIconCache.getTitlesAndIconsInBulk(allAppsItemRequestInfos);
+            if (Flags.restoreArchivedAppIconsFromDb()) {
+                for (IconRequestInfo<AppInfo> iconRequestInfo : allAppsItemRequestInfos) {
+                    AppInfo appInfo = iconRequestInfo.itemInfo;
+                    if (mIconCache.isDefaultIcon(appInfo.bitmap, appInfo.user)) {
+                        logASplit("LoadAllAppsIconsInBulk: default icon found for "
+                                + appInfo.getTargetComponent()
+                                + ", will attempt to load from iconBlob: "
+                                + Arrays.toString(iconRequestInfo.iconBlob));
+                        iconRequestInfo.loadIconFromDbBlob(mApp.getContext());
+                    }
+                }
+            }
+            allAppsItemRequestInfos.forEach(iconRequestInfo ->
                     mBgAllAppsList.updateSectionName(iconRequestInfo.itemInfo));
         } finally {
             Trace.endSection();
@@ -800,6 +813,49 @@ public class LoaderTask implements Runnable {
         return allActivityList;
     }
 
+    @NonNull
+    @VisibleForTesting
+    IconRequestInfo<AppInfo> getAppInfoIconRequestInfo(
+            AppInfo appInfo,
+            LauncherActivityInfo activityInfo,
+            List<IconRequestInfo<WorkspaceItemInfo>> workspaceRequestInfos
+    ) {
+        if (Flags.restoreArchivedAppIconsFromDb()) {
+            Optional<IconRequestInfo<WorkspaceItemInfo>> workspaceIconRequest =
+                    workspaceRequestInfos.stream()
+                            .filter(request -> appInfo.getTargetComponent().equals(
+                                    request.itemInfo.getTargetComponent()))
+                            .findFirst();
+
+            if (workspaceIconRequest.isPresent() && activityInfo.getApplicationInfo().isArchived) {
+                logASplit("getAppInfoIconRequestInfo:"
+                            + " matching archived info found, loading icon blob into icon request."
+                            + " Component=" + appInfo.getTargetComponent());
+                IconRequestInfo<AppInfo> iconRequestInfo = new IconRequestInfo<>(
+                        appInfo,
+                        activityInfo,
+                        workspaceIconRequest.get().iconBlob,
+                        false /* useLowResIcon= */
+                );
+                if (!iconRequestInfo.loadIconFromDbBlob(mApp.getContext())) {
+                    Log.d(TAG, "AppInfo Icon failed to load from blob, using cache.");
+                    mIconCache.getTitleAndIcon(
+                            appInfo,
+                            iconRequestInfo.launcherActivityInfo,
+                            DEFAULT_LOOKUP_FLAG
+                    );
+                }
+                return iconRequestInfo;
+            } else {
+                Log.d(TAG, "App not archived or workspace info not found"
+                        + ", creating IconRequestInfo without icon blob."
+                        + " Component:" + appInfo.getTargetComponent()
+                        + ", isArchived: " + activityInfo.getApplicationInfo().isArchived);
+            }
+        }
+        return new IconRequestInfo<>(appInfo, activityInfo, false /* useLowResIcon= */);
+    }
+
     private List<ShortcutInfo> loadDeepShortcuts() {
         List<ShortcutInfo> allShortcuts = new ArrayList<>();
         mBgDataModel.deepShortcutMap.clear();
@@ -819,18 +875,19 @@ public class LoaderTask implements Runnable {
 
     private void loadFolderNames() {
         FolderNameProvider provider = FolderNameProvider.newInstance(mApp.getContext(),
-                mBgAllAppsList.data, mBgDataModel.collections);
+                mBgAllAppsList.data, FolderNameProvider.getCollectionForSuggestions(mBgDataModel));
 
         synchronized (mBgDataModel) {
-            for (int i = 0; i < mBgDataModel.collections.size(); i++) {
-                FolderNameInfos suggestionInfos = new FolderNameInfos();
-                CollectionInfo info = mBgDataModel.collections.valueAt(i);
-                if (info instanceof FolderInfo fi && fi.suggestedFolderNames == null) {
-                    provider.getSuggestedFolderName(mApp.getContext(), fi.getAppContents(),
-                            suggestionInfos);
-                    fi.suggestedFolderNames = suggestionInfos;
-                }
-            }
+            mBgDataModel.itemsIdMap.stream()
+                    .filter(item ->
+                            item instanceof FolderInfo fi && fi.suggestedFolderNames == null)
+                    .forEach(info -> {
+                        FolderInfo fi = (FolderInfo) info;
+                        FolderNameInfos suggestionInfos = new FolderNameInfos();
+                        provider.getSuggestedFolderName(mApp.getContext(), fi.getAppContents(),
+                                suggestionInfos);
+                        fi.suggestedFolderNames = suggestionInfos;
+                    });
         }
     }
 

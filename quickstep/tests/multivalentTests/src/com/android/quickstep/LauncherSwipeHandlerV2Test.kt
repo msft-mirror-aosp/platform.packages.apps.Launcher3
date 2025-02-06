@@ -17,6 +17,12 @@
 package com.android.quickstep
 
 import android.graphics.PointF
+import android.hardware.display.DisplayManager
+import android.hardware.display.DisplayManagerGlobal
+import android.view.Display
+import android.view.Display.DEFAULT_DISPLAY
+import android.view.DisplayAdjustments.DEFAULT_DISPLAY_ADJUSTMENTS
+import android.view.DisplayInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.launcher3.R
@@ -25,7 +31,6 @@ import com.android.launcher3.dagger.LauncherAppModule
 import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.util.LauncherModelHelper
 import com.android.launcher3.util.MSDLPlayerWrapper
-import com.android.quickstep.fallback.window.RecentsDisplayModel
 import com.android.systemui.contextualeducation.GestureType
 import com.android.systemui.shared.system.InputConsumerController
 import dagger.BindsInstance
@@ -53,8 +58,6 @@ class LauncherSwipeHandlerV2Test {
 
     @Mock private lateinit var systemUiProxy: SystemUiProxy
 
-    @Mock private lateinit var recentsDisplayModel: RecentsDisplayModel
-
     @Mock private lateinit var msdlPlayerWrapper: MSDLPlayerWrapper
 
     private lateinit var underTest: LauncherSwipeHandlerV2
@@ -67,22 +70,32 @@ class LauncherSwipeHandlerV2Test {
     private val flingSpeed =
         -(sandboxContext.resources.getDimension(R.dimen.quickstep_fling_threshold_speed) + 1)
 
+    private val displayManager: DisplayManager =
+        sandboxContext.spyService(DisplayManager::class.java)
+
     @Before
     fun setup() {
+        val display =
+            Display(
+                DisplayManagerGlobal.getInstance(),
+                DEFAULT_DISPLAY,
+                DisplayInfo(),
+                DEFAULT_DISPLAY_ADJUSTMENTS,
+            )
+        whenever(displayManager.getDisplay(eq(DEFAULT_DISPLAY))).thenReturn(display)
+        whenever(displayManager.displays).thenReturn(arrayOf(display))
+
         sandboxContext.initDaggerComponent(
             DaggerTestComponent.builder()
                 .bindSystemUiProxy(systemUiProxy)
-                .bindRecentsDisplayModel(recentsDisplayModel)
+                .bindRotationHelper(mock(RotationTouchHelper::class.java))
+                .bindRecentsState(mock(RecentsAnimationDeviceState::class.java))
         )
-
-        val deviceState = mock(RecentsAnimationDeviceState::class.java)
-        whenever(deviceState.rotationTouchHelper).thenReturn(mock(RotationTouchHelper::class.java))
         gestureState = spy(GestureState(OverviewComponentObserver.INSTANCE.get(sandboxContext), 0))
 
         underTest =
             LauncherSwipeHandlerV2(
                 sandboxContext,
-                deviceState,
                 taskAnimationManager,
                 gestureState,
                 0,
@@ -98,20 +111,14 @@ class LauncherSwipeHandlerV2Test {
         gestureState.setTrackpadGestureType(GestureState.TrackpadGestureType.THREE_FINGER)
         underTest.onGestureEnded(flingSpeed, PointF())
         verify(systemUiProxy)
-            .updateContextualEduStats(
-                /* isTrackpadGesture= */ eq(true),
-                eq(GestureType.HOME.toString()),
-            )
+            .updateContextualEduStats(/* isTrackpadGesture= */ eq(true), eq(GestureType.HOME))
     }
 
     @Test
     fun goHomeFromAppByTouch_updateEduStats() {
         underTest.onGestureEnded(flingSpeed, PointF())
         verify(systemUiProxy)
-            .updateContextualEduStats(
-                /* isTrackpadGesture= */ eq(false),
-                eq(GestureType.HOME.toString()),
-            )
+            .updateContextualEduStats(/* isTrackpadGesture= */ eq(false), eq(GestureType.HOME))
     }
 }
 
@@ -122,7 +129,9 @@ interface TestComponent : LauncherAppComponent {
     interface Builder : LauncherAppComponent.Builder {
         @BindsInstance fun bindSystemUiProxy(proxy: SystemUiProxy): Builder
 
-        @BindsInstance fun bindRecentsDisplayModel(model: RecentsDisplayModel): Builder
+        @BindsInstance fun bindRotationHelper(helper: RotationTouchHelper): Builder
+
+        @BindsInstance fun bindRecentsState(state: RecentsAnimationDeviceState): Builder
 
         override fun build(): TestComponent
     }

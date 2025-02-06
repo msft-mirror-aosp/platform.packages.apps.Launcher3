@@ -17,7 +17,6 @@
 package com.android.launcher3.folder;
 
 import static com.android.launcher3.Flags.enableCursorHoverStates;
-import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.ICON_OVERLAP_FACTOR;
 import static com.android.launcher3.folder.ClippedFolderIconLayoutRule.MAX_NUM_ITEMS_IN_PREVIEW;
 import static com.android.launcher3.folder.FolderGridOrganizer.createFolderGridOrganizer;
 import static com.android.launcher3.folder.PreviewItemManager.INITIAL_ITEM_ANIMATION_DURATION;
@@ -177,12 +176,16 @@ public class FolderIcon extends FrameLayout implements FolderListener, FloatingI
         FolderIcon icon = inflateIcon(resId, activityContext, group, folderInfo);
         folder.setFolderIcon(icon);
         folder.bind(folderInfo);
+
         icon.setFolder(folder);
+        folderInfo.addListener(icon);
         return icon;
     }
 
     /**
-     * Builds a FolderIcon to be added to the Launcher
+     * Builds a FolderIcon to be added to the activity.
+     * This method doesn't add any listeners to the FolderInfo, and hence any changes to the info
+     * will not be reflected in the folder.
      */
     public static FolderIcon inflateIcon(int resId, ActivityContext activity,
             @Nullable ViewGroup group, FolderInfo folderInfo) {
@@ -228,8 +231,6 @@ public class FolderIcon extends FrameLayout implements FolderListener, FloatingI
         icon.mPreviewVerifier.setFolderInfo(folderInfo);
         icon.updatePreviewItems(false);
 
-        folderInfo.addListener(icon);
-
         return icon;
     }
 
@@ -246,7 +247,8 @@ public class FolderIcon extends FrameLayout implements FolderListener, FloatingI
         mPreviewItemManager.recomputePreviewDrawingParams();
         mBackground.getBounds(outBounds);
         // The preview items go outside of the bounds of the background.
-        Utilities.scaleRectAboutCenter(outBounds, ICON_OVERLAP_FACTOR);
+        Utilities.scaleRectAboutCenter(outBounds,
+                ClippedFolderIconLayoutRule.getIconOverlapFactor());
     }
 
     public float getBackgroundStrokeWidth() {

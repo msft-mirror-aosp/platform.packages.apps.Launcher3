@@ -17,17 +17,20 @@
 package com.android.launcher3.icons;
 
 import android.content.Context;
+import android.graphics.Path;
+import android.graphics.Rect;
+import android.graphics.drawable.AdaptiveIconDrawable;
 import android.os.UserHandle;
 
 import androidx.annotation.NonNull;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.graphics.IconShape;
-import com.android.launcher3.icons.mono.MonoIconThemeController;
+import com.android.launcher3.graphics.ThemeManager;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.MainThreadInitializedObject;
 import com.android.launcher3.util.SafeCloseable;
-import com.android.launcher3.util.Themes;
 import com.android.launcher3.util.UserIconInfo;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -57,11 +60,8 @@ public class LauncherIcons extends BaseIconFactory implements AutoCloseable {
 
     protected LauncherIcons(Context context, int fillResIconDpi, int iconBitmapSize,
             ConcurrentLinkedQueue<LauncherIcons> pool) {
-        super(context, fillResIconDpi, iconBitmapSize,
-                IconShape.INSTANCE.get(context).getShape().enableShapeDetection());
-        if (Themes.isThemedIconEnabled(context)) {
-            mThemeController = new MonoIconThemeController();
-        }
+        super(context, fillResIconDpi, iconBitmapSize);
+        mThemeController = ThemeManager.INSTANCE.get(context).getThemeController();
         mPool = pool;
     }
 
@@ -77,6 +77,13 @@ public class LauncherIcons extends BaseIconFactory implements AutoCloseable {
     @Override
     protected UserIconInfo getUserInfo(@NonNull UserHandle user) {
         return UserCache.INSTANCE.get(mContext).getUserInfo(user);
+    }
+
+    @NonNull
+    @Override
+    public Path getShapePath(AdaptiveIconDrawable drawable, Rect iconBounds) {
+        if (!Flags.enableLauncherIconShapes()) return drawable.getIconMask();
+        return IconShape.INSTANCE.get(mContext).getShape().getPath(iconBounds);
     }
 
     @Override

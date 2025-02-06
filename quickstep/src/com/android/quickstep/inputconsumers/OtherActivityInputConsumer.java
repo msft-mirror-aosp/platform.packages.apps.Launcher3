@@ -38,6 +38,7 @@ import android.graphics.PointF;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
+import android.window.TransitionInfo;
 
 import androidx.annotation.UiThread;
 
@@ -156,8 +157,7 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
         mPassedPilferInputSlop = mPassedWindowMoveSlop = continuingPreviousGesture;
         mStartDisplacement = continuingPreviousGesture ? 0 : -mTouchSlop;
         mDisableHorizontalSwipe = !mPassedPilferInputSlop && disableHorizontalSwipe;
-        mRotationTouchHelper = mDeviceState.getRotationTouchHelper();
-
+        mRotationTouchHelper = RotationTouchHelper.INSTANCE.get(this);
     }
 
     @Override
@@ -294,15 +294,15 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
                 float upDist = -displacement;
                 boolean isTrackpadGesture = mGestureState.isTrackpadGesture();
                 float squaredHypot = squaredHypot(displacementX, displacementY);
-                boolean isInExtendedSlopRegion = !mGestureState.isInExtendedSlopRegion();
+                boolean isInExtendedSlopRegion = mGestureState.isInExtendedSlopRegion();
                 boolean passedSlop = isTrackpadGesture
                         || (squaredHypot >= mSquaredTouchSlop
-                        && isInExtendedSlopRegion);
+                        && !isInExtendedSlopRegion);
                 if (DEBUG) {
                     Log.d(TAG, "ACTION_MOVE: passedSlop=" + passedSlop
                             + " ( " + isTrackpadGesture
                             + " || (" + squaredHypot + " >= " + mSquaredTouchSlop
-                            + " && " + isInExtendedSlopRegion + " ))");
+                            + " && " + !isInExtendedSlopRegion + " ))");
                 }
 
                 if (!mPassedSlopOnThisGesture && passedSlop) {
@@ -574,8 +574,9 @@ public class OtherActivityInputConsumer extends ContextWrapper implements InputC
     private static class FinishImmediatelyHandler
             implements RecentsAnimationCallbacks.RecentsAnimationListener {
 
+        @Override
         public void onRecentsAnimationStart(RecentsAnimationController controller,
-                RecentsAnimationTargets targets) {
+                RecentsAnimationTargets targets, TransitionInfo transitionInfo) {
             if (DEBUG) {
                 Log.d(TAG, "FinishImmediatelyHandler: queuing callback");
             }

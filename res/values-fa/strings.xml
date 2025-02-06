@@ -125,8 +125,7 @@
     <string name="folder_renamed" msgid="1794088362165669656">"نام پوشه به <xliff:g id="NAME">%1$s</xliff:g> تغییر کرد"</string>
     <string name="folder_name_format_exact" msgid="8626242716117004803">"پوشه: <xliff:g id="NAME">%1$s</xliff:g>، <xliff:g id="SIZE">%2$d</xliff:g> مورد"</string>
     <string name="folder_name_format_overflow" msgid="4270108890534995199">"پوشه: <xliff:g id="NAME">%1$s</xliff:g>، <xliff:g id="SIZE">%2$d</xliff:g> مورد یا بیشتر"</string>
-    <!-- no translation found for unnamed_folder (2420192029474044442) -->
-    <skip />
+    <string name="unnamed_folder" msgid="2420192029474044442">"پوشه بی‌نام"</string>
     <string name="app_pair_name_format" msgid="8134106404716224054">"جفت برنامه: <xliff:g id="APP1">%1$s</xliff:g> و <xliff:g id="APP2">%2$s</xliff:g>"</string>
     <string name="styles_wallpaper_button_text" msgid="8216961355289236794">"کاغذدیواری و سبک"</string>
     <string name="edit_home_screen" msgid="8947858375782098427">"ویرایش «صفحه اصلی»"</string>
@@ -164,7 +163,6 @@
     <string name="widgets_list_closed" msgid="6141506579418771922">"فهرست ابزاره‌ها بسته شد"</string>
     <string name="action_add_to_workspace" msgid="215894119683164916">"افزودن به صفحه اصلی"</string>
     <string name="action_move_here" msgid="2170188780612570250">"انتقال مورد به اینجا"</string>
-    <string name="item_added_to_workspace" msgid="4211073925752213539">"مورد به صفحه اصلی اضافه شد"</string>
     <string name="item_removed" msgid="851119963877842327">"مورد حذف شد"</string>
     <string name="undo" msgid="4151576204245173321">"واگرد"</string>
     <string name="action_move" msgid="4339390619886385032">"انتقال مورد"</string>
@@ -191,13 +189,13 @@
     <string name="all_apps_work_tab" msgid="4884822796154055118">"کاری"</string>
     <string name="work_profile_toggle_label" msgid="3081029915775481146">"نمایه کاری"</string>
     <string name="work_profile_edu_work_apps" msgid="7895468576497746520">"برنامه‌های کاری نشان‌دار هستند و سرپرست فناوری اطلاعات می‌تواند آن‌ها را ببیند"</string>
-    <string name="work_profile_edu_accept" msgid="6069788082535149071">"متوجه‌ام"</string>
+    <string name="work_profile_edu_accept" msgid="6069788082535149071">"متوجهم"</string>
     <string name="work_apps_paused_title" msgid="3040901117349444598">"برنامه‌های کاری موقتاً متوقف شده‌اند."</string>
     <string name="work_apps_paused_info_body" msgid="1687828929959237477">"از برنامه‌های کاری‌تان اعلان دریافت نخواهید کرد"</string>
     <string name="work_apps_paused_body" msgid="261634750995824906">"برنامه‌های کاری نمی‌توانند برای شما اعلان ارسال کنند، از باتری استفاده کنند، یا به مکانتان دسترسی داشته باشند"</string>
     <string name="work_apps_paused_telephony_unavailable_body" msgid="8358872357502756790">"از برنامه‌های کاری‌تان تماس تلفنی، پیام نوشتاری، یا اعلان دریافت نخواهید کرد"</string>
     <string name="work_apps_paused_edu_banner" msgid="8872412121608402058">"برنامه‌های کاری نشان‌دار هستند و سرپرست فناوری اطلاعات می‌تواند آن‌ها را ببیند."</string>
-    <string name="work_apps_paused_edu_accept" msgid="6377476824357318532">"متوجه‌ام"</string>
+    <string name="work_apps_paused_edu_accept" msgid="6377476824357318532">"متوجهم"</string>
     <string name="work_apps_pause_btn_text" msgid="4669288269140620646">"توقف موقت برنامه‌های کاری"</string>
     <string name="work_apps_enable_btn_text" msgid="1736198302467317371">"ازسرگیری"</string>
     <string name="work_scheduler_button_content_description" msgid="917340740986764967">"برنامه زمانی برنامه‌های کاری"</string>

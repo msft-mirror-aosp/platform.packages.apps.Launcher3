@@ -16,6 +16,11 @@
 
 package com.android.launcher3.model;
 
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP;
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APP_PAIR;
+import static com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_DEEP_SHORTCUT;
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
 import static com.android.launcher3.Utilities.SHOULD_SHOW_FIRST_PAGE_WIDGET;
 import static com.android.launcher3.icons.cache.CacheLookupFlag.DEFAULT_LOOKUP_FLAG;
@@ -37,6 +42,7 @@ import android.util.LongSparseArray;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import com.android.launcher3.Flags;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
 import com.android.launcher3.LauncherSettings.Favorites;
@@ -48,6 +54,8 @@ import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.icons.IconCache;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.model.data.AppInfo;
+import com.android.launcher3.model.data.CollectionInfo;
+import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.IconRequestInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemInfo;
@@ -83,6 +91,11 @@ public class LoaderCursor extends CursorWrapper {
     private final IntArray mItemsToRemove = new IntArray();
     private final IntArray mRestoredRows = new IntArray();
     private final IntSparseArrayMap<GridOccupancy> mOccupied = new IntSparseArrayMap<>();
+
+    // CollectionInfo objects, which have not yet been loaded from the DB, but are expected to
+    // found eventually as the loading progresses
+    private final IntSparseArrayMap<CollectionInfo> mPendingCollectionInfo =
+            new IntSparseArrayMap<>();
 
     private final int mIconIndex;
     public final int mTitleIndex;
@@ -189,7 +202,7 @@ public class LoaderCursor extends CursorWrapper {
         info.itemType = itemType;
         info.title = getTitle();
         // the fallback icon
-        if (!loadIcon(info)) {
+        if (!loadIconFromDb(info)) {
             info.bitmap = mIconCache.getDefaultIcon(info.user);
         }
 
@@ -201,15 +214,15 @@ public class LoaderCursor extends CursorWrapper {
     /**
      * Loads the icon from the cursor and updates the {@param info} if the icon is an app resource.
      */
-    protected boolean loadIcon(WorkspaceItemInfo info) {
-        return createIconRequestInfo(info, false).loadWorkspaceIcon(mContext);
+    protected boolean loadIconFromDb(WorkspaceItemInfo info) {
+        return createIconRequestInfo(info, false).loadIconFromDbBlob(mContext);
     }
 
     public IconRequestInfo<WorkspaceItemInfo> createIconRequestInfo(
             WorkspaceItemInfo wai, boolean useLowResIcon) {
         byte[] iconBlob = itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT || restoreFlag != 0
+                || (wai.isInactiveArchive() && Flags.restoreArchivedAppIconsFromDb())
                 ? getIconBlob() : null;
-
         return new IconRequestInfo<>(wai, mActivityInfo, iconBlob, useLowResIcon);
     }
 
@@ -300,7 +313,7 @@ public class LoaderCursor extends CursorWrapper {
         info.intent = intent;
 
         // the fallback icon
-        if (!loadIcon(info)) {
+        if (!loadIconFromDb(info)) {
             mIconCache.getTitleAndIcon(info, DEFAULT_LOOKUP_FLAG);
         }
 
@@ -363,20 +376,11 @@ public class LoaderCursor extends CursorWrapper {
         info.intent = newIntent;
         UserCache userCache = UserCache.getInstance(mContext);
         UserIconInfo userIconInfo = userCache.getUserInfo(user);
-
-        if (loadIcon) {
-            mIconCache.getTitleAndIcon(info, mActivityInfo,
-                    DEFAULT_LOOKUP_FLAG.withUseLowRes(useLowResIcon));
-            if (mIconCache.isDefaultIcon(info.bitmap, user)) {
-                loadIcon(info);
-            }
-        }
-
         if (mActivityInfo != null) {
             AppInfo.updateRuntimeFlagsForActivityTarget(info, mActivityInfo, userIconInfo,
                     ApiWrapper.INSTANCE.get(mContext), mPmHelper);
         }
-
+        loadWorkspaceTitleAndIcon(useLowResIcon, loadIcon, info);
         // from the db
         if (TextUtils.isEmpty(info.title)) {
             if (loadIcon) {
@@ -393,6 +397,32 @@ public class LoaderCursor extends CursorWrapper {
 
         info.contentDescription = mIconCache.getUserBadgedLabel(info.title, info.user);
         return info;
+    }
+
+    @VisibleForTesting
+    void loadWorkspaceTitleAndIcon(
+            boolean useLowResIcon,
+            boolean loadIconFromCache,
+            WorkspaceItemInfo info
+    ) {
+        boolean isPreArchived = Flags.enableSupportForArchiving()
+                && Flags.restoreArchivedAppIconsFromDb()
+                && info.isInactiveArchive();
+        boolean preArchivedIconNotFound = isPreArchived && !loadIconFromDb(info);
+        if (preArchivedIconNotFound) {
+            Log.d(TAG, "loadIconFromDb failed for pre-archived icon, loading from cache."
+                    + " Component=" + info.getTargetComponent());
+            mIconCache.getTitleAndIcon(info, mActivityInfo,
+                    DEFAULT_LOOKUP_FLAG.withUseLowRes(useLowResIcon));
+        } else if (loadIconFromCache && !info.isInactiveArchive()) {
+            mIconCache.getTitleAndIcon(info, mActivityInfo,
+                    DEFAULT_LOOKUP_FLAG.withUseLowRes(useLowResIcon));
+            if (mIconCache.isDefaultIcon(info.bitmap, user)) {
+                Log.d(TAG, "Default Icon found in cache, trying DB instead. "
+                        + " Component=" + info.getTargetComponent());
+                loadIconFromDb(info);
+            }
+        }
     }
 
     /**
@@ -479,8 +509,26 @@ public class LoaderCursor extends CursorWrapper {
         info.cellY = getInt(mCellYIndex);
     }
 
-    public void checkAndAddItem(ItemInfo info, BgDataModel dataModel) {
-        checkAndAddItem(info, dataModel, null);
+    /**
+     * Return an existing FolderInfo object if we have encountered this ID previously,
+     * or make a new one.
+     */
+    public CollectionInfo findOrMakeFolder(int id, BgDataModel dataModel) {
+        // See if a placeholder was created for us already
+        ItemInfo info = dataModel.itemsIdMap.get(id);
+        if (info instanceof CollectionInfo c) return c;
+
+        CollectionInfo pending = mPendingCollectionInfo.get(id);
+        if (pending != null) return pending;
+
+        // No placeholder -- create a new blank folder instance. At this point, we don't know
+        // if the desired container is supposed to be a folder or an app pair. In the case that
+        // it is an app pair, the blank folder will be replaced by a blank app pair when the app
+        // pair is getting processed, in WorkspaceItemProcessor.processFolderOrAppPair().
+        pending = new FolderInfo();
+        pending.id = id;
+        mPendingCollectionInfo.put(id, pending);
+        return pending;
     }
 
     /**
@@ -495,7 +543,21 @@ public class LoaderCursor extends CursorWrapper {
             ShortcutKey.fromItemInfo(info);
         }
         if (checkItemPlacement(info, dataModel.isFirstPagePinnedItemEnabled)) {
-            dataModel.addItem(mContext, info, false, logger);
+            if (logger != null) {
+                logger.addLog(
+                        Log.DEBUG,
+                        TAG,
+                        String.format("Adding item to ID map: %s", info),
+                        /* stackTrace= */ null);
+            }
+            dataModel.addItem(mContext, info, false);
+            if ((info.itemType == ITEM_TYPE_APP_PAIR
+                    || info.itemType == ITEM_TYPE_DEEP_SHORTCUT
+                    || info.itemType == ITEM_TYPE_APPLICATION)
+                    && info.container != CONTAINER_DESKTOP
+                    && info.container != CONTAINER_HOTSEAT) {
+                findOrMakeFolder(info.container, dataModel).add(info);
+            }
             if (mRestoreEventLogger != null) {
                 mRestoreEventLogger.logSingleFavoritesItemRestored(itemType);
             }

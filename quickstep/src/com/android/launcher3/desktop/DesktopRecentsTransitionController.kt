@@ -60,15 +60,20 @@ class DesktopRecentsTransitionController(
                 callback,
             )
         val transition = RemoteTransition(animRunner, appThread, "RecentsToDesktop")
-        systemUiProxy.showDesktopApps(desktopTaskView.display.displayId, transition)
+        systemUiProxy.showDesktopApps(desktopTaskView.displayId, transition)
     }
 
     /** Launch desktop tasks from recents view */
-    fun moveToDesktop(taskContainer: TaskContainer, transitionSource: DesktopModeTransitionSource) {
+    fun moveToDesktop(
+        taskContainer: TaskContainer,
+        transitionSource: DesktopModeTransitionSource,
+        successCallback: Runnable,
+    ) {
         systemUiProxy.moveToDesktop(
             taskContainer.task.key.id,
             transitionSource,
             /* transition = */ null,
+            successCallback,
         )
     }
 

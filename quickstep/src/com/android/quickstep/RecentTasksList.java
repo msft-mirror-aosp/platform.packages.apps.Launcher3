@@ -18,9 +18,11 @@ package com.android.quickstep;
 
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 
+import static com.android.launcher3.Flags.enableSeparateExternalDisplayTasks;
 import static com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR;
 import static com.android.quickstep.util.SplitScreenUtils.convertShellSplitBoundsToLauncher;
 import static com.android.wm.shell.shared.GroupedTaskInfo.TYPE_FREEFORM;
+import static com.android.wm.shell.shared.GroupedTaskInfo.TYPE_SPLIT;
 
 import android.app.ActivityManager.RunningTaskInfo;
 import android.app.KeyguardManager;
@@ -38,16 +40,26 @@ import com.android.launcher3.util.LooperExecutor;
 import com.android.launcher3.util.SplitConfigurationOptions;
 import com.android.quickstep.util.DesktopTask;
 import com.android.quickstep.util.GroupTask;
+import com.android.quickstep.util.SingleTask;
+import com.android.quickstep.util.SplitTask;
 import com.android.systemui.shared.recents.model.Task;
+import com.android.wm.shell.Flags;
 import com.android.wm.shell.recents.IRecentTasksListener;
 import com.android.wm.shell.shared.GroupedTaskInfo;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 
+import kotlin.collections.ArraysKt;
+import kotlin.collections.CollectionsKt;
+import kotlin.collections.MapsKt;
+
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -116,7 +128,8 @@ public class RecentTasksList {
             @Override
             public void onTaskMovedToFront(GroupedTaskInfo taskToFront) {
                 mMainThreadExecutor.execute(() -> {
-                    topTaskTracker.handleTaskMovedToFront(taskToFront.getTaskInfo1());
+                    topTaskTracker.handleTaskMovedToFront(
+                            taskToFront.getBaseGroupedTask().getTaskInfo1());
                 });
             }
 
@@ -340,81 +353,109 @@ public class RecentTasksList {
 
         int numVisibleTasks = 0;
         for (GroupedTaskInfo rawTask : rawTasks) {
-            if (rawTask.getType() == TYPE_FREEFORM) {
+            if (rawTask.isBaseType(TYPE_FREEFORM)) {
                 // TYPE_FREEFORM tasks is only created when desktop mode can be entered,
                 // leftover TYPE_FREEFORM tasks created when flag was on should be ignored.
                 if (DesktopModeStatus.canEnterDesktopMode(mContext)) {
-                    GroupTask desktopTask = createDesktopTask(rawTask);
-                    if (desktopTask != null) {
-                        allTasks.add(desktopTask);
-                    }
+                    List<DesktopTask> desktopTasks = createDesktopTasks(
+                            rawTask.getBaseGroupedTask());
+                    allTasks.addAll(desktopTasks);
                 }
                 continue;
             }
-            TaskInfo taskInfo1 = rawTask.getTaskInfo1();
-            TaskInfo taskInfo2 = rawTask.getTaskInfo2();
-            Task.TaskKey task1Key = new Task.TaskKey(taskInfo1);
-            Task task1 = loadKeysOnly
-                    ? new Task(task1Key)
-                    : Task.from(task1Key, taskInfo1,
-                            tmpLockedUsers.get(task1Key.userId) /* isLocked */);
-            Task task2 = null;
-            if (taskInfo2 != null) {
-                // Is split task
-                Task.TaskKey task2Key = new Task.TaskKey(taskInfo2);
-                task2 = loadKeysOnly
-                        ? new Task(task2Key)
-                        : Task.from(task2Key, taskInfo2,
-                                tmpLockedUsers.get(task2Key.userId) /* isLocked */);
+
+            if (Flags.enableShellTopTaskTracking()) {
+                final TaskInfo taskInfo1 = rawTask.getBaseGroupedTask().getTaskInfo1();
+                final Task.TaskKey task1Key = new Task.TaskKey(taskInfo1);
+                final Task task1 = Task.from(task1Key, taskInfo1,
+                        tmpLockedUsers.get(task1Key.userId) /* isLocked */);
+
+                if (rawTask.isBaseType(TYPE_SPLIT)) {
+                    final TaskInfo taskInfo2 = rawTask.getBaseGroupedTask().getTaskInfo2();
+                    final Task.TaskKey task2Key = new Task.TaskKey(taskInfo2);
+                    final Task task2 = Task.from(task2Key, taskInfo2,
+                            tmpLockedUsers.get(task2Key.userId) /* isLocked */);
+                    final SplitConfigurationOptions.SplitBounds launcherSplitBounds =
+                            convertShellSplitBoundsToLauncher(
+                                    rawTask.getBaseGroupedTask().getSplitBounds());
+                    allTasks.add(new SplitTask(task1, task2, launcherSplitBounds));
+                } else {
+                    allTasks.add(new SingleTask(task1));
+                }
             } else {
-                // Is fullscreen task
-                if (numVisibleTasks > 0) {
-                    boolean isExcluded = (taskInfo1.baseIntent.getFlags()
-                            & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) != 0;
-                    if (taskInfo1.isTopActivityTransparent && isExcluded) {
-                        // If there are already visible tasks, then ignore the excluded tasks and
-                        // don't add them to the returned list
-                        continue;
+                TaskInfo taskInfo1 = rawTask.getTaskInfo1();
+                TaskInfo taskInfo2 = rawTask.getTaskInfo2();
+                Task.TaskKey task1Key = new Task.TaskKey(taskInfo1);
+                Task task1 = loadKeysOnly
+                        ? new Task(task1Key)
+                        : Task.from(task1Key, taskInfo1,
+                                tmpLockedUsers.get(task1Key.userId) /* isLocked */);
+                Task task2 = null;
+                if (taskInfo2 != null) {
+                    // Is split task
+                    Task.TaskKey task2Key = new Task.TaskKey(taskInfo2);
+                    task2 = loadKeysOnly
+                            ? new Task(task2Key)
+                            : Task.from(task2Key, taskInfo2,
+                                    tmpLockedUsers.get(task2Key.userId) /* isLocked */);
+                } else {
+                    // Is fullscreen task
+                    if (numVisibleTasks > 0) {
+                        boolean isExcluded = (taskInfo1.baseIntent.getFlags()
+                                & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS) != 0;
+                        if (taskInfo1.isTopActivityTransparent && isExcluded) {
+                            // If there are already visible tasks, then ignore the excluded tasks
+                            // and don't add them to the returned list
+                            continue;
+                        }
                     }
                 }
+                if (taskInfo1.isVisible) {
+                    numVisibleTasks++;
+                }
+                if (task2 != null) {
+                    Objects.requireNonNull(rawTask.getSplitBounds());
+                    final SplitConfigurationOptions.SplitBounds launcherSplitBounds =
+                            convertShellSplitBoundsToLauncher(rawTask.getSplitBounds());
+                    allTasks.add(new SplitTask(task1, task2, launcherSplitBounds));
+                } else {
+                    allTasks.add(new SingleTask(task1));
+                }
             }
-            if (taskInfo1.isVisible) {
-                numVisibleTasks++;
-            }
-            final SplitConfigurationOptions.SplitBounds launcherSplitBounds =
-                    convertShellSplitBoundsToLauncher(rawTask.getSplitBounds());
-            allTasks.add(new GroupTask(task1, task2, launcherSplitBounds));
         }
 
         return allTasks;
     }
 
-    private @Nullable DesktopTask createDesktopTask(GroupedTaskInfo recentTaskInfo) {
-        ArrayList<Task> tasks = new ArrayList<>(recentTaskInfo.getTaskInfoList().size());
-        int[] minimizedTaskIds = recentTaskInfo.getMinimizedTaskIds();
-        if (minimizedTaskIds.length == recentTaskInfo.getTaskInfoList().size()) {
-            // All Tasks are minimized -> don't create a DesktopTask
-            return null;
-        }
-        for (TaskInfo taskInfo : recentTaskInfo.getTaskInfoList()) {
-            Task.TaskKey key = new Task.TaskKey(taskInfo);
-            Task task = Task.from(key, taskInfo, false);
-            task.positionInParent = taskInfo.positionInParent;
-            task.appBounds = taskInfo.configuration.windowConfiguration.getAppBounds();
-            task.isVisible = taskInfo.isVisible;
-            task.isMinimized =
-                    Arrays.stream(minimizedTaskIds).anyMatch(taskId -> taskId == taskInfo.taskId);
-            tasks.add(task);
-        }
-        return new DesktopTask(tasks);
+    private Task createTask(TaskInfo taskInfo, Set<Integer> minimizedTaskIds) {
+        Task.TaskKey key = new Task.TaskKey(taskInfo);
+        Task task = Task.from(key, taskInfo, false);
+        task.positionInParent = taskInfo.positionInParent;
+        task.appBounds = taskInfo.configuration.windowConfiguration.getAppBounds();
+        task.isVisible = taskInfo.isVisible;
+        task.isMinimized = minimizedTaskIds.contains(taskInfo.taskId);
+        return task;
     }
 
-    private ArrayList<GroupTask> copyOf(ArrayList<GroupTask> tasks) {
-        ArrayList<GroupTask> newTasks = new ArrayList<>();
-        for (int i = 0; i < tasks.size(); i++) {
-            newTasks.add(tasks.get(i).copy());
+    private List<DesktopTask> createDesktopTasks(GroupedTaskInfo recentTaskInfo) {
+        int[] minimizedTaskIdArray = recentTaskInfo.getMinimizedTaskIds();
+        Set<Integer> minimizedTaskIds = minimizedTaskIdArray != null
+                ? CollectionsKt.toSet(ArraysKt.asIterable(minimizedTaskIdArray))
+                : Collections.emptySet();
+        if (enableSeparateExternalDisplayTasks()) {
+            Map<Integer, List<Task>> perDisplayTasks = new HashMap<>();
+            for (TaskInfo taskInfo : recentTaskInfo.getTaskInfoList()) {
+                Task task = createTask(taskInfo, minimizedTaskIds);
+                List<Task> tasks = perDisplayTasks.computeIfAbsent(taskInfo.displayId,
+                        k -> new ArrayList<>());
+                tasks.add(task);
+            }
+            return MapsKt.map(perDisplayTasks, it -> new DesktopTask(it.getValue()));
+        } else {
+            List<Task> tasks = CollectionsKt.map(recentTaskInfo.getTaskInfoList(),
+                    it -> createTask(it, minimizedTaskIds));
+            return List.of(new DesktopTask(tasks));
         }
-        return newTasks;
     }
 
     public void dump(String prefix, PrintWriter writer) {
@@ -422,14 +463,12 @@ public class RecentTasksList {
         writer.println(prefix + "  mChangeId=" + mChangeId);
         writer.println(prefix + "  mResultsUi=[id=" + mResultsUi.mRequestId + ", tasks=");
         for (GroupTask task : mResultsUi) {
-            Task task1 = task.task1;
-            Task task2 = task.task2;
-            ComponentName cn1 = task1.getTopComponent();
-            ComponentName cn2 = task2 != null ? task2.getTopComponent() : null;
-            writer.println(prefix + "    t1: (id=" + task1.key.id
-                    + "; package=" + (cn1 != null ? cn1.getPackageName() + ")" : "no package)")
-                    + " t2: (id=" + (task2 != null ? task2.key.id : "-1")
-                    + "; package=" + (cn2 != null ? cn2.getPackageName() + ")" : "no package)"));
+            int count = 0;
+            for (Task t : task.getTasks()) {
+                ComponentName cn = t.getTopComponent();
+                writer.println(prefix + "    t" + (++count) + ": (id=" + t.key.id
+                        + "; package=" + (cn != null ? cn.getPackageName() + ")" : "no package)"));
+            }
         }
         writer.println(prefix + "  ]");
         int currentUserId = Process.myUserHandle().getIdentifier();
@@ -441,14 +480,7 @@ public class RecentTasksList {
         }
         writer.println(prefix + "  rawTasks=[");
         for (GroupedTaskInfo task : rawTasks) {
-            TaskInfo taskInfo1 = task.getTaskInfo1();
-            TaskInfo taskInfo2 = task.getTaskInfo2();
-            ComponentName cn1 = taskInfo1.topActivity;
-            ComponentName cn2 = taskInfo2 != null ? taskInfo2.topActivity : null;
-            writer.println(prefix + "    t1: (id=" + taskInfo1.taskId
-                    + "; package=" + (cn1 != null ? cn1.getPackageName() + ")" : "no package)")
-                    + " t2: (id=" + (taskInfo2 != null ? taskInfo2.taskId : "-1")
-                    + "; package=" + (cn2 != null ? cn2.getPackageName() + ")" : "no package)"));
+            writer.println(prefix + task);
         }
         writer.println(prefix + "  ]");
     }

@@ -32,6 +32,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
 
 private val phoneContext = InstrumentationRegistry.getInstrumentation().targetContext
 
@@ -80,12 +82,12 @@ class GridMigrationData(dbFileName: String?, val gridState: DeviceGridState) {
 @RunWith(AndroidJUnit4::class)
 class GridMigrationTest {
     private val DB_FILE = "test_launcher.db"
-    // This DB is used for testing the heuristic where we add an extra row at the bottom.
-    private val DB_FILE_NO_SHIFT = "test_launcher_2.db"
 
     @JvmField
     @Rule
     val setFlagsRule = SetFlagsRule(SetFlagsRule.DefaultInitValueType.DEVICE_DEFAULT)
+
+    val modelDelegate = mock<ModelDelegate>()
 
     @Before
     fun setup() {
@@ -102,6 +104,7 @@ class GridMigrationTest {
                 dst.dbHelper,
                 src.dbHelper.readableDatabase,
                 true,
+                modelDelegate,
             )
         } else {
             GridSizeMigrationDBController.migrateGridIfNeeded(
@@ -111,6 +114,7 @@ class GridMigrationTest {
                 dst.dbHelper,
                 src.dbHelper.readableDatabase,
                 true,
+                modelDelegate,
             )
         }
     }
@@ -149,11 +153,12 @@ class GridMigrationTest {
     }
 
     /**
-     * Migrate src into dst and compare to target. This method validates 3 things:
+     * Migrate src into dst and compare to target. This method validates 4 things:
      * 1. dst has the same number of items as src after the migration, meaning, none of the items
      *    were removed during the migration.
      * 2. dst is valid, meaning that none of the items overlap with each other.
      * 3. dst is equal to target to ensure we don't unintentionally change the migration logic.
+     * 4. migration notifies the complete callback.
      */
     private fun runTest(src: GridMigrationData, dst: GridMigrationData, target: GridMigrationData) {
         migrate(src, dst)
@@ -162,6 +167,7 @@ class GridMigrationTest {
         }
         validateDb(dst)
         compare(dst, target, src)
+        verify(modelDelegate).gridMigrationComplete(src.gridState, dst.gridState)
     }
 
     // Copying the src db for all tests.
@@ -222,42 +228,6 @@ class GridMigrationTest {
 
     @JvmField
     @Rule
-    val result5x5to5x8WithShift =
-        TestToPhoneFileCopier(
-            src = "databases/GridMigrationTest/result5x5to5x8WithShift.db",
-            dest = "databases/result5x5to5x8WithShift.db",
-            removeOnFinish = true,
-        )
-
-    @Test
-    fun `5x5 to 5x8 with cells shifting down`() =
-        runTest(
-            src = GridMigrationData(DB_FILE, DeviceGridState(5, 5, 5, TYPE_PHONE, DB_FILE)),
-            dst =
-                GridMigrationData(
-                    null, // in memory db, to download a new db change null
-                    // for
-                    // the filename of the db name to store it. Do not use existing names.
-                    DeviceGridState(5, 8, 5, TYPE_PHONE, ""),
-                ),
-            target =
-                GridMigrationData(
-                    "result5x5to5x8WithShift.db",
-                    DeviceGridState(5, 8, 5, TYPE_PHONE, ""),
-                ),
-        )
-
-    @JvmField
-    @Rule
-    val fileCopierNoShift =
-        TestToPhoneFileCopier(
-            src = "databases/GridMigrationTest/$DB_FILE_NO_SHIFT",
-            dest = "databases/$DB_FILE_NO_SHIFT",
-            removeOnFinish = true,
-        )
-
-    @JvmField
-    @Rule
     val result5x5to5x8 =
         TestToPhoneFileCopier(
             src = "databases/GridMigrationTest/result5x5to5x8.db",
@@ -266,16 +236,13 @@ class GridMigrationTest {
         )
 
     @Test
-    fun `5x5 to 5x8 without cell shift`() =
+    fun `5x5 to 5x8`() =
         runTest(
-            src =
-                GridMigrationData(
-                    DB_FILE_NO_SHIFT,
-                    DeviceGridState(5, 5, 5, TYPE_PHONE, DB_FILE_NO_SHIFT),
-                ),
+            src = GridMigrationData(DB_FILE, DeviceGridState(5, 5, 5, TYPE_PHONE, DB_FILE)),
             dst =
                 GridMigrationData(
-                    null, // in memory db, to download a new db change null for
+                    null, // in memory db, to download a new db change null
+                    // for
                     // the filename of the db name to store it. Do not use existing names.
                     DeviceGridState(5, 8, 5, TYPE_PHONE, ""),
                 ),

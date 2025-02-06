@@ -30,6 +30,8 @@
     <string name="recent_task_option_desktop">Desktop</string>
     <!-- Title and content description for an option to move app to external display. -->
     <string name="recent_task_option_external_display">Move to external display</string>
+    <!-- Title and content description for an option to close the app [CHAR LIMIT=30] -->
+    <string name="recent_task_option_close">Close</string>
 
     <!-- Title and content description for Desktop tile in Recents screen that contains apps opened inside desktop windowing mode [CHAR LIMIT=NONE] -->
     <string name="recent_task_desktop">Desktop</string>
@@ -48,9 +50,6 @@
 
     <!-- Accessibility title for the list of recent apps [CHAR_LIMIT=none] -->
     <string name="accessibility_recent_apps">Recent apps</string>
-
-    <!-- Accessibility confirmation for task closed -->
-    <string name="task_view_closed">Task Closed</string>
 
     <!-- Accessibility title for an app card in Recents for apps that have time limit set
      [CHAR_LIMIT=none] -->
@@ -100,6 +99,9 @@
 
     <!-- content description for hotseat items -->
     <string name="hotseat_prediction_content_description">Predicted app: <xliff:g id="title" example="Chrome">%1$s</xliff:g></string>
+
+    <!-- Title of the Gesture Navigation Tutorial page [CHAR LIMIT=NONE] -->
+    <string name="gesture_tutorial_title">Gesture Navigation Tutorial</string>
 
     <!-- Title of prompt shown before the gesture navigation tutorial to users who need to rotate their screen. [CHAR LIMIT=100] -->
     <string name="gesture_tutorial_rotation_prompt_title">Rotate your device</string>
@@ -304,10 +306,6 @@
     <string name="taskbar_a11y_shown_with_bubbles_left_title">Taskbar &#38; bubbles left shown</string>
     <!-- Accessibility title for the Taskbar window appearing together with bubble bar on right. [CHAR_LIMIT=30] -->
     <string name="taskbar_a11y_shown_with_bubbles_right_title">Taskbar &#38; bubbles right shown</string>
-    <!-- Accessibility title for the Taskbar window being closed. [CHAR_LIMIT=30] -->
-    <string name="taskbar_a11y_hidden_title">Taskbar hidden</string>
-    <!-- Accessibility title for the Taskbar window being closed together with bubble bar. [CHAR_LIMIT=30] -->
-    <string name="taskbar_a11y_hidden_with_bubbles_title">Taskbar &#38; bubbles hidden</string>
     <!-- Accessibility title for the Taskbar window on phones. [CHAR_LIMIT=NONE] -->
     <string name="taskbar_phone_a11y_title">Navigation bar</string>
     <!-- Text in popup dialog for user to switch between always showing Taskbar or not. [CHAR LIMIT=30] -->
@@ -360,4 +358,12 @@
     <!-- Name of Google's new feature to circle to search anything on your phone screen, without
      switching apps. [CHAR_LIMIT=60] -->
     <string name="search_gesture_feature_title">Circle to Search</string>
+
+    <!-- Strings for task thumbnail header in Overview -->
+    <!-- Content description for the header app icon. [CHAR LIMIT=NONE] -->
+    <string name="header_app_icon_description">App icon</string>
+    <!-- Default app title for a task view in Overview. [CHAR LIMIT=NONE] -->
+    <string name="header_default_app_title">App title</string>
+    <!-- Content description for the header close button. [CHAR LIMIT=NONE] -->
+    <string name="header_close_icon_description">Close button</string>
 </resources>

@@ -23,11 +23,14 @@ import android.os.SystemClock
 import android.os.Trace
 import android.util.Log
 import android.view.View
+import android.window.TransitionInfo
 import androidx.annotation.BinderThread
 import androidx.annotation.UiThread
 import androidx.annotation.VisibleForTesting
 import com.android.internal.jank.Cuj
+import com.android.launcher3.Flags.enableFallbackOverviewInWindow
 import com.android.launcher3.Flags.enableLargeDesktopWindowingTile
+import com.android.launcher3.Flags.enableLauncherOverviewInWindow
 import com.android.launcher3.Flags.enableOverviewCommandHelperTimeout
 import com.android.launcher3.PagedView
 import com.android.launcher3.logger.LauncherAtom
@@ -343,9 +346,12 @@ constructor(
             return false
         }
 
-        val activity = containerInterface.getCreatedContainer()
-        if (activity != null) {
-            InteractionJankMonitorWrapper.begin(activity.rootView, Cuj.CUJ_LAUNCHER_QUICK_SWITCH)
+        val recentsInWindowFlagSet =
+            enableFallbackOverviewInWindow() || enableLauncherOverviewInWindow()
+        if (!recentsInWindowFlagSet) {
+            containerInterface.getCreatedContainer()?.rootView?.let { view ->
+                InteractionJankMonitorWrapper.begin(view, Cuj.CUJ_LAUNCHER_QUICK_SWITCH)
+            }
         }
 
         val gestureState =
@@ -369,8 +375,15 @@ constructor(
                 override fun onRecentsAnimationStart(
                     controller: RecentsAnimationController,
                     targets: RecentsAnimationTargets,
+                    transitionInfo: TransitionInfo?,
                 ) {
                     Log.d(TAG, "recents animation started: $command")
+                    if (recentsInWindowFlagSet) {
+                        containerInterface.getCreatedContainer()?.rootView?.let { view ->
+                            InteractionJankMonitorWrapper.begin(view, Cuj.CUJ_LAUNCHER_QUICK_SWITCH)
+                        }
+                    }
+
                     updateRecentsViewFocus(command)
                     logShowOverviewFrom(command.type)
                     containerInterface.runOnInitBackgroundStateUI {

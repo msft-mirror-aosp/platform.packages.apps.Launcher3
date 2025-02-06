@@ -21,6 +21,7 @@ import static android.content.res.Configuration.UI_MODE_NIGHT_YES;
 import static android.view.Display.DEFAULT_DISPLAY;
 
 import static com.android.launcher3.LauncherSettings.Favorites.TABLE_NAME;
+import static com.android.launcher3.graphics.ThemeManager.PREF_ICON_SHAPE;
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
 
@@ -52,6 +53,7 @@ import androidx.annotation.WorkerThread;
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.graphics.LauncherPreviewRenderer.PreviewContext;
@@ -70,6 +72,7 @@ import com.android.systemui.shared.Flags;
 
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /** Render preview using surface view. */
@@ -77,9 +80,7 @@ import java.util.concurrent.TimeUnit;
 public class PreviewSurfaceRenderer {
 
     private static final String TAG = "PreviewSurfaceRenderer";
-
     private static final int FADE_IN_ANIMATION_DURATION = 200;
-
     private static final String KEY_HOST_TOKEN = "host_token";
     private static final String KEY_VIEW_WIDTH = "width";
     private static final String KEY_VIEW_HEIGHT = "height";
@@ -90,24 +91,24 @@ public class PreviewSurfaceRenderer {
     private static final String KEY_DARK_MODE = "use_dark_mode";
 
     private Context mContext;
+    private SparseIntArray mPreviewColorOverride;
+    private String mGridName;
+    private String mShapeKey;
+
+    @Nullable private Boolean mDarkMode;
+    private boolean mDestroyed = false;
+    private boolean mHideQsb;
+    @Nullable private FrameLayout mViewRoot = null;
+
     private final IBinder mHostToken;
     private final int mWidth;
     private final int mHeight;
-    private String mGridName;
-
     private final int mDisplayId;
     private final Display mDisplay;
     private final WallpaperColors mWallpaperColors;
-    private SparseIntArray mPreviewColorOverride;
-    @Nullable private Boolean mDarkMode;
     private final RunnableList mLifeCycleTracker;
-
     private final SurfaceControlViewHost mSurfaceControlViewHost;
 
-    private boolean mDestroyed = false;
-    private LauncherPreviewRenderer mRenderer;
-    private boolean mHideQsb;
-    @Nullable private FrameLayout mViewRoot = null;
 
     public PreviewSurfaceRenderer(
             Context context, RunnableList lifecycleTracker, Bundle bundle) throws Exception {
@@ -135,10 +136,10 @@ public class PreviewSurfaceRenderer {
         }
 
         mSurfaceControlViewHost = MAIN_EXECUTOR.submit(() -> new MySurfaceControlViewHost(
-                mContext,
-                context.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY),
-                mHostToken,
-                mLifeCycleTracker))
+                        mContext,
+                        context.getSystemService(DisplayManager.class).getDisplay(DEFAULT_DISPLAY),
+                        mHostToken,
+                        mLifeCycleTracker))
                 .get(5, TimeUnit.SECONDS);
         mLifeCycleTracker.add(this::destroy);
     }
@@ -219,14 +220,27 @@ public class PreviewSurfaceRenderer {
     }
 
     /**
+     * Update the shapes of the launcher preview
+     *
+     * @param shapeKey key for the IconShape model
+     */
+    public void updateShape(@Nullable String shapeKey) {
+        if (Objects.equals(mShapeKey, shapeKey)) {
+            Log.w(TAG, "Preview shape already set, skipping. shape=" + mShapeKey);
+            return;
+        }
+        mShapeKey = shapeKey;
+        loadAsync();
+    }
+
+    /**
      * Hides the components in the bottom row.
      *
      * @param hide True to hide and false to show.
      */
     public void hideBottomRow(boolean hide) {
-        if (mRenderer != null) {
-            mRenderer.hideBottomRow(hide);
-        }
+        mHideQsb = hide;
+        loadAsync();
     }
 
     /**
@@ -303,9 +317,13 @@ public class PreviewSurfaceRenderer {
     private void loadModelData() {
         final Context inflationContext = getPreviewContext();
         final InvariantDeviceProfile idp = new InvariantDeviceProfile(inflationContext, mGridName);
-        if (GridSizeMigrationDBController.needsToMigrate(inflationContext, idp)) {
+        if (GridSizeMigrationDBController.needsToMigrate(inflationContext, idp)
+                || mShapeKey != null) {
             // Start the migration
             PreviewContext previewContext = new PreviewContext(inflationContext, idp);
+            if (mShapeKey != null) {
+                LauncherPrefs.INSTANCE.get(previewContext).put(PREF_ICON_SHAPE, mShapeKey);
+            }
             // Copy existing data to preview DB
             LauncherDbUtils.copyTable(LauncherAppState.getInstance(mContext)
                             .getModel().getModelDbController().getDb(),
@@ -368,15 +386,16 @@ public class PreviewSurfaceRenderer {
         if (mDestroyed) {
             return;
         }
+        LauncherPreviewRenderer renderer;
         if (Flags.newCustomizationPickerUi()) {
-            mRenderer = new LauncherPreviewRenderer(inflationContext, idp, mPreviewColorOverride,
+            renderer = new LauncherPreviewRenderer(inflationContext, idp, mPreviewColorOverride,
                     mWallpaperColors, launcherWidgetSpanInfo);
         } else {
-            mRenderer = new LauncherPreviewRenderer(inflationContext, idp,
+            renderer = new LauncherPreviewRenderer(inflationContext, idp,
                     mWallpaperColors, launcherWidgetSpanInfo);
         }
-        mRenderer.hideBottomRow(mHideQsb);
-        View view = mRenderer.getRenderedView(dataModel, widgetProviderInfoMap);
+        renderer.hideBottomRow(mHideQsb);
+        View view = renderer.getRenderedView(dataModel, widgetProviderInfoMap);
         // This aspect scales the view to fit in the surface and centers it
         final float scale = Math.min(mWidth / (float) view.getMeasuredWidth(),
                 mHeight / (float) view.getMeasuredHeight());

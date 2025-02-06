@@ -34,8 +34,7 @@ import static com.android.quickstep.util.SystemActionConstants.SYSTEM_ACTION_ID_
 import static com.android.quickstep.util.SystemUiFlagUtils.isTaskbarHidden;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_BUBBLES_EXPANDED;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_DIALOG_SHOWING;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SHOWING;
-import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_SWITCHER_SHOWING;
+import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_IME_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE;
 import static com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_SCREEN_PINNING;
 
@@ -259,8 +258,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
 
     private @Nullable AnimatorSet mAnimator;
     private boolean mIsSystemGestureInProgress;
-    private boolean mIsImeShowing;
-    private boolean mIsImeSwitcherShowing;
+    /** Whether the IME is visible. */
+    private boolean mIsImeVisible;
 
     private final Alarm mTimeoutAlarm = new Alarm();
     private boolean mEnableBlockingTimeoutDuringTests = false;
@@ -268,6 +267,8 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     private Animator mTaskbarBackgroundAlphaAnimator;
     private final long mTaskbarBackgroundDuration;
     private boolean mUserIsNotGoingHome = false;
+
+    private final boolean mInAppStateAffectsDesktopTasksVisibilityInTaskbar;
 
     // Evaluate whether the handle should be stashed
     private final LongPredicate mIsStashedPredicate = flags -> {
@@ -293,8 +294,17 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         mSystemUiProxy = SystemUiProxy.INSTANCE.get(activity);
         mAccessibilityManager = mActivity.getSystemService(AccessibilityManager.class);
 
-        mTaskbarBackgroundDuration =
-                activity.getResources().getInteger(R.integer.taskbar_background_duration);
+        // Taskbar, via `TaskbarDesktopModeController`, depends on `TaskbarStashController` state to
+        // determine whether desktop tasks should be shown because taskbar is pinned on the home
+        // screen for freeform windowing displays. In this case, list of items shown in the taskbar
+        // needs to be updated when in-app state changes.
+        // TODO(b/390665752): Feature to "lock" pinned taskbar to home screen will be superseded by
+        //     pinning, in other launcher states, at which point this variable can be removed.
+        mInAppStateAffectsDesktopTasksVisibilityInTaskbar =
+                DisplayController.showLockedTaskbarOnHome(mActivity);
+
+        mTaskbarBackgroundDuration = activity.getResources().getInteger(
+                R.integer.taskbar_background_duration);
         if (mActivity.isPhoneMode()) {
             mUnstashedHeight = mActivity.getResources().getDimensionPixelSize(
                     R.dimen.taskbar_phone_size);
@@ -1109,7 +1119,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
      */
     @VisibleForTesting
     long getTaskbarStashStartDelayForIme() {
-        if (mIsImeShowing) {
+        if (mIsImeVisible) {
             // Only delay when IME is exiting, not entering.
             return 0;
         }
@@ -1135,8 +1145,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         updateStateForFlag(FLAG_STASHED_DEVICE_LOCKED,
                 SystemUiFlagUtils.isLocked(systemUiStateFlags));
 
-        mIsImeShowing = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_IME_SHOWING);
-        mIsImeSwitcherShowing = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_IME_SWITCHER_SHOWING);
+        mIsImeVisible = hasAnyFlag(systemUiStateFlags, SYSUI_STATE_IME_VISIBLE);
         if (updateStateForFlag(FLAG_STASHED_IME, shouldStashForIme())) {
             animDuration = TASKBAR_STASH_DURATION_FOR_IME;
             startDelay = getTaskbarStashStartDelayForIme();
@@ -1152,7 +1161,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
     }
 
     /**
-     * We stash when IME or IME switcher is showing.
+     * We stash when the IME is visible.
      *
      * <p>Do not stash if in small screen, with 3 button nav, and in landscape (or seascape).
      * <p>Do not stash if taskbar is transient.
@@ -1188,7 +1197,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
             return false;
         }
 
-        return mIsImeShowing || mIsImeSwitcherShowing;
+        return mIsImeVisible;
     }
 
     /**
@@ -1237,6 +1246,10 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         if (hasAnyFlag(changedFlags, FLAG_IN_OVERVIEW | FLAG_IN_APP)) {
             mControllers.runAfterInit(() -> mControllers.taskbarInsetsController
                     .onTaskbarOrBubblebarWindowHeightOrInsetsChanged());
+            if (mInAppStateAffectsDesktopTasksVisibilityInTaskbar) {
+                mControllers.runAfterInit(
+                        () -> mControllers.taskbarViewController.commitRunningAppsToUI());
+            }
         }
         mActivity.applyForciblyShownFlagWhileTransientTaskbarUnstashed(!isStashedInApp());
     }
@@ -1359,8 +1372,7 @@ public class TaskbarStashController implements TaskbarControllers.LoggableTaskba
         pw.println(prefix + "\tappliedState=" + getStateString(mStatePropertyHolder.mPrevFlags));
         pw.println(prefix + "\tmState=" + getStateString(mState));
         pw.println(prefix + "\tmIsSystemGestureInProgress=" + mIsSystemGestureInProgress);
-        pw.println(prefix + "\tmIsImeShowing=" + mIsImeShowing);
-        pw.println(prefix + "\tmIsImeSwitcherShowing=" + mIsImeSwitcherShowing);
+        pw.println(prefix + "\tmIsImeVisible=" + mIsImeVisible);
     }
 
     private static String getStateString(long flags) {

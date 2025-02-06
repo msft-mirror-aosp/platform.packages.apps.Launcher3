@@ -49,6 +49,7 @@ import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.SurfaceControl.Transaction;
 import android.view.animation.Interpolator;
+import android.window.TransitionInfo;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -66,7 +67,6 @@ import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.quickstep.AbsSwipeUpHandler;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.RecentsAnimationController;
-import com.android.quickstep.RecentsAnimationDeviceState;
 import com.android.quickstep.RecentsAnimationTargets;
 import com.android.quickstep.TaskAnimationManager;
 import com.android.quickstep.fallback.FallbackRecentsView;
@@ -110,11 +110,10 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
 
     private boolean mAppCanEnterPip;
 
-    public RecentsWindowSwipeHandler(Context context, RecentsAnimationDeviceState deviceState,
-            TaskAnimationManager taskAnimationManager, GestureState gestureState, long touchTimeMs,
-            boolean continuingLastGesture, InputConsumerController inputConsumer,
-            MSDLPlayerWrapper msdlPlayerWrapper) {
-        super(context, deviceState, taskAnimationManager, gestureState, touchTimeMs,
+    public RecentsWindowSwipeHandler(Context context, TaskAnimationManager taskAnimationManager,
+            GestureState gestureState, long touchTimeMs, boolean continuingLastGesture,
+            InputConsumerController inputConsumer, MSDLPlayerWrapper msdlPlayerWrapper) {
+        super(context, taskAnimationManager, gestureState, touchTimeMs,
                 continuingLastGesture, inputConsumer, msdlPlayerWrapper);
 
         mRecentsDisplayModel = RecentsDisplayModel.getINSTANCE().get(context);
@@ -126,8 +125,8 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
 
     @Override
     public void onRecentsAnimationStart(RecentsAnimationController controller,
-            RecentsAnimationTargets targets) {
-        super.onRecentsAnimationStart(controller, targets);
+            RecentsAnimationTargets targets, @Nullable TransitionInfo transitionInfo) {
+        super.onRecentsAnimationStart(controller, targets, transitionInfo);
         initTransformParams();
     }
 
@@ -257,8 +256,7 @@ public class RecentsWindowSwipeHandler extends AbsSwipeUpHandler<RecentsWindowMa
         if (mRunningOverHome) {
             if (DisplayController.getNavigationMode(mContext).hasGestures) {
                 mRecentsView.onGestureAnimationStartOnHome(
-                        mGestureState.getRunningTask().getPlaceholderTasks(),
-                        mDeviceState.getRotationTouchHelper());
+                        mGestureState.getRunningTask().getPlaceholderTasks());
             }
         } else {
             super.notifyGestureAnimationStartToRecents();

@@ -19,19 +19,23 @@ package com.android.launcher3.dagger;
 import android.content.Context;
 
 import com.android.launcher3.LauncherPrefs;
-import com.android.launcher3.contextualeducation.ContextualEduStatsManager;
 import com.android.launcher3.graphics.IconShape;
+import com.android.launcher3.graphics.ThemeManager;
 import com.android.launcher3.model.ItemInstallQueue;
 import com.android.launcher3.pm.InstallSessionHelper;
+import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.util.ApiWrapper;
 import com.android.launcher3.util.DaggerSingletonTracker;
+import com.android.launcher3.util.DisplayController;
 import com.android.launcher3.util.DynamicResource;
+import com.android.launcher3.util.LockedUserState;
 import com.android.launcher3.util.MSDLPlayerWrapper;
 import com.android.launcher3.util.PackageManagerHelper;
 import com.android.launcher3.util.PluginManagerWrapper;
 import com.android.launcher3.util.ScreenOnTracker;
 import com.android.launcher3.util.SettingsCache;
 import com.android.launcher3.util.VibratorWrapper;
+import com.android.launcher3.util.WallpaperColorHints;
 import com.android.launcher3.util.window.RefreshRateTracker;
 import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.widget.custom.CustomWidgetManager;
@@ -49,7 +53,6 @@ import dagger.BindsInstance;
 public interface LauncherBaseAppComponent {
     DaggerSingletonTracker getDaggerSingletonTracker();
     ApiWrapper getApiWrapper();
-    ContextualEduStatsManager getContextualEduStatsManager();
     CustomWidgetManager getCustomWidgetManager();
     DynamicResource getDynamicResource();
     IconShape getIconShape();
@@ -64,6 +67,11 @@ public interface LauncherBaseAppComponent {
     MSDLPlayerWrapper getMSDLPlayerWrapper();
     WindowManagerProxy getWmProxy();
     LauncherPrefs getLauncherPrefs();
+    ThemeManager getThemeManager();
+    UserCache getUserCache();
+    DisplayController getDisplayController();
+    WallpaperColorHints getWallpaperColorHints();
+    LockedUserState getLockedUserState();
 
     /** Builder for LauncherBaseAppComponent. */
     interface Builder {

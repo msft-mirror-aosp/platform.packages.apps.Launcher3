@@ -17,27 +17,30 @@
 package com.android.launcher3.folder
 
 import android.R
-import android.graphics.Bitmap
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.launcher3.LauncherAppState
-import com.android.launcher3.LauncherPrefs.Companion.THEMED_ICONS
-import com.android.launcher3.LauncherPrefs.Companion.get
+import com.android.launcher3.LauncherPrefs
+import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER
+import com.android.launcher3.dagger.LauncherAppComponent
+import com.android.launcher3.dagger.LauncherAppSingleton
 import com.android.launcher3.graphics.PreloadIconDrawable
+import com.android.launcher3.graphics.ThemeManager
 import com.android.launcher3.icons.BitmapInfo
 import com.android.launcher3.icons.FastBitmapDrawable
 import com.android.launcher3.icons.IconCache
 import com.android.launcher3.icons.IconCache.ItemInfoUpdateReceiver
 import com.android.launcher3.icons.PlaceHolderIconDrawable
 import com.android.launcher3.icons.UserBadgeDrawable
-import com.android.launcher3.icons.mono.MonoThemedBitmap
 import com.android.launcher3.model.data.FolderInfo
 import com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_ARCHIVED
 import com.android.launcher3.model.data.ItemInfoWithIcon.FLAG_INSTALL_SESSION_ACTIVE
 import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.util.ActivityContextWrapper
+import com.android.launcher3.util.AllModulesForTest
 import com.android.launcher3.util.Executors
+import com.android.launcher3.util.FakePrefsModule
 import com.android.launcher3.util.FlagOp
 import com.android.launcher3.util.LauncherLayoutBuilder
 import com.android.launcher3.util.LauncherModelHelper
@@ -45,10 +48,19 @@ import com.android.launcher3.util.LauncherModelHelper.SandboxModelContext
 import com.android.launcher3.util.TestUtil
 import com.android.launcher3.util.UserIconInfo
 import com.google.common.truth.Truth.assertThat
+import dagger.Component
+import kotlin.annotation.AnnotationRetention.RUNTIME
+import kotlin.annotation.AnnotationTarget.FUNCTION
+import kotlin.annotation.AnnotationTarget.PROPERTY_GETTER
+import kotlin.annotation.AnnotationTarget.PROPERTY_SETTER
 import org.junit.After
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestRule
+import org.junit.runner.Description
 import org.junit.runner.RunWith
+import org.junit.runners.model.Statement
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.doReturn
@@ -62,6 +74,8 @@ import org.mockito.kotlin.whenever
 @RunWith(AndroidJUnit4::class)
 class PreviewItemManagerTest {
 
+    @get:Rule val theseStateRule = ThemeStateRule()
+
     private lateinit var previewItemManager: PreviewItemManager
     private lateinit var context: SandboxModelContext
     private lateinit var folderItems: ArrayList<WorkspaceItemInfo>
@@ -69,12 +83,14 @@ class PreviewItemManagerTest {
     private lateinit var folderIcon: FolderIcon
     private lateinit var iconCache: IconCache
 
-    private var defaultThemedIcons = false
-
     @Before
     fun setup() {
         modelHelper = LauncherModelHelper()
         context = modelHelper.sandboxContext
+        context.initDaggerComponent(DaggerPreviewItemManagerTestComponent.builder())
+        theseStateRule.themeState?.let {
+            LauncherPrefs.get(context).putSync(ThemeManager.THEMED_ICONS.to(it))
+        }
         folderIcon = FolderIcon(ActivityContextWrapper(context))
 
         val app = spy(LauncherAppState.getInstance(context))
@@ -97,27 +113,16 @@ class PreviewItemManagerTest {
             )
             .loadModelSync()
 
+        folderIcon.mInfo =
+            modelHelper.bgDataModel.itemsIdMap.find { it.itemType == ITEM_TYPE_FOLDER }
+                as FolderInfo
         // Use getAppContents() to "cast" contents to WorkspaceItemInfo so we can set bitmaps
-        folderItems = modelHelper.bgDataModel.collections.valueAt(0).getAppContents()
-        folderIcon.mInfo = modelHelper.bgDataModel.collections.valueAt(0) as FolderInfo
-        folderIcon.mInfo.getContents().addAll(folderItems)
-
-        // Set first icon to be themed.
-        folderItems[0].bitmap.themedBitmap =
-            MonoThemedBitmap(
-                folderItems[0].bitmap.icon,
-                Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888),
-            )
+        folderItems = folderIcon.mInfo.getAppContents()
 
         // Set second icon to be non-themed.
         folderItems[1].bitmap.themedBitmap = null
 
         // Set third icon to be themed with badge.
-        folderItems[2].bitmap.themedBitmap =
-            MonoThemedBitmap(
-                folderItems[2].bitmap.icon,
-                Bitmap.createBitmap(10, 10, Bitmap.Config.ARGB_8888),
-            )
         folderItems[2].bitmap =
             folderItems[2].bitmap.withFlags(profileFlagOp(UserIconInfo.TYPE_WORK))
 
@@ -125,20 +130,17 @@ class PreviewItemManagerTest {
         folderItems[3].bitmap =
             folderItems[3].bitmap.withFlags(profileFlagOp(UserIconInfo.TYPE_WORK))
         folderItems[3].bitmap.themedBitmap = null
-
-        defaultThemedIcons = get(context).get(THEMED_ICONS)
     }
 
     @After
     @Throws(Exception::class)
     fun tearDown() {
-        get(context).put(THEMED_ICONS, defaultThemedIcons)
         modelHelper.destroy()
     }
 
     @Test
+    @MonoThemeEnabled(true)
     fun checkThemedIconWithThemingOn_iconShouldBeThemed() {
-        get(context).put(THEMED_ICONS, true)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[0])
@@ -147,8 +149,8 @@ class PreviewItemManagerTest {
     }
 
     @Test
+    @MonoThemeEnabled(false)
     fun checkThemedIconWithThemingOff_iconShouldNotBeThemed() {
-        get(context).put(THEMED_ICONS, false)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[0])
@@ -157,8 +159,8 @@ class PreviewItemManagerTest {
     }
 
     @Test
+    @MonoThemeEnabled(true)
     fun checkUnthemedIconWithThemingOn_iconShouldNotBeThemed() {
-        get(context).put(THEMED_ICONS, true)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[1])
@@ -167,8 +169,8 @@ class PreviewItemManagerTest {
     }
 
     @Test
+    @MonoThemeEnabled(false)
     fun checkUnthemedIconWithThemingOff_iconShouldNotBeThemed() {
-        get(context).put(THEMED_ICONS, false)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[1])
@@ -177,8 +179,8 @@ class PreviewItemManagerTest {
     }
 
     @Test
+    @MonoThemeEnabled(true)
     fun checkThemedIconWithBadgeWithThemingOn_iconAndBadgeShouldBeThemed() {
-        get(context).put(THEMED_ICONS, true)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[2])
@@ -190,8 +192,8 @@ class PreviewItemManagerTest {
     }
 
     @Test
+    @MonoThemeEnabled(true)
     fun checkUnthemedIconWithBadgeWithThemingOn_badgeShouldBeThemed() {
-        get(context).put(THEMED_ICONS, true)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[3])
@@ -203,8 +205,8 @@ class PreviewItemManagerTest {
     }
 
     @Test
+    @MonoThemeEnabled(false)
     fun checkUnthemedIconWithBadgeWithThemingOff_iconAndBadgeShouldNotBeThemed() {
-        get(context).put(THEMED_ICONS, false)
         val drawingParams = PreviewItemDrawingParams(0f, 0f, 0f)
 
         previewItemManager.setDrawable(drawingParams, folderItems[3])
@@ -275,4 +277,29 @@ class PreviewItemManagerTest {
 
     private fun profileFlagOp(type: Int) =
         UserIconInfo(Process.myUserHandle(), type).applyBitmapInfoFlags(FlagOp.NO_OP)
+}
+
+class ThemeStateRule : TestRule {
+
+    var themeState: Boolean? = null
+
+    override fun apply(base: Statement, description: Description): Statement {
+        themeState = description.getAnnotation(MonoThemeEnabled::class.java)?.value
+        return base
+    }
+}
+
+// Annotation for tests that need to be run with quickstep enabled and disabled.
+@Retention(RUNTIME)
+@Target(FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+annotation class MonoThemeEnabled(val value: Boolean = false)
+
+@LauncherAppSingleton
+@Component(modules = [AllModulesForTest::class, FakePrefsModule::class])
+interface PreviewItemManagerTestComponent : LauncherAppComponent {
+
+    @Component.Builder
+    interface Builder : LauncherAppComponent.Builder {
+        override fun build(): PreviewItemManagerTestComponent
+    }
 }

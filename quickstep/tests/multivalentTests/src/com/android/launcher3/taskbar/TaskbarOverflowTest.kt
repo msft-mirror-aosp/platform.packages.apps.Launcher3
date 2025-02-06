@@ -19,9 +19,11 @@ package com.android.launcher3.taskbar
 import android.animation.AnimatorTestRule
 import android.content.ComponentName
 import android.content.Intent
+import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.SetFlagsRule
 import androidx.test.core.app.ApplicationProvider
+import com.android.launcher3.Flags.FLAG_ENABLE_MULTI_INSTANCE_MENU_TASKBAR
 import com.android.launcher3.Flags.FLAG_TASKBAR_OVERFLOW
 import com.android.launcher3.R
 import com.android.launcher3.taskbar.TaskbarControllerTestUtil.runOnMainSync
@@ -64,6 +66,7 @@ import org.mockito.kotlin.whenever
     FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
     FLAG_ENABLE_BUBBLE_BAR,
 )
+@DisableFlags(FLAG_ENABLE_MULTI_INSTANCE_MENU_TASKBAR)
 class TaskbarOverflowTest {
     @get:Rule(order = 0) val setFlagsRule = SetFlagsRule()
 
@@ -85,7 +88,8 @@ class TaskbarOverflowTest {
 
     @get:Rule(order = 4) val animatorTestRule = AnimatorTestRule(this)
 
-    @get:Rule(order = 5) val taskbarUnitTestRule = TaskbarUnitTestRule(this, context)
+    @get:Rule(order = 5)
+    val taskbarUnitTestRule = TaskbarUnitTestRule(this, context, this::onControllersInitialized)
 
     @InjectController lateinit var taskbarViewController: TaskbarViewController
     @InjectController lateinit var recentAppsController: TaskbarRecentAppsController
@@ -94,16 +98,27 @@ class TaskbarOverflowTest {
 
     private var desktopTaskListener: IDesktopTaskListener? = null
 
-    @Before
-    fun ensureRunningAppsShowing() {
+    private var currentControllerInitCallback: () -> Unit = {}
+        set(value) {
+            runOnMainSync { value.invoke() }
+            field = value
+        }
+
+    private fun onControllersInitialized() {
         runOnMainSync {
             if (!recentAppsController.canShowRunningApps) {
                 recentAppsController.onDestroy()
                 recentAppsController.canShowRunningApps = true
                 recentAppsController.init(taskbarUnitTestRule.activityContext.controllers)
             }
-            recentsModel.resolvePendingTaskRequests()
+
+            currentControllerInitCallback.invoke()
         }
+    }
+
+    @Before
+    fun ensureRunningAppsShowing() {
+        runOnMainSync { recentsModel.resolvePendingTaskRequests() }
     }
 
     @Test
@@ -196,7 +211,7 @@ class TaskbarOverflowTest {
         var initialMaxNumIconViews = maxNumberOfTaskbarIcons
         assertThat(initialMaxNumIconViews).isGreaterThan(0)
 
-        runOnMainSync { bubbleBarViewController.setHiddenForBubbles(false) }
+        currentControllerInitCallback = { bubbleBarViewController.setHiddenForBubbles(false) }
 
         val maxNumIconViews = addRunningAppsAndVerifyOverflowState(2)
         assertThat(maxNumIconViews).isLessThan(initialMaxNumIconViews)
@@ -210,7 +225,7 @@ class TaskbarOverflowTest {
         var initialMaxNumIconViews = maxNumberOfTaskbarIcons
         assertThat(initialMaxNumIconViews).isGreaterThan(0)
 
-        runOnMainSync { bubbleBarViewController.setHiddenForBubbles(false) }
+        currentControllerInitCallback = { bubbleBarViewController.setHiddenForBubbles(false) }
 
         val maxNumIconViews = addRunningAppsAndVerifyOverflowState(2)
         assertThat(maxNumIconViews).isLessThan(initialMaxNumIconViews)
@@ -228,7 +243,7 @@ class TaskbarOverflowTest {
     fun testBubbleBarReducesTaskbarMaxNumIcons_transientBubbleInitiallyStashed() {
         var initialMaxNumIconViews = maxNumberOfTaskbarIcons
         assertThat(initialMaxNumIconViews).isGreaterThan(0)
-        runOnMainSync {
+        currentControllerInitCallback = {
             bubbleStashController.stashBubbleBarImmediate()
             bubbleBarViewController.setHiddenForBubbles(false)
         }
@@ -247,7 +262,7 @@ class TaskbarOverflowTest {
     @Test
     @TaskbarMode(TRANSIENT)
     fun testStashingBubbleBarMaintainsMaxNumIcons_transient() {
-        runOnMainSync { bubbleBarViewController.setHiddenForBubbles(false) }
+        currentControllerInitCallback = { bubbleBarViewController.setHiddenForBubbles(false) }
 
         val initialNumIcons = currentNumberOfTaskbarIcons
         val maxNumIconViews = addRunningAppsAndVerifyOverflowState(2)
@@ -261,15 +276,13 @@ class TaskbarOverflowTest {
     @Test
     @TaskbarMode(PINNED)
     fun testHidingBubbleBarIncreasesMaxNumIcons_pinned() {
-        runOnMainSync { bubbleBarViewController.setHiddenForBubbles(false) }
+        currentControllerInitCallback = { bubbleBarViewController.setHiddenForBubbles(false) }
 
         val initialNumIcons = currentNumberOfTaskbarIcons
         val initialMaxNumIconViews = addRunningAppsAndVerifyOverflowState(5)
 
-        runOnMainSync {
-            bubbleBarViewController.setHiddenForBubbles(true)
-            animatorTestRule.advanceTimeBy(150)
-        }
+        currentControllerInitCallback = { bubbleBarViewController.setHiddenForBubbles(true) }
+        runOnMainSync { animatorTestRule.advanceTimeBy(150) }
 
         val maxNumIconViews = maxNumberOfTaskbarIcons
         assertThat(maxNumIconViews).isGreaterThan(initialMaxNumIconViews)
@@ -282,15 +295,13 @@ class TaskbarOverflowTest {
     @Test
     @TaskbarMode(TRANSIENT)
     fun testHidingBubbleBarIncreasesMaxNumIcons_transient() {
-        runOnMainSync { bubbleBarViewController.setHiddenForBubbles(false) }
+        currentControllerInitCallback = { bubbleBarViewController.setHiddenForBubbles(false) }
 
         val initialNumIcons = currentNumberOfTaskbarIcons
         val initialMaxNumIconViews = addRunningAppsAndVerifyOverflowState(5)
 
-        runOnMainSync {
-            bubbleBarViewController.setHiddenForBubbles(true)
-            animatorTestRule.advanceTimeBy(150)
-        }
+        currentControllerInitCallback = { bubbleBarViewController.setHiddenForBubbles(true) }
+        runOnMainSync { animatorTestRule.advanceTimeBy(150) }
 
         val maxNumIconViews = maxNumberOfTaskbarIcons
         assertThat(maxNumIconViews).isGreaterThan(initialMaxNumIconViews)

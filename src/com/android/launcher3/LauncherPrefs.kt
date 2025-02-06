@@ -34,7 +34,7 @@ import com.android.launcher3.settings.SettingsActivity
 import com.android.launcher3.states.RotationHelper
 import com.android.launcher3.util.DaggerSingletonObject
 import com.android.launcher3.util.DisplayController
-import com.android.launcher3.util.Themes
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 /**
@@ -53,10 +53,11 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
             .getSharedPreferences(BOOT_AWARE_PREFS_KEY, MODE_PRIVATE)
     }
 
-    open val Item.sharedPrefs: SharedPreferences
-        get() =
+    open protected fun getSharedPrefs(item: Item): SharedPreferences =
+        item.run {
             if (encryptionType == EncryptionType.DEVICE_PROTECTED) deviceProtectedSharedPrefs
             else encryptedContext.getSharedPreferences(sharedPrefFile, MODE_PRIVATE)
+        }
 
     /** Returns the value with type [T] for [item]. */
     fun <T> get(item: ContextualItem<T>): T =
@@ -72,7 +73,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
      */
     @Suppress("IMPLICIT_CAST_TO_ANY", "UNCHECKED_CAST")
     private fun <T> getInner(item: Item, default: T): T {
-        val sp = item.sharedPrefs
+        val sp = getSharedPrefs(item)
 
         return when (item.type) {
             String::class.java -> sp.getString(item.sharedPrefKey, default as? String)
@@ -128,7 +129,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
     private fun prepareToPutValues(
         updates: Array<out Pair<Item, Any>>
     ): List<SharedPreferences.Editor> {
-        val updatesPerPrefFile = updates.groupBy { it.first.sharedPrefs }.toMap()
+        val updatesPerPrefFile = updates.groupBy { getSharedPrefs(it.first) }.toMap()
 
         return updatesPerPrefFile.map { (sharedPref, itemList) ->
             sharedPref.edit().apply { itemList.forEach { (item, value) -> putValue(item, value) } }
@@ -141,7 +142,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
      * types of Item values.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun SharedPreferences.Editor.putValue(
+    internal fun SharedPreferences.Editor.putValue(
         item: Item,
         value: Any?,
     ): SharedPreferences.Editor =
@@ -169,7 +170,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
      */
     fun addListener(listener: LauncherPrefChangeListener, vararg items: Item) {
         items
-            .map { it.sharedPrefs }
+            .map { getSharedPrefs(it) }
             .distinct()
             .forEach { it.registerOnSharedPreferenceChangeListener(listener) }
     }
@@ -181,7 +182,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
     fun removeListener(listener: LauncherPrefChangeListener, vararg items: Item) {
         // If a listener is not registered to a SharedPreference, unregistering it does nothing
         items
-            .map { it.sharedPrefs }
+            .map { getSharedPrefs(it) }
             .distinct()
             .forEach { it.unregisterOnSharedPreferenceChangeListener(listener) }
     }
@@ -192,7 +193,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
      */
     fun has(vararg items: Item): Boolean {
         items
-            .groupBy { it.sharedPrefs }
+            .groupBy { getSharedPrefs(it) }
             .forEach { (prefs, itemsSublist) ->
                 if (!itemsSublist.none { !prefs.contains(it.sharedPrefKey) }) return false
             }
@@ -216,7 +217,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
      *   .apply() or .commit()
      */
     private fun prepareToRemove(items: Array<out Item>): List<SharedPreferences.Editor> {
-        val itemsPerFile = items.groupBy { it.sharedPrefs }.toMap()
+        val itemsPerFile = items.groupBy { getSharedPrefs(it) }.toMap()
 
         return itemsPerFile.map { (prefs, items) ->
             prefs.edit().also { editor ->
@@ -235,13 +236,9 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         const val TASKBAR_PINNING_KEY = "TASKBAR_PINNING_KEY"
         const val TASKBAR_PINNING_DESKTOP_MODE_KEY = "TASKBAR_PINNING_DESKTOP_MODE_KEY"
         const val SHOULD_SHOW_SMARTSPACE_KEY = "SHOULD_SHOW_SMARTSPACE_KEY"
-        @JvmField
-        val ICON_STATE = nonRestorableItem("pref_icon_shape_path", "", EncryptionType.ENCRYPTED)
 
         @JvmField
         val ENABLE_TWOLINE_ALLAPPS_TOGGLE = backedUpItem("pref_enable_two_line_toggle", false)
-        @JvmField
-        val THEMED_ICONS = backedUpItem(Themes.KEY_THEMED_ICONS, false, EncryptionType.ENCRYPTED)
         @JvmField val PROMISE_ICON_IDS = backedUpItem(InstallSessionHelper.PROMISE_ICON_IDS, "")
         @JvmField val WORK_EDU_STEP = backedUpItem("showed_work_profile_edu", 0)
         @JvmField
@@ -410,4 +407,27 @@ data class ContextualItem<T>(
 enum class EncryptionType {
     ENCRYPTED,
     DEVICE_PROTECTED,
+}
+
+/**
+ * LauncherPrefs which delegates all lookup to [prefs] but uses the real prefs for initial values
+ */
+class ProxyPrefs(context: Context, private val prefs: SharedPreferences) : LauncherPrefs(context) {
+
+    private val copiedPrefs = ConcurrentHashMap<SharedPreferences, Boolean>()
+
+    override fun getSharedPrefs(item: Item): SharedPreferences {
+        val originalPrefs = super.getSharedPrefs(item)
+        // Copy all existing values, when the pref is accessed for the first time
+        copiedPrefs.computeIfAbsent(originalPrefs) { op ->
+            val editor = prefs.edit()
+            op.all.forEach { (key, value) ->
+                if (value != null) {
+                    editor.putValue(backedUpItem(key, value), value)
+                }
+            }
+            editor.commit()
+        }
+        return prefs
+    }
 }

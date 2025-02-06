@@ -144,15 +144,6 @@ public final class FeatureFlags {
         return ENABLE_TASKBAR_PINNING.get() || Flags.enableTaskbarPinning();
     }
 
-    // Aconfig migration complete for ENABLE_APP_PAIRS.
-    public static final BooleanFlag ENABLE_APP_PAIRS = getDebugFlag(274189428,
-            "ENABLE_APP_PAIRS", DISABLED,
-            "Enables the ability to create and save app pairs on the Home screen for easy"
-                    + " split screen launching.");
-    public static boolean enableAppPairs() {
-        return ENABLE_APP_PAIRS.get() || com.android.wm.shell.Flags.enableAppPairs();
-    }
-
     // TODO(Block 20): Clean up flags
     // Aconfig migration complete for ENABLE_HOME_TRANSITION_LISTENER.
     public static final BooleanFlag ENABLE_HOME_TRANSITION_LISTENER = getDebugFlag(306053414,
@@ -200,15 +191,6 @@ public final class FeatureFlags {
     public static final BooleanFlag USE_LOCAL_ICON_OVERRIDES = getDebugFlag(270394973,
             "USE_LOCAL_ICON_OVERRIDES", ENABLED,
             "Use inbuilt monochrome icons if app doesn't provide one");
-
-    // Aconfig migration complete for ENABLE_SPLIT_FROM_WORKSPACE_TO_WORKSPACE.
-    public static final BooleanFlag ENABLE_SPLIT_FROM_WORKSPACE_TO_WORKSPACE = getDebugFlag(
-            270393453, "ENABLE_SPLIT_FROM_WORKSPACE_TO_WORKSPACE", DISABLED,
-            "Enable initiating split screen from workspace to workspace.");
-    public static boolean enableSplitContextually() {
-        return ENABLE_SPLIT_FROM_WORKSPACE_TO_WORKSPACE.get() ||
-                com.android.wm.shell.Flags.enableSplitContextual();
-    }
 
     // TODO(Block 29): Clean up flags
     // Aconfig migration complete for ENABLE_ALL_APPS_BUTTON_IN_HOTSEAT.

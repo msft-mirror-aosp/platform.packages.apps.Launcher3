@@ -60,6 +60,7 @@ import androidx.dynamicanimation.animation.SpringForce;
 import com.android.app.animation.Interpolators;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.graphics.IconShape;
 import com.android.launcher3.icons.FastBitmapDrawable;
 import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.model.data.ItemInfo;
@@ -264,8 +265,7 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
                 try (LauncherIcons li = LauncherIcons.obtain(mActivity)) {
                     // Since we just want the scale, avoid heavy drawing operations
                     Utilities.scaleRectAboutCenter(bounds, li.getNormalizer().getScale(
-                            new AdaptiveIconDrawable(new ColorDrawable(Color.BLACK), null),
-                            null, null, null));
+                            new AdaptiveIconDrawable(new ColorDrawable(Color.BLACK), null)));
                 }
 
                 // Shrink very tiny bit so that the clip path is smaller than the original bitmap
@@ -273,7 +273,11 @@ public abstract class DragView<T extends Context & ActivityContext> extends Fram
                 Rect shrunkBounds = new Rect(bounds);
                 Utilities.scaleRectAboutCenter(shrunkBounds, 0.98f);
                 adaptiveIcon.setBounds(shrunkBounds);
-                final Path mask = adaptiveIcon.getIconMask();
+
+                IconShape iconShape = IconShape.INSTANCE.get(getContext());
+                final Path mask = (adaptiveIcon instanceof FolderAdaptiveIcon
+                        ? iconShape.getFolderShape() : iconShape.getShape())
+                        .getPath(shrunkBounds);
 
                 mTranslateX = new SpringFloatValue(DragView.this,
                         w * AdaptiveIconDrawable.getExtraInsetFraction());

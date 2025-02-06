@@ -24,10 +24,10 @@ import static com.android.launcher3.BubbleTextView.DISPLAY_TASKBAR;
 import static com.android.launcher3.BubbleTextView.DISPLAY_WORKSPACE;
 import static com.android.launcher3.DeviceProfile.DEFAULT_SCALE;
 import static com.android.launcher3.Hotseat.ALPHA_CHANNEL_PREVIEW_RENDERER;
+import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT;
 import static com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT_PREDICTION;
 import static com.android.launcher3.Utilities.SHOULD_SHOW_FIRST_PAGE_WIDGET;
-import static com.android.launcher3.model.ModelUtils.filterCurrentWorkspaceItems;
-import static com.android.launcher3.model.ModelUtils.getMissingHotseatRanks;
+import static com.android.launcher3.model.ModelUtils.currentScreenContentFilter;
 
 import android.app.Fragment;
 import android.app.WallpaperColors;
@@ -67,7 +67,9 @@ import com.android.launcher3.Hotseat;
 import com.android.launcher3.InsettableFrameLayout;
 import com.android.launcher3.InvariantDeviceProfile;
 import com.android.launcher3.LauncherAppState;
+import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.LauncherSettings.Favorites;
+import com.android.launcher3.ProxyPrefs;
 import com.android.launcher3.R;
 import com.android.launcher3.Workspace;
 import com.android.launcher3.WorkspaceLayoutManager;
@@ -75,6 +77,9 @@ import com.android.launcher3.apppairs.AppPairIcon;
 import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.celllayout.CellPosMapper;
 import com.android.launcher3.config.FeatureFlags;
+import com.android.launcher3.dagger.LauncherAppComponent;
+import com.android.launcher3.dagger.LauncherAppModule;
+import com.android.launcher3.dagger.LauncherAppSingleton;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.model.BgDataModel;
 import com.android.launcher3.model.BgDataModel.FixedContainerItems;
@@ -100,12 +105,18 @@ import com.android.launcher3.widget.LocalColorExtractor;
 import com.android.launcher3.widget.util.WidgetSizes;
 import com.android.systemui.shared.Flags;
 
+import dagger.BindsInstance;
+import dagger.Component;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Utility class for generating the preview of Launcher for a given InvariantDeviceProfile.
@@ -124,11 +135,24 @@ public class LauncherPreviewRenderer extends ContextWrapper
      */
     public static class PreviewContext extends SandboxContext {
 
+        private final String mPrefName;
+
         public PreviewContext(Context base, InvariantDeviceProfile idp) {
             super(base);
+            mPrefName = "preview-" + UUID.randomUUID().toString();
+            initDaggerComponent(DaggerLauncherPreviewRenderer_PreviewAppComponent.builder()
+                    .bindPrefs(new ProxyPrefs(
+                            this, getSharedPreferences(mPrefName, MODE_PRIVATE))));
+
             putObject(InvariantDeviceProfile.INSTANCE, idp);
             putObject(LauncherAppState.INSTANCE,
                     new LauncherAppState(this, null /* iconCacheFileName */));
+        }
+
+        @Override
+        protected void cleanUpObjects() {
+            super.cleanUpObjects();
+            deleteSharedPreferences(mPrefName);
         }
     }
 
@@ -456,54 +480,48 @@ public class LauncherPreviewRenderer extends ContextWrapper
 
     private void populate(BgDataModel dataModel,
             Map<ComponentKey, AppWidgetProviderInfo> widgetProviderInfoMap) {
-        // Separate the items that are on the current screen, and the other remaining items.
-        ArrayList<ItemInfo> currentWorkspaceItems = new ArrayList<>();
-        ArrayList<ItemInfo> otherWorkspaceItems = new ArrayList<>();
-        ArrayList<LauncherAppWidgetInfo> currentAppWidgets = new ArrayList<>();
-        ArrayList<LauncherAppWidgetInfo> otherAppWidgets = new ArrayList<>();
+        IntSet missingHotseatRank = new IntSet();
+        IntStream.range(0, mDp.numShownHotseatIcons).forEach(missingHotseatRank::add);
 
-        IntSet currentScreenIds = IntSet.wrap(mWorkspaceScreens.keySet());
-        filterCurrentWorkspaceItems(currentScreenIds, dataModel.workspaceItems,
-                currentWorkspaceItems, otherWorkspaceItems);
-        filterCurrentWorkspaceItems(currentScreenIds, dataModel.appWidgets, currentAppWidgets,
-                otherAppWidgets);
-        for (ItemInfo itemInfo : currentWorkspaceItems) {
-            switch (itemInfo.itemType) {
-                case Favorites.ITEM_TYPE_APPLICATION:
-                case Favorites.ITEM_TYPE_DEEP_SHORTCUT:
-                    inflateAndAddIcon((WorkspaceItemInfo) itemInfo);
-                    break;
-                case Favorites.ITEM_TYPE_FOLDER:
-                case Favorites.ITEM_TYPE_APP_PAIR:
-                    inflateAndAddCollectionIcon((CollectionInfo) itemInfo);
-                    break;
-                default:
-                    break;
-            }
-        }
-        Map<ComponentKey, AppWidgetProviderInfo> widgetsMap = widgetProviderInfoMap;
-        for (ItemInfo itemInfo : currentAppWidgets) {
-            switch (itemInfo.itemType) {
-                case Favorites.ITEM_TYPE_APPWIDGET:
-                case Favorites.ITEM_TYPE_CUSTOM_APPWIDGET:
-                    if (widgetsMap == null) {
-                        widgetsMap = dataModel.widgetsModel.getWidgetsByComponentKey()
-                                .entrySet()
-                                .stream()
-                                .filter(entry -> entry.getValue().widgetInfo != null)
-                                .collect(Collectors.toMap(
-                                        Map.Entry::getKey,
-                                        entry -> entry.getValue().widgetInfo
-                                ));
+        Map<ComponentKey, AppWidgetProviderInfo>[] widgetsMap = new Map[] { widgetProviderInfoMap};
+
+        // Separate the items that are on the current screen, and the other remaining items.
+        dataModel.itemsIdMap.stream()
+                .filter(currentScreenContentFilter(IntSet.wrap(mWorkspaceScreens.keySet())))
+                .forEach(itemInfo -> {
+                    switch (itemInfo.itemType) {
+                        case Favorites.ITEM_TYPE_APPLICATION:
+                        case Favorites.ITEM_TYPE_DEEP_SHORTCUT:
+                            inflateAndAddIcon((WorkspaceItemInfo) itemInfo);
+                            break;
+                        case Favorites.ITEM_TYPE_FOLDER:
+                        case Favorites.ITEM_TYPE_APP_PAIR:
+                            inflateAndAddCollectionIcon((CollectionInfo) itemInfo);
+                            break;
+                        case Favorites.ITEM_TYPE_APPWIDGET:
+                        case Favorites.ITEM_TYPE_CUSTOM_APPWIDGET:
+                            if (widgetsMap[0] == null) {
+                                widgetsMap[0] = dataModel.widgetsModel.getWidgetsByComponentKey()
+                                        .entrySet()
+                                        .stream()
+                                        .filter(entry -> entry.getValue().widgetInfo != null)
+                                        .collect(Collectors.toMap(
+                                                Entry::getKey,
+                                                entry -> entry.getValue().widgetInfo
+                                        ));
+                            }
+                            inflateAndAddWidgets((LauncherAppWidgetInfo) itemInfo, widgetsMap[0]);
+                            break;
+                        default:
+                            break;
                     }
-                    inflateAndAddWidgets((LauncherAppWidgetInfo) itemInfo, widgetsMap);
-                    break;
-                default:
-                    break;
-            }
-        }
-        IntArray ranks = getMissingHotseatRanks(currentWorkspaceItems,
-                mDp.numShownHotseatIcons);
+
+                    if (itemInfo.container == CONTAINER_HOTSEAT) {
+                        missingHotseatRank.remove(itemInfo.screenId);
+                    }
+                });
+
+        IntArray ranks = missingHotseatRank.getArray();
         FixedContainerItems hotseatPredictions =
                 dataModel.extraItems.get(CONTAINER_HOTSEAT_PREDICTION);
         List<ItemInfo> predictions = hotseatPredictions == null
@@ -580,6 +598,18 @@ public class LauncherPreviewRenderer extends ContextWrapper
         @Override
         public boolean onInterceptTouchEvent(MotionEvent ev) {
             return true;
+        }
+    }
+
+    @LauncherAppSingleton
+    @Component(modules = LauncherAppModule.class)
+    public interface PreviewAppComponent extends LauncherAppComponent {
+
+        /** Builder for NexusLauncherAppComponent. */
+        @Component.Builder
+        interface Builder extends LauncherAppComponent.Builder {
+            @BindsInstance Builder bindPrefs(LauncherPrefs prefs);
+            PreviewAppComponent build();
         }
     }
 }

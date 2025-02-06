@@ -110,7 +110,6 @@ import com.android.launcher3.widget.PendingAddShortcutInfo;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -517,8 +516,6 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         mInfo = info;
         mFromTitle = info.title;
         mFromLabelState = info.getFromLabelState();
-        ArrayList<ItemInfo> children = info.getContents();
-        Collections.sort(children, ITEM_POS_COMPARATOR);
         updateItemLocationsInDatabaseBatch(true);
 
         BaseDragLayer.LayoutParams lp = (BaseDragLayer.LayoutParams) getLayoutParams();
@@ -700,8 +697,14 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             }
         }
 
+        Log.d("b/383526431", "animateOpen: content child count before: "
+                + mContent.getTotalChildCount());
+
         mContent.completePendingPageChanges();
         mContent.setCurrentPage(pageNo);
+
+        Log.d("b/383526431", "animateOpen: content child count after pending page"
+                + " changes: " + mContent.getTotalChildCount());
 
         // This is set to true in close(), but isn't reset to false until onDropCompleted(). This
         // leads to an inconsistent state if you drag out of the folder and drag back in without
@@ -709,6 +712,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         mDeleteFolderOnDropCompleted = false;
 
         cancelRunningAnimations();
+        Log.d("b/383526431", "animateOpen: content child count after cancelling"
+                + " animation: " + mContent.getTotalChildCount());
         FolderAnimationManager fam = new FolderAnimationManager(this, true /* isOpening */);
         AnimatorSet anim = fam.getAnimator();
         anim.addListener(new AnimatorListenerAdapter() {
@@ -1703,7 +1708,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
     @Override
     public boolean canInterceptEventsInSystemGestureRegion() {
-        return true;
+        return !mIsEditingName;
     }
 
     /**

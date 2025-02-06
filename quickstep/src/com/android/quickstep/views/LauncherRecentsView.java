@@ -36,7 +36,6 @@ import androidx.annotation.Nullable;
 import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
-import com.android.launcher3.config.FeatureFlags;
 import com.android.launcher3.desktop.DesktopRecentsTransitionController;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.statehandlers.DepthController;
@@ -50,7 +49,6 @@ import com.android.launcher3.util.SplitConfigurationOptions.SplitSelectSource;
 import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.GestureState;
 import com.android.quickstep.LauncherActivityInterface;
-import com.android.quickstep.RotationTouchHelper;
 import com.android.quickstep.SystemUiProxy;
 import com.android.quickstep.util.AnimUtils;
 import com.android.quickstep.util.SplitSelectStateController;
@@ -128,9 +126,11 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
         // If Launcher needs to return to split select state, do it now, after the icon has updated.
         if (mContainer.hasPendingSplitSelectInfo()) {
             PendingSplitSelectInfo recoveryData = mContainer.getPendingSplitSelectInfo();
-            if (recoveryData.getStagedTaskId() == taskId) {
+            TaskContainer taskContainer;
+            if (recoveryData != null && recoveryData.getStagedTaskId() == taskId && (taskContainer =
+                    mUtils.getTaskContainerById(taskId)) != null) {
                 initiateSplitSelect(
-                        getTaskViewByTaskId(recoveryData.getStagedTaskId()),
+                        taskContainer,
                         recoveryData.getStagePosition(), recoveryData.getSource()
                 );
                 mContainer.finishSplitSelectRecovery();
@@ -168,9 +168,7 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
 
     @Override
     public void onStateTransitionComplete(LauncherState finalState) {
-        if (mContainer.getDesktopVisibilityController() != null) {
-            mContainer.getDesktopVisibilityController().onLauncherStateChanged(finalState);
-        }
+        DesktopVisibilityController.INSTANCE.get(mContainer).onLauncherStateChanged(finalState);
 
         if (!finalState.isRecentsViewVisible) {
             // Clean-up logic that occurs when recents is no longer in use/visible.
@@ -243,10 +241,10 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
     }
 
     @Override
-    public void initiateSplitSelect(TaskView taskView,
+    public void initiateSplitSelect(TaskContainer taskContainer,
             @SplitConfigurationOptions.StagePosition int stagePosition,
             StatsLogManager.EventEnum splitEvent) {
-        super.initiateSplitSelect(taskView, stagePosition, splitEvent);
+        super.initiateSplitSelect(taskContainer, stagePosition, splitEvent);
         getStateManager().goToState(LauncherState.OVERVIEW_SPLIT_SELECT);
     }
 
@@ -258,45 +256,32 @@ public class LauncherRecentsView extends RecentsView<QuickstepLauncher, Launcher
 
     @Override
     public boolean canLaunchFullscreenTask() {
-        if (FeatureFlags.enableSplitContextually()) {
-            return !mSplitSelectStateController.isSplitSelectActive();
-        } else {
-            return !mContainer.isInState(OVERVIEW_SPLIT_SELECT);
-        }
+        return !mSplitSelectStateController.isSplitSelectActive();
     }
 
     @Override
-    public void onGestureAnimationStart(Task[] runningTasks,
-            RotationTouchHelper rotationTouchHelper) {
-        super.onGestureAnimationStart(runningTasks, rotationTouchHelper);
-        DesktopVisibilityController desktopVisibilityController =
-                mContainer.getDesktopVisibilityController();
-        if (!ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()
-                && desktopVisibilityController != null) {
+    public void onGestureAnimationStart(Task[] runningTasks) {
+        super.onGestureAnimationStart(runningTasks);
+        if (!ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()) {
             // TODO: b/333533253 - Remove after flag rollout
-            desktopVisibilityController.setRecentsGestureStart();
+            DesktopVisibilityController.INSTANCE.get(mContainer).setRecentsGestureStart();
         }
     }
 
     @Override
     public void onGestureAnimationEnd() {
-        DesktopVisibilityController desktopVisibilityController =
-                mContainer.getDesktopVisibilityController();
+        final DesktopVisibilityController desktopVisibilityController =
+                DesktopVisibilityController.INSTANCE.get(mContainer);
         boolean showDesktopApps = false;
-        GestureState.GestureEndTarget endTarget = null;
-        if (desktopVisibilityController != null) {
-            desktopVisibilityController = mContainer.getDesktopVisibilityController();
-            endTarget = mCurrentGestureEndTarget;
-            if (endTarget == GestureState.GestureEndTarget.LAST_TASK
-                    && desktopVisibilityController.areDesktopTasksVisibleAndNotInOverview()) {
-                // Recents gesture was cancelled and we are returning to the previous task.
-                // After super class has handled clean up, show desktop apps on top again
-                showDesktopApps = true;
-            }
+        GestureState.GestureEndTarget endTarget = mCurrentGestureEndTarget;
+        if (endTarget == GestureState.GestureEndTarget.LAST_TASK
+                && desktopVisibilityController.areDesktopTasksVisibleAndNotInOverview()) {
+            // Recents gesture was cancelled and we are returning to the previous task.
+            // After super class has handled clean up, show desktop apps on top again
+            showDesktopApps = true;
         }
         super.onGestureAnimationEnd();
-        if (!ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()
-                && desktopVisibilityController != null) {
+        if (!ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY.isTrue()) {
             // TODO: b/333533253 - Remove after flag rollout
             desktopVisibilityController.setRecentsGestureEnd(endTarget);
         }

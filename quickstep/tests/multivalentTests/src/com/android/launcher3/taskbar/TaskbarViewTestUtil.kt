@@ -28,6 +28,7 @@ import com.android.launcher3.taskbar.TaskbarIconType.HOTSEAT
 import com.android.launcher3.taskbar.TaskbarIconType.OVERFLOW
 import com.android.launcher3.taskbar.TaskbarIconType.RECENT
 import com.android.quickstep.util.GroupTask
+import com.android.quickstep.util.SingleTask
 import com.android.systemui.shared.recents.model.Task
 import com.android.systemui.shared.recents.model.Task.TaskKey
 import com.google.common.truth.FailureMetadata
@@ -56,7 +57,7 @@ object TaskbarViewTestUtil {
     /** Creates a list of fake recent tasks. */
     fun createRecents(size: Int): List<GroupTask> {
         return List(size) {
-            GroupTask(
+            SingleTask(
                 Task().apply {
                     key =
                         TaskKey(
@@ -99,9 +100,9 @@ class TaskbarViewSubject(failureMetadata: FailureMetadata, private val view: Tas
     /** Verifies that recents from [startIndex] have IDs that match [expectedIds] in order. */
     fun hasRecentsOrder(startIndex: Int, expectedIds: List<Int>) {
         val actualIds =
-            view.iconViews.slice(startIndex..<startIndex + expectedIds.size).map {
+            view.iconViews.slice(startIndex..<startIndex + expectedIds.size).flatMap {
                 assertThat(it.tag).isInstanceOf(GroupTask::class.java)
-                (it.tag as? GroupTask)?.task1?.key?.id
+                (it.tag as GroupTask).tasks.map { task -> task.key.id }
             }
         assertThat(actualIds).containsExactlyElementsIn(expectedIds).inOrder()
     }

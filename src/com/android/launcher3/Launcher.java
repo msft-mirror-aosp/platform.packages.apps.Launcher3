@@ -102,6 +102,7 @@ import static com.android.launcher3.testing.shared.TestProtocol.LAUNCHER_ACTIVIT
 import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
 import static com.android.launcher3.util.ItemInfoMatcher.forFolderMatch;
 import static com.android.launcher3.util.SettingsCache.TOUCHPAD_NATURAL_SCROLLING;
+import static com.android.launcher3.util.WallpaperThemeManager.setWallpaperDependentTheme;
 
 import android.animation.Animator;
 import android.animation.AnimatorSet;
@@ -144,6 +145,7 @@ import android.view.KeyboardShortcutGroup;
 import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver.OnPreDrawListener;
 import android.view.WindowInsets;
@@ -222,6 +224,7 @@ import com.android.launcher3.states.RotationHelper;
 import com.android.launcher3.testing.TestLogging;
 import com.android.launcher3.testing.shared.TestProtocol;
 import com.android.launcher3.touch.AllAppsSwipeController;
+import com.android.launcher3.touch.ItemClickHandler;
 import com.android.launcher3.touch.ItemLongClickListener;
 import com.android.launcher3.util.ActivityResultInfo;
 import com.android.launcher3.util.BackPressHandler;
@@ -277,11 +280,11 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -466,6 +469,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder()
                     .detectLeakedSqlLiteObjects()
                     .detectLeakedClosableObjects()
+                    .detectActivityLeaks()
                     .penaltyLog()
                     .penaltyDeath()
                     .build());
@@ -509,6 +513,7 @@ public class Launcher extends StatefulActivity<LauncherState>
         }
 
         super.onCreate(savedInstanceState);
+        setWallpaperDependentTheme(this);
 
         LauncherAppState app = LauncherAppState.getInstance(this);
         mModel = app.getModel();
@@ -628,6 +633,10 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     protected ColdRebootStartupLatencyLogger createColdRebootStartupLatencyLogger() {
         return new ColdRebootStartupLatencyLogger();
+    }
+
+    @NonNull View getAccessibilityActionView() {
+        return findViewById(R.id.accessibility_action_view);
     }
 
     /**
@@ -815,7 +824,6 @@ public class Launcher extends StatefulActivity<LauncherState>
                     this, getMultiWindowDisplaySize());
         }
 
-        onDeviceProfileInitiated();
         if (FOLDABLE_SINGLE_PAGE.get() && mDeviceProfile.isTwoPanels) {
             mCellPosMapper = new TwoPanelCellPosMapper(mDeviceProfile.inv.numColumns);
         } else {
@@ -1653,9 +1661,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                 }
             }
 
-            if (FeatureFlags.enableSplitContextually()) {
-                handleSplitAnimationGoingToHome(LAUNCHER_SPLIT_SELECTION_EXIT_HOME);
-            }
+            handleSplitAnimationGoingToHome(LAUNCHER_SPLIT_SELECTION_EXIT_HOME);
             mOverlayManager.hideOverlay(isStarted());
             handleGestureContract(intent);
         } else if (Intent.ACTION_ALL_APPS.equals(intent.getAction())) {
@@ -2596,25 +2602,12 @@ public class Launcher extends StatefulActivity<LauncherState>
         mModelCallbacks.bindIncrementalDownloadProgressUpdated(app);
     }
 
-    @Override
-    public void bindWidgetsRestored(ArrayList<LauncherAppWidgetInfo> widgets) {
-        mModelCallbacks.bindWidgetsRestored(widgets);
-    }
-
     /**
      * See {@code LauncherBindingDelegate}
      */
     @Override
-    public void bindWorkspaceItemsChanged(List<WorkspaceItemInfo> updated) {
-        mModelCallbacks.bindWorkspaceItemsChanged(updated);
-    }
-
-    /**
-     * See {@code LauncherBindingDelegate}
-     */
-    @Override
-    public void bindRestoreItemsChange(HashSet<ItemInfo> updates) {
-        mModelCallbacks.bindRestoreItemsChange(updates);
+    public void bindItemsUpdated(Set<ItemInfo> updates) {
+        mModelCallbacks.bindItemsUpdated(updates);
     }
 
     /**
@@ -2849,12 +2842,6 @@ public class Launcher extends StatefulActivity<LauncherState>
      */
     public void onStateTransitionCompletedAfterSwipeToHome(LauncherState finalState) {
         // Overridden
-    }
-
-    @Override
-    public void returnToHomescreen() {
-        super.returnToHomescreen();
-        getStateManager().goToState(LauncherState.NORMAL);
     }
 
     public void closeOpenViews() {
@@ -3179,6 +3166,11 @@ public class Launcher extends StatefulActivity<LauncherState>
     @Nullable
     public ArrowPopup<?> getOptionsPopup() {
         return findViewById(R.id.popup_container);
+    }
+
+    @Override
+    public OnClickListener getItemOnClickListener() {
+        return ItemClickHandler.INSTANCE;
     }
 
     // End of Getters and Setters

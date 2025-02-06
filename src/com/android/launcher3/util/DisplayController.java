@@ -53,9 +53,13 @@ import com.android.launcher3.InvariantDeviceProfile.DeviceType;
 import com.android.launcher3.LauncherPrefChangeListener;
 import com.android.launcher3.LauncherPrefs;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.dagger.ApplicationContext;
+import com.android.launcher3.dagger.LauncherAppComponent;
+import com.android.launcher3.dagger.LauncherAppSingleton;
 import com.android.launcher3.logging.FileLog;
 import com.android.launcher3.util.window.CachedDisplayInfo;
 import com.android.launcher3.util.window.WindowManagerProxy;
+import com.android.launcher3.util.window.WindowManagerProxy.DesktopVisibilityListener;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -65,12 +69,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import javax.inject.Inject;
 
 /**
  * Utility class to cache properties of default display to avoid a system RPC on every call.
  */
 @SuppressLint("NewApi")
-public class DisplayController implements ComponentCallbacks, SafeCloseable {
+@LauncherAppSingleton
+public class DisplayController implements ComponentCallbacks,
+        DesktopVisibilityListener {
 
     private static final String TAG = "DisplayController";
     private static final boolean DEBUG = false;
@@ -80,8 +89,8 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     // TODO(b/254119092) remove all logs with this tag
     public static final String TASKBAR_NOT_DESTROYED_TAG = "b/254119092";
 
-    public static final MainThreadInitializedObject<DisplayController> INSTANCE =
-            new MainThreadInitializedObject<>(DisplayController::new);
+    public static final DaggerSingletonObject<DisplayController> INSTANCE =
+            new DaggerSingletonObject<>(LauncherAppComponent::getDisplayController);
 
     public static final int CHANGE_ACTIVE_SCREEN = 1 << 0;
     public static final int CHANGE_ROTATION = 1 << 1;
@@ -99,14 +108,15 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     private static final String TARGET_OVERLAY_PACKAGE = "android";
 
     private final Context mContext;
-    private final DisplayManager mDM;
+    private final WindowManagerProxy mWMProxy;
 
     // Null for SDK < S
     private final Context mWindowContext;
 
     // The callback in this listener updates DeviceProfile, which other listeners might depend on
     private DisplayInfoChangeListener mPriorityListener;
-    private final ArrayList<DisplayInfoChangeListener> mListeners = new ArrayList<>();
+    private final CopyOnWriteArrayList<DisplayInfoChangeListener> mListeners =
+            new CopyOnWriteArrayList<>();
 
     // We will register broadcast receiver on main thread to ensure not missing changes on
     // TARGET_OVERLAY_PACKAGE and ACTION_OVERLAY_CHANGED.
@@ -116,48 +126,52 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     private Info mInfo;
     private boolean mDestroyed = false;
 
-    private LauncherPrefChangeListener mTaskbarPinningPreferenceChangeListener;
-
-    @VisibleForTesting
-    protected DisplayController(Context context) {
+    @Inject
+    protected DisplayController(@ApplicationContext Context context,
+            WindowManagerProxy wmProxy,
+            LauncherPrefs prefs,
+            DaggerSingletonTracker lifecycle) {
         mContext = context;
-        mDM = context.getSystemService(DisplayManager.class);
+        mWMProxy = wmProxy;
 
         if (enableTaskbarPinning()) {
-            attachTaskbarPinningSharedPreferenceChangeListener(mContext);
+            LauncherPrefChangeListener prefListener = key -> {
+                boolean isTaskbarPinningChanged = TASKBAR_PINNING_KEY.equals(key)
+                        && mInfo.mIsTaskbarPinned != prefs.get(TASKBAR_PINNING);
+                boolean isTaskbarPinningDesktopModeChanged =
+                        TASKBAR_PINNING_DESKTOP_MODE_KEY.equals(key)
+                                && mInfo.mIsTaskbarPinnedInDesktopMode != prefs.get(
+                                TASKBAR_PINNING_IN_DESKTOP_MODE);
+                if (isTaskbarPinningChanged || isTaskbarPinningDesktopModeChanged) {
+                    notifyConfigChange();
+                }
+            };
+
+            prefs.addListener(prefListener, TASKBAR_PINNING);
+            prefs.addListener(prefListener, TASKBAR_PINNING_IN_DESKTOP_MODE);
+            lifecycle.addCloseable(() -> prefs.removeListener(
+                        prefListener, TASKBAR_PINNING, TASKBAR_PINNING_IN_DESKTOP_MODE));
         }
 
-        Display display = mDM.getDisplay(DEFAULT_DISPLAY);
+        Display display = context.getSystemService(DisplayManager.class)
+                .getDisplay(DEFAULT_DISPLAY);
         mWindowContext = mContext.createWindowContext(display, TYPE_APPLICATION, null);
         mWindowContext.registerComponentCallbacks(this);
 
         // Initialize navigation mode change listener
         mReceiver.registerPkgActions(mContext, TARGET_OVERLAY_PACKAGE, ACTION_OVERLAY_CHANGED);
 
-        WindowManagerProxy wmProxy = WindowManagerProxy.INSTANCE.get(context);
         mInfo = new Info(mWindowContext, wmProxy,
                 wmProxy.estimateInternalDisplayBounds(mWindowContext));
+        wmProxy.registerDesktopVisibilityListener(this);
         FileLog.i(TAG, "(CTOR) perDisplayBounds: " + mInfo.mPerDisplayBounds);
-    }
 
-    private void attachTaskbarPinningSharedPreferenceChangeListener(Context context) {
-        mTaskbarPinningPreferenceChangeListener = key -> {
-            LauncherPrefs prefs = LauncherPrefs.get(mContext);
-            boolean isTaskbarPinningChanged = TASKBAR_PINNING_KEY.equals(key)
-                    && mInfo.mIsTaskbarPinned != prefs.get(TASKBAR_PINNING);
-            boolean isTaskbarPinningDesktopModeChanged =
-                    TASKBAR_PINNING_DESKTOP_MODE_KEY.equals(key)
-                            && mInfo.mIsTaskbarPinnedInDesktopMode != prefs.get(
-                            TASKBAR_PINNING_IN_DESKTOP_MODE);
-            if (isTaskbarPinningChanged || isTaskbarPinningDesktopModeChanged) {
-                notifyConfigChange();
-            }
-        };
-
-        LauncherPrefs.get(context).addListener(
-                mTaskbarPinningPreferenceChangeListener, TASKBAR_PINNING);
-        LauncherPrefs.get(context).addListener(
-                mTaskbarPinningPreferenceChangeListener, TASKBAR_PINNING_IN_DESKTOP_MODE);
+        lifecycle.addCloseable(() -> {
+            mDestroyed = true;
+            mWindowContext.unregisterComponentCallbacks(this);
+            mReceiver.unregisterReceiverSafely(mContext);
+            wmProxy.unregisterDesktopVisibilityListener(this);
+        });
     }
 
     /**
@@ -207,20 +221,8 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
     }
 
     @Override
-    public void close() {
-        mDestroyed = true;
-        if (enableTaskbarPinning()) {
-            LauncherPrefs.get(mContext).removeListener(
-                    mTaskbarPinningPreferenceChangeListener, TASKBAR_PINNING);
-            LauncherPrefs.get(mContext).removeListener(
-                    mTaskbarPinningPreferenceChangeListener, TASKBAR_PINNING_IN_DESKTOP_MODE);
-        }
-        if (mWindowContext != null) {
-            mWindowContext.unregisterComponentCallbacks(this);
-        } else {
-            // TODO: unregister broadcast receiver
-        }
-        mReceiver.unregisterReceiverSafely(mContext);
+    public void onDesktopVisibilityChanged(boolean visible) {
+        notifyConfigChange();
     }
 
     /**
@@ -256,7 +258,7 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
                 || !mInfo.mScreenSizeDp.equals(
                         new PortraitSize(config.screenHeightDp, config.screenWidthDp))
                 || mWindowContext.getDisplay().getRotation() != mInfo.rotation
-                || WindowManagerProxy.INSTANCE.get(mContext).showLockedTaskbarOnHome(mWindowContext)
+                || mWMProxy.showLockedTaskbarOnHome(mWindowContext)
                         != mInfo.showLockedTaskbarOnHome()) {
             notifyConfigChange();
         }
@@ -283,17 +285,16 @@ public class DisplayController implements ComponentCallbacks, SafeCloseable {
 
     @AnyThread
     public void notifyConfigChange() {
-        WindowManagerProxy wmProxy = WindowManagerProxy.INSTANCE.get(mContext);
         Info oldInfo = mInfo;
 
         Context displayInfoContext = mWindowContext;
-        Info newInfo = new Info(displayInfoContext, wmProxy, oldInfo.mPerDisplayBounds);
+        Info newInfo = new Info(displayInfoContext, mWMProxy, oldInfo.mPerDisplayBounds);
 
         if (newInfo.densityDpi != oldInfo.densityDpi || newInfo.fontScale != oldInfo.fontScale
                 || newInfo.getNavigationMode() != oldInfo.getNavigationMode()) {
             // Cache may not be valid anymore, recreate without cache
-            newInfo = new Info(displayInfoContext, wmProxy,
-                    wmProxy.estimateInternalDisplayBounds(displayInfoContext));
+            newInfo = new Info(displayInfoContext, mWMProxy,
+                    mWMProxy.estimateInternalDisplayBounds(displayInfoContext));
         }
 
         int change = 0;

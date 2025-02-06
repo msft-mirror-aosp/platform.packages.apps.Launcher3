@@ -36,6 +36,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
+import android.util.Log;
 import android.util.Property;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
@@ -49,8 +50,8 @@ import com.android.launcher3.anim.AnimatedFloat;
 import com.android.launcher3.anim.AnimatorListeners;
 import com.android.launcher3.celllayout.CellLayoutLayoutParams;
 import com.android.launcher3.celllayout.DelegatedCellDrawing;
+import com.android.launcher3.graphics.IconShape;
 import com.android.launcher3.icons.FastBitmapDrawable;
-import com.android.launcher3.icons.GraphicsUtils;
 import com.android.launcher3.icons.IconNormalizer;
 import com.android.launcher3.icons.LauncherIcons;
 import com.android.launcher3.model.data.ItemInfoWithIcon;
@@ -110,6 +111,8 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
     private boolean mForceHideRing = false;
     private Animator mRingScaleAnim;
 
+    private int mWidth;
+
     private static final FloatProperty<PredictedAppIcon> SLOT_MACHINE_TRANSLATION_Y =
             new FloatProperty<PredictedAppIcon>("slotMachineTranslationY") {
         @Override
@@ -139,7 +142,7 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
         int shadowSize = context.getResources().getDimensionPixelSize(
                 R.dimen.blur_size_thin_outline);
         mShadowFilter = new BlurMaskFilter(shadowSize, BlurMaskFilter.Blur.OUTER);
-        mShapePath = GraphicsUtils.getShapePath(context, mNormalizedIconSize);
+        mShapePath = IconShape.INSTANCE.get(context).getShape().getPath(mNormalizedIconSize);
     }
 
     @Override
@@ -211,7 +214,7 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
         boolean animate = shouldAnimateIconChange(info);
         Drawable oldIcon = getIcon();
         int oldPlateColor = mPlateColor.currentColor;
-        applyFromWorkspaceItem(info, null);
+        applyFromWorkspaceItem(info);
 
         setContentDescription(
                 mIsPinned ? info.contentDescription :
@@ -300,7 +303,13 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
     }
 
     private int getOutlineOffsetX() {
-        return (getMeasuredWidth() - mNormalizedIconSize) / 2;
+        int measuredWidth = getMeasuredWidth();
+        if (mDisplay != DISPLAY_TASKBAR) {
+            Log.d("b/387844520", "getOutlineOffsetX: measured width = " + measuredWidth
+                    + ", mNormalizedIconSize = " + mNormalizedIconSize
+                    + ", last updated width = " + mWidth);
+        }
+        return (mWidth - mNormalizedIconSize) / 2;
     }
 
     private int getOutlineOffsetY() {
@@ -313,7 +322,11 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        mWidth = w;
         mSlotIconBound.offsetTo((w - getIconSize()) / 2, (h - getIconSize()) / 2);
+        if (mDisplay != DISPLAY_TASKBAR) {
+            Log.d("b/387844520", "calling updateRingPath from onSizeChanged");
+        }
         updateRingPath();
     }
 
@@ -325,6 +338,7 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
 
     private void updateRingPath() {
         mRingPath.reset();
+        mTmpMatrix.reset();
         mTmpMatrix.setTranslate(getOutlineOffsetX(), getOutlineOffsetY());
         mRingPath.addPath(mShapePath, mTmpMatrix);
 
@@ -339,6 +353,7 @@ public class PredictedAppIcon extends DoubleShadowBubbleTextView {
             mTmpMatrix.preTranslate(-mNormalizedIconSize, -mNormalizedIconSize);
             mRingPath.addPath(mShapePath, mTmpMatrix);
         }
+        invalidate();
     }
 
     @Override

@@ -718,12 +718,14 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
     }
 
     /**
-     * Queues the given callback to be run once {@code mPageScrolls} has been initialized.
+     * Run the given `callback` immediately once {@code mPageScrolls} has been initialized,
+     * otherwise queue the callback to `mOnPageScrollsInitializedCallbacks`.
      */
     public void runOnPageScrollsInitialized(Runnable callback) {
-        mOnPageScrollsInitializedCallbacks.add(callback);
         if (isPageScrollsInitialized()) {
-            onPageScrollsInitialized();
+            callback.run();
+        } else {
+            mOnPageScrollsInitializedCallbacks.add(callback);
         }
     }
 
@@ -903,14 +905,12 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
     @Override
     public void onViewAdded(View child) {
         super.onViewAdded(child);
-        mPageScrolls = null;
         dispatchPageCountChanged();
     }
 
     @Override
     public void onViewRemoved(View child) {
         super.onViewRemoved(child);
-        mPageScrolls = null;
         runOnPageScrollsInitialized(() -> {
             mCurrentPage = validateNewPage(mCurrentPage);
             mCurrentScrollOverPage = mCurrentPage;
