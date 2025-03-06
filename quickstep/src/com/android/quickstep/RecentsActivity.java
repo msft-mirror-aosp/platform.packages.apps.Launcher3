@@ -364,14 +364,6 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
     }
 
     @Override
-    public void onUiChangedWhileSleeping() {
-        super.onUiChangedWhileSleeping();
-        // Dismiss recents and navigate to home if the device goes to sleep
-        // while in recents.
-        startHome();
-    }
-
-    @Override
     protected void onResume() {
         super.onResume();
         AccessibilityManagerCompat.sendStateEventToTest(getBaseContext(), OVERVIEW_STATE_ORDINAL);
@@ -552,12 +544,6 @@ public final class RecentsActivity extends StatefulActivity<RecentsState> implem
     public boolean canStartHomeSafely() {
         OverviewCommandHelper overviewCommandHelper = mTISBindHelper.getOverviewCommandHelper();
         return overviewCommandHelper == null || overviewCommandHelper.canStartHomeSafely();
-    }
-
-    @NonNull
-    @Override
-    public TISBindHelper getTISBindHelper() {
-        return mTISBindHelper;
     }
 
     @Override

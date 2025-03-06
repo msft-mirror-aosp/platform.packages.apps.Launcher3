@@ -34,7 +34,6 @@ import com.android.launcher3.logging.StatsLogManager.LauncherEvent.LAUNCHER_LAUN
 import com.android.quickstep.BaseContainerInterface
 import com.android.quickstep.DeviceConfigWrapper
 import com.android.quickstep.OverviewComponentObserver
-import com.android.quickstep.RecentsAnimationDeviceState
 import com.android.quickstep.SystemUiProxy
 import com.android.quickstep.TopTaskTracker
 import com.android.quickstep.views.RecentsView
@@ -162,7 +161,11 @@ internal constructor(
             statsLogManager.logger().log(LAUNCHER_LAUNCH_OMNI_FAILED_NOT_AVAILABLE)
             return false
         }
-
+        if (isFakeLandscape()) {
+            // TODO (b/383421642): Fake landscape is to be removed in 25Q3 and this entire block
+            // can be removed when that happens.
+            return false
+        }
         return true
     }
 
@@ -198,6 +201,13 @@ internal constructor(
         return true
     }
 
+    private fun isFakeLandscape(): Boolean =
+        getRecentsContainerInterface()
+            ?.getCreatedContainer()
+            ?.getOverviewPanel<RecentsView<*, *>>()
+            ?.getPagedOrientationHandler()
+            ?.isLayoutNaturalToLauncher == false
+
     private fun isInSplitscreen(): Boolean {
         return topTaskTracker.getRunningSplitTaskIds().isNotEmpty()
     }
@@ -212,14 +222,7 @@ internal constructor(
 
     @VisibleForTesting
     fun getRecentsContainerInterface(): BaseContainerInterface<*, *>? {
-        val rads = RecentsAnimationDeviceState(context)
-        val observer = OverviewComponentObserver(context, rads)
-        try {
-            return observer.containerInterface
-        } finally {
-            observer.onDestroy()
-            rads.destroy()
-        }
+        return OverviewComponentObserver.INSTANCE.get(context).containerInterface
     }
 
     /**
